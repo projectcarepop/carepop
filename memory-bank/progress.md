@@ -27,11 +27,16 @@
     *   Added Winston for structured logging with Cloud Logging integration (`carepop-backend/src/utils/logger.ts`).
     *   Updated Supabase client config (`carepop-backend/src/config/supabaseClient.ts`) to load secrets from GCP Secret Manager (in GCP) or `.env` (local).
     *   Created basic backend entrypoint (`carepop-backend/src/server.ts`) demonstrating usage.
+*   FOUND-5: Configure CI/CD Pipeline (Backend Part):
+    *   Created `carepop-backend/Dockerfile` for containerization.
+    *   Configured GCP Artifact Registry (`carepop-images`).
+    *   Set up GitHub Actions Workload Identity Federation for GCP auth.
+    *   Created `.github/workflows/deploy-backend-staging.yml` to build/push/deploy backend to Cloud Run on `main` branch pushes.
 
 ## What's Left to Build (High Level - Based on Epics/Phases)
 
 *   **Phase 1 (MVP):**
-    *   Core platform foundation (FOUND-5 CI/CD, FOUND-6 Testing - Epic 1 tickets).
+    *   Core platform foundation (FOUND-5 FE/Supabase CI/CD?, FOUND-6 Testing - Epic 1 tickets).
     *   User Management (Auth UI, Profile - Epic 1/2 tickets).
     *   Basic Appointment Scheduling (Epic 2 tickets).
     *   Basic Provider Directory (Epic 2 tickets, Web SEO setup).

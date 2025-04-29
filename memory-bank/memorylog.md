@@ -8,4 +8,5 @@
 *   **Timestamp:** 2024-05-21T10:XX:XXZ (Placeholder) - **Action:** Completed FOUND-3: Provisioned core staging infrastructure (Supabase Project, GCP Cloud Run placeholder, GCP Secret Manager for keys, Cloud Logging confirmed). Staging Cloud Run URL: https://carepop-backend-staging-199126225625.asia-southeast1.run.app
 *   **Timestamp:** 2024-05-21T11:XX:XXZ (Placeholder) - **Action:** Conceptual Commit Point: FOUND-3 (Core Staging Infrastructure) completed and approved.
 *   **Timestamp:** 2024-05-21T11:YY:YYZ (Placeholder) - **Action:** Completed FOUND-4: Implemented structured logging (Winston + Cloud Logging) and configuration management (GCP Secret Manager / .env fallback) in backend.
-*   **Timestamp:** 2024-05-21T11:ZZ:ZZZ (Placeholder) - **Action:** Conceptual Commit Point: FOUND-4 (Logging & Config) completed and approved. 
+*   **Timestamp:** 2024-05-21T11:ZZ:ZZZ (Placeholder) - **Action:** Conceptual Commit Point: FOUND-4 (Logging & Config) completed and approved.
+*   **Timestamp:** 2024-05-21T12:AA:AAZ (Placeholder) - **Action:** Completed FOUND-5 (Backend Part): Created backend Dockerfile, configured Artifact Registry, and set up GitHub Actions workflow (`deploy-backend-staging.yml`) for CI/CD to Cloud Run staging service using Workload Identity Federation. 

@@ -2,29 +2,30 @@
 
 ## Current Work Focus
 
-*   **Active Ticket:** FOUND-5: Configure CI/CD Pipeline (Build, Test, Deploy to Staging) (Cloud Run & Supabase).
-*   **Current Goal:** Set up an initial CI/CD pipeline (e.g., GitHub Actions) to automate linting, testing (basic), building Docker images for the backend, and deploying to the staging Cloud Run service.
+*   **Active Ticket:** FOUND-6: Set up Basic Testing Frameworks & Initial Unit Tests.
+*   **Current Goal:** Integrate Jest (or similar) into frontend and backend projects. Write minimal initial unit tests to verify setup and integration with the CI pipeline (`deploy-backend-staging.yml`).
 
 ## Current Focus
 
 *   Completing foundational setup tasks (Epic 1).
-*   Currently transitioning from **FOUND-2 (Basic Dev Env Setup)** to **FOUND-3 (Setup Supabase Project & Basic Schema)**.
+*   Just completed setting up the initial backend CI/CD pipeline (`FOUND-5` backend part).
 
 ## Recent Changes
 
-*   Created initial versions of `projectbrief.md`, `productContext.md`, `systemPatterns.md`, `techContext.md`, `activeContext.md`, and `progress.md`.
-*   Completed FOUND-1: Established initial project directory structure and placeholder files for `carepop-frontend` and `carepop-backend`.
-*   Completed FOUND-2: Configured basic development environments for frontend (React Native/TS) and backend (Node/TS), including dependency installation, TS config, basic scripts, and Supabase client initialization.
+*   Completed FOUND-3: Staging infrastructure setup (Supabase, Cloud Run, Secret Manager).
+*   Completed FOUND-4: Implemented backend structured logging (Winston/Cloud Logging) and configuration loading (Secret Manager/.env).
+*   Completed FOUND-5 (Backend Part): Added `carepop-backend/Dockerfile` and `.github/workflows/deploy-backend-staging.yml` for automated deployment to Cloud Run.
+*   Pushed all changes up to FOUND-5 (Backend Part) to GitHub `main` branch.
 
 ## Next Steps
 
-*   Begin work on **FOUND-3: Setup Supabase Project & Basic Schema**. This includes:
-    *   Creating the Supabase project (if not already done).
-    *   Configuring basic project settings (Auth, APIs).
-    *   Defining initial database schema (e.g., `users`, `profiles` tables) via Supabase Studio UI or SQL migrations.
-    *   Setting up basic RLS policies.
-*   Review the initialized Memory Bank files for accuracy and completeness based on the source documents.
-*   Address the Task Master AI initialization/parsing issues (API key error) or proceed with manual task creation based on `Epic and Tickets Tracker.txt`.
+*   Monitor the first run of the `deploy-backend-staging.yml` workflow in GitHub Actions.
+*   Begin work on **FOUND-6: Set up Basic Testing Frameworks & Initial Unit Tests**.
+    *   Install Jest and necessary types/presets for `carepop-backend`.
+    *   Install Jest and React Native Testing Library for `carepop-frontend`.
+    *   Configure Jest in both projects.
+    *   Add basic unit tests.
+    *   Update CI workflow to include a test step.
 
 ## Active Decisions & Considerations
 
@@ -47,6 +48,7 @@
 *   Prioritize security and compliance (DPA mandatory, HIPAA strategic).
 *   User-centered and inclusive design.
 *   Cross-platform development using React Native CLI.
+*   **CI/CD:** GitHub Actions workflow (`.github/workflows/deploy-backend-staging.yml`) handles backend build and deployment to Cloud Run staging via Workload Identity Federation.
 
 ## Learnings & Insights
 
