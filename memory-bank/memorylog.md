@@ -42,3 +42,7 @@
 *   **Timestamp:** <placeholder_timestamp> - **Action:** Updated `supabaseClient.ts` to initialize and export a second client (`supabaseServiceRole`) using the service role key.
 *   **Timestamp:** <placeholder_timestamp> - **Action:** Updated `authService.ts` to use `supabaseServiceRole` client for the profile insert operation.
 *   **Timestamp:** <placeholder_timestamp> - **Action:** Added `SUPABASE_SERVICE_ROLE_KEY` to local `.env` file. Restarted backend. Successful user registration and profile creation confirmed.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Manually verified RLS policies (individual read/update) via SQL Editor - Passed.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Committed and pushed fixes for profile creation and RLS verification.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Memory Bank update process completed after successful implementation and verification of user registration, profile creation, and basic RLS.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Corrected Memory Bank references to non-existent FOUND-11 ticket; clarified Profile Update belongs to Epic 4.

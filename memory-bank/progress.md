@@ -3,48 +3,46 @@
 ## Current Status
 
 *   Project initialized.
-*   Initial Memory Bank files created based on context documents (`PRD`, `Technical Spike`, `Brainstorming`, `Epic Tracker`).
-*   Task Master AI tools encountered errors (API key issue), preventing automated task generation from PRD or Epic Tracker.
+*   Foundational infrastructure (GCP, Supabase), CI/CD, logging, config management, and testing frameworks are set up (FOUND-1 to FOUND-6).
+*   User registration (FOUND-9) and login (FOUND-10) backend endpoints implemented and functional.
+*   `profiles` table created and basic RLS policies implemented and verified (FOUND-8).
+*   Profile creation is now successfully linked to the registration process.
 
 ## What Works
 
-*   Basic project structure exists (implicitly, via Memory Bank creation).
-*   Core requirements and technical direction documented in Memory Bank.
-*   FOUND-1: Initial project structure (`carepop-frontend`, `carepop-backend` folders, basic files, `.gitignore`) created.
-*   FOUND-2: Basic Dev Env Setup:
-    *   `package.json` initialized for frontend and backend.
-    *   Core dependencies installed (React Native, Node, TS, Supabase client, dotenv).
-    *   `tsconfig.json` configured for both.
-    *   Basic run/dev/build scripts added.
-    *   Backend Supabase client configured (`src/config/supabaseClient.ts`) reading from `.env`.
-*   FOUND-3: Core Cloud Infrastructure (Staging):
-    *   Supabase project (`carepop-staging`) provisioned.
-    *   GCP project selected, APIs enabled (Cloud Run, Secret Manager, Logging).
-    *   Placeholder Cloud Run service (`carepop-backend-staging`) created.
-    *   Supabase credentials stored in GCP Secret Manager.
-    *   Basic Cloud Logging confirmed.
-*   FOUND-4: Structured Logging & Configuration Management:
-    *   Added Winston for structured logging with Cloud Logging integration (`carepop-backend/src/utils/logger.ts`).
-    *   Updated Supabase client config (`carepop-backend/src/config/supabaseClient.ts`) to load secrets from GCP Secret Manager (in GCP) or `.env` (local).
-    *   Created basic backend entrypoint (`carepop-backend/src/server.ts`) demonstrating usage.
-*   FOUND-5: Configure CI/CD Pipeline (Backend Part):
-    *   Created `carepop-backend/Dockerfile` for containerization.
-    *   Configured GCP Artifact Registry (`carepop-images`).
-    *   Set up GitHub Actions Workload Identity Federation for GCP auth.
-    *   Created `.github/workflows/deploy-backend-staging.yml` to build/push/deploy backend to Cloud Run on `main` branch pushes.
-    *   **Successfully deployed to Cloud Run staging via CI/CD.**
-*   FOUND-6: Configure Testing Frameworks:
-    *   Installed and configured Jest for backend (`ts-jest`) and frontend (`react-native` preset).
-    *   Installed `react-native-testing-library` and `@testing-library/jest-native` for frontend component testing.
-    *   Added basic test files and `test` scripts to both packages.
+*   Basic project structure exists.
+*   FOUND-1: Initial project structure created.
+*   FOUND-2: Basic Dev Env Setup completed.
+*   FOUND-3: Core Cloud Infrastructure (Staging) provisioned.
+*   FOUND-4: Structured Logging & Configuration Management implemented.
+*   FOUND-5: Backend CI/CD Pipeline configured and working.
+*   FOUND-6: Testing Frameworks configured.
+*   FOUND-8: Profiles Table & Basic RLS:
+    *   `profiles` table schema defined and migrated.
+    *   Basic RLS policies (`Allow individual read/update/insert`) implemented and **verified** via SQL Editor tests.
+*   FOUND-9: Secure User Registration Endpoint:
+    *   Backend endpoint `/api/auth/register` implemented using Express and `authService`.
+    *   Successfully calls `supabase.auth.signUp`.
+    *   Successfully creates a corresponding `profiles` table entry using the `service_role` client to bypass RLS.
+    *   Functionality confirmed via Postman testing.
+*   FOUND-10: Secure User Login Endpoint:
+    *   Backend endpoint `/api/auth/login` implemented using Express and `authService`.
+    *   Successfully calls `supabase.auth.signInWithPassword`.
+    *   Returns JWT session/user data on success.
+    *   Functionality confirmed via Postman testing.
+*   Backend Configuration (`supabaseClient.ts`):
+    *   Successfully loads credentials from GCP Secret Manager or local `.env`.
+    *   Initializes both `anon` and `service_role` Supabase clients.
 
 ## What's Left to Build (High Level - Based on Epics/Phases)
 
 *   **Phase 1 (MVP):**
-    *   User Management (AUTH-1 Initial Setup, Auth UI, Profile - Epic 1/2 tickets).
+    *   User Management (AUTH-1 RLS refinement - Epic 3, Auth UI - Epic 2).
+    *   Profile Management (View/Update - Epic 4).
     *   Basic Appointment Scheduling (Epic 2 tickets).
     *   Basic Provider Directory (Epic 2 tickets, Web SEO setup).
-    *   Foundational Security/Compliance (Consent mechanism, initial RLS - Epic 3 tickets).
+    *   Foundational Security/Compliance (Further RLS, Consent mechanism - Epic 3 tickets).
+    *   Frontend integration for Auth/Profile.
 *   **Phase 2 (Core Feature Expansion):**
     *   Health Records/Labs integration.
     *   Advanced Appointment features (reminders).
@@ -52,7 +50,7 @@
     *   Initial Reporting (non-sensitive).
     *   Basic Admin UI.
     *   Robust Application Encryption implementation.
-    *   Solidified RLS policies.
+    *   Solidified RLS policies for providers/relationships.
 *   **Phase 3 (Advanced Features):**
     *   AI Health Assessment (low-risk).
     *   Pill/Menstrual Trackers.
@@ -61,12 +59,14 @@
     *   Full Compliance posture hardening.
     *   Performance Tuning / Advanced SEO.
 
-*(Refer to `Epic and Tickets Tracker.txt` for detailed task breakdown)*
+*(Refer to `Epic and Tickets Tracker.txt` or `epics_and_tickets.md` for detailed task breakdown)*
 
 ## Known Issues
 
-*   Task Master AI `parse_prd` tool fails due to API key authentication error.
-*   Task Master AI `add_task` tool fails because `tasks.json` doesn't exist (due to `parse_prd` failure).
+*   Task Master AI `parse_prd` / `add_task` tools fail due to API key authentication error (Low Priority).
+*   ~~Profile creation failed after registration due to schema mismatch (`consent_given`)~~ - **Resolved.**
+*   ~~Profile creation failed after registration due to RLS violation~~ - **Resolved by using service_role client.**
+*   ~~Supabase client initialization failed locally due to missing `SUPABASE_SERVICE_ROLE_KEY` in `.env`~~ - **Resolved.**
 
 ## Evolution of Project Decisions
 
@@ -74,4 +74,6 @@
 *   Decision made to prioritize React Native CLI over Expo for long-term flexibility.
 *   Decision made to recommend Redux Toolkit for state management due to complexity.
 *   Decision made that application-level encryption (AES-256-GCM) is mandatory for SPI/PHI before storage in Supabase.
-*   Decision made that SSR/SSG is required for public web pages. 
+*   Decision made that SSR/SSG is required for public web pages.
+*   Decision to handle auth via backend endpoints instead of direct frontend calls.
+*   **Decision:** Use `service_role` Supabase client for server-side operations that need to bypass user RLS (e.g., profile creation post-signup). 
