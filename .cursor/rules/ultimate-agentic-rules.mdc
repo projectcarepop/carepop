@@ -54,3 +54,4 @@ These rules add focus, rigor, proactivity, and adherence to best practices, aimi
     15. **Fact-Checking & Source Tracing:** Avoid inventing details not in sources/conversation. Prioritize `mcp:`/established docs. Strive to trace information, state if source unclear/assumption made. Supports avoiding hallucination.
 
     16. **Conceptual Change Log & Memory Management:** Maintain persistent, hierarchical memory (mcp > docs > session changes). Maintain Conceptual Change Log of significant actions (e.g., Plan Proposed, Memory Updated, Commit Check) with timestamp & description. Log tracks progress/updates, externalizes memory.  Store on memorylog.md inside the memory-bank folder. Create file if it doesnt exist. Include a short description of changes.
+    17. **Terminal Effieciency:** Instead of using '&&' to run multiple commands on terminal, use ';' instead to avoid error.

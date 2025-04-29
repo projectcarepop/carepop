@@ -45,10 +45,11 @@
 
 *   **Source Control:** Git (GitHub/GitLab repositories for frontend and backend).
 *   **Package Management:** npm or yarn.
-*   **CI/CD:** To be configured (e.g., GitHub Actions, GitLab CI) to build, test, and deploy frontend artifacts and backend Cloud Run services/Supabase Functions.
-*   **Testing:** Frameworks needed (e.g., Jest, React Native Testing Library for frontend; Jest/Mocha for backend).
+*   **CI/CD:** GitHub Actions for backend deployment to Cloud Run staging.
+*   **Testing:** Jest selected for both backend (with `ts-jest`) and frontend (with `react-native-testing-library`).
 *   **Local Development:** Scripts required to run frontend (web/mobile dev servers) and backend (Node.js server simulating Cloud Run).
 *   **Debugging:** Flipper, Reactotron (Frontend); Standard Node.js debugging tools, Cloud Logging/Monitoring (Backend).
+*   **Secrets:** GCP Secret Manager for cloud credentials, `.env` for local development.
 
 ## 5. Key Third-Party Services (Requires Vetting)
 

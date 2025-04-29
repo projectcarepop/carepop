@@ -2,33 +2,36 @@
 
 ## Current Work Focus
 
-*   **Active Ticket:** FOUND-6: Set up Basic Testing Frameworks & Initial Unit Tests.
-*   **Current Goal:** Integrate Jest (or similar) into frontend and backend projects. Write minimal initial unit tests to verify setup and integration with the CI pipeline (`deploy-backend-staging.yml`).
+*   **Active Epic:** Epic 1: Core Platform & Foundational Setup
+*   **Active Ticket:** FOUND-6: Configure Testing Frameworks (Unit/Integration)
 
 ## Current Focus
 
 *   Completing foundational setup tasks (Epic 1).
 *   Just completed setting up the initial backend CI/CD pipeline (`FOUND-5` backend part).
 
-## Recent Changes
+## Recent Changes & Decisions
 
-*   Completed FOUND-3: Staging infrastructure setup (Supabase, Cloud Run, Secret Manager).
-*   Completed FOUND-4: Implemented backend structured logging (Winston/Cloud Logging) and configuration loading (Secret Manager/.env).
-*   Completed FOUND-5 (Backend Part): Added `carepop-backend/Dockerfile` and `.github/workflows/deploy-backend-staging.yml` for automated deployment to Cloud Run.
-*   Pushed all changes up to FOUND-5 (Backend Part) to GitHub `main` branch.
+*   Completed **FOUND-5:** Backend CI/CD pipeline setup.
+    *   Successfully configured GitHub Actions workflow (`deploy-backend-staging.yml`).
+    *   Utilized Workload Identity Federation for GCP authentication.
+    *   Troubleshooted and resolved issues related to OIDC audience and GCP attribute mapping.
+    *   Backend container is now automatically built, pushed to Artifact Registry, and deployed to Cloud Run staging on `main` branch pushes.
+*   Resolved local Git state inconsistencies that prevented changes to the workflow file from being detected by `git status`.
 
 ## Next Steps
 
-*   Monitor the first run of the `deploy-backend-staging.yml` workflow in GitHub Actions.
-*   Begin work on **FOUND-6: Set up Basic Testing Frameworks & Initial Unit Tests**.
-    *   Install Jest and necessary types/presets for `carepop-backend`.
-    *   Install Jest and React Native Testing Library for `carepop-frontend`.
-    *   Configure Jest in both projects.
-    *   Add basic unit tests.
-    *   Update CI workflow to include a test step.
+*   **Immediate:**
+    *   Begin work on **FOUND-6**:
+        *   Research and select appropriate testing libraries for backend (e.g., Jest, Vitest) and frontend (e.g., Jest, React Native Testing Library).
+        *   Configure chosen frameworks in both `carepop-backend` and `carepop-frontend`.
+        *   Write initial placeholder unit tests for key components (e.g., Supabase client connection, logger util).
 
 ## Active Decisions & Considerations
 
+*   **Decision:** Use **Jest** as the testing framework for both backend (Node.js/TypeScript) and frontend (React Native) for consistency.
+    *   Backend will use `ts-jest` for TypeScript integration.
+    *   Frontend will use Jest with `react-native-testing-library` for component testing.
 *   Confirming the Supabase + Google Cloud Run hybrid architecture.
 *   Verifying the multi-layered access control strategy (Supabase RLS + Cloud Run checks).
 *   Acknowledging the critical need for application-level encryption (AES-256-GCM) for SPI/PHI.

@@ -32,11 +32,12 @@
     *   Configured GCP Artifact Registry (`carepop-images`).
     *   Set up GitHub Actions Workload Identity Federation for GCP auth.
     *   Created `.github/workflows/deploy-backend-staging.yml` to build/push/deploy backend to Cloud Run on `main` branch pushes.
+    *   **Successfully deployed to Cloud Run staging via CI/CD.**
 
 ## What's Left to Build (High Level - Based on Epics/Phases)
 
 *   **Phase 1 (MVP):**
-    *   Core platform foundation (FOUND-5 FE/Supabase CI/CD?, FOUND-6 Testing - Epic 1 tickets).
+    *   Core platform foundation (FOUND-6 Testing - Epic 1 tickets).
     *   User Management (Auth UI, Profile - Epic 1/2 tickets).
     *   Basic Appointment Scheduling (Epic 2 tickets).
     *   Basic Provider Directory (Epic 2 tickets, Web SEO setup).
