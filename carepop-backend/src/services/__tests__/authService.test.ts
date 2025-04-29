@@ -1,0 +1,81 @@
+import { registerUserService } from '../authService';
+import { supabase } from '../../config/supabaseClient'; // Import the actual client
+
+// Mock the Supabase client module
+jest.mock('../../config/supabaseClient', () => ({
+  supabase: {
+    auth: {
+      signUp: jest.fn(),
+    },
+  },
+}));
+
+// Define a type for the mocked signUp function for easier use
+const mockSignUp = supabase.auth.signUp as jest.Mock;
+
+describe('registerUserService', () => {
+  beforeEach(() => {
+    // Clear mock history and reset implementation before each test
+    mockSignUp.mockClear();
+    mockSignUp.mockReset();
+  });
+
+  it('should register a user successfully', async () => {
+    const userData = { email: 'test@example.com', password: 'password123' };
+    const mockUser = { id: 'user-123', email: userData.email };
+    mockSignUp.mockResolvedValueOnce({ data: { user: mockUser }, error: null });
+
+    const result = await registerUserService(userData);
+
+    expect(mockSignUp).toHaveBeenCalledTimes(1);
+    expect(mockSignUp).toHaveBeenCalledWith({ email: userData.email, password: userData.password });
+    expect(result).toEqual({
+      success: true,
+      user: mockUser,
+      message: 'User registered successfully. Please check your email for verification.',
+    });
+  });
+
+  it('should throw an error if email is missing', async () => {
+    const userData = { password: 'password123' };
+    
+    // Use try/catch for async functions or expect().rejects for promises
+    await expect(registerUserService(userData)).rejects.toThrow('Email and password are required.');
+    expect(mockSignUp).not.toHaveBeenCalled();
+  });
+
+  it('should throw an error if password is missing', async () => {
+    const userData = { email: 'test@example.com' };
+
+    await expect(registerUserService(userData)).rejects.toThrow('Email and password are required.');
+    expect(mockSignUp).not.toHaveBeenCalled();
+  });
+
+  it('should return an error if Supabase signUp fails', async () => {
+    const userData = { email: 'test@example.com', password: 'password123' };
+    const mockError = { message: 'User already registered', status: 400 }; // Example error
+    mockSignUp.mockResolvedValueOnce({ data: { user: null }, error: mockError });
+
+    const result = await registerUserService(userData);
+
+    expect(mockSignUp).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      success: false,
+      error: mockError,
+      message: mockError.message,
+    });
+  });
+
+  it('should return an error if Supabase returns no user and no error', async () => {
+    const userData = { email: 'test@example.com', password: 'password123' };
+    mockSignUp.mockResolvedValueOnce({ data: { user: null }, error: null }); // Unlikely case
+
+    const result = await registerUserService(userData);
+
+    expect(mockSignUp).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      success: false,
+      message: 'User registration failed for an unknown reason.',
+    });
+  });
+}); 
