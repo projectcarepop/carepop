@@ -2,8 +2,8 @@
 
 ## Current Work Focus
 
-*   **Active Epic:** Epic 1: Core Platform & Foundational Setup
-*   **Active Ticket:** FOUND-6: Configure Testing Frameworks (Unit/Integration)
+*   **Active Epic:** Epic 1: Core Platform & Foundational Setup / Epic 2: User Management & Core Features
+*   **Active Ticket:** AUTH-1: Configure Supabase Auth & Basic Settings
 
 ## Current Focus
 
@@ -12,7 +12,8 @@
 
 ## Recent Changes & Decisions
 
-*   Completed **FOUND-5:** Backend CI/CD pipeline setup.
+*   Completed **FOUND-6:** Configured Jest testing framework for backend (`ts-jest`) and frontend (`react-native-testing-library`). Added initial test files and scripts.
+*   Completed **FOUND-5:** Backend CI/CD pipeline setup (GitHub Actions, WIF, Cloud Run deployment).
     *   Successfully configured GitHub Actions workflow (`deploy-backend-staging.yml`).
     *   Utilized Workload Identity Federation for GCP authentication.
     *   Troubleshooted and resolved issues related to OIDC audience and GCP attribute mapping.
@@ -22,10 +23,11 @@
 ## Next Steps
 
 *   **Immediate:**
-    *   Begin work on **FOUND-6**:
-        *   Research and select appropriate testing libraries for backend (e.g., Jest, Vitest) and frontend (e.g., Jest, React Native Testing Library).
-        *   Configure chosen frameworks in both `carepop-backend` and `carepop-frontend`.
-        *   Write initial placeholder unit tests for key components (e.g., Supabase client connection, logger util).
+    *   Begin work on **AUTH-1**:
+        *   Review Supabase Auth documentation (Email/Password, potentially providers like Google).
+        *   Configure required settings in the Supabase dashboard (enable providers, set up email templates, configure redirect URLs if using OAuth).
+        *   Ensure Supabase client (`supabaseClient.ts` in backend, equivalent setup needed in frontend) is ready for auth interactions.
+    *   Plan initial frontend Auth UI components (Login/Signup screens).
 
 ## Active Decisions & Considerations
 

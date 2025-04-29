@@ -33,12 +33,15 @@
     *   Set up GitHub Actions Workload Identity Federation for GCP auth.
     *   Created `.github/workflows/deploy-backend-staging.yml` to build/push/deploy backend to Cloud Run on `main` branch pushes.
     *   **Successfully deployed to Cloud Run staging via CI/CD.**
+*   FOUND-6: Configure Testing Frameworks:
+    *   Installed and configured Jest for backend (`ts-jest`) and frontend (`react-native` preset).
+    *   Installed `react-native-testing-library` and `@testing-library/jest-native` for frontend component testing.
+    *   Added basic test files and `test` scripts to both packages.
 
 ## What's Left to Build (High Level - Based on Epics/Phases)
 
 *   **Phase 1 (MVP):**
-    *   Core platform foundation (FOUND-6 Testing - Epic 1 tickets).
-    *   User Management (Auth UI, Profile - Epic 1/2 tickets).
+    *   User Management (AUTH-1 Initial Setup, Auth UI, Profile - Epic 1/2 tickets).
     *   Basic Appointment Scheduling (Epic 2 tickets).
     *   Basic Provider Directory (Epic 2 tickets, Web SEO setup).
     *   Foundational Security/Compliance (Consent mechanism, initial RLS - Epic 3 tickets).
