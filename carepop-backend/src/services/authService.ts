@@ -1,5 +1,5 @@
 import { supabase } from '../config/supabaseClient';
-import { AuthError, User } from '@supabase/supabase-js';
+import { AuthError, User, Session } from '@supabase/supabase-js';
 
 // Placeholder for user registration logic
 // We'll add Supabase interaction here later
@@ -50,4 +50,39 @@ export const registerUserService = async (userData: any): Promise<{ success: boo
 
   console.log('User registered successfully:', data.user.id);
   return { success: true, user: data.user, message: 'User registered successfully. Please check your email for verification.' };
+};
+
+// Login User Service
+export const loginUserService = async (loginData: any): Promise<{ success: boolean; user?: User | null; session?: Session | null; message?: string; error?: AuthError | null }> => {
+  console.log('Attempting login for email:', loginData?.email);
+
+  // Basic Input Validation
+  if (!loginData?.email || !loginData?.password) {
+    console.error('Login Error: Missing email or password');
+    throw new Error('Email and password are required.');
+  }
+
+  const { email, password } = loginData;
+
+  // Call Supabase signInWithPassword
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: email,
+    password: password,
+  });
+
+  if (error) {
+    console.error('Supabase SignIn Error:', error.message);
+    // Common errors: Invalid login credentials
+    return { success: false, error: error, message: error.message };
+  }
+
+  if (!data.session || !data.user) {
+     console.error('Supabase SignIn Error: No session/user data returned despite no error.');
+     // Handle unlikely case
+     return { success: false, message: 'Login failed for an unknown reason.' };
+  }
+
+  console.log('User logged in successfully:', data.user.id);
+  // Return user and session info (session contains the JWT access_token)
+  return { success: true, user: data.user, session: data.session, message: 'User logged in successfully.' };
 }; 
