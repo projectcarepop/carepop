@@ -1,4 +1,4 @@
-import { supabase } from '../config/supabaseClient';
+import { supabase, supabaseServiceRole } from '../config/supabaseClient';
 import { AuthError, User, Session } from '@supabase/supabase-js';
 
 // Placeholder for user registration logic
@@ -21,11 +21,11 @@ export const registerUserService = async (userData: any): Promise<{ success: boo
 
   const { email, password } = userData;
 
-  // Call Supabase signUp
+  // Call Supabase signUp (Restoring options block)
   const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
     email: email,
     password: password,
-    options: {
+    options: { // Restore options block
       // Include any initial data from registration form if needed, ensure keys match profiles table columns
       data: {
         first_name: userData.first_name || null,
@@ -51,7 +51,9 @@ export const registerUserService = async (userData: any): Promise<{ success: boo
     // Note: Supabase RLS policy allows user to insert their own profile using auth.uid()
     // We are using the user's own session here implicitly from the JS client perspective,
     // although technically this runs server-side. If using service_role key, ensure user_id is set correctly.
-    const { error: profileError } = await supabase
+    
+    // *** Use the service role client to bypass RLS for this trusted server-side operation ***
+    const { error: profileError } = await supabaseServiceRole // Use service role client here
       .from('profiles')
       .insert({
         user_id: signUpData.user.id, // Link to the newly created auth user
@@ -60,7 +62,7 @@ export const registerUserService = async (userData: any): Promise<{ success: boo
         first_name: userData.first_name || null, // Example: getting first name from input
         last_name: userData.last_name || null,   // Example: getting last name from input
         phone_number: userData.phone_number || null, // Example
-        consent_given: userData.consent_given === true, // Example: explicitly require boolean true
+        granular_consents: { initial_consent_given: userData.consent_given === true }, // Store boolean in JSONB
         // granular_consents: {}, // Set initial consents if needed
       });
 

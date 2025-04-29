@@ -13,3 +13,32 @@
 *   **Timestamp:** 2024-05-21T14:00:00Z (Placeholder) - **Action:** Successfully completed FOUND-5 (Backend CI/CD) after troubleshooting Workload Identity Federation audience and attribute mapping issues. Backend is deploying to Cloud Run staging via GitHub Actions.
 *   **Timestamp:** 2024-05-21T15:00:00Z (Placeholder) - **Action:** Completed FOUND-6: Configured Jest testing framework for backend (ts-jest) and frontend (react-native-testing-library), including basic test files and package scripts.
 *   **Timestamp:** 2024-05-21T15:30:00Z (Placeholder) - **Action:** Completed Supabase Auth dashboard configuration (AUTH-1 Part 1): Enabled Email/Google providers, configured Google OAuth Client, set Site/Redirect URLs.
+*   **Timestamp:** 2024-05-21T15:35:00Z (Placeholder) - **Action:** Decided to implement backend endpoints (Option B) for user registration and login (FOUND-9, FOUND-10) rather than direct frontend calls to Supabase Auth.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Proposed plan to implement `registerUserService` in `carepop-backend/src/services/authService.ts` to handle user registration via Supabase `signUp` (FOUND-9).
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Implemented `registerUserService` in `carepop-backend/src/services/authService.ts`, including Supabase client import, input validation, `supabase.auth.signUp` call, and error handling (FOUND-9). Corrected import name after initial error.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Added Jest unit tests for `registerUserService` in `carepop-backend/src/services/__tests__/authService.test.ts`, mocking Supabase client and covering success/failure cases. Tests passed. (FOUND-9)
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Committed changes for registration endpoint implementation and tests (FOUND-9).
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Confirmed next step is FOUND-10 (Login Endpoint). Updated active context.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Updated `tracker.md` to include FOUND-9 (Done) and FOUND-10 (To Do) entries based on `epics_and_tickets.md`.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Implemented login endpoint (route, controller, service) and added unit tests for `loginUserService`. Tests passed. (FOUND-10)
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Committed changes for login endpoint implementation and tests (FOUND-10).
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Pushed commits for FOUND-9 (Registration) and FOUND-10 (Login) to origin main.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Updated `tracker.md` to mark FOUND-10 as Done.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Fixed `Promise<void>` linter warnings in `authController.ts` by changing return type annotation to `Promise<Response | void>`.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Shifted focus to FOUND-8 (Profiles Table & RLS). Updated active context.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Guided user to fix PATH environment variable for Supabase CLI.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** `supabase db push` failed due to missing `moddatetime` extension. Instructed user to enable it in Supabase dashboard.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Modified `create_profiles_table` migration trigger to use `extensions.moddatetime()`. User manually ran `supabase db push` successfully, applying the migration. (FOUND-8)
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Committed profiles table migration file (FOUND-8).
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Reviewed Memory Bank. Proposed plan: Push FOUND-8 commit, implement profile creation on registration, commit/push, discuss RLS verification.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Pushed commit for FOUND-8 (Profiles migration) to origin main.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Implemented profile creation in `registerUserService` after successful signup (FOUND-9 TODO).
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Committed and pushed profile creation logic.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Manual RLS test failed to select user's own profile; investigation showed profile row did not exist for the test user (likely created before profile creation logic was added).
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Registration test with `@gmail.com` succeeded, confirming `@example.com` was blocked by Supabase (`email_address_invalid`).
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Restored `options.data` block in `signUp` call in `authService.ts`.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Registration succeeded but profile creation failed due to schema mismatch (`consent_given` vs `granular_consents`). Corrected column name in `authService.ts` profile insert.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Profile creation still failed due to RLS violation (`new row violates row-level security policy`). Identified that anon key client lacked permission for insert.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Updated `supabaseClient.ts` to initialize and export a second client (`supabaseServiceRole`) using the service role key.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Updated `authService.ts` to use `supabaseServiceRole` client for the profile insert operation.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Added `SUPABASE_SERVICE_ROLE_KEY` to local `.env` file. Restarted backend. Successful user registration and profile creation confirmed.

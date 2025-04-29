@@ -6,8 +6,9 @@ import { SecretManagerServiceClient } from '@google-cloud/secret-manager';
 async function getGcpSecret(secretName: string): Promise<string | null> {
   const projectId = process.env.GOOGLE_CLOUD_PROJECT;
   if (!projectId) {
-    console.error('GOOGLE_CLOUD_PROJECT environment variable not set.');
-    return null; // Or throw an error
+    // Allow falling back to .env locally even if project ID isn't set
+    // console.warn('GOOGLE_CLOUD_PROJECT environment variable not set. Assuming local execution.');
+    return null;
   }
   const client = new SecretManagerServiceClient();
   const name = `projects/${projectId}/secrets/${secretName}/versions/latest`;
@@ -16,60 +17,77 @@ async function getGcpSecret(secretName: string): Promise<string | null> {
     const [version] = await client.accessSecretVersion({ name });
     const payload = version.payload?.data?.toString();
     if (!payload) {
-      console.error(`Secret payload for ${secretName} is empty.`);
+      console.warn(`Secret payload for ${secretName} is empty in GCP.`); // Warn instead of error
       return null;
     }
     return payload;
   } catch (error) {
-    console.error(`Error accessing secret ${secretName}:`, error);
-    return null; // Or throw an error
+    // Log error but allow fallback to .env
+    console.warn(`Error accessing secret ${secretName} in GCP, falling back to .env if possible:`, error);
+    return null;
   }
 }
 
-let supabase: SupabaseClient;
+// Rename the standard client variable for clarity
+let supabaseAnonClient: SupabaseClient;
+// Add a variable for the service role client
+let supabaseServiceRoleClient: SupabaseClient;
+
 
 async function initializeSupabase() {
   let supabaseUrl: string | null = null;
   let supabaseAnonKey: string | null = null;
-  // Optional: Fetch service role key if needed later
-  // let supabaseServiceKey: string | null = null; 
+  // Add variable for service role key
+  let supabaseServiceKey: string | null = null;
 
   // Check if running in a GCP environment (Cloud Run sets this automatically)
   if (process.env.K_SERVICE || process.env.GOOGLE_CLOUD_PROJECT) {
     console.log('Running in GCP environment. Fetching secrets from Secret Manager...');
     supabaseUrl = await getGcpSecret('supabase-staging-url');
     supabaseAnonKey = await getGcpSecret('supabase-staging-anon-key');
-    // supabaseServiceKey = await getGcpSecret('supabase-staging-service-role-key'); 
-  } else {
-    console.log('Running locally. Loading secrets from .env file...');
-    // Load environment variables from .env file for local development
-    dotenv.config();
-    supabaseUrl = process.env.SUPABASE_URL || null;
-    supabaseAnonKey = process.env.SUPABASE_ANON_KEY || null;
-    // supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || null;
+    // Fetch service role key from GCP
+    supabaseServiceKey = await getGcpSecret('supabase-staging-service-role-key');
   }
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    const message = 'Supabase URL or Anon Key is missing. Ensure configuration is correct (GCP Secret Manager or .env).';
-    console.error(message);
-    // Throw an error to prevent the application from starting incorrectly
-    throw new Error(message); 
+  // Always try loading from .env as a fallback or for local dev
+  console.log('Loading secrets from .env file (if present)...');
+  dotenv.config(); // Load environment variables from .env file
+
+  // Use .env values if GCP values weren't found or if running locally
+  if (!supabaseUrl) supabaseUrl = process.env.SUPABASE_URL || null;
+  if (!supabaseAnonKey) supabaseAnonKey = process.env.SUPABASE_ANON_KEY || null;
+  if (!supabaseServiceKey) supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || null;
+
+
+  // Validate required keys
+  if (!supabaseUrl) {
+      throw new Error('Supabase URL is missing. Ensure configuration is correct (GCP Secret Manager or .env).');
+  }
+  if (!supabaseAnonKey) {
+      throw new Error('Supabase Anon Key is missing. Ensure configuration is correct (GCP Secret Manager or .env).');
+  }
+   if (!supabaseServiceKey) {
+      // Throw error only if service key is absolutely required at startup,
+      // otherwise just warn and let parts of the app fail if they try to use it.
+      // For profile creation, it IS required.
+      throw new Error('Supabase Service Role Key is missing. Ensure configuration is correct (GCP Secret Manager or .env).');
   }
 
-  // Create a single supabase client instance
-  supabase = createClient(supabaseUrl, supabaseAnonKey);
+  // Create the standard anon client instance
+  supabaseAnonClient = createClient(supabaseUrl, supabaseAnonKey);
+  console.log('Supabase anon client initialized successfully.');
 
-  console.log('Supabase client initialized successfully.');
+  // Create the service role client instance
+  supabaseServiceRoleClient = createClient(supabaseUrl, supabaseServiceKey);
+  console.log('Supabase service role client initialized successfully.');
+
 }
 
 // Initialize Supabase async and handle potential errors
 initializeSupabase().catch(error => {
-  console.error("Failed to initialize Supabase client:", error);
+  console.error("Failed to initialize Supabase clients:", error);
   process.exit(1); // Exit if Supabase cannot be initialized
 });
 
-// Export the initialized client (it will be undefined until initializeSupabase completes)
-// Consumers need to ensure initialization is complete, or handle the async nature.
-// A better approach might be to export a promise or an initialization function.
-// For simplicity now, we export the variable directly, assuming it's initialized before use.
-export { supabase }; 
+// Export both initialized clients
+export { supabaseAnonClient as supabase, supabaseServiceRoleClient as supabaseServiceRole }; 
