@@ -1,0 +1,28 @@
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+build/
+coverage/
+
+# React Native
+ios/
+android/
+.expo/
+.idea/
+*.iml
+*.ipr
+*.iws
+*.keystore
+*.private
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Editor directories and files
+.vscode/
+*.swp
+*~ 

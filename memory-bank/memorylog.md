@@ -1,0 +1,11 @@
+# Conceptual Change Log
+
+*   **Timestamp:** 2024-05-21T10:00:00Z (Placeholder) - **Action:** Completed FOUND-1 (Setup Code Repositories & Initial Project Structure). Conceptual commit approved. 
+*   **Timestamp:** 2024-05-21T10:05:00Z (Placeholder) - **Action:** Started FOUND-2: Initialized `package.json`, installed core dependencies (react, react-native, typescript, types), and created `tsconfig.json` for `carepop-frontend`.
+*   **Timestamp:** 2024-05-21T10:10:00Z (Placeholder) - **Action:** Continued FOUND-2: Initialized `package.json`, installed dependencies (@supabase/supabase-js, dotenv, typescript, types, ts-node-dev), and created `tsconfig.json` for `carepop-backend`. 
+*   **Timestamp:** 2024-05-21T10:15:00Z (Placeholder) - **Action:** Completed FOUND-2: Added dev/build/run scripts to `package.json` files and created backend Supabase client config (`src/config/supabaseClient.ts`). User confirmed manual creation of `.env` file.
+*   **Timestamp:** 2024-05-21T10:20:00Z (Placeholder) - **Action:** Conceptual Commit Point: FOUND-2 (Basic Dev Env Setup) completed and approved. 
+*   **Timestamp:** 2024-05-21T10:XX:XXZ (Placeholder) - **Action:** Completed FOUND-3: Provisioned core staging infrastructure (Supabase Project, GCP Cloud Run placeholder, GCP Secret Manager for keys, Cloud Logging confirmed). Staging Cloud Run URL: https://carepop-backend-staging-199126225625.asia-southeast1.run.app
+*   **Timestamp:** 2024-05-21T11:XX:XXZ (Placeholder) - **Action:** Conceptual Commit Point: FOUND-3 (Core Staging Infrastructure) completed and approved.
+*   **Timestamp:** 2024-05-21T11:YY:YYZ (Placeholder) - **Action:** Completed FOUND-4: Implemented structured logging (Winston + Cloud Logging) and configuration management (GCP Secret Manager / .env fallback) in backend.
+*   **Timestamp:** 2024-05-21T11:ZZ:ZZZ (Placeholder) - **Action:** Conceptual Commit Point: FOUND-4 (Logging & Config) completed and approved. 
