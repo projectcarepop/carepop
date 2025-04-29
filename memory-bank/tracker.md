@@ -90,18 +90,20 @@ This file tracks the progress of Epics and Tickets using a structured format.
 
 ### Ticket: AUTH-1: Configure Supabase Auth & Basic Settings
 
-*   **Status:** To Do
+*   **Status:** In Progress
 *   **Goal:** Set up the basic authentication configuration within the Supabase project dashboard.
 *   **Acceptance Criteria:**
-    *   [ ] Decision made on primary auth method (Email/Password vs. Social).
-    *   [ ] Chosen auth providers (Email/Password, Google, etc.) enabled in Supabase dashboard.
-    *   [ ] Email templates (confirmation, password reset) reviewed/customized if necessary.
-    *   [ ] Site URL and Redirect URLs configured correctly in Supabase Auth settings.
+    *   [x] Decision made on primary auth method (Email/Password + Google Login for MVP).
+    *   [x] Email provider enabled in Supabase dashboard.
+    *   [x] Google provider enabled in Supabase dashboard (requires GCP OAuth setup).
+    *   [x] Email templates (confirmation, password reset) reviewed.
+    *   [x] Site URL and Redirect URLs configured correctly in Supabase Auth settings.
     *   [ ] RLS policies for basic user access reviewed/created (e.g., users can see their own profile).
 *   **Notes:**
-    *   Need to confirm which social providers (if any) are required for MVP based on PRD.
-    *   Initial setup will focus on Email/Password.
-*   **Technology/Implementation Suggestions:** Supabase Platform (Auth section), Supabase JS SDK.
+    *   Initial setup includes both Email/Password and Google Login.
+    *   Google OAuth requires setting up credentials in Google Cloud Console first.
+    *   Basic RLS policy review deferred to FOUND-8 which handles the profiles table.
+*   **Technology/Implementation Suggestions:** Supabase Platform (Auth section), Supabase JS SDK, Google Cloud Console (OAuth Credentials).
 
 ---
 

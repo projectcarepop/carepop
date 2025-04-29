@@ -3,7 +3,7 @@
 ## Current Work Focus
 
 *   **Active Epic:** Epic 1: Core Platform & Foundational Setup / Epic 2: User Management & Core Features
-*   **Active Ticket:** AUTH-1: Configure Supabase Auth & Basic Settings
+*   **Active Ticket:** AUTH-2: Integrate Supabase Client (Frontend)
 
 ## Current Focus
 
@@ -12,7 +12,8 @@
 
 ## Recent Changes & Decisions
 
-*   Completed **FOUND-6:** Configured Jest testing framework for backend (`ts-jest`) and frontend (`react-native-testing-library`). Added initial test files and scripts.
+*   Completed Supabase Auth dashboard configuration (**AUTH-1** Part 1): Enabled Email/Google, configured URLs.
+*   Completed **FOUND-6:** Configured Jest testing framework for backend (`ts-jest`) and frontend (`react-native-testing-library`).
 *   Completed **FOUND-5:** Backend CI/CD pipeline setup (GitHub Actions, WIF, Cloud Run deployment).
     *   Successfully configured GitHub Actions workflow (`deploy-backend-staging.yml`).
     *   Utilized Workload Identity Federation for GCP authentication.
@@ -23,11 +24,15 @@
 ## Next Steps
 
 *   **Immediate:**
-    *   Begin work on **AUTH-1**:
-        *   Review Supabase Auth documentation (Email/Password, potentially providers like Google).
-        *   Configure required settings in the Supabase dashboard (enable providers, set up email templates, configure redirect URLs if using OAuth).
-        *   Ensure Supabase client (`supabaseClient.ts` in backend, equivalent setup needed in frontend) is ready for auth interactions.
-    *   Plan initial frontend Auth UI components (Login/Signup screens).
+    *   Begin work on **AUTH-2**:
+        *   Install Supabase JS SDK (`@supabase/supabase-js`) in `carepop-frontend`.
+        *   Create Supabase client instance configuration (`carepop-frontend/src/config/supabaseClient.ts` or similar).
+        *   Load Supabase URL and Anon Key securely (e.g., via environment variables for React Native - `react-native-dotenv`).
+        *   Set up an Auth context provider or similar mechanism to manage user session state globally in the frontend app.
+    *   Plan initial frontend Auth UI components (Login/Signup screens - UI-5, UI-6).
+*   **Upcoming:**
+    *   Define user schema and RLS (`FOUND-8`).
+    *   Build backend registration/login endpoints (`FOUND-9`, `FOUND-10`).
 
 ## Active Decisions & Considerations
 
