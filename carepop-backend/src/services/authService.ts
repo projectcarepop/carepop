@@ -22,34 +22,67 @@ export const registerUserService = async (userData: any): Promise<{ success: boo
   const { email, password } = userData;
 
   // Call Supabase signUp
-  const { data, error } = await supabase.auth.signUp({
+  const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
     email: email,
     password: password,
-    // options: { // Optional: Add additional user metadata or redirect URLs here
-    //   data: { 
-    //     full_name: 'Example User',
-    //   }
-    // }
+    options: {
+      // Include any initial data from registration form if needed, ensure keys match profiles table columns
+      data: {
+        first_name: userData.first_name || null,
+        last_name: userData.last_name || null,
+        // Add other fields from registration form here if applicable
+      }
+    }
   });
 
-  if (error) {
-    console.error('Supabase SignUp Error:', error.message);
-    // Return error details for the controller to handle
-    // Note: We might want to map Supabase errors to more user-friendly messages later
-    return { success: false, error: error, message: error.message };
+  if (signUpError) {
+    console.error('Supabase SignUp Error:', signUpError.message);
+    return { success: false, error: signUpError, message: signUpError.message };
   }
 
-  if (!data.user) {
+  if (!signUpData.user) {
     console.error('Supabase SignUp Error: No user data returned despite no error.');
-    // Handle the unlikely case where there's no error but also no user data
     return { success: false, message: 'User registration failed for an unknown reason.' };
   }
 
-  // TODO: Potentially create a corresponding profile entry in a 'users' or 'profiles' table here
-  // using data.user.id
+  // --- Create Profile Entry --- 
+  // Use a separate try-catch for profile creation to handle potential errors without losing the successful auth user
+  try {
+    // Note: Supabase RLS policy allows user to insert their own profile using auth.uid()
+    // We are using the user's own session here implicitly from the JS client perspective,
+    // although technically this runs server-side. If using service_role key, ensure user_id is set correctly.
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .insert({
+        user_id: signUpData.user.id, // Link to the newly created auth user
+        // Extract relevant data from registration input (userData) or use defaults
+        // Ensure these match the columns in your profiles table
+        first_name: userData.first_name || null, // Example: getting first name from input
+        last_name: userData.last_name || null,   // Example: getting last name from input
+        phone_number: userData.phone_number || null, // Example
+        consent_given: userData.consent_given === true, // Example: explicitly require boolean true
+        // granular_consents: {}, // Set initial consents if needed
+      });
 
-  console.log('User registered successfully:', data.user.id);
-  return { success: true, user: data.user, message: 'User registered successfully. Please check your email for verification.' };
+    if (profileError) {
+      // Log the error but potentially still return success for user creation
+      // Alternatively, could attempt to delete the auth user for atomicity (complex)
+      console.error('Failed to create profile after signup:', profileError.message);
+      // Consider returning a partial success message or specific error state
+      return { success: true, user: signUpData.user, message: 'User registered, but profile creation failed. Please contact support.' };
+    }
+
+    console.log('User profile created successfully for:', signUpData.user.id);
+
+  } catch (profileCatchError: any) {
+      console.error('Unexpected error creating profile:', profileCatchError.message);
+      // Decide on return value - user exists but profile failed
+      return { success: true, user: signUpData.user, message: 'User registered, profile creation error. Contact support.' };
+  }
+  // --- End Profile Entry --- 
+
+  console.log('User registered successfully:', signUpData.user.id);
+  return { success: true, user: signUpData.user, message: 'User registered successfully. Please check your email for verification.' };
 };
 
 // Login User Service
