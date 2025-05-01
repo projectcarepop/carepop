@@ -1,50 +1,60 @@
-import http from 'http';
+import express, { Express, Request, Response, NextFunction } from 'express';
 import logger from './utils/logger';
-import { supabase } from './config/supabaseClient'; // supabase is initialized async
+import { supabase } from './config/supabaseClient'; // Ensure Supabase client initialization logic runs before server start
+import authRoutes from './routes/authRoutes';
 
-const PORT = process.env.PORT || 8080; // Default to 8080 for Cloud Run
+const PORT = process.env.PORT || 8080;
+const app: Express = express();
 
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ message: 'CarePoP Backend Placeholder' }));
+// Middleware
+app.use(express.json()); // Middleware to parse JSON bodies
+
+// --- Mount Routers ---
+app.use('/api/auth', authRoutes); // Mount auth routes under /api/auth
+
+// --- Basic Routes (Optional) ---
+app.get('/', (req: Request, res: Response) => {
+  res.status(200).json({ message: 'CarePoP Backend API is running' });
 });
 
-server.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+// --- Centralized Error Handler (Placeholder) ---
+// This should be defined *after* all routes and middleware
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  logger.error('Unhandled Error:', { 
+    message: err.message, 
+    stack: err.stack, 
+    url: req.originalUrl, 
+    method: req.method 
+  });
+  
+  // Avoid sending detailed errors in production
+  const isProduction = process.env.NODE_ENV === 'production';
+  res.status(500).json({ 
+    success: false, 
+    message: isProduction ? 'An internal server error occurred.' : err.message 
+  });
 });
 
-console.log('Starting server...');
+// --- Start Server ---
+async function startServer() {
+  logger.info('Backend service starting...');
 
-// Example basic server logic (replace with actual framework like Express later)
-async function main() {
-    logger.info('Backend service starting...');
+  // Simple check if supabase client seems available (initialization happens in its own module)
+  if (!supabase) {
+      logger.warn('Supabase client might not be initialized yet. Proceeding, but DB ops might fail initially.');
+      // In a real app, might implement a more robust readiness check or delay start
+  }
 
-    // Check if Supabase client is ready (due to async init)
-    // In a real app, ensure this check or await mechanism is robust
-    if (!supabase) {
-        logger.error('Supabase client not initialized yet. Exiting.');
-        process.exit(1);
-    }
-
-    logger.info('Supabase client seems ready.');
-
-    // TODO: Add actual server setup (e.g., Express app)
-    logger.info('Server setup placeholder. Listening for connections...');
-
-    // Example: Log environment type
+  app.listen(PORT, () => {
+    logger.info(`Server listening on port ${PORT}`);
     const envType = process.env.K_SERVICE || process.env.GOOGLE_CLOUD_PROJECT ? 'GCP' : 'Local';
     logger.info(`Running in environment: ${envType}`);
-
-    // Example error log
-    // try {
-    //     throw new Error('Simulated startup error');
-    // } catch (error) {
-    //     logger.error('Caught an example error during startup', error);
-    // }
+  });
 }
 
-// Handle potential errors during top-level await or async operations
-main().catch(error => {
-    logger.error('Unhandled error during server startup:', error);
-    process.exit(1);
+// Handle potential errors during top-level async operations
+startServer().catch(error => {
+  logger.error('Unhandled error during server startup:', error);
+  process.exit(1);
 }); 

@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { registerUserService, loginUserService } from '../services/authService';
 
 // We will add the call to the service layer later
-export const registerUser = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const registerUser = async (req: Request, res: Response, next: NextFunction): Promise<Response | void> => {
   try {
     // TODO: Input validation (email, password)
     console.log('Register request body:', req.body); // Log for now
@@ -18,7 +18,8 @@ export const registerUser = async (req: Request, res: Response, next: NextFuncti
       return res.status(400).json(result); 
     }
 
-    res.status(201).json(result); 
+    // Return the successful response
+    return res.status(201).json(result); 
   } catch (error: any) { // Added type annotation for caught error
     console.error('Registration Error:', error);
     // Pass error to the centralized error handler (to be implemented)
@@ -26,12 +27,12 @@ export const registerUser = async (req: Request, res: Response, next: NextFuncti
     if (error.message === 'Email and password are required.') {
       return res.status(400).json({ success: false, message: error.message });
     }
-    next(error); 
+    next(error); // Calls next, implying void return for this path
   }
 };
 
 // Login User Controller
-export const loginUser = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const loginUser = async (req: Request, res: Response, next: NextFunction): Promise<Response | void> => {
   try {
     // TODO: Add more robust input validation (e.g., using a library like Joi or validator.js)
     console.log('Login request body:', req.body);
@@ -50,7 +51,8 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
     }
 
     // Send the successful login response (including user and session/token)
-    res.status(200).json(result);
+    // Return the successful response
+    return res.status(200).json(result);
 
   } catch (error: any) {
     console.error('Login Error:', error);
@@ -59,6 +61,6 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
       return res.status(400).json({ success: false, message: error.message });
     }
     // Pass other errors to the centralized error handler
-    next(error);
+    next(error); // Calls next, implying void return for this path
   }
 }; 

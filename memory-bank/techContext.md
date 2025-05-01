@@ -26,7 +26,7 @@
     *   Supabase Row Level Security (RLS - Core for data access control)
     *   Supabase Storage (For files)
     *   Supabase Edge Functions (Potential for simple, data-proximate logic)
-    *   Supabase SDK (Used by frontend and backend Cloud Run services)
+    *   Supabase SDK (Used by frontend and backend Cloud Run services - **Backend uses separate `anon` and `service_role` clients initialized in `supabaseClient.ts`**)
 *   **Google Cloud Platform (GCP):**
     *   **Cloud Run:** Hosts Node.js/TypeScript backend services/functions for custom logic, integrations, sensitive processing, background jobs.
     *   **Cloud Secret Manager:** Securely stores all API keys, database credentials, application encryption keys.
@@ -49,7 +49,7 @@
 *   **Testing:** Jest selected for both backend (with `ts-jest`) and frontend (with `react-native-testing-library`).
 *   **Local Development:** Scripts required to run frontend (web/mobile dev servers) and backend (Node.js server simulating Cloud Run).
 *   **Debugging:** Flipper, Reactotron (Frontend); Standard Node.js debugging tools, Cloud Logging/Monitoring (Backend).
-*   **Secrets:** GCP Secret Manager for cloud credentials, `.env` for local development.
+*   **Secrets:** GCP Secret Manager for cloud credentials, `.env` for local development (including `SUPABASE_URL`, `SUPABASE_ANON_KEY`, **`SUPABASE_SERVICE_ROLE_KEY`**).
 
 ## 5. Key Third-Party Services (Requires Vetting)
 

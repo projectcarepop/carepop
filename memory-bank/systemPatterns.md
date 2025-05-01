@@ -32,7 +32,10 @@ Access control is multi-layered:
 2.  **Supabase Row Level Security (RLS):** The **primary** mechanism for enforcing data access rules at the database level for queries made using user tokens. Policies restrict row visibility/modification based on `auth.uid()`, `auth.role()`, relationships (e.g., provider-patient), and consent flags stored in the database.
 3.  **Application-Level Checks (in Cloud Run):** Backend code running on Google Cloud Run performs authorization checks for:
     *   Complex workflows or actions not easily expressible in RLS.
-    *   Operations requiring elevated privileges (e.g., admin actions, data aggregation/anonymization). These functions may use a Supabase `service_role` key (bypassing RLS) but **must** perform rigorous application-level authorization checks based on the calling user's context (obtained from Supabase Auth) *before* performing the action or returning data.
+    *   Operations requiring elevated privileges (e.g., admin actions, data aggregation/anonymization).
+    *   Server-side operations that must bypass user-specific RLS (e.g., creating a user's profile row immediately after signup).
+
+    These functions may use a Supabase `service_role` key (bypassing RLS) but **must** perform rigorous application-level authorization checks based on the *calling user's authenticated context* (obtained from Supabase Auth and passed to the function) *before* performing the action or returning data, unless the operation is inherently system-level (like the initial profile creation linked directly to a just-created `auth.uid`).
     *   Enforcing business logic constraints before database interaction.
 
 **Principle:** Deny by Default (inherent in RLS, enforced in Cloud Run code).
