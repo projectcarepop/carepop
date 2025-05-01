@@ -46,3 +46,5 @@
 *   **Timestamp:** <placeholder_timestamp> - **Action:** Committed and pushed fixes for profile creation and RLS verification.
 *   **Timestamp:** <placeholder_timestamp> - **Action:** Memory Bank update process completed after successful implementation and verification of user registration, profile creation, and basic RLS.
 *   **Timestamp:** <placeholder_timestamp> - **Action:** Corrected Memory Bank references to non-existent FOUND-11 ticket; clarified Profile Update belongs to Epic 4.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Decided to restart frontend implementation using a Monorepo structure (Turborepo/npm) with Next.js (web) + React Native CLI (native) and NativeWind, following a detailed frontend plan provided by the user. Previous frontend code/build setup discarded.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Attempted initial Turborepo setup; encountered errors. Deleted partial setup. Proceeding with fresh `npx create-turbo@latest` initialization.

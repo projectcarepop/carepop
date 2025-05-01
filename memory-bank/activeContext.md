@@ -2,73 +2,61 @@
 
 ## Current Work Focus
 
-*   **Active Epic & Ticket(s):**
-    *   `FOUND-8`: Design & Implement Foundational User Database Schema (Supabase) - **Table created, basic RLS policies verified.**
-    *   `FOUND-9`: Registration Endpoint (including profile creation) - **Done & Verified.**
-    *   `FOUND-10`: Login Endpoint - **Done & Verified.**
-*   **Goal:** Foundational authentication and profile management backend is functional and secure with basic RLS. Recent changes committed and pushed.
+*   **Goal:** Restart frontend development using a Monorepo structure (Turborepo/pnpm) with Next.js (web), React Native CLI (native), and NativeWind, based on the detailed frontend plan provided.
+*   **Action:** **Initialize a *new* Turborepo monorepo from scratch using `create-turbo`.**
 
 ## Current Focus
 
-*   Consolidating recent progress on authentication and RLS.
-*   Planning next steps based on foundational work completion.
+*   **Executing the `npx create-turbo@latest` command to scaffold the foundational monorepo structure (`carepop-monorepo`).**
+*   Setting up the foundational monorepo structure (`carepop-monorepo`).
+*   Configuring the `apps/web` (Next.js) and initializing `apps/native` (React Native CLI) applications.
+*   Establishing shared packages (`packages/ui`, `packages/config`, `packages/store`, `packages/types`).
 
 ## Recent Changes & Decisions
 
-*   Completed foundational setup (FOUND-1 to FOUND-6), including project structure, dependencies, Supabase clients, GCP infrastructure (Cloud Run, Artifact Registry, Secret Manager), logging, config, CI/CD pipeline, and basic testing setup.
-*   Configured Supabase Auth providers (Email, Google) in the dashboard (AUTH-1 Part 1).
-*   **Decision:** Confirmed that user authentication (registration, login) will be handled via dedicated backend endpoints (Option B) rather than direct frontend Supabase calls.
-*   Backend refactored to use Express (`server.ts`).
-*   Registration (FOUND-9) and Login (FOUND-10) endpoints implemented and tested via Postman.
-*   `profiles` table migration (FOUND-8) created and applied.
-*   **Decision:** Implemented profile creation within `registerUserService` immediately after successful `signUp`.
-*   **Troubleshooting:** Resolved `email_address_invalid` error (Supabase blocks `@example.com`). Resolved `consent_given` column mismatch. Resolved RLS violation on profile insert.
-*   **Decision/Pattern:** Implemented a dual Supabase client pattern in the backend (`supabaseClient.ts`):
-    *   Standard client (`supabase`) using `anon` key for general operations respecting RLS.
-    *   Service role client (`supabaseServiceRole`) using `service_role` key (loaded from `.env`/Secret Manager) to bypass RLS for specific trusted server-side operations (e.g., initial profile creation post-signup).
-*   Basic RLS policies (`Allow individual read/update/insert`) verified manually via SQL Editor.
-*   Relevant code changes committed and pushed to `origin main`.
+*   **Decision:** Abandoned previous `carepop-frontend` implementation due to persistent build issues and desire for a cleaner setup.
+*   **Decision:** Adopted a Monorepo structure (using Turborepo/pnpm) for frontend development (`carepop-monorepo`).
+*   **Decision:** **Discarded the initial Turborepo setup attempt due to errors and opted for a complete re-initialization.**
+*   **Decision:** Confirmed the detailed frontend architecture:
+    *   `apps/native`: RN CLI, React Navigation.
+    *   `apps/web`: Next.js, Next.js Router, React Native Web.
+    *   `packages/ui`: Shared RN components styled with NativeWind `className`.
+    *   `packages/config`: Shared Tailwind config.
+    *   `packages/store`: Shared Redux Toolkit logic.
+    *   `packages/types`: Shared TypeScript types.
+    *   Separate Public Landing Pages / Admin UI project (likely using Next.js) to be created later.
+*   Backend setup (Supabase + Cloud Run) remains as previously established.
 
 ## Next Steps
 
-*Discuss and decide on the next priority:*
-1.  **Implement Profile Update:** Work on an endpoint for users to update their own profiles (Part of Epic 4 - Profile Management, e.g., PROF-3).
-2.  **Frontend Integration:** Start integrating these auth/profile endpoints into the frontend application (e.g., UI-5, UI-6).
-3.  **Refine RLS:** Discuss and implement more complex RLS scenarios (e.g., provider access) (Part of Epic 3 - Security/Consent, e.g., SEC-BE-1, SEC-BE-3).
-4.  **Other:** Address another task or feature from the backlog.
+1.  **Initialize the Turborepo monorepo structure using `npx create-turbo@latest` (using `pnpm`).**
+2.  Refine `apps/web` (Next.js setup, TypeScript, Tailwind integration).
+3.  Remove `apps/docs` (if created by default) and initialize `apps/native` (React Native CLI).
+4.  Configure shared `packages/config` (Tailwind, TSConfig) and `packages/ui` (basic setup).
+5.  Ensure basic monorepo build/dev commands work.
 
 ## Active Decisions & Considerations
 
-*   **Decision:** Use **Jest** as the testing framework for both backend (Node.js/TypeScript) and frontend (React Native) for consistency.
-*   Confirming the Supabase + Google Cloud Run hybrid architecture.
-*   Verifying the multi-layered access control strategy (Supabase RLS + Cloud Run checks).
-*   Acknowledging the critical need for application-level encryption (AES-256-GCM) for SPI/PHI.
-*   Planning for SSR/SSG for public web pages (Directory).
-*   Need to resolve Task Master AI tool errors or switch to manual task management.
-*   **Pattern:** Use dual Supabase clients (anon/service role) in backend for appropriate privilege levels.
+*   **Frontend Architecture:** Committed to the Monorepo structure and detailed frontend plan (Next.js + RN CLI + NativeWind + Shared Packages).
+*   **State Management:** Redux Toolkit remains the recommended choice for shared state (`packages/store`).
+*   **Styling:** NativeWind with a shared Tailwind config is the standard (`packages/ui`, `packages/config`).
+*   **Backend Architecture:** Supabase + Google Cloud Run hybrid remains unchanged.
+*   **Access Control:** Supabase RLS + Cloud Run checks remain the standard.
+*   **Encryption:** Application-level AES-256-GCM for SPI/PHI remains required.
 
 ## Important Patterns & Preferences
 
-*   **Backend:** Node.js/TypeScript on Google Cloud Run, using Express.
-*   **Database/BaaS:** Supabase (PostgreSQL, Auth, RLS).
-*   **Security:** SPI/PHI requires application-level AES-256-GCM encryption before storage. RLS is primary access control, supplemented by backend checks. Secrets in GCP Secret Manager. **Use service role key with caution only for trusted server-side ops needing to bypass RLS.**
-*   **Frontend:** React Native (CLI) with TypeScript. Redux Toolkit recommended.
-*   **Infrastructure:** Staging environment provisioned (Supabase project, GCP Cloud Run, Secret Manager).
-    *   Staging Cloud Run URL: `https://carepop-backend-staging-199126225625.asia-southeast1.run.app`
-    *   Supabase URL/Keys stored in GCP Secret Manager (`supabase-staging-url`, `supabase-staging-anon-key`, `supabase-staging-service-role-key`, `supabase-staging-db-password`). `.env` used for local dev.
-*   Leverage managed services (Supabase, GCP) where possible.
-*   Prioritize security and compliance (DPA mandatory, HIPAA strategic).
-*   User-centered and inclusive design.
-*   Cross-platform development using React Native CLI.
-*   **CI/CD:** GitHub Actions workflow (`.github/workflows/deploy-backend-staging.yml`) handles backend build and deployment to Cloud Run staging via Workload Identity Federation.
-*   **Supabase Client:** Dual client pattern used in backend (`supabaseClient.ts`) - `supabase` (anon key) and `supabaseServiceRole` (service role key).
+*   **Monorepo Structure:** `apps/native`, `apps/web`, `packages/ui`, `packages/config`, `packages/store`, `packages/types` managed by Turborepo/pnpm.
+*   **Styling:** NativeWind `className` props on RN primitives in `packages/ui`, shared `tailwind.config.js` in `packages/config`.
+*   **Navigation:** React Navigation in `apps/native`, Next.js Router in `apps/web`. Callbacks for shared components.
+*   **State:** Shared RTK slices in `packages/store`, Provider setup in each app.
+*   **Backend:** Node.js/TypeScript on Google Cloud Run, using Express. Supabase (PostgreSQL, Auth, RLS).
+*   **Security:** SPI/PHI requires application-level AES-256-GCM encryption. RLS primary access control. Secrets in GCP Secret Manager.
+*   **Infrastructure:** Staging environment (Supabase project, GCP Cloud Run) provisioned.
+*   **CI/CD:** Backend pipeline exists. Frontend TBD.
 
 ## Learnings & Insights
 
-*   The project involves significant complexity due to sensitive data, dual compliance goals (DPA/HIPAA), cross-platform requirements, and the hybrid backend architecture.
-*   Supabase RLS is powerful but requires careful design and testing, especially in the context of the SQL editor vs. actual client behavior.
-*   Server-side operations creating data for a user immediately after signup often require bypassing RLS using the `service_role` key, as the standard client may not be authenticated as the new user yet in that context.
-*   Application-level encryption adds a necessary layer but requires careful implementation and key management (via Cloud Secret Manager).
-*   Third-party vetting (including Supabase/GCP) is crucial.
-*   Supabase Auth may block certain email domains (e.g., `@example.com`).
-*   Ensure database schema matches code expectations (e.g., column names). 
+*   Attempting complex cross-platform builds (RNW + NativeWind + Webpack) without a structured monorepo and clear configuration strategy led to persistent issues.
+*   Adopting a standard monorepo setup (Turborepo) and leveraging framework conventions (Next.js for web) should provide a more stable foundation.
+*   Clear definition of shared vs. app-specific code is crucial.

@@ -10,13 +10,17 @@
 
 ## 2. Frontend Stack Details
 
-*   **React Native CLI:** Chosen for flexibility and native module access.
-*   **TypeScript:** Enforced for type safety and maintainability.
-*   **State Management:** Redux Toolkit (Recommended).
-*   **Navigation:** React Navigation (or similar).
-*   **UI Library:** To be selected (e.g., React Native Paper), customized for project design.
-*   **Web Rendering:** Requires SSR/SSG solution (e.g., integrated Next.js) for public-facing pages needing SEO.
-*   **Key Libraries:** Supabase JS SDK (for interacting with Supabase), potentially form handling libraries, mapping libraries (React Native Maps).
+*   **Monorepo:** Project uses a monorepo structure (e.g., Turborepo with pnpm) with `apps` and `packages` directories.
+*   **Native App Framework (`apps/native`):** React Native CLI (Chosen for flexibility and native module access).
+*   **Web App Framework (`apps/web`):** Next.js (Chosen for SSR/SSG, efficient web development).
+*   **Language:** TypeScript (Enforced across all packages/apps).
+*   **Styling:** NativeWind using Tailwind CSS (Shared config in `packages/config`, `className` prop used in shared components).
+*   **Shared UI (`packages/ui`):** Components built with React Native primitives, styled with NativeWind, designed for cross-platform use.
+*   **State Management (`packages/store`):** Redux Toolkit (Recommended).
+*   **Native Navigation (`apps/native`):** React Navigation.
+*   **Web Routing (`apps/web`):** Next.js Router (App or Pages).
+*   **Key Libraries:** Supabase JS SDK, React Navigation, React Native Web (configured in `apps/web`).
+*   **Shared Types (`packages/types`):** Centralized TypeScript definitions.
 
 ## 3. Backend Stack Details
 
@@ -43,13 +47,14 @@
 
 ## 4. Development Setup & Tooling
 
-*   **Source Control:** Git (GitHub/GitLab repositories for frontend and backend).
-*   **Package Management:** npm or yarn.
-*   **CI/CD:** GitHub Actions for backend deployment to Cloud Run staging.
-*   **Testing:** Jest selected for both backend (with `ts-jest`) and frontend (with `react-native-testing-library`).
-*   **Local Development:** Scripts required to run frontend (web/mobile dev servers) and backend (Node.js server simulating Cloud Run).
-*   **Debugging:** Flipper, Reactotron (Frontend); Standard Node.js debugging tools, Cloud Logging/Monitoring (Backend).
-*   **Secrets:** GCP Secret Manager for cloud credentials, `.env` for local development (including `SUPABASE_URL`, `SUPABASE_ANON_KEY`, **`SUPABASE_SERVICE_ROLE_KEY`**).
+*   **Source Control:** Git (GitHub/GitLab repositories).
+*   **Monorepo Management:** Turborepo (or chosen tool like Nx, Lerna).
+*   **Package Management:** pnpm (or chosen tool like npm/yarn with workspaces).
+*   **CI/CD:** GitHub Actions for backend deployment to Cloud Run staging. Frontend deployment strategy TBD (Vercel for web, App Store/Play Store for native).
+*   **Testing:** Jest selected for both backend (with `ts-jest`), frontend (`react-native-testing-library` for native, potentially `@testing-library/react` for web-specific parts), and shared packages.
+*   **Local Development:** Monorepo scripts (`dev`, `build`, `lint`) managed by Turborepo/package manager. Requires running native emulator/device, web browser, and backend simulator.
+*   **Debugging:** Flipper, Reactotron (Native); Next.js/React DevTools (Web); Standard Node.js debugging tools, Cloud Logging/Monitoring (Backend).
+*   **Secrets:** GCP Secret Manager for cloud credentials, `.env` files within specific apps/packages for local development as needed.
 
 ## 5. Key Third-Party Services (Requires Vetting)
 
@@ -66,7 +71,7 @@
 
 *   **Compliance:** Strict adherence to Philippines DPA is mandatory. HIPAA compliance is a strategic goal.
 *   **Security:** High priority due to sensitive health data (SPI/PHI). Requires robust implementation of encryption, access control (RLS + backend checks), secure coding, etc.
-*   **Cross-Platform Consistency:** Achieving identical UX/features across web and mobile requires careful design and testing.
-*   **Performance:** Needs proactive optimization (frontend rendering, backend query/RLS performance).
+*   **Cross-Platform Consistency:** Core goal achieved via shared `packages/ui` styled with NativeWind. Requires careful component design and testing.
+*   **Performance:** Needs proactive optimization (native rendering, web vitals, backend query/RLS performance).
 *   **Scalability:** Leverage managed services (Supabase, Cloud Run) but requires monitoring and appropriate configuration.
-*   **SEO:** Public web pages must be discoverable, mandating SSR/SSG. 
+*   **SEO:** Public web pages (Landing Pages, Directory in `apps/web`) must be discoverable, achieved via Next.js SSR/SSG. 

@@ -63,12 +63,33 @@ Access control is multi-layered:
 
 ## 5. Frontend Architecture Pattern
 
-*   **React Native (CLI):** Core framework for cross-platform (web/mobile) development.
-*   **TypeScript:** For type safety and maintainability.
-*   **State Management:** Redux Toolkit (Recommended) for complex application state.
-*   **Navigation:** React Navigation (or similar).
-*   **UI Components:** Utilize a customizable UI library (e.g., React Native Paper) integrated with a defined design system.
-*   **Web Rendering (SSR/SSG):** Required for public-facing web pages (e.g., Provider Directory) to ensure SEO discoverability. May involve integrating React Native for Web with a framework like Next.js.
+*   **Monorepo Structure:** The frontend is managed within a monorepo (e.g., Turborepo/pnpm), separating concerns into applications (`apps`) and shared code (`packages`).
+*   **Native Application (`apps/native`):**
+    *   Built using **React Native CLI**.
+    *   Contains native entry points (iOS/Android), native configurations.
+    *   Implements navigation using **React Navigation**.
+    *   Consumes shared components from `packages/ui` and state logic from `packages/store`.
+    *   Uses **NativeWind Babel plugin** for styling compilation.
+*   **Web Application (`apps/web`):**
+    *   Built using **Next.js**.
+    *   Handles web routing (using **Next.js Router**), page structure, layouts, and API routes if needed.
+    *   Serves public landing pages (using SSR/SSG for SEO), the authenticated user web application, and the admin UI.
+    *   Configured with **React Native Web** to render shared components from `packages/ui`.
+    *   Uses standard **Tailwind CSS + PostCSS** setup for styling, referencing the shared config.
+    *   Consumes shared components from `packages/ui` and state logic from `packages/store`.
+*   **Shared UI Package (`packages/ui`):**
+    *   Contains reusable UI components built with **React Native primitives** (View, Text, Pressable, etc.).
+    *   Styled exclusively using **NativeWind `className` props**, referencing the shared Tailwind config.
+    *   Designed for maximum platform-agnosticism.
+*   **Shared Configuration (`packages/config`):**
+    *   Hosts the single source of truth `tailwind.config.js`.
+    *   May contain shared TypeScript `tsconfig.json` base configurations.
+*   **Shared State (`packages/store`):**
+    *   Contains shared **Redux Toolkit** slices, selectors, and store configuration logic.
+*   **Shared Types (`packages/types`):**
+    *   Contains shared TypeScript interfaces and types.
+*   **Styling Approach:** **NativeWind** allows using Tailwind CSS utilities via `className` across both native and web, ensuring consistency through a shared `tailwind.config.js`.
+*   **Navigation Strategy:** Native app uses React Navigation; Web app uses Next.js Router. Shared components trigger navigation via callbacks passed from the platform-specific parent.
 
 ## 6. Background Tasks Pattern
 
