@@ -2,61 +2,42 @@
 
 ## Current Status
 
-*   Monorepo structure (`carepop-monorepo`) initialized with `apps/web` and `apps/nativeapp`.
-*   Basic setup for shared Tailwind config (`packages/tailwind-config`) for web and shared UI (`packages/ui` using StyleSheet for native) is complete.
-*   `apps/web` is configured for Tailwind; basic dev mode runs.
-*   `apps/nativeapp` is configured for standard `StyleSheet` styling. **Build is no longer blocked by Babel error.** Verification pending.
-*   React/React-DOM versions downgraded to 18.2.0 across workspaces.
-*   Foundational infrastructure (GCP, Supabase), backend CI/CD, logging, config management, and backend testing frameworks remain set up (FOUND-1 to FOUND-6 related to backend).
-*   User registration (FOUND-9) and login (FOUND-10) backend endpoints remain implemented and functional.
-*   `profiles` table created and basic RLS policies implemented and verified (FOUND-8).
-*   Backend CI/CD Pipeline.
-*   Backend Testing Framework.
-*   Monorepo structure created (`carepop-monorepo`) with `apps/web` and `apps/nativeapp`.
-*   **Basic monorepo development environment (`pnpm run dev`) starts both web and native apps.**
+*   **Frontend Monorepo:** Deleted due to persistent React Native Android build errors related to pnpm path resolution. Requires re-initialization with a modified strategy (e.g., `.npmrc` hoisting rules).
+*   Backend infrastructure, CI/CD, auth endpoints, profiles table, etc., remain functional and unchanged.
 
 ## What Works
 
-*   Backend Infrastructure & Core Logic.
-*   Monorepo structure created (`carepop-monorepo`) with `apps/web` and `apps/nativeapp`.
-*   Shared Tailwind configuration (`packages/tailwind-config`) for web.
-*   Shared UI package (`packages/ui`) setup using `StyleSheet` for native.
-*   `apps/web` development server (`pnpm run dev`) starts and renders shared component (styling might be affected by NativeWind/Tailwind peer dep warning).
-*   `apps/nativeapp` development server (`pnpm run dev`) starts without the previous Babel error (App functionality verification pending).
+*   Backend Infrastructure & Core Logic (Supabase + Cloud Run).
+*   Backend Auth Endpoints (Register, Login).
+*   Backend Profiles Table & Basic RLS.
 
 ## What's Left to Build (High Level - Based on Epics/Phases)
 
-*   **Frontend Monorepo Setup:**
-    *   ~~Initialize new monorepo using `create-turbo`.~~ (Done)
-    *   ~~Initialize `apps/nativeapp` (RN CLI).~~ (Done)
-    *   ~~Establish basic monorepo build/dev workflows (`pnpm run dev`).~~ (Native no longer blocked, verification pending)
-    *   ~~Refine `apps/web` (Next.js setup, Tailwind, etc.).~~ (Basic setup done)
-    *   ~~Configure shared packages (`ui`, `config` [Tailwind part]).~~ (UI uses StyleSheet for native)
-    *   ~~Fix `apps/nativeapp` Babel build error.~~ (Fixed by removing NativeWind)
-    *   **Verify `apps/nativeapp` runs correctly and renders basic components.**
-    *   Test shared component styling/functionality end-to-end (Native: StyleSheet, Web: Tailwind/RNW).
-    *   Develop strategy for consistent cross-platform styling in `packages/ui`.
-    *   Configure shared `packages/typescript-config` usage consistency.
-    *   Configure shared `packages/store`.
-*   **Phase 1 (MVP) - Frontend Implementation within Monorepo:**
-    *   Implement Auth UI (`apps/web`, `apps/nativeapp` using `packages/ui`).
+*   **Frontend Monorepo Setup (RESTART):**
+    *   Re-initialize Turborepo monorepo.
+    *   Configure pnpm hoisting (`.npmrc`).
+    *   Initialize `apps/nativeapp` (RN CLI).
+    *   Initialize `apps/web` (Next.js).
+    *   Establish basic monorepo build/dev workflows, **verifying native Android build succeeds**.
+    *   Configure shared packages (`ui`, `config`, `store`, etc.) using appropriate styling (StyleSheet native, Tailwind web).
+*   **Phase 1 (MVP) - Frontend Implementation within Monorepo:** (Dependent on successful setup)
+    *   Implement Auth UI.
     *   Implement Profile Management UI.
     *   Implement Basic Appointment Scheduling UI.
-    *   Implement Basic Provider Directory UI (`apps/web` with SEO focus).
-    *   Integrate State Management (`packages/store`, app providers).
+    *   Implement Basic Provider Directory UI.
     *   Implement DPA Consent UI flow.
-*   **Phase 1 (MVP) - Backend Refinements:**
+*   **Phase 1 (MVP) - Backend Refinements:** (Can proceed independently if needed)
     *   Refine RLS policies (Epic 3).
     *   Implement Profile Update endpoint (Epic 4).
     *   Implement foundational DPA consent logic (Epic 3).
-*   **Phase 2 & 3:** As previously outlined, implemented within the new monorepo structure.
+*   **Phase 2 & 3:** (Dependent on successful setup)
 
-*(Refer to `Epic and Tickets Tracker.txt` or `epics_and_tickets.md` for detailed task breakdown)*
+*(Refer to `epics_and_tickets.md` for detailed task breakdown)*
 
 ## Known Issues
 
-*   ~~`apps/nativeapp` build fails due to persistent Babel error: `.plugins is not a valid Plugin property`. Root cause unclear despite troubleshooting (React versions aligned, config syntax checked, cache cleared).~~ (Resolved by removing NativeWind)
-*   Peer Dependency Warning in `apps/web`: `tailwindcss` v4 installed, but a dependency might expect v3. (Potential styling issues later on web).
+*   **BLOCKER:** React Native Android builds fail within the pnpm monorepo due to Gradle being unable to find required scripts (`native_modules.gradle`, `gradle-plugin`) because of pnpm's default hoisting behavior. Requires re-setup with hoisting configuration.
+*   Peer Dependency Warning in `apps/web` (from previous attempt, likely to reappear): Tailwind version mismatch.
 *   Task Master AI tools fail (Low Priority).
 
 ## Evolution of Project Decisions
@@ -75,3 +56,5 @@
 *   **Decision:** Configured `metro.config.js` in `nativeapp` with monorepo settings (`watchFolders`, `nodeModulesPaths`, `extraNodeModules`, `blockList`, `server.enhanceMiddleware`).
 *   **Decision:** Downgraded React/React-DOM to 18.2.0 across workspaces to match RN 0.73.8 dependency.
 *   **Decision:** Removed NativeWind/Tailwind CSS from `apps/nativeapp` due to persistent build errors. Switched to standard React Native `StyleSheet` for native styling.
+*   **Decision:** Re-initialized monorepo after resolving initial Babel errors.
+*   **Decision:** Deleted the re-initialized monorepo again after encountering persistent Android Gradle build failures related to pnpm path resolution. Will attempt a third initialization, configuring pnpm hoisting immediately.

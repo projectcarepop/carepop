@@ -2,55 +2,37 @@
 
 ## Current Work Focus
 
-*   **Goal:** Verify that `apps/nativeapp` starts correctly after removing NativeWind/Tailwind CSS.
-*   **Action:** Checking Metro bundler output from `pnpm run dev`.
+*   **Goal:** Successfully initialize a clean frontend monorepo structure.
+*   **Action:** Prepare to re-run Turborepo initialization.
 
 ## Current Focus
 
-*   **Verify `apps/nativeapp` build success.**
+*   **Re-initializing `carepop-monorepo`.**
 
 ## Recent Changes & Decisions
 
-*   **Decision:** Abandoned previous `carepop-frontend` implementation due to persistent build issues and desire for a cleaner setup.
-*   **Decision:** Adopted a Monorepo structure (using Turborepo/pnpm) for frontend development (`carepop-monorepo`).
-*   **Decision:** **Discarded the initial Turborepo setup attempt due to errors and opted for a complete re-initialization.**
-*   **Decision:** Confirmed the detailed frontend architecture:
-    *   `apps/nativeapp`: RN CLI (Initialized, BLOCKED by Babel error), React Navigation.
-    *   `apps/web`: Next.js (Initialized, basic dev works), Next.js Router, React Native Web.
-    *   `packages/ui`: Shared RN components styled with NativeWind `className`.
-    *   `packages/config`: Shared Tailwind config.
-    *   `packages/store`: Shared Redux Toolkit logic.
-    *   `packages/types`: Shared TypeScript types.
-    *   Separate Public Landing Pages / Admin UI project (likely using Next.js) to be created later.
-*   Backend setup (Supabase + Cloud Run) remains as previously established.
-*   **Decision:** Downgraded React/React-DOM to `18.2.0` across workspaces to align with `react-native@0.73.8`.
-*   **Decision:** Configured `metro.config.js` and `babel.config.js` (including NativeWind plugin) for monorepo setup.
-*   **Decision:** Tested shared component (`@repo/ui/button`) usage in both apps (initially with NativeWind).
-*   **Decision:** Abandoned NativeWind/Tailwind CSS for `apps/nativeapp` due to persistent Babel errors (`.plugins is not a valid Plugin property`). Shifted to standard `StyleSheet` styling for native components.
+*   **Decision:** Re-initialized `carepop-monorepo` using `pnpx create-turbo` after initial Babel errors were resolved by removing NativeWind from `nativeapp`.
+*   **Encountered Blocker:** Persistent Android build errors (`Could not read script ... native_modules.gradle`) due to path resolution conflicts between React Native's Gradle scripts and pnpm's hoisted `node_modules` structure.
+    *   Attempts to fix by adjusting `settings.gradle` paths or adding local dependencies failed.
+*   **Decision:** Deleted the `carepop-monorepo` directory *again* to ensure a completely clean slate before trying a different setup strategy (e.g., configuring pnpm hoisting via `.npmrc` immediately after initialization).
 
 ## Next Steps
 
-1.  ~~Initialize the Turborepo monorepo structure using `npx create-turbo@latest` (using `pnpm`).~~ (Done)
-2.  ~~Remove `apps/docs`.~~ (Done)
-3.  ~~Initialize `apps/nativeapp` (React Native CLI).~~ (Done)
-4.  ~~Ensure basic monorepo build/dev commands work.~~ (Web works, Native blocked)
-5.  ~~Refine `apps/web` (Next.js setup, TypeScript, Tailwind integration).~~ (Basic Tailwind setup done)
-6.  ~~Configure shared `packages/config` (Tailwind, TSConfig) and `packages/ui` (basic setup).~~ (Tailwind config now only applies to web, UI uses StyleSheet for native)
-7.  ~~Diagnose and fix the `apps/nativeapp` Babel error (`.plugins is not a valid Plugin property`).~~ (Resolved by removing NativeWind)
-8.  **Verify `apps/nativeapp` starts correctly with Metro bundler.**
-9.  Test the updated shared Button component in `apps/nativeapp`.
-10. Test the shared Button component in `apps/web` (may require adjustments as it still uses Tailwind/NativeWind via RNW).
-11. Address peer dependency warnings (related to Tailwind v4 in web context).
-12. Define a consistent styling strategy for shared components across `apps/web` (Tailwind/RNW) and `apps/nativeapp` (StyleSheet).
+1.  **Re-run `pnpx create-turbo@latest carepop-monorepo`.**
+2.  Immediately configure pnpm hoisting via `.npmrc` (e.g., `public-hoist-pattern[]=*react-native*`).
+3.  Perform basic monorepo cleanup (remove `apps/docs`).
+4.  Initialize `apps/nativeapp` (RN CLI, skip install).
+5.  Initialize `apps/web` (Next.js).
+6.  Run `pnpm install`.
+7.  Configure `apps/nativeapp/android/settings.gradle` to use *local* `../node_modules` paths (as hoisting should be disabled for RN packages).
+8.  Configure `apps/nativeapp/metro.config.js` for monorepo.
+9.  Attempt `pnpm --filter nativeapp run android` build.
 
 ## Active Decisions & Considerations
 
-*   **Frontend Architecture:** Committed to the Monorepo structure and detailed frontend plan (Next.js + RN CLI + NativeWind + Shared Packages).
-*   **State Management:** Redux Toolkit remains the recommended choice for shared state (`packages/store`).
-*   **Styling:** NativeWind with a shared Tailwind config is the standard (`packages/ui`, `packages/config`).
-*   **Backend Architecture:** Supabase + Google Cloud Run hybrid remains unchanged.
-*   **Access Control:** Supabase RLS + Cloud Run checks remain the standard.
-*   **Encryption:** Application-level AES-256-GCM for SPI/PHI remains required.
+*   **Frontend Architecture:** Still aiming for Monorepo (Next.js + RN CLI + Shared Packages), but acknowledging the friction between RN and pnpm.
+*   **Styling:** Standard `StyleSheet` for `nativeapp`. Tailwind CSS for `apps/web`.
+*   **Package Manager:** Sticking with pnpm for now, but attempting to configure hoisting explicitly via `.npmrc` as the next mitigation strategy.
 
 ## Important Patterns & Preferences
 

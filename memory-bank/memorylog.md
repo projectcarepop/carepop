@@ -62,3 +62,6 @@
 *   **Timestamp:** <placeholder_timestamp> - **Action:** Encountered persistent Babel error (`.plugins is not a valid Plugin property`) in `apps/nativeapp` despite troubleshooting (React downgrade, cache clears, config changes).
 *   **Timestamp:** <placeholder_timestamp> - **Action:** Pausing work. Next step is to investigate the root cause of the `nativeapp` Babel error.
 *   **Timestamp:** <placeholder_timestamp> - **Action:** Decided to remove NativeWind/Tailwind CSS from `apps/nativeapp` due to persistent build errors. Removed dependencies (`nativewind`, `tailwindcss`), updated `babel.config.js`, and modified shared UI component (`packages/ui/src/button.tsx`) to use `StyleSheet`.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Encountered persistent Android build errors (`Could not read script ... native_modules.gradle`) due to pnpm hoisting.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Attempted fixes by adjusting `settings.gradle` paths and adding local dependencies failed to resolve Gradle script path issues.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Deleted `carepop-monorepo` again. Planning third attempt at initialization, including immediate configuration of pnpm hoisting via `.npmrc`.
