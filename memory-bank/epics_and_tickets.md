@@ -1,4 +1,3 @@
-
 **Jira Epics & Tickets - CarePoP/QueerCare Platform (Revised for Supabase/Cloud Run)**
 
 **Epic 1: Core Setup, Authentication & Deployment Foundation (Supabase & GCP)**
@@ -126,62 +125,78 @@
         *   Basic rate limiting added for this endpoint (potentially via middleware on **Cloud Run** or **GCP Load Balancer/Cloud Armor**).
     *   **Technology/Implementation Suggestions:** **Google Cloud Run**, Node.js, TypeScript. **Supabase JS SDK**. **Google Cloud Run rate limiting/Cloud Armor.**
 
+---
+**Task ID:** FE-SETUP-1 (NEW)
+*   **Title:** Establish Frontend Monorepo Structure & Dev Environment
+*   **Background:** Set up the Turborepo monorepo using pnpm, initialize Next.js (`apps/web`) and React Native CLI (`apps/nativeapp`) applications, configure shared packages (`tailwind-config`, `ui` placeholder), and ensure basic development environments (`pnpm run dev`, including Android build) are functional.
+*   **Acceptance Criteria:**
+    *   `carepop-monorepo` created using Turborepo/pnpm.
+    *   `apps/web` (Next.js + Tailwind) initialized and configured.
+    *   `apps/nativeapp` (RN CLI) initialized and configured.
+    *   Shared `packages/tailwind-config` created.
+    *   Shared `packages/ui` placeholder created.
+    *   `.npmrc` configured for pnpm (attempted hoisting control).
+    *   Android build files (`settings.gradle`, `app/build.gradle`) modified to point to root `node_modules`.
+    *   Metro config (`metro.config.js`) adjusted for monorepo and `blockList` fix applied.
+    *   `pnpm run dev` successfully starts both web and native development servers.
+    *   `pnpm --filter nativeapp run android` successfully builds and installs the Android app.
+*   **Status:** DONE
+---
+
 **Epic 2: UI/UX Design System & Core Components (MVP Kickoff)**
 
-*   **Epic Goal:** Define the initial visual design language and build the absolute core reusable UI components, allowing feature Epics (starting with Auth UI in Epic 1) to immediately consume them for a consistent look and feel. This runs in parallel with Epic 1 backend work.
+*   **Epic Goal:** Define the initial visual design language and build the absolute core reusable UI components using **React Native `StyleSheet` and shared theme tokens**, allowing feature Epics to immediately consume them for a consistent look and feel.
 
-1.  **Ticket ID:** UI-1
-    *   **Title:** Select & Integrate React Native UI Component Library
-    *   **Background:** ... (Remains the same) ...
-    *   **Acceptance Criteria:** ... (Remains the same) ...
-    *   **Technology/Implementation Suggestions:** Evaluate `react-native-paper` or similar, focusing on customizability and cross-platform support.
+1.  **Ticket ID:** UI-1 (REVISED)
+    *   **Title:** Define & Implement Shared Theme
+    *   **Background:** Establish a shared theme system (`packages/ui/src/theme.ts`) containing design tokens (colors, spacing, typography, radii) to be consumed by `StyleSheet` across shared components.
+    *   **Acceptance Criteria:**
+        *   `theme.ts` file created with initial color palette, spacing scale, font sizes, and border radii.
+        *   Theme tokens are easily importable and usable within `StyleSheet.create` calls in `packages/ui`.
+        *   Theme structure is extensible for future additions (e.g., shadows, typography weights).
+    *   **Technology/Implementation Suggestions:** TypeScript constants/objects in `theme.ts`. Consider platform-specific values if needed later.
 
-2.  **Ticket ID:** UI-2
-    *   **Title:** Define & Implement Design Tokens (Initial Palette, Typography Scale)
-    *   **Background:** ... (Remains the same) ...
-    *   **Acceptance Criteria:** ... (Remains the same) ...
-    *   **Technology/Implementation Suggestions:** TypeScript constants, theme context, integrate with UI library theming.
+2.  **Ticket ID:** UI-2 (REVISED)
+    *   **Title:** Build Core Reusable Components - Buttons
+    *   **Background:** Create a reusable `Button` component within `packages/ui` using `StyleSheet` and the shared theme.
+    *   **Acceptance Criteria:**
+        *   `Button.tsx` component created in `packages/ui`.
+        *   Component accepts necessary props (`title`, `onPress`, `variant`, `disabled`, `style`, `titleStyle`).
+        *   Component uses `StyleSheet` for styling.
+        *   Styles utilize tokens defined in `packages/ui/src/theme.ts`.
+        *   Supports at least 'primary' and 'secondary' variants, plus a disabled state.
+        *   Component renders correctly and is functional in `apps/nativeapp`.
+        *   Component renders and is styled appropriately in `apps/web` (requires testing).
+    *   **Technology/Implementation Suggestions:** React Native `Pressable`, `Text`, `StyleSheet`. Import theme tokens.
 
-3.  **Ticket ID:** UI-3
-    *   **Title:** Build Core Reusable Components - Buttons & Form Inputs
-    *   **Background:** ... (Remains the same) ...
-    *   **Acceptance Criteria:** ... (Remains the same) ...
-    *   **Technology/Implementation Suggestions:** React Native components, utilize UI library components, style using design tokens.
+3.  **Ticket ID:** UI-3 (REVISED)
+    *   **Title:** Build Core Reusable Components - Form Inputs
+    *   **Background:** Create reusable form input components (e.g., `TextInput`) using `StyleSheet` and theme tokens.
+    *   **Acceptance Criteria:**
+        *   Basic `TextInput` component created in `packages/ui`.
+        *   Uses `StyleSheet` and theme tokens for styling (border, padding, text color, etc.).
+        *   Handles basic props (`value`, `onChangeText`, `placeholder`, `secureTextEntry`, etc.).
+        *   Includes styling for focus states (if applicable).
+        *   Renders correctly in `nativeapp` and `web` (requires testing).
+    *   **Technology/Implementation Suggestions:** React Native `TextInput`, `StyleSheet`. Import theme tokens.
 
-4.  **Ticket ID:** UI-4
-    *   **Title:** Build Core Reusable Components - Headers & Layout Containers
-    *   **Background:** ... (Remains the same) ...
-    *   **Acceptance Criteria:** ... (Remains the same) ...
-    *   **Technology/Implementation Suggestions:** React Native View, SafeAreaView. May wrap navigation library headers.
+4.  **Ticket ID:** UI-4 (REVISED)
+    *   **Title:** Build Core Reusable Components - Layout (Card, Container)
+    *   **Background:** Create basic layout components like `Card` or styled `View` containers using `StyleSheet` and theme tokens.
+    *   **Acceptance Criteria:**
+        *   `Card.tsx` (or similar) component created in `packages/ui`.
+        *   Uses `StyleSheet` and theme tokens (e.g., background color, border radius, padding, shadows if defined).
+        *   Accepts `children` prop.
+        *   Renders correctly in `nativeapp` and `web` (requires testing).
+    *   **Technology/Implementation Suggestions:** React Native `View`, `StyleSheet`. Import theme tokens.
 
-5.  **Ticket ID:** UI-5 (UPDATED for Cloud Run endpoint)
+5.  **Ticket ID:** UI-5 (No change needed here, depends on UI-1 to UI-4)
     *   **Title:** Implement Frontend UI: User Registration Screen (Functional)
-    *   **Background:** Build the UI for user sign-up, connecting to the backend API (**Cloud Run function**) and utilizing established UI components.
-    *   **Acceptance Criteria:**
-        *   Registration screen developed, accessible via a public route.
-        *   Screen uses components from UI-3 and UI-4.
-        *   Form fields match BE requirements (email, password).
-        *   Includes clear UI for required fields.
-        *   Integrates placeholder DPA consent checkbox/link (see EPIC 3 SEC-FE-2).
-        *   Form data submitted to backend API (**FOUND-9 Cloud Run function**) upon user action.
-        *   Loading state indicated while submitting.
-        *   Navigates user or displays success message on completion.
-        *   Displays validation/error messages from backend clearly.
-    *   **Technology/Implementation Suggestions:** React Native screens, form handling library. Integrate with frontend network calls (fetch, Axios) to the **Cloud Run endpoint** (`/api/auth/register`). Consume UI components (UI-3, UI-4).
+    *   ...
 
-6.  **Ticket ID:** UI-6 (UPDATED for Cloud Run endpoint)
+6.  **Ticket ID:** UI-6 (No change needed here, depends on UI-1 to UI-4)
     *   **Title:** Implement Frontend UI: User Login Screen (Functional)
-    *   **Background:** Build the UI for user sign-in, connecting to the backend API (**Cloud Run function**) and utilizing established UI components.
-    *   **Acceptance Criteria:**
-        *   Login screen developed, accessible via a public route.
-        *   Screen uses components from UI-3 and UI-4.
-        *   Form fields for email and password.
-        *   Form data submitted to backend API (**FOUND-10 Cloud Run function**) upon user action.
-        *   Loading state indicated while submitting.
-        *   On successful login, **Supabase Auth token** is securely stored client-side (see Epic 3 ticket SEC-FE-1).
-        *   User is navigated to authenticated part of the app (e.g., dashboard - minimal placeholder needed).
-        *   Displays validation/error messages from backend clearly.
-    *   **Technology/Implementation Suggestions:** React Native screens, form handling library, frontend network calls to the **Cloud Run endpoint** (`/api/auth/login`), secure client storage integration (SEC-FE-1). Consume UI components.
+    *   ...
 
 **Epic 3: Secure Client Handling, Supabase RLS & Foundational DPA Consent**
 

@@ -10,17 +10,33 @@
 
 ## 2. Frontend Stack Details
 
-*   **Monorepo:** Project uses a monorepo structure (e.g., Turborepo with pnpm) with `apps` and `packages` directories.
-*   **Native App Framework (`apps/native`):** React Native CLI (Chosen for flexibility and native module access).
-*   **Web App Framework (`apps/web`):** Next.js (Chosen for SSR/SSG, efficient web development).
-*   **Language:** TypeScript (Enforced across all packages/apps).
-*   **Styling:** NativeWind using Tailwind CSS (Shared config in `packages/config`, `className` prop used in shared components).
-*   **Shared UI (`packages/ui`):** Components built with React Native primitives, styled with NativeWind, designed for cross-platform use.
-*   **State Management (`packages/store`):** Redux Toolkit (Recommended).
-*   **Native Navigation (`apps/native`):** React Navigation.
-*   **Web Routing (`apps/web`):** Next.js Router (App or Pages).
-*   **Key Libraries:** Supabase JS SDK, React Navigation, React Native Web (configured in `apps/web`).
-*   **Shared Types (`packages/types`):** Centralized TypeScript definitions.
+*   **Monorepo:** Turborepo / pnpm monorepo (`carepop-monorepo`).
+*   **Package Manager:** pnpm (Note: Required specific Gradle path adjustments for RN Android).
+*   **Web App (`apps/web`):**
+    *   Framework: Next.js (v15.3.0, App Router)
+    *   Language: TypeScript
+    *   Styling: Tailwind CSS (v3.4.6, via `packages/config`, using relative path `require` in `tailwind.config.ts`).
+    *   State Management: Redux Toolkit (planned).
+    *   UI Components: Next.js components, shared components from `packages/ui` (via RNW).
+*   **Native App (`apps/nativeapp`):**
+    *   Framework: React Native CLI (v0.73.8)
+    *   Language: TypeScript
+    *   Styling: **React Native `StyleSheet` confirmed as the stable approach.**
+    *   Navigation: React Navigation (planned).
+    *   State Management: Redux Toolkit (planned).
+    *   UI Components: Native components, shared components from `packages/ui` (using StyleSheet).
+    *   **Android Build:** Requires paths in `settings.gradle` (line 2, 4) and `app/build.gradle` (line 118) to point to root `node_modules` (`../../../` and `../../../../` respectively) to find Gradle scripts.
+    *   **Metro Config:** Requires `blockList` entry for `react-native/Libraries/Core/Devtools/` in `metro.config.js` to be commented out to prevent internal module resolution errors.
+*   **Shared UI (`packages/ui`):**
+    *   Purpose: Reusable React Native components.
+    *   Styling: **`StyleSheet` confirmed as the stable approach, using tokens from `./theme.ts`.** Previous attempts with NativeWind/styled-components were reverted due to instability.
+*   **Shared Tailwind Config (`packages/tailwind-config`):**
+    *   Purpose: Base Tailwind config for `apps/web`.
+    *   Structure: `package.json` (no `type: module`), `tailwind.config.js` (CommonJS).
+*   **Shared TS Config (`packages/typescript-config`):** Planned.
+*   **Shared State (`packages/store`):** Planned (Redux Toolkit).
+*   **Shared Types (`packages/types`):** Planned.
+*   **Build/Dev:** Turborepo, `pnpm run dev`, `pnpm run build` (Note: Production build currently has TS issues).
 
 ## 3. Backend Stack Details
 
@@ -47,12 +63,12 @@
 
 ## 4. Development Setup & Tooling
 
-*   **Source Control:** Git (GitHub/GitLab repositories).
-*   **Monorepo Management:** Turborepo (or chosen tool like Nx, Lerna).
-*   **Package Management:** pnpm (or chosen tool like npm/yarn with workspaces).
-*   **CI/CD:** GitHub Actions for backend deployment to Cloud Run staging. Frontend deployment strategy TBD (Vercel for web, App Store/Play Store for native).
-*   **Testing:** Jest selected for both backend (with `ts-jest`), frontend (`react-native-testing-library` for native, potentially `@testing-library/react` for web-specific parts), and shared packages.
-*   **Local Development:** Monorepo scripts (`dev`, `build`, `lint`) managed by Turborepo/package manager. Requires running native emulator/device, web browser, and backend simulator.
+*   **Source Control:** Git.
+*   **Monorepo Management:** Turborepo.
+*   **Package Management:** pnpm (with `.npmrc` for non-Gradle related hoisting, e.g., `public-hoist-pattern[]=*react-native*`).
+*   **CI/CD:** GitHub Actions (backend). Frontend TBD.
+*   **Testing:** Jest.
+*   **Local Development:** `pnpm run dev` starts both app servers. Requires emulator/device and browser.
 *   **Debugging:** Flipper, Reactotron (Native); Next.js/React DevTools (Web); Standard Node.js debugging tools, Cloud Logging/Monitoring (Backend).
 *   **Secrets:** GCP Secret Manager for cloud credentials, `.env` files within specific apps/packages for local development as needed.
 
@@ -88,16 +104,56 @@
 *   **Native App (`apps/nativeapp`):**
     *   Framework: React Native CLI (v0.73.8)
     *   Language: TypeScript
-    *   Styling: **React Native `StyleSheet`.** (Removed NativeWind/Tailwind).
+    *   Styling: **React Native `StyleSheet` confirmed.**
     *   Navigation: React Navigation (planned).
     *   State Management: Redux Toolkit (planned, via `packages/store`).
     *   UI Components: Primarily native components, shared components from `packages/ui` (using StyleSheet).
 *   **Shared UI (`packages/ui`):**
     *   Purpose: House reusable React Native components for both web and native apps.
-    *   Styling: **Primarily uses React Native `StyleSheet`.** Requires a strategy for web compatibility/styling (e.g., platform-specific files, conditional logic, potentially leveraging RNW + Tailwind on web).
+    *   Styling: **Primarily uses React Native `StyleSheet` confirmed.** Requires a strategy for web compatibility/styling (e.g., platform-specific files, conditional logic, potentially leveraging RNW + Tailwind on web).
 *   **Shared Config (`packages/config`):**
     *   `tailwind-config`: Shared Tailwind CSS configuration (used by `apps/web`).
     *   `typescript-config`: Shared `tsconfig.json` presets (planned).
 *   **Shared State (`packages/store`):** Redux Toolkit slices and store configuration (planned).
 *   **Shared Types (`packages/types`):** TypeScript interfaces and types (planned).
-*   **Build/Dev:** Turborepo orchestrates builds, `pnpm run dev` starts both apps. 
+*   **Build/Dev:** Turborepo orchestrates builds, `pnpm run dev` starts both apps.
+
+**Frontend - Native (`apps/nativeapp`):**
+*   **Framework:** React Native (v0.73.8)
+*   **Language:** TypeScript
+*   **Styling:** **Standard `StyleSheet` confirmed.** (Removed ambiguity about pending decision).
+*   **Bundler:** Metro
+*   **Build:** Android build successful via Gradle (requires manual path adjustments in `settings.gradle` and `app/build.gradle` for monorepo `node_modules`).
+*   **Troubleshooting Notes:**
+    *   Metro `blockList` might need adjustments if core RN modules fail to resolve.
+    *   Persistent rendering errors (even with standard components) can indicate deep caching/build issues requiring aggressive cleaning (Gradle clean, delete `android/build` & `app/build`, delete all `node_modules` via explicit `rimraf` commands on Windows, reinstall). Monitor for `ERR_PNPM_EBUSY` on Windows and terminate blocking processes.
+
+**Frontend - Web (`apps/web`):**
+*   **Framework:** Next.js (v?.? - Check package.json)
+*   **Language:** TypeScript
+*   **Styling:** Tailwind CSS (configured via `postcss.config.mjs` and `tailwind.config.ts`)
+
+**Backend (`carepop-backend`):**
+*   **Framework:** Node.js / Express
+*   **Language:** TypeScript
+*   **Database:** Supabase (PostgreSQL)
+*   **Authentication:** Supabase Auth
+*   **Deployment:** (Likely GCP Cloud Run/Functions - TBD)
+
+**Shared Packages:**
+*   `packages/ui`:
+    *   Targeting both React Native and React (Web).
+    *   Currently uses basic `StyleSheet` for Button component (pending styling strategy decision).
+    *   `theme.ts` exists with basic tokens.
+*   Config packages (`eslint`, `typescript`, `tailwind`) ensure consistency.
+
+**Development Environment:**
+*   OS: Windows (requires careful handling of paths and processes, e.g., `rimraf` usage, `EBUSY` errors).
+*   Editor: (User's choice, e.g., VS Code)
+*   Version Control: Git / GitHub
+
+**Tooling:**
+*   `pnpm` for package management.
+*   `Turborepo` for build/task orchestration.
+*   `eslint`, `prettier` for code quality.
+*   `typescript` for static typing. 

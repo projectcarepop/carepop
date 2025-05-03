@@ -65,3 +65,60 @@
 *   **Timestamp:** <placeholder_timestamp> - **Action:** Encountered persistent Android build errors (`Could not read script ... native_modules.gradle`) due to pnpm hoisting.
 *   **Timestamp:** <placeholder_timestamp> - **Action:** Attempted fixes by adjusting `settings.gradle` paths and adding local dependencies failed to resolve Gradle script path issues.
 *   **Timestamp:** <placeholder_timestamp> - **Action:** Deleted `carepop-monorepo` again. Planning third attempt at initialization, including immediate configuration of pnpm hoisting via `.npmrc`.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Initialized Turborepo (3rd attempt), created `.npmrc`, manually configured `apps/web` (Next.js, Tailwind), created `@repo/tailwind-config`.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Resolved `apps/web` dev server errors (Tailwind config path, TS types).
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Initialized `apps/nativeapp` (RN CLI).
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Resolved Android Gradle build errors by modifying paths in `settings.gradle` and `app/build.gradle` to point to root `node_modules`.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Resolved Metro bundler `Unable to resolve module` error by commenting out `blockList` entry in `metro.config.js`.
+*   **Timestamp:** <placeholder_timestamp> - **Action:** Confirmed both `apps/web` and `apps/nativeapp` dev environments are functional. Monorepo setup complete.
+*   **2024-08-28T14:00:00Z:** Reset frontend monorepo (`carepop-monorepo`) due to persistent, intractable build/cache errors after attempting NativeWind integration. Re-initialized with `pnpm create-turbo`.
+*   **2024-08-28T14:30:00Z:** Configured `apps/web` with Tailwind CSS.
+*   **2024-08-28T15:00:00Z:** Initialized `apps/nativeapp` and configured Metro for monorepo.
+*   **2024-08-28T15:30:00Z:** Fixed Android Gradle build issues in `nativeapp` by adjusting `node_modules` paths in `settings.gradle` and `app/build.gradle`.
+*   **2024-08-28T15:45:00Z:** Fixed Metro bundler error (`Unable to resolve module ../../Core/Devtools/parseErrorStack`) by adjusting `blockList` in `metro.config.js`.
+*   **2024-08-28T16:00:00Z:** Resolved persistent RN rendering errors ("Objects are not valid...", "Text strings must...") in `nativeapp` via aggressive cleaning (Gradle, build folders, node_modules). Successfully rendered shared `@repo/ui/button` (using `title` prop) in `nativeapp`.
+*   **2024-08-29T10:00:00Z:** Attempted to implement `styled-components` theming for `@repo/ui`.
+*   **2024-08-29T10:30:00Z:** Reverted `@repo/ui` styling from `styled-components` back to `StyleSheet` due to persistent TypeScript type errors indicating conflicts between library versions (`@types/react-native`, core RN, `styled-components`).
+*   **2024-08-29T10:45:00Z:** Configured Inter font for web (via `next/font/google`) and native (via manual asset linking + `react-native.config.js`). Updated theme and Button component to use Inter.
+*   **Date:** 2024-08-29 **Time:** 14:07
+  - **Action:** Simplified `Button.tsx` and `App.tsx` drastically to isolate persistent "Objects are not valid as a React child" error.
+  - **Description:** Removed props, variants, and complex rendering logic. `App.tsx` now only renders one minimal button. Goal is to see if the error occurs even in the simplest possible case.
+*   **Date:** 2024-08-29 **Time:** 14:15
+  - **Action:** Modified `App.tsx` to render simple `<Text>` on cyan background, removing `@repo/ui` Button usage entirely.
+  - **Description:** Repeating a previously successful debugging step to verify the basic React Native rendering pipeline before re-introducing the shared component. This helps determine if the error is fundamental to the RN setup or specific to the shared UI package interaction.
+*   **Date:** 2024-08-29 **Time:** 14:25
+  - **Action:** Added custom `resolveRequest` logging to `metro.config.js`. Restored minimal `@repo/ui` Button usage in `App.tsx`.
+  - **Description:** To gain visibility into Metro's handling of the shared UI package, a custom resolver logs attempts to resolve `@repo/ui`. Minimal button usage is restored to trigger this resolution path during the next run.
+*   **Date:** 2024-08-29 **Time:** 14:30
+  - **Action:** Ran `nativeapp` with Metro resolver logging and minimal Button.
+  - **Description:** The "Objects are not valid as a React child" error persisted. Awaiting user confirmation of Metro resolver logs to determine if `@repo/ui` was correctly located by the bundler.
+*   **Date:** 2024-08-29 **Time:** 14:35
+  - **Action:** Corrected Metro custom resolver logic.
+  - **Description:** Fixed "defaultResolveRequest is not a function" error by using `context.resolveRequest` directly instead of attempting to use a previously extracted function reference.
+*   **Date:** 2024-08-29 **Time:** 14:40
+  - **Action:** Ran `nativeapp` after correcting Metro resolver logic.
+  - **Description:** \"Objects are not valid...\" error still occurs. Still waiting for the critical `[Metro Resolver]` log output from the Metro bundler terminal to understand if `@repo/ui` is being resolved correctly.
+*   **Date:** 2024-08-29 **Time:** 14:50
+  - **Action:** Added further logging to `metro.config.js`.
+  - **Description:** Added a top-level log to confirm file loading and modified the custom resolver to log *all* module resolution attempts, not just `@repo/ui`, because specific logging wasn't appearing.
+*   **Date:** 2024-08-29 **Time:** 14:55
+  - **Action:** Verified Metro resolves `@repo/ui` to `packages/ui/src/index.ts`. Verified `index.ts` exports `Button`. Changed `App.tsx` to import Button via direct path (`@repo/ui/src/button`).
+  - **Description:** Confirmed module resolution is working. Testing if bypassing `index.ts` export affects the render error. Linter error for direct import is expected due to Metro config mapping only the root.
+*   **Date:** 2024-08-29 **Time:** 15:05
+  - **Action:** Encountered Metro internal error (`Got unexpected undefined`) when using direct import path. Cleared Metro cache manually. Reverted `App.tsx` import back to `@repo/ui`.
+  - **Description:** The direct import path test led to a bundler error instead of the render error. Attempting cache clear and reverting to standard import path before further investigation.
+*   **Date:** 2024-08-29 **Time:** 15:15
+  - **Action:** Added explicit `react` and `react-native` mappings to `metro.config.js` `extraNodeModules`.
+  - **Description:** Since the \"Objects are not valid...\" error persists despite confirmed module resolution, attempting a common workaround for potential duplicate React instances by forcing Metro to use the app's versions.
+*   **Date:** 2024-08-29 **Time:** 15:35
+  - **Action:** Reviewed `package.json` for `ui` and `nativeapp`. Set explicit `transformer.babelTransformerPath` in `metro.config.js`.
+  - **Description:** Package dependencies and peer dependencies seem correctly configured. Explicitly setting the Babel transformer path is another attempt to ensure consistent code processing for shared packages.
+*   **Date:** 2024-08-29 **Time:** 15:45
+  - **Action:** Reset `metro.config.js`, restored previous working `Button.tsx` and `App.tsx`. Performed aggressive clean (Metro cache, Android build, `node_modules`) and started `pnpm install --force`.
+  - **Description:** Attempting to fully restore the last known working state before the `styled-components` experiment caused instability. Cleaning steps executed successfully after quoting paths. Waiting for `pnpm install` to complete.
+*   **Date:** 2024-08-29 **Time:** 16:00
+  - **Action:** Successfully restored working state for `nativeapp`.
+  - **Description:** After resetting `metro.config.js` to basic monorepo settings, restoring `Button.tsx` and `App.tsx` to their last known working (StyleSheet) versions, and performing an aggressive clean/reinstall, the \"Objects are not valid...\" rendering error is resolved. The shared Button component renders correctly in `nativeapp`.
+*   **Date:** 2024-08-29 **Time:** 16:05
+  - **Action:** Session End. Reviewed and updated Memory Bank (`epics_and_tickets.md`, `techContext.md`) to reflect resolution of native rendering errors and confirmation of `StyleSheet` styling approach.
+  - **Description:** Project state is stable with `nativeapp` rendering shared UI correctly. Ready to continue UI component development in the next session.
