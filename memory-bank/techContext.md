@@ -74,4 +74,30 @@
 *   **Cross-Platform Consistency:** Core goal achieved via shared `packages/ui` styled with NativeWind. Requires careful component design and testing.
 *   **Performance:** Needs proactive optimization (native rendering, web vitals, backend query/RLS performance).
 *   **Scalability:** Leverage managed services (Supabase, Cloud Run) but requires monitoring and appropriate configuration.
-*   **SEO:** Public web pages (Landing Pages, Directory in `apps/web`) must be discoverable, achieved via Next.js SSR/SSG. 
+*   **SEO:** Public web pages (Landing Pages, Directory in `apps/web`) must be discoverable, achieved via Next.js SSR/SSG.
+
+### Frontend (`carepop-monorepo`)
+
+*   **Structure:** Turborepo / pnpm monorepo.
+*   **Web App (`apps/web`):**
+    *   Framework: Next.js (App Router)
+    *   Language: TypeScript
+    *   Styling: Tailwind CSS (via `packages/config`), React Native Web (for potential `@repo/ui` component usage).
+    *   State Management: Redux Toolkit (planned, via `packages/store`).
+    *   UI Components: Primarily Next.js components, potentially shared components from `packages/ui`.
+*   **Native App (`apps/nativeapp`):**
+    *   Framework: React Native CLI (v0.73.8)
+    *   Language: TypeScript
+    *   Styling: **React Native `StyleSheet`.** (Removed NativeWind/Tailwind).
+    *   Navigation: React Navigation (planned).
+    *   State Management: Redux Toolkit (planned, via `packages/store`).
+    *   UI Components: Primarily native components, shared components from `packages/ui` (using StyleSheet).
+*   **Shared UI (`packages/ui`):**
+    *   Purpose: House reusable React Native components for both web and native apps.
+    *   Styling: **Primarily uses React Native `StyleSheet`.** Requires a strategy for web compatibility/styling (e.g., platform-specific files, conditional logic, potentially leveraging RNW + Tailwind on web).
+*   **Shared Config (`packages/config`):**
+    *   `tailwind-config`: Shared Tailwind CSS configuration (used by `apps/web`).
+    *   `typescript-config`: Shared `tsconfig.json` presets (planned).
+*   **Shared State (`packages/store`):** Redux Toolkit slices and store configuration (planned).
+*   **Shared Types (`packages/types`):** TypeScript interfaces and types (planned).
+*   **Build/Dev:** Turborepo orchestrates builds, `pnpm run dev` starts both apps. 

@@ -2,29 +2,44 @@
 
 ## Current Status
 
-*   **Frontend development being restarted from scratch using a Monorepo structure (`carepop-monorepo`).**
-*   Previous `carepop-frontend` code and build configuration discarded.
+*   Monorepo structure (`carepop-monorepo`) initialized with `apps/web` and `apps/nativeapp`.
+*   Basic setup for shared Tailwind config (`packages/tailwind-config`) for web and shared UI (`packages/ui` using StyleSheet for native) is complete.
+*   `apps/web` is configured for Tailwind; basic dev mode runs.
+*   `apps/nativeapp` is configured for standard `StyleSheet` styling. **Build is no longer blocked by Babel error.** Verification pending.
+*   React/React-DOM versions downgraded to 18.2.0 across workspaces.
 *   Foundational infrastructure (GCP, Supabase), backend CI/CD, logging, config management, and backend testing frameworks remain set up (FOUND-1 to FOUND-6 related to backend).
 *   User registration (FOUND-9) and login (FOUND-10) backend endpoints remain implemented and functional.
 *   `profiles` table created and basic RLS policies implemented and verified (FOUND-8).
+*   Backend CI/CD Pipeline.
+*   Backend Testing Framework.
+*   Monorepo structure created (`carepop-monorepo`) with `apps/web` and `apps/nativeapp`.
+*   **Basic monorepo development environment (`pnpm run dev`) starts both web and native apps.**
 
 ## What Works
 
-*   Backend Infrastructure (GCP Services, Supabase Project).
-*   Backend Core Logic (Auth Endpoints, Profile Creation, Basic RLS, Config, Logging).
-*   Backend CI/CD Pipeline.
-*   Backend Testing Framework.
+*   Backend Infrastructure & Core Logic.
+*   Monorepo structure created (`carepop-monorepo`) with `apps/web` and `apps/nativeapp`.
+*   Shared Tailwind configuration (`packages/tailwind-config`) for web.
+*   Shared UI package (`packages/ui`) setup using `StyleSheet` for native.
+*   `apps/web` development server (`pnpm run dev`) starts and renders shared component (styling might be affected by NativeWind/Tailwind peer dep warning).
+*   `apps/nativeapp` development server (`pnpm run dev`) starts without the previous Babel error (App functionality verification pending).
 
 ## What's Left to Build (High Level - Based on Epics/Phases)
 
 *   **Frontend Monorepo Setup:**
-    *   **Initialize new monorepo using `create-turbo`.**
-    *   Configure `apps/web` (Next.js).
-    *   Initialize `apps/native` (RN CLI).
-    *   Configure shared packages (`ui`, `config`, `store`, `types`).
-    *   Establish monorepo build/dev workflows.
+    *   ~~Initialize new monorepo using `create-turbo`.~~ (Done)
+    *   ~~Initialize `apps/nativeapp` (RN CLI).~~ (Done)
+    *   ~~Establish basic monorepo build/dev workflows (`pnpm run dev`).~~ (Native no longer blocked, verification pending)
+    *   ~~Refine `apps/web` (Next.js setup, Tailwind, etc.).~~ (Basic setup done)
+    *   ~~Configure shared packages (`ui`, `config` [Tailwind part]).~~ (UI uses StyleSheet for native)
+    *   ~~Fix `apps/nativeapp` Babel build error.~~ (Fixed by removing NativeWind)
+    *   **Verify `apps/nativeapp` runs correctly and renders basic components.**
+    *   Test shared component styling/functionality end-to-end (Native: StyleSheet, Web: Tailwind/RNW).
+    *   Develop strategy for consistent cross-platform styling in `packages/ui`.
+    *   Configure shared `packages/typescript-config` usage consistency.
+    *   Configure shared `packages/store`.
 *   **Phase 1 (MVP) - Frontend Implementation within Monorepo:**
-    *   Implement Auth UI (`apps/web`, `apps/native` using `packages/ui`).
+    *   Implement Auth UI (`apps/web`, `apps/nativeapp` using `packages/ui`).
     *   Implement Profile Management UI.
     *   Implement Basic Appointment Scheduling UI.
     *   Implement Basic Provider Directory UI (`apps/web` with SEO focus).
@@ -40,8 +55,9 @@
 
 ## Known Issues
 
+*   ~~`apps/nativeapp` build fails due to persistent Babel error: `.plugins is not a valid Plugin property`. Root cause unclear despite troubleshooting (React versions aligned, config syntax checked, cache cleared).~~ (Resolved by removing NativeWind)
+*   Peer Dependency Warning in `apps/web`: `tailwindcss` v4 installed, but a dependency might expect v3. (Potential styling issues later on web).
 *   Task Master AI tools fail (Low Priority).
-*   **Monorepo initialization needs to be performed.**
 
 ## Evolution of Project Decisions
 
@@ -55,3 +71,7 @@
 *   **Decision:** Abandoned initial frontend implementation due to build issues.
 *   **Decision:** Restarted frontend using a Monorepo structure (Turborepo/pnpm) with Next.js (web), RN CLI (native), NativeWind styling, and shared packages, based on a detailed frontend plan.
 *   **Decision:** Discarded first monorepo initialization attempt due to errors; proceeding with fresh `create-turbo` initialization.
+*   **Decision:** Named the React Native application `nativeapp` during initialization.
+*   **Decision:** Configured `metro.config.js` in `nativeapp` with monorepo settings (`watchFolders`, `nodeModulesPaths`, `extraNodeModules`, `blockList`, `server.enhanceMiddleware`).
+*   **Decision:** Downgraded React/React-DOM to 18.2.0 across workspaces to match RN 0.73.8 dependency.
+*   **Decision:** Removed NativeWind/Tailwind CSS from `apps/nativeapp` due to persistent build errors. Switched to standard React Native `StyleSheet` for native styling.

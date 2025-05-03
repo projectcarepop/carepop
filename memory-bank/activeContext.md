@@ -2,15 +2,12 @@
 
 ## Current Work Focus
 
-*   **Goal:** Restart frontend development using a Monorepo structure (Turborepo/pnpm) with Next.js (web), React Native CLI (native), and NativeWind, based on the detailed frontend plan provided.
-*   **Action:** **Initialize a *new* Turborepo monorepo from scratch using `create-turbo`.**
+*   **Goal:** Verify that `apps/nativeapp` starts correctly after removing NativeWind/Tailwind CSS.
+*   **Action:** Checking Metro bundler output from `pnpm run dev`.
 
 ## Current Focus
 
-*   **Executing the `npx create-turbo@latest` command to scaffold the foundational monorepo structure (`carepop-monorepo`).**
-*   Setting up the foundational monorepo structure (`carepop-monorepo`).
-*   Configuring the `apps/web` (Next.js) and initializing `apps/native` (React Native CLI) applications.
-*   Establishing shared packages (`packages/ui`, `packages/config`, `packages/store`, `packages/types`).
+*   **Verify `apps/nativeapp` build success.**
 
 ## Recent Changes & Decisions
 
@@ -18,22 +15,33 @@
 *   **Decision:** Adopted a Monorepo structure (using Turborepo/pnpm) for frontend development (`carepop-monorepo`).
 *   **Decision:** **Discarded the initial Turborepo setup attempt due to errors and opted for a complete re-initialization.**
 *   **Decision:** Confirmed the detailed frontend architecture:
-    *   `apps/native`: RN CLI, React Navigation.
-    *   `apps/web`: Next.js, Next.js Router, React Native Web.
+    *   `apps/nativeapp`: RN CLI (Initialized, BLOCKED by Babel error), React Navigation.
+    *   `apps/web`: Next.js (Initialized, basic dev works), Next.js Router, React Native Web.
     *   `packages/ui`: Shared RN components styled with NativeWind `className`.
     *   `packages/config`: Shared Tailwind config.
     *   `packages/store`: Shared Redux Toolkit logic.
     *   `packages/types`: Shared TypeScript types.
     *   Separate Public Landing Pages / Admin UI project (likely using Next.js) to be created later.
 *   Backend setup (Supabase + Cloud Run) remains as previously established.
+*   **Decision:** Downgraded React/React-DOM to `18.2.0` across workspaces to align with `react-native@0.73.8`.
+*   **Decision:** Configured `metro.config.js` and `babel.config.js` (including NativeWind plugin) for monorepo setup.
+*   **Decision:** Tested shared component (`@repo/ui/button`) usage in both apps (initially with NativeWind).
+*   **Decision:** Abandoned NativeWind/Tailwind CSS for `apps/nativeapp` due to persistent Babel errors (`.plugins is not a valid Plugin property`). Shifted to standard `StyleSheet` styling for native components.
 
 ## Next Steps
 
-1.  **Initialize the Turborepo monorepo structure using `npx create-turbo@latest` (using `pnpm`).**
-2.  Refine `apps/web` (Next.js setup, TypeScript, Tailwind integration).
-3.  Remove `apps/docs` (if created by default) and initialize `apps/native` (React Native CLI).
-4.  Configure shared `packages/config` (Tailwind, TSConfig) and `packages/ui` (basic setup).
-5.  Ensure basic monorepo build/dev commands work.
+1.  ~~Initialize the Turborepo monorepo structure using `npx create-turbo@latest` (using `pnpm`).~~ (Done)
+2.  ~~Remove `apps/docs`.~~ (Done)
+3.  ~~Initialize `apps/nativeapp` (React Native CLI).~~ (Done)
+4.  ~~Ensure basic monorepo build/dev commands work.~~ (Web works, Native blocked)
+5.  ~~Refine `apps/web` (Next.js setup, TypeScript, Tailwind integration).~~ (Basic Tailwind setup done)
+6.  ~~Configure shared `packages/config` (Tailwind, TSConfig) and `packages/ui` (basic setup).~~ (Tailwind config now only applies to web, UI uses StyleSheet for native)
+7.  ~~Diagnose and fix the `apps/nativeapp` Babel error (`.plugins is not a valid Plugin property`).~~ (Resolved by removing NativeWind)
+8.  **Verify `apps/nativeapp` starts correctly with Metro bundler.**
+9.  Test the updated shared Button component in `apps/nativeapp`.
+10. Test the shared Button component in `apps/web` (may require adjustments as it still uses Tailwind/NativeWind via RNW).
+11. Address peer dependency warnings (related to Tailwind v4 in web context).
+12. Define a consistent styling strategy for shared components across `apps/web` (Tailwind/RNW) and `apps/nativeapp` (StyleSheet).
 
 ## Active Decisions & Considerations
 
@@ -46,9 +54,12 @@
 
 ## Important Patterns & Preferences
 
-*   **Monorepo Structure:** `apps/native`, `apps/web`, `packages/ui`, `packages/config`, `packages/store`, `packages/types` managed by Turborepo/pnpm.
-*   **Styling:** NativeWind `className` props on RN primitives in `packages/ui`, shared `tailwind.config.js` in `packages/config`.
-*   **Navigation:** React Navigation in `apps/native`, Next.js Router in `apps/web`. Callbacks for shared components.
+*   **Monorepo Structure:** `apps/nativeapp`, `apps/web`, `packages/ui`, `packages/config`, `packages/store`, `packages/types` managed by Turborepo/pnpm.
+*   **Styling:** 
+    *   `apps/nativeapp`: Standard React Native `StyleSheet`.
+    *   `apps/web`: Tailwind CSS (via `packages/config`) potentially using React Native Web for component compatibility.
+    *   `packages/ui`: Components primarily use `StyleSheet`. Need strategy for web compatibility/styling overrides (e.g., platform-specific files, conditional styling).
+*   **Navigation:** React Navigation in `apps/nativeapp`, Next.js Router in `apps/web`. Callbacks for shared components.
 *   **State:** Shared RTK slices in `packages/store`, Provider setup in each app.
 *   **Backend:** Node.js/TypeScript on Google Cloud Run, using Express. Supabase (PostgreSQL, Auth, RLS).
 *   **Security:** SPI/PHI requires application-level AES-256-GCM encryption. RLS primary access control. Secrets in GCP Secret Manager.
@@ -59,4 +70,8 @@
 
 *   Attempting complex cross-platform builds (RNW + NativeWind + Webpack) without a structured monorepo and clear configuration strategy led to persistent issues.
 *   Adopting a standard monorepo setup (Turborepo) and leveraging framework conventions (Next.js for web) should provide a more stable foundation.
+*   **React Native Metro bundler requires specific `watchFolders` and `nodeModulesPaths` configuration in `metro.config.js` for pnpm monorepos.**
+*   React Native CLI init seems sensitive to command-line arguments in this environment; interactive prompts may be more reliable.
 *   Clear definition of shared vs. app-specific code is crucial.
+*   **Android SDK path in `local.properties` requires escaped backslashes (`\\`) and no trailing spaces.**
+*   **Persistent Babel Error:** `.plugins is not a valid Plugin property` error in `apps/nativeapp` build was directly caused by the `nativewind/babel` plugin in the monorepo setup.
