@@ -1,102 +1,211 @@
-import Image, { type ImageProps } from "next/image";
-import { Button } from "@repo/ui/button";
-import styles from "./page.module.css";
+"use client";
 
+import React, { useState } from 'react';
+// import Image, { type ImageProps } from "next/image"; // Remove unused import
+import {
+  Button,
+  Card,
+  TextInput,
+  Checkbox,
+  RadioGroup,
+  // RadioButton, // Keep removed
+  Switch,
+  // theme // Keep removed
+} from "@repo/ui";
+// import styles from "./page.module.css"; // Keep removed
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+
+// Remove unused ThemeImage component definition
+/*
 type Props = Omit<ImageProps, "src"> & {
   srcLight: string;
   srcDark: string;
 };
-
 const ThemeImage = (props: Props) => {
-  const { srcLight, srcDark, ...rest } = props;
-
-  return (
-    <>
-      <Image {...rest} src={srcLight} className="imgLight" />
-      <Image {...rest} src={srcDark} className="imgDark" />
-    </>
-  );
+  // ...
 };
+*/
 
 export default function Home() {
-  return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <ThemeImage
-          className={styles.logo}
-          srcLight="turborepo-dark.svg"
-          srcDark="turborepo-light.svg"
-          alt="Turborepo logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>apps/web/app/page.tsx</code>
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [textValue, setTextValue] = useState('');
+  const [textValueError, setTextValueError] = useState<string | undefined>(undefined);
+  const [isChecked, setIsChecked] = useState(false);
+  const [radioValue, setRadioValue] = useState<string | null>('option1');
+  const [isSwitchEnabled, setIsSwitchEnabled] = useState(false);
 
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new/clone?demo-description=Learn+to+implement+a+monorepo+with+a+two+Next.js+sites+that+has+installed+three+local+packages.&demo-image=%2F%2Fimages.ctfassets.net%2Fe5382hct74si%2F4K8ZISWAzJ8X1504ca0zmC%2F0b21a1c6246add355e55816278ef54bc%2FBasic.png&demo-title=Monorepo+with+Turborepo&demo-url=https%3A%2F%2Fexamples-basic-web.vercel.sh%2F&from=templates&project-name=Monorepo+with+Turborepo&repository-name=monorepo-turborepo&repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fturborepo%2Ftree%2Fmain%2Fexamples%2Fbasic&root-directory=apps%2Fdocs&skippable-integrations=1&teamSlug=vercel&utm_source=create-turbo"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://turborepo.com/docs?utm_source"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
-        </div>
-        <Button appName="web" className={styles.secondary}>
-          Open alert
-        </Button>
+  const handleTextChange = (text: string) => {
+      setTextValue(text);
+      if (text.length > 0 && text.length < 3) {
+          setTextValueError('Must be at least 3 characters');
+      } else {
+          setTextValueError(undefined);
+      }
+  }
+
+  // Define options for RadioGroup
+  const radioOptions = [
+    { label: "Option 1", value: "option1" },
+    { label: "Option 2", value: "option2" },
+    { label: "Option 3 (Disabled)", value: "option3", disabled: true },
+  ];
+
+  // Create Icon components
+  const MagnifyIcon = <MaterialIcons name="search" size={20} color="#888" />;
+  const CloseIcon = <MaterialIcons name="close" size={20} color="#888" />;
+
+  return (
+    <div /* className={styles.page} */ >
+      <main /* className={styles.main} */ style={{ padding: 20 }}>
+        <h1 /* style={pageStyles.heading} */ >@repo/ui Web Component Tests</h1>
+
+        <Card /* style={pageStyles.card} */>
+            <h2 /* style={pageStyles.componentTitle} */>Button</h2>
+            <Button title="Primary Button" variant="primary" onPress={() => alert('Primary Pressed')} />
+            <div style={{ marginBottom: '12px' }} />
+            <Button title="Secondary Solid" variant="secondary-solid" onPress={() => alert('Secondary Solid Pressed')} />
+            <div style={{ marginBottom: '12px' }} />
+            <Button title="Secondary Outline" variant="secondary-outline" onPress={() => alert('Secondary Outline Pressed')} />
+            <div style={{ marginBottom: '12px' }} />
+            <Button title="Destructive" variant="destructive" onPress={() => alert('Destructive Pressed')} />
+            <div style={{ marginBottom: '12px' }} />
+            <Button title="Disabled Primary" variant="primary" onPress={() => {}} disabled />
+        </Card>
+
+        <div style={{ marginBottom: '24px' }} />
+
+         <Card /* style={pageStyles.card} */>
+            <h2 /* style={pageStyles.componentTitle} */>Card</h2>
+            <p>This content is inside a Card component.</p>
+        </Card>
+
+         <div style={{ marginBottom: '24px' }} />
+
+         <Card /* style={pageStyles.card} */>
+             <h2 /* style={pageStyles.componentTitle} */>TextInput</h2>
+             <TextInput
+                label="Standard Input"
+                placeholder="Enter text here"
+                value={textValue}
+                onChangeText={handleTextChange}
+                helperText="This is some helper text."
+             />
+              <div style={{ marginBottom: '12px' }} />
+             <TextInput
+                label="Input with Error"
+                placeholder="Enter text (min 3 chars)"
+                value={textValue}
+                onChangeText={handleTextChange}
+                error={textValueError}
+             />
+              <div style={{ marginBottom: '12px' }} />
+              <TextInput
+                label="Input with Icons"
+                placeholder="Search"
+                leadingIcon={MagnifyIcon}
+                trailingIcon={CloseIcon}
+                value={textValue}
+                onChangeText={handleTextChange}
+             />
+              <div style={{ marginBottom: '12px' }} />
+              <TextInput
+                label="Disabled Input"
+                placeholder="Cannot edit"
+                value="Some disabled text"
+                disabled
+             />
+         </Card>
+
+         <div style={{ marginBottom: '24px' }} />
+
+         <Card /* style={pageStyles.card} */>
+             <h2 /* style={pageStyles.componentTitle} */ style={{ fontSize: 18, fontWeight: '500', marginBottom: 16 }}>Checkbox</h2>
+             <Checkbox
+                label="Accept Terms"
+                checked={isChecked}
+                onPress={() => setIsChecked(!isChecked)}
+             />
+              <div style={{ marginBottom: '12px' }} />
+             <Checkbox
+                label="Disabled Unchecked"
+                checked={false}
+                onPress={() => {}}
+                disabled
+             />
+              <div style={{ marginBottom: '12px' }} />
+              <Checkbox
+                label="Disabled Checked"
+                checked={true}
+                onPress={() => {}}
+                disabled
+             />
+         </Card>
+
+          <div style={{ marginBottom: '24px' }} />
+
+          <Card /* style={pageStyles.card} */>
+             <h2 /* style={pageStyles.componentTitle} */>RadioButton</h2>
+             <RadioGroup
+                label="Choose an option:"
+                options={radioOptions}
+                selectedValue={radioValue}
+                onValueChange={setRadioValue}
+              >
+              </RadioGroup>
+               <p style={{ marginTop: '8px' }}>Selected: {radioValue || 'None'}</p>
+          </Card>
+
+            <div style={{ marginBottom: '24px' }} />
+
+          <Card /* style={pageStyles.card} */>
+             <h2 /* style={pageStyles.componentTitle} */>Switch</h2>
+             <Switch
+                label="Enable Feature"
+                value={isSwitchEnabled}
+                onValueChange={setIsSwitchEnabled}
+             />
+              <div style={{ marginBottom: '12px' }} />
+              <Switch
+                label="Disabled Off"
+                value={false}
+                onValueChange={() => {}}
+                disabled
+             />
+               <div style={{ marginBottom: '12px' }} />
+               <Switch
+                label="Disabled On"
+                value={true}
+                onValueChange={() => {}}
+                disabled
+             />
+          </Card>
+
       </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com/templates?search=turborepo&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://turborepo.com?utm_source=create-turbo"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to turborepo.com →
-        </a>
-      </footer>
     </div>
   );
 }
+
+// Remove or adjust pageStyles definition if not used
+/*
+const pageStyles = {
+  heading: {
+    fontSize: '24px',
+    fontWeight: '600',
+    marginBottom: '24px',
+    textAlign: 'center',
+  },
+  card: {
+    marginBottom: '24px',
+    padding: '16px',
+    border: '1px solid #eee',
+    borderRadius: '8px',
+  },
+  componentTitle: {
+     fontSize: '18px',
+     fontWeight: '500',
+     marginBottom: '16px',
+  },
+  componentSpacing: {
+    marginBottom: '12px',
+  },
+};
+*/

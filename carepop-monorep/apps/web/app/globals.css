@@ -1,3 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Load Material Icons font for react-native-vector-icons on web */
+@font-face {
+  font-family: 'MaterialIcons';
+  src: url('~react-native-vector-icons/Fonts/MaterialIcons.ttf') format('truetype');
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
