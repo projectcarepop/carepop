@@ -7,7 +7,13 @@
   "exports": {
     ".": "./src/index.ts",
     "./button": "./src/button.tsx",
-    "./styles/theme": "./src/styles/theme.ts"
+    "./card": "./src/card.tsx",
+    "./checkbox": "./src/checkbox.tsx",
+    "./radioGroup": "./src/radioGroup.tsx",
+    "./radioButton": "./src/radioButton.tsx",
+    "./switch": "./src/switch",
+    "./textInput": "./src/textInput.tsx",
+    "./theme": "./src/theme.ts"
   },
   "typesVersions": {
     "*": {
@@ -17,8 +23,27 @@
       "button": [
         "src/button.tsx"
       ],
-      "styles/theme": [
-        "src/styles/theme.ts"
+      "card": [
+        "src/card.tsx"
+      ],
+      "checkbox": [
+        "src/checkbox.tsx"
+      ],
+      "radioGroup": [
+        "src/radioGroup.tsx"
+      ],
+      "radioButton": [
+        "src/radioButton.tsx"
+      ],
+      "switch": [
+        "src/switch.web.tsx",
+        "src/switch.native.tsx"
+      ],
+      "textInput": [
+        "src/textInput.tsx"
+      ],
+      "theme": [
+        "src/theme.ts"
       ]
     }
   },

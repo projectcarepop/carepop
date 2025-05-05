@@ -1,102 +1,178 @@
-import Image, { type ImageProps } from "next/image";
-import { Button } from "@repo/ui/button";
-import styles from "./page.module.css";
+"use client"; // Required for useState
 
-type Props = Omit<ImageProps, "src"> & {
-  srcLight: string;
-  srcDark: string;
-};
+import React, { useState } from 'react';
+import {
+  Button,
+  Card,
+  TextInput,
+  Checkbox,
+  RadioButton,
+  RadioGroup,
+  Switch
+} from '@repo/ui';
+import { theme } from '@repo/ui/theme';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
-const ThemeImage = (props: Props) => {
-  const { srcLight, srcDark, ...rest } = props;
+// Define sample radio options
+const radioOptions = [
+  { label: 'Option 1', value: '1' },
+  { label: 'Option 2', value: '2' },
+  { label: 'Option 3 (Disabled)', value: '3', disabled: true },
+  { label: 'Option 4', value: '4' },
+];
+
+export default function Page() {
+  const [textValue, setTextValue] = useState('');
+  // Add state for the interactive checkbox
+  const [isChecked, setIsChecked] = useState(false);
+  // Add state for the selected radio value
+  const [selectedRadioValue, setSelectedRadioValue] = useState<string | null>('2'); // Default to option 2
+  
+  // Define icon color (use default web textSecondary for simplicity here)
+  const iconColor = theme.colors.textSecondary;
+
+  const [isSwitchOn, setIsSwitchOn] = useState(false);
+  const [isLabeledSwitchOn, setIsLabeledSwitchOn] = useState(true);
+  const [isDisabledSwitchOn, setIsDisabledSwitchOn] = useState(false);
+  
+  const handleSwitchChange = (value: boolean) => setIsSwitchOn(value);
+  const handleLabeledSwitchChange = (value: boolean) => setIsLabeledSwitchOn(value);
+  const handleDisabledSwitchChange = (value: boolean) => setIsDisabledSwitchOn(value);
+
+  const [selectedRadio, setSelectedRadio] = useState('option1');
+  const [isIndeterminateChecked, setIsIndeterminateChecked] = useState(false);
+  const [isDisabledChecked, setIsDisabledChecked] = useState(true);
 
   return (
-    <>
-      <Image {...rest} src={srcLight} className="imgLight" />
-      <Image {...rest} src={srcDark} className="imgDark" />
-    </>
-  );
-};
+    <div className="flex min-h-screen flex-col items-center justify-center p-6 md:p-24 bg-gray-100">
+      <div className="w-full max-w-2xl bg-white p-8 rounded-lg shadow-xl">
+        <h1 className="text-3xl font-bold mb-8 text-center text-primary">UI Component Showcase</h1>
 
-export default function Home() {
-  return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <ThemeImage
-          className={styles.logo}
-          srcLight="turborepo-dark.svg"
-          srcDark="turborepo-light.svg"
-          alt="Turborepo logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>apps/web/app/page.tsx</code>
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new/clone?demo-description=Learn+to+implement+a+monorepo+with+a+two+Next.js+sites+that+has+installed+three+local+packages.&demo-image=%2F%2Fimages.ctfassets.net%2Fe5382hct74si%2F4K8ZISWAzJ8X1504ca0zmC%2F0b21a1c6246add355e55816278ef54bc%2FBasic.png&demo-title=Monorepo+with+Turborepo&demo-url=https%3A%2F%2Fexamples-basic-web.vercel.sh%2F&from=templates&project-name=Monorepo+with+Turborepo&repository-name=monorepo-turborepo&repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fturborepo%2Ftree%2Fmain%2Fexamples%2Fbasic&root-directory=apps%2Fdocs&skippable-integrations=1&teamSlug=vercel&utm_source=create-turbo"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://turborepo.com/docs?utm_source"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
+        {/* Button Examples */}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold mb-4">Buttons</h2>
+          <div className="flex flex-wrap gap-4 mb-4">
+            <Button onPress={() => alert('Primary Pressed!')} title="Primary Button" variant="primary" />
+            <Button onPress={() => alert('Secondary Solid Pressed!')} title="Secondary Solid" variant="secondary-solid" />
+            <Button onPress={() => alert('Secondary Outline Pressed!')} title="Secondary Outline" variant="secondary-outline" />
+            <Button onPress={() => alert('Destructive Pressed!')} title="Destructive" variant="destructive" />
+          </div>
+          <div className="flex flex-wrap gap-4">
+            <Button onPress={() => {}} title="Primary Disabled" variant="primary" disabled />
+            <Button onPress={() => {}} title="Secondary Solid Disabled" variant="secondary-solid" disabled />
+            <Button onPress={() => {}} title="Secondary Outline Disabled" variant="secondary-outline" disabled />
+            <Button onPress={() => {}} title="Destructive Disabled" variant="destructive" disabled />
+          </div>
         </div>
-        <Button appName="web" className={styles.secondary}>
-          Open alert
-        </Button>
-      </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com/templates?search=turborepo&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
+
+        {/* TextInput Examples */}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold mb-4">Text Inputs</h2>
+          <TextInput
+            label="Email Address"
+            placeholder="you@example.com"
+            keyboardType="email-address"
+            helperText="Please enter a valid email."
+            leadingIcon={<MaterialIcons name="mail-outline" size={20} color={iconColor} />}
           />
-          Examples
-        </a>
-        <a
-          href="https://turborepo.com?utm_source=create-turbo"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
+          <TextInput
+            label="Password"
+            placeholder="••••••••"
+            secureTextEntry
+            helperText="Must be at least 8 characters."
+            trailingIcon={<MaterialIcons name="visibility-off" size={20} color={iconColor} />}
           />
-          Go to turborepo.com →
-        </a>
-      </footer>
-    </div>
+          <TextInput
+            label="Search"
+            placeholder="Search terms..."
+            leadingIcon={<MaterialIcons name="search" size={20} color={iconColor} />}
+            trailingIcon={<MaterialIcons name="mic" size={20} color={iconColor} />}
+          />
+           <TextInput
+            label="Error State Input"
+            placeholder="Something wrong here"
+            error="This field has an error."
+            labelStyle={{ color: theme.colors.destructive }}
+            trailingIcon={<MaterialIcons name="error-outline" size={20} color={theme.colors.destructive} />}
+          />
+           <TextInput
+            label="Disabled Input"
+            placeholder="Cannot edit"
+            value="Some pre-filled value"
+            disabled={true}
+            leadingIcon={<MaterialIcons name="lock-outline" size={20} color={theme.colors.disabledText} />}
+        />
+      </div>
+
+        {/* Checkbox Section */}
+        <h2 className="text-xl font-semibold mb-4 text-center text-gray-600">Checkboxes</h2>
+        <div className="space-y-4 w-full items-start"> {/* Use items-start */} 
+          <Checkbox
+            label="Interactive Checkbox"
+            checked={isChecked}
+            onPress={() => setIsChecked(!isChecked)}
+          />
+          <Checkbox
+            label="Already Checked"
+            checked={true}
+            onPress={() => { /* Usually you'd have state here */ }}
+          />
+          <Checkbox
+            label="Disabled Checkbox"
+            checked={false}
+            disabled={true}
+            onPress={() => {}}
+          />
+          <Checkbox
+            label="Disabled Checked"
+            checked={true}
+          disabled={true}
+            onPress={() => {}}
+        />
+      </div>
+
+        {/* Radio Button Section */}
+        <h2 className="text-xl font-semibold mb-4 text-center text-gray-600">Radio Buttons</h2>
+        <div className="w-full items-start">
+          <RadioGroup
+            label="Choose one option:"
+            options={radioOptions}
+            selectedValue={selectedRadioValue}
+            onValueChange={setSelectedRadioValue}
+        />
+      </div>
+
+        {/* Switch Examples */}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold mb-4">Switches</h2>
+          <Switch
+            label="Basic Switch"
+            value={isSwitchOn}
+            onValueChange={handleSwitchChange}
+          />
+          <Switch
+            label="Initially On Switch"
+            value={isLabeledSwitchOn}
+            onValueChange={handleLabeledSwitchChange}
+          />
+          <Switch
+            label="Disabled Switch"
+            value={isDisabledSwitchOn}
+            onValueChange={handleDisabledSwitchChange}
+          disabled={true}
+        />
+      </div>
+
+        {/* Card Example - Ensure this has some content */}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold mb-4">Card</h2>
+          <div className={`bg-${theme.colors.surface} rounded-${theme.borderRadius.lg} shadow-md p-${theme.spacing.md}`}>
+            <Card>
+              <p style={{ color: theme.colors.text }}>This is content inside a card.</p>
+            </Card>
+          </div>
+        </div>
+      </div>
+      </div>
   );
 }

@@ -19,6 +19,7 @@
     *   State Management: Redux Toolkit (planned).
     *   UI Components: Next.js components, shared components from `packages/ui` (via RNW).
 *   **Native App (`apps/nativeapp`):**
+    *   **Main Component File:** `apps/nativeapp/App.tsx` (Note: NOT `apps/nativeapp/src/App.tsx`).
     *   Framework: React Native CLI (v0.73.8)
     *   Language: TypeScript
     *   Styling: **React Native `StyleSheet` confirmed as the stable approach.**
@@ -156,4 +157,13 @@
 *   `pnpm` for package management.
 *   `Turborepo` for build/task orchestration.
 *   `eslint`, `prettier` for code quality.
-*   `typescript` for static typing. 
+*   `typescript` for static typing.
+
+## Learnings & Insights
+
+*   Monorepo setups with RN + Web require careful configuration (`next.config.js` / `next.config.mjs` including `transpilePackages`, webpack aliases/loaders, `metro.config.js` settings, `pnpm` hoisting awareness in native build files like `build.gradle`).
+*   `react-native-vector-icons` is generally preferred over `@expo/vector-icons` in bare RN CLI projects to avoid needing extra Expo modules/config. Requires native setup (`fonts.gradle`) and web setup (`transpilePackages`, webpack font loader, potentially explicit `loadFont()` or `@font-face` CSS).
+*   ES Module (`"type": "module"`) in `package.json` requires config files like `next.config` to use `.mjs` extension and `import`/`export default` syntax. `__dirname` is not available.
+*   Next.js config files must use `.js`, `.mjs`, or `.ts` extensions; `.cjs` is not supported.
+*   Web hydration errors can often be caused by browser extensions modifying the DOM.
+*   Aggressive caching (Metro, Next.js, Gradle, node_modules) can mask file changes and require thorough cleaning. 

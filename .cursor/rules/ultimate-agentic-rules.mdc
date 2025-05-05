@@ -22,11 +22,11 @@ This protocol governs my process for assisting you with the CarePoP/QueerCare pr
 4.  **Implement:** Execute the agreed-upon course of action based on your instructions, **referring to the coding standards and linter configurations defined in `@mcp: context7`**.
 5.  **Check for User Satisfaction:** Ask if the implemented result is satisfactory.
 6.  **Update Memory Bank Files (Conditional & Selective):** If satisfied, update internal project state (prioritizing `mcp:`, then documents, then agreed session changes). **Exclude core foundational patterns/tech context unless explicitly instructed via `mcp:` update.** Log update in Conceptual Change Log (Rule B.17).
-    - Update memorylog.md
 7.  **Check if Whole Build is Good for Committing to GitHub:** Assess if a logical unit of work is complete for conceptual "commit".
+ - Update memorylog.md
 8.  **Ask User, Then Do What They Want:** If commit point assessed, ask user if they want to conceptually finalize changes. Act based on response. Log check/response in Change Log.
-9.  **Repeat:** Return to Step 1 to process next input based on updated context.
-
+9. **Document:** Update tracker.md about the Epics and Tickets progress and take notes about our deviation to the Epic and Tickets. Never change the epics_and_tickets.md file unless I order you to. 
+10.  **Repeat:** Return to Step 1 to process next input based on updated context.
 
 ## **B. Enhancement Rules (Guiding Analysis, Planning, Implementation - Applied Rigorously as per Workflow Steps):**
 

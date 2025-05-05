@@ -1,96 +1,125 @@
 "use client";
 
 import React from "react";
-import { Pressable, StyleSheet, ViewStyle, Text, TextStyle, StyleProp } from "react-native"; 
-import { colors, spacing, radii, fontSizes } from "./theme"; // Adjusted path if exported directly from theme.ts
+import {
+  StyleSheet,
+  ViewStyle,
+  Text,
+  TextStyle,
+  StyleProp,
+  TouchableOpacity,
+  TouchableOpacityProps,
+} from "react-native";
+import { theme } from './theme';
 
-// Minimal props for debugging
-interface ButtonProps {
+// Define possible button variants
+export type ButtonVariant = 'primary' | 'secondary-solid' | 'secondary-outline' | 'destructive';
+
+// Define props for the Button component
+interface ButtonProps extends TouchableOpacityProps {
   title: string;
-  onPress?: () => void;
-  style?: StyleProp<ViewStyle>; 
+  variant?: ButtonVariant;
   titleStyle?: StyleProp<TextStyle>;
-  variant?: 'primary' | 'secondary';
-  disabled?: boolean;
 }
+
+// Style mappings for different variants (no pressed state needed here)
+const variantStyles: Record<ButtonVariant, { container: ViewStyle; text: TextStyle }> = {
+  primary: {
+    container: {
+      backgroundColor: theme.colors.primary,
+      borderColor: theme.colors.primary,
+    },
+    text: {
+      color: theme.colors.primaryText,
+    },
+  },
+  'secondary-solid': {
+    container: {
+      backgroundColor: theme.colors.secondarySolidBase,
+      borderColor: theme.colors.secondarySolidBase,
+    },
+    text: {
+      color: theme.colors.secondarySolidText,
+    },
+  },
+  'secondary-outline': {
+    container: {
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: theme.colors.secondaryOutlineBorder,
+    },
+    text: {
+      color: theme.colors.secondaryOutlineText,
+    },
+  },
+  destructive: {
+    container: {
+      backgroundColor: theme.colors.destructive,
+      borderColor: theme.colors.destructive,
+    },
+    text: {
+      color: theme.colors.destructiveText,
+    },
+  },
+};
 
 export const Button: React.FC<ButtonProps> = ({
   title,
-  onPress,
+  variant = 'primary',
   style,
   titleStyle,
-  variant = 'primary',
-  disabled = false,
-  ...rest // Capture other PressableProps
+  disabled,
+  onPress,
+  activeOpacity = 0.8,
+  ...props
 }) => {
-
   return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      accessibilityRole="button"
-      style={({ pressed }) => [
-        styles.base,
-        variant === 'primary' ? styles.primaryButton : styles.secondaryButton,
-        disabled && styles.disabledButton,
-        pressed && !disabled && styles.pressed, 
+    <TouchableOpacity
+      style={[
+        styles.container,
+        variantStyles[variant].container,
+        disabled && styles.disabledContainer,
         style,
       ]}
-      {...rest} // Spread remaining props
+      disabled={disabled}
+      onPress={onPress}
+      activeOpacity={disabled ? 1 : activeOpacity}
+      {...props}
     >
-      <Text 
-        style={[
-          styles.textBase,
-          variant === 'primary' ? styles.primaryText : styles.secondaryText,
-          disabled && styles.disabledText,
-          titleStyle,
-        ]}
-      >
-        {/* Render title primarily, maybe children as fallback? Or combine? For now, just title. */}
-        {title} 
+      <Text style={[
+        styles.text,
+        variantStyles[variant].text,
+        disabled && styles.disabledText,
+        titleStyle,
+      ]}>
+        {title}
       </Text>
-    </Pressable>
+    </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
-  base: {
-    paddingVertical: spacing.sm + 2, 
-    paddingHorizontal: spacing.md, 
-    borderRadius: radii.md, 
+  container: {
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.borderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    minWidth: 100, // Example width
+    minWidth: 100,
   },
-  textBase: {
-    fontSize: fontSizes.md, 
-    fontWeight: '600',
+  text: {
+    fontSize: theme.typography.fontSizes.md,
+    fontWeight: theme.typography.fontWeights.bold,
     textAlign: 'center',
+    fontFamily: theme.typography.fontFamily,
   },
-  primaryButton: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  primaryText: {
-    color: colors.background,
-  },
-  secondaryButton: {
-    backgroundColor: colors.background,
-    borderColor: colors.border,
-  },
-  secondaryText: {
-    color: colors.text,
-  },
-  disabledButton: {
-    backgroundColor: colors.border,
-    borderColor: colors.border,
+  disabledContainer: {
+    backgroundColor: theme.colors.disabledBackground,
+    borderColor: theme.colors.disabledBorder,
     opacity: 0.6,
   },
   disabledText: {
-    color: colors.textSecondary,
-  },
-  pressed: {
-    transform: [{ scale: 0.98 }], 
+    color: theme.colors.disabledText,
   },
 });

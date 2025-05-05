@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from 'next/font/google';
 import "./globals.css";
 import React from 'react';
+import { FontLoader } from './components/FontLoader';
 
 // Instantiate Inter font with desired weights and subsets
 const inter = Inter({
@@ -24,6 +25,7 @@ const RootLayout: React.FC<RootLayoutProps> = ({ children }) => {
   return (
     <html lang="en" className={inter.variable}>
       <body>
+        <FontLoader />
         {children}
       </body>
     </html>

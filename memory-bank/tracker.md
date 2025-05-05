@@ -157,4 +157,56 @@ This file tracks the progress of Epics and Tickets using a structured format.
 
 ---
 
+## Epic 2: UI/UX Design System & Core Components (MVP Kickoff)
+
+*   **Ticket UI-1: Establish Design System Foundation (Theme, Typography)**
+    *   **Status:** Done
+    *   **Notes:** Created `packages/ui/src/theme.ts` defining colors, spacing, typography, borderRadius. Color theme updated multiple times based on user input.
+
+*   **Ticket UI-2: Build Core Reusable Components - Buttons**
+    *   **Status:** Done
+    *   **Notes (YYYY-MM-DD):** Multi-variant (`primary`, `secondary-solid`, `secondary-outline`, `destructive`) Button component implemented using `StyleSheet` and shared theme. Tested and rendering correctly in both `nativeapp` (Android) and `apps/web`.
+
+*   **Ticket UI-3: Build Core Reusable Components - Card**
+    *   **Status:** Done
+    *   **Notes (YYYY-MM-DD):** Basic `Card` component created as a styled container using `StyleSheet` and theme.
+
+*   **Ticket UI-4: Build Core Reusable Components - TextInput**
+    *   **Status:** Done
+    *   **Notes (YYYY-MM-DD):** Implemented `TextInput` with label, placeholder, helper text, error state, disabled state, and support for leading/trailing icons using `react-native-vector-icons`.
+
+*   **Ticket UI-5: Build Core Reusable Components - Checkbox**
+    *   **Status:** Done
+    *   **Notes (YYYY-MM-DD):** Implemented `Checkbox` with label, disabled state. Style refined based on user guidance.
+
+*   **Ticket UI-6: Build Core Reusable Components - RadioButton / RadioGroup**
+    *   **Status:** Done
+    *   **Notes (YYYY-MM-DD):** Implemented `RadioButton` and `RadioGroup` for managing selections. Includes label, disabled state, and styling based on user guidance.
+
+*   **Ticket UI-7: Build Core Reusable Components - Switch**
+    *   **Status:** Done (with caveat)
+    *   **Notes (YYYY-MM-DD):** Implemented `Switch` using platform-specific files (`.web.tsx`, `.native.tsx`). Native uses standard `RNSwitch`. Web uses custom `div`/Tailwind implementation. Both use `theme.colors.destructive` ('#FF4769') for the 'on' track and white thumb. Visual difference accepted (no icon in native thumb). Native Metro port conflict prevents definitive native testing.
+
+---
+
+## Epic 3: User Authentication Flow (Frontend)
+
+*   **Ticket AUTH-2: Build User Registration Form UI**
+    *   **Status:** In Progress
+    *   **Goal:** Create the frontend UI for user registration.
+    *   **Acceptance Criteria:**
+        *   [x] Registration form exists (`apps/web/app/register/page.tsx`).
+        *   [x] Native screen file created (`apps/nativeapp/src/screens/RegisterScreen.tsx`).
+        *   [x] Uses `@repo/ui` components (`TextInput` for email, password, confirm password; `Button` for submit).
+        *   [x] Basic form state management implemented (`useState`).
+        *   [x] Handles form submission (calls backend API endpoint `/api/auth/register`).
+        *   [x] Basic client-side validation (e.g., password match, required fields).
+        *   [x] Displays validation errors near relevant fields.
+        *   [x] Includes link to Login page.
+        *   [x] Placeholder "Sign up with Google" button added to UI.
+        *   [ ] (Optional) Includes checkbox/link for Terms/Privacy Policy.
+    *   **Notes:** Email/password flow tested successfully on web after fixing CORS/backend issues. Native implementation requires navigation setup and API URL update. Google button UI added, logic pending.
+
+---
+
 *(Structure for other epics/tickets can be added here as needed)* 

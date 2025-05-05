@@ -122,3 +122,65 @@
 *   **Date:** 2024-08-29 **Time:** 16:05
   - **Action:** Session End. Reviewed and updated Memory Bank (`epics_and_tickets.md`, `techContext.md`) to reflect resolution of native rendering errors and confirmation of `StyleSheet` styling approach.
   - **Description:** Project state is stable with `nativeapp` rendering shared UI correctly. Ready to continue UI component development in the next session.
+*   **Date:** 2024-08-29 **Time:** ~17:00
+    - **Action:** Successfully rendered multi-variant Button component in `nativeapp`.
+    - **Description:** Resolved persistent issues preventing Metro from serving updated code for `App.tsx` and `packages/ui/button.tsx`. Fixes involved: Correcting `index.js` import path, deleting duplicate folders outside the monorepo, ensuring correct file content was saved/applied, fixing runtime error related to incorrect theme import in `button.tsx`, and adding `--no-packager` flag to android script. Button variants (`primary`, `secondary-solid`, `secondary-outline`) now display correctly.
+*   **Date:** 2024-08-30 **Time:** <placeholder_timestamp>
+    - **Action:** Session End. Button component implemented and tested on native/web. Environment stable.
+    - **Description:** Next steps involve refining button styling and implementing subsequent UI components.
+*   **Date:** 2024-08-30 **Time:** <placeholder_timestamp>
+    - **Action:** Identified and documented correct path for `nativeapp` main component: `apps/nativeapp/App.tsx`.
+    - **Description:** Corrected persistent issue where edits were applied to the wrong file (`src/App.tsx`), causing significant debugging delays. Updated Memory Bank accordingly.
+*   **Date:** 2024-08-30 **Time:** <placeholder_timestamp>
+    - **Action:** Restored `App.tsx` content to display Card with Buttons after incorrect GymFit layout was added.
+    - **Description:** Ensured the native app displays the correct test content with the refined Card style.
+*   **Date:** 2024-08-30 **Time:** <placeholder_timestamp>
+    - **Action:** Created shared `TextInput` component in `packages/ui`.
+    - **Description:** Implemented basic `TextInput` with label, error handling, and theme-based styling using `StyleSheet`. Exported from package index.
+*   **Date:** 2024-08-30 **Time:** <placeholder_timestamp>
+    - **Action:** Enhanced `TextInput` with focus state (border color) and `helperText`.
+    - **Description:** Tested successfully in native app.
+*   **Date:** 2024-08-30 **Time:** <placeholder_timestamp>
+    - **Action:** Diagnosed and fixed `Button` component error related to `pressedState` scope.
+    - **Description:** Corrected text color logic for `secondary-outline` variant.
+*   **Date:** 2024-08-30 **Time:** <placeholder_timestamp>
+    - **Action:** Recreated missing `TextInput.tsx` file and fixed theme property errors.
+    - **Description:** Ensured `theme.ts` and component matched.
+*   **Date:** 2024-08-30 **Time:** <placeholder_timestamp>
+    - **Action:** Fixed `Button` and `Card` components referencing incorrect `theme.radii` instead of `theme.borderRadius`.
+    - **Description:** Resolved "Cannot read property 'xl'" error.
+*   **Date:** 2024-08-30 **Time:** <placeholder_timestamp>
+    - **Action:** Corrected primary button color usage in `Button` component.
+    - **Description:** Changed `primaryBase` to `primary` after theme refactoring.
+*   **Date:** 2024-08-30 **Time:** <placeholder_timestamp>
+    - **Action:** Added `TextInput`, `Card` examples to web app (`page.tsx`). Refactored web Card styling to use wrapper div for shadow compatibility.
+    - **Description:** Ensured basic components render on web.
+*   **Date:** 2024-08-30 **Time:** <placeholder_timestamp>
+    - **Action:** Enhanced `TextInput` with `disabled` state and `leadingIcon`/`trailingIcon` props.
+    - **Description:** Implemented styling and functionality for new props.
+*   **Date:** 2024-08-30 **Time:** <placeholder_timestamp>
+    - **Action:** Replaced icon placeholders with `react-native-vector-icons`.
+    - **Description:** Switched from `@expo/vector-icons` due to native integration issues. Updated imports, configs (`metro`, `next`, `gradle`), installed dependencies, added web font loading logic (`@font-face` in CSS). Resolved various build/runtime errors.
+*   **Date:** 2024-08-30 **Time:** <placeholder_timestamp>
+    - **Action:** Confirmed `TextInput` enhancements (disabled, icons) working on native and web.
+    - **Description:** Environment stable, ready for next UI component.
+*   **Date:** 2024-08-30 **Time:** <placeholder_timestamp>
+    - **Action:** Created shared `Checkbox` component in `packages/ui`.
+    - **Description:** Implemented basic Checkbox using Pressable, MaterialIcons, and theme styling. Handles checked/disabled states.
+*   **Date:** 2024-08-30 **Time:** <placeholder_timestamp>
+    - **Action:** Refactored Checkbox styling to match target design (solid background when checked).
+    - **Description:** Adjusted styling for the box View and used only the checkmark icon.
+*   **Date:** 2024-08-30 **Time:** <placeholder_timestamp>
+    - **Action:** Created shared `RadioButton` and `RadioGroup` components in `packages/ui`.
+    - **Description:** Implemented components using Pressable, MaterialIcons, and theme styling. RadioGroup manages selection state.
+*   **Date:** 2024-08-30 **Time:** <placeholder_timestamp>
+    - **Action:** Goal: Finalize basic UI components (Checkbox, RadioButton, Switch).
+    - **Description:** Actions: Created `Checkbox` component, tested, refined style. Created `RadioButton` and `RadioGroup` components, tested, refined style. Created `Switch` component initially using RNSwitch. Updated theme colors based on user request (`primary`, `secondary`, `destructive`, `accent`). Troubleshooting: Addressed web rendering issue for Switch thumb color (browser defaults). Refactored Switch: Created `switch.native.tsx` (uses RNSwitch) and `switch.web.tsx` (custom div/Tailwind implementation) to achieve desired look (icon in thumb for web, specific colors). Revised Switch (web/native) again to simpler design (pink track, white thumb, no icon).
+*   **Date:** 2024-08-30 **Time:** <placeholder_timestamp>
+    - **Action:** State: Basic input components functional. Switch has platform-specific implementations. Native Metro server port 8081 conflict (`EADDRINUSE`) persists but user chose to defer resolution.
+    - **Description:** Next: Plan and implement Registration Form.
+*   **Date:** 2024-08-30 **Time:** <placeholder_timestamp>
+    - **Action:** Goal: Implement and test web registration form UI and backend connection.
+    - **Description:** Actions: Created web registration page (`register/page.tsx`) with form fields, state, validation. Implemented `fetch` call to backend `/api/auth/register`. Debugged and resolved `ERR_CONNECTION_REFUSED` by correcting backend port in fetch URL. Debugged and resolved CORS error by adding `cors` middleware to backend. Debugged and resolved backend startup error (`Cannot find module ./config/secrets`). Confirmed successful email/password registration via web UI. Added placeholder Google Sign-Up button UI to web form. Created native registration screen file (`RegisterScreen.tsx`) with initial UI/logic.
+    - **State:** Web email/password registration functional. Native form created but untested (pending navigation/port fix). Google login UI added, logic pending.
+    - **Next:** Implement Google OAuth logic.

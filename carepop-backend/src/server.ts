@@ -1,12 +1,20 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
+import cors from 'cors';
 import logger from './utils/logger';
-import { supabase } from './config/supabaseClient'; // Ensure Supabase client initialization logic runs before server start
+import { supabase, supabaseServiceRole } from './config/supabaseClient';
 import authRoutes from './routes/authRoutes';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const PORT = process.env.PORT || 8080;
 const app: Express = express();
 
 // Middleware
+app.use(cors({
+  origin: 'http://localhost:3000',
+  optionsSuccessStatus: 200
+}));
 app.use(express.json()); // Middleware to parse JSON bodies
 
 // --- Mount Routers ---
@@ -37,24 +45,13 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 });
 
 // --- Start Server ---
-async function startServer() {
-  logger.info('Backend service starting...');
-
-  // Simple check if supabase client seems available (initialization happens in its own module)
+app.listen(PORT, () => {
+  logger.info(`Server listening on port ${PORT}`);
   if (!supabase) {
-      logger.warn('Supabase client might not be initialized yet. Proceeding, but DB ops might fail initially.');
-      // In a real app, might implement a more robust readiness check or delay start
+    logger.warn('Supabase client might not be initialized yet (import timing issue?).');
+  } else {
+    logger.info('Supabase client appears initialized.');
   }
-
-  app.listen(PORT, () => {
-    logger.info(`Server listening on port ${PORT}`);
-    const envType = process.env.K_SERVICE || process.env.GOOGLE_CLOUD_PROJECT ? 'GCP' : 'Local';
-    logger.info(`Running in environment: ${envType}`);
-  });
-}
-
-// Handle potential errors during top-level async operations
-startServer().catch(error => {
-  logger.error('Unhandled error during server startup:', error);
-  process.exit(1);
+  const envType = process.env.K_SERVICE || process.env.GOOGLE_CLOUD_PROJECT ? 'GCP' : 'Local';
+  logger.info(`Running in environment: ${envType}`);
 }); 

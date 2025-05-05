@@ -2,15 +2,55 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Add @font-face rule for MaterialIcons */
+@font-face {
+  font-family: 'MaterialIcons';
+  /* Adjust the path based on how Next.js serves node_modules assets */
+  /* This path assumes it might be accessible relative to the build output */
+  src: url('~react-native-vector-icons/Fonts/MaterialIcons.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* Override default browser styles for checked switch inputs */
+input[type="checkbox"][role="switch"]:checked {
+  /* Reset browser default appearance */
+  -webkit-appearance: none;
+  appearance: none;
+  /* Attempt to hide default checkmark/background color */
+  color: transparent; /* Often controls the checkmark color */
+  
+  /* Let RNWeb handle the background/thumb color if possible */
+  background-color: unset; /* Revert to unset or remove line */
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
   }
 }
 
@@ -18,11 +58,6 @@ html,
 body {
   max-width: 100vw;
   overflow-x: hidden;
-}
-
-body {
-  color: var(--foreground);
-  background: var(--background);
 }
 
 * {

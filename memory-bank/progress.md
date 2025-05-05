@@ -2,51 +2,50 @@
 
 ## Progress Log
 
-**Current Status:** Frontend Monorepo (`carepop-monorepo`) initialized and basic setup complete for `nativeapp` and `web`. Backend (`carepop-backend`) basic structure exists but needs implementation.
+**Current Status:** Foundational shared Button component implemented and rendering correctly in both `nativeapp` (Android) and `apps/web`. Monorepo build/dev environment stabilized after troubleshooting.
 
 **What Works:**
-*   **FE Monorepo:** Turborepo structure initialized.
-*   **FE NativeApp:**
-    *   Basic app initializes and builds successfully on Android after fixing Gradle path issues (`settings.gradle`, `app/build.gradle`) and Metro `blockList` conflicts.
-    *   Persistent rendering errors ("Objects are not valid...", "Text strings must...") resolved through aggressive cleaning (Gradle, build folders, all node_modules).
-    *   Shared UI Button (`@repo/ui/button`, using `title` prop) renders correctly.
-*   **FE Web:**
-    *   Basic Next.js app setup.
-    *   Tailwind configured.
+*   **FE Monorepo:** Turborepo structure stable and functional.
+*   **FE NativeApp (`apps/nativeapp`):
+    *   Builds and runs on Android.
+    *   Metro bundler configured and stable.
+    *   Renders shared UI (`Button` with variants, `Card`, `TextInput` with icons/disabled state) correctly using `react-native-vector-icons`.
+*   **FE Web (`apps/web`):
+    *   Builds and runs (using Webpack, Turbopack disabled for now).
+    *   Configured with Tailwind CSS.
+    *   Configured for `react-native-web`.
+    *   Renders shared UI (`Button` with variants, `Card`, `TextInput` with icons/disabled state) correctly using `react-native-vector-icons`.
+*   **Shared UI (`packages/ui`):
+    *   `Button` component implemented with `primary`, `secondary-solid`, `secondary-outline` variants using `StyleSheet`.
+    *   `Card` component implemented using `StyleSheet`.
+    *   `TextInput` component implemented using `StyleSheet` with label, helper/error text, focus state, disabled state, and icon support.
+    *   `Checkbox` component implemented.
+    *   `RadioButton` and `RadioGroup` components implemented.
+    *   `Switch` component implemented.
+    *   Shared `theme.ts` defined with color palette, spacing, typography (using `sans-serif`), radii.
 
-**What's Left to Build (High-Level):**
-*   **FE Shared UI (`@repo/ui`):
-    *   **UI-1:** Finalize styling approach (StyleSheet/Context vs Styled Components) and implement Theme setup/providers.
-    *   **UI-2:** Define comprehensive theme tokens (colors, spacing, typography). (Basic structure exists in `theme.ts`).
-    *   **UI-3:** Button component. (Basic version working in native, needs web testing & refinement).
-    *   **UI-4:** Integrate Button in Web.
-    *   Implement other core components (Inputs, Cards, Modals, etc.).
-*   **FE NativeApp:**
-    *   Integrate chosen theming solution.
-    *   Build out actual app screens and navigation.
-    *   Connect to backend API.
-*   **FE Web:**
-    *   Integrate chosen theming solution.
-    *   Build out actual app pages and navigation.
-    *   Connect to backend API.
-*   **Backend:**
-    *   Implement core services (Authentication, User Profiles, etc.).
-    *   Define database schema (Supabase migrations).
-    *   Implement API endpoints.
-    *   Set up tests.
-*   **Infrastructure & CI/CD:**
-    *   GitHub Actions workflows.
-    *   Deployment strategies.
+**What's Left to Build (Immediate Focus):**
+*   **Test `Radio*`:** Integrate and test the new Radio components in both `nativeapp` and `apps/web`.
+*   **Expand Shared UI Library (`packages/ui`):**
+    *   Implement next core components (e.g., `Switch`, `Form`).
+*   **Integrate UI in Apps:** Start using shared components to build actual screens/pages.
+*   **State Management:** Set up shared state (`packages/store`).
+*   **Authentication Flow:** Implement UI screens.
+*   **(Lower Priority):** Revisit Turbopack issue in `apps/web`.
 
 **Known Issues:**
-*   None currently critical now that RN rendering is fixed.
+*   Persistent TS/Linter errors for module resolution in IDE (e.g., `@repo/ui`, `react-native`), but runtime resolution works correctly.
+*   Web app sometimes shows hydration errors likely caused by browser extensions.
+*   **Native Metro Port Conflict:** Port 8081 (`EADDRINUSE`) prevents Metro bundler from starting. User has deferred resolution.
+*   **Switch Visual Difference:** Native switch doesn't have an icon in the thumb like the (now unused) web version design iteration.
 
 **Decisions/Evolutions:**
-*   **2024-08-28:** Abandoned NativeWind for `nativeapp` due to persistent Babel errors. Switched to standard `StyleSheet` approach for initial components.
-*   **2024-08-28:** Reset entire `carepop-monorepo` due to intractable build/cache errors.
-*   **2024-08-28:** Resolved Gradle path issues in `nativeapp` for monorepo compatibility.
-*   **2024-08-28:** Resolved Metro `blockList` issue preventing app boot.
-*   **2024-08-28:** Resolved persistent RN rendering errors via aggressive cleaning.
+*   Confirmed `StyleSheet` + theme tokens as the styling approach for `packages/ui`.
+*   Removed unused folders outside `carepop-monorepo`.
+*   Configured `next.config.js` for RNW.
+*   Installed `react-native-web` in `apps/web`.
+*   Added `--no-packager` flag to `nativeapp` android script.
+*   Switched button font from 'Inter' back to default `sans-serif`.
 
 ## Progress & Current Status
 
@@ -65,6 +64,7 @@
 
 ### What's Left to Build (Immediate Focus)
 
+*   **Test `Radio*`:** Integrate and test the new Radio components in both `nativeapp` and `apps/web`.
 *   **Expand Shared UI Library (`packages/ui`):**
     *   Implement core components (Card, Input, Headers, etc.) using `StyleSheet`.
     *   Refine styling and variants for existing components (Button).
@@ -78,8 +78,10 @@ The foundational monorepo setup for both web and native apps is stable. The prim
 
 ### Known Issues
 
-*   TypeScript errors persist in `App.tsx` regarding inability to find `@repo/ui` modules, despite runtime success. Likely an IDE/TS server issue needing restart or further investigation if it causes problems later.
-*   Web app (`apps/web`) hasn't been tested with the latest shared UI Button changes yet.
+*   TypeScript errors persist in IDE/Linter regarding inability to find `@repo/ui` modules and its contents, despite runtime success. Likely an IDE/TS server issue needing restart or further investigation if it causes problems later.
+*   Web app sometimes shows hydration errors likely caused by browser extensions.
+*   **Native Metro Port Conflict:** Port 8081 (`EADDRINUSE`) prevents Metro bundler from starting. User has deferred resolution.
+*   **Switch Visual Difference:** Native switch doesn't have an icon in the thumb like the (now unused) web version design iteration.
 
 ### Evolution of Decisions
 
@@ -157,3 +159,33 @@ The foundational monorepo setup for both web and native apps is stable. The prim
 *   **Decision:** Resolved Android Gradle build issues by modifying `settings.gradle` and `app/build.gradle` to point directly to root `node_modules`.
 *   **Decision:** Resolved Metro bundler issues by commenting out `blockList` entry for RN Devtools path.
 *   **Outcome:** Monorepo development environment is now functional for both web and native apps.
+
+## Current Status
+
+*   **Core UI Components (@repo/ui):**
+    *   `Button`: Functional (Primary, Secondary Solid/Outline, Destructive variants). Styles refined.
+    *   `Card`: Basic container functional.
+    *   `TextInput`: Functional with label, placeholder, helper text, error state, leading/trailing icons.
+    *   `Checkbox`: Functional with label, disabled state. Style refined.
+    *   `RadioButton`/`RadioGroup`: Functional with label, disabled state. Style refined.
+    *   `Switch`: Functional. Uses platform-specific implementations (`.web.tsx`, `.native.tsx`) for consistent styling goals (pink 'on' track, white thumb). Native version uses standard `RNSwitch` (no thumb icon), Web uses custom divs/Tailwind.
+*   **Platform Setup:**
+    *   `apps/web`: Next.js app running, displaying UI components, Tailwind configured.
+    *   `apps/nativeapp`: React Native app setup, dependencies linked. **Metro bundler currently blocked by port 8081 conflict (`EADDRINUSE`).**
+*   **Tooling:** Icons (`react-native-vector-icons`) working on both platforms.
+
+## What Works
+
+*   Basic UI components render and function on both web and native (assuming native Metro can be started).
+*   Theme colors are applied correctly.
+*   Monorepo structure allows sharing UI code.
+*   Platform-specific file resolution (`.web.tsx`, `.native.tsx`) is working for the Switch.
+
+## What's Left / Next Steps
+
+*   **Implement User Registration Form:** Utilize existing UI components.
+*   **Resolve Native Metro Port Conflict:** The `EADDRINUSE` error for port 8081 needs to be fixed to allow native development/testing.
+*   **Develop Core App Features:** Move beyond basic UI components.
+*   **Add State Management:** Implement more robust state management if needed (beyond local component state).
+*   **Backend Integration:** Connect forms/actions to the backend (Supabase).
+*   **Testing:** Implement unit/integration/E2E tests.
