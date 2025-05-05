@@ -2,7 +2,7 @@
 
 ## 1. Core Technologies
 
-*   **Frontend Framework:** React Native (using CLI)
+*   **Frontend Framework:** Expo CLI (for native app), Next.js (for web app)
 *   **Frontend Language:** TypeScript
 *   **Backend Language:** Node.js (with TypeScript)
 *   **Backend Hosting (Custom Logic):** Google Cloud Run
@@ -11,7 +11,7 @@
 ## 2. Frontend Stack Details
 
 *   **Monorepo:** Turborepo / pnpm monorepo (`carepop-monorepo`).
-*   **Package Manager:** pnpm (Note: Required specific Gradle path adjustments for RN Android).
+*   **Package Manager:** pnpm (Note: RN CLI previously required specific Gradle path adjustments; Expo usage may simplify this).
 *   **Web App (`apps/web`):**
     *   Framework: Next.js (v15.3.0, App Router)
     *   Language: TypeScript
@@ -19,25 +19,23 @@
     *   State Management: Redux Toolkit (planned).
     *   UI Components: Next.js components, shared components from `packages/ui` (via RNW).
 *   **Native App (`apps/nativeapp`):**
-    *   **Main Component File:** `apps/nativeapp/App.tsx` (Note: NOT `apps/nativeapp/src/App.tsx`).
-    *   Framework: React Native CLI (v0.73.8)
-    *   Language: TypeScript
-    *   Styling: **React Native `StyleSheet` confirmed as the stable approach.**
-    *   Navigation: React Navigation (planned).
-    *   State Management: Redux Toolkit (planned).
-    *   UI Components: Native components, shared components from `packages/ui` (using StyleSheet).
-    *   **Android Build:** Requires paths in `settings.gradle` (line 2, 4) and `app/build.gradle` (line 118) to point to root `node_modules` (`../../../` and `../../../../` respectively) to find Gradle scripts.
-    *   **Metro Config:** Requires `blockList` entry for `react-native/Libraries/Core/Devtools/` in `metro.config.js` to be commented out to prevent internal module resolution errors.
+    *   **Framework:** Expo CLI (Managed Workflow likely, SDK version TBD)
+    *   **Language:** TypeScript
+    *   **Entry Point:** (Likely `App.tsx` or similar, defined by Expo)
+    *   **Styling:** **To Be Determined.** (Previous RN CLI `StyleSheet` approach is an option. Expo offers other solutions like `expo-styling`/`nativewind` v4 which should be evaluated).
+    *   **Navigation:** Expo Router (recommended), or React Navigation (possible).
+    *   **State Management:** Redux Toolkit (planned).
+    *   **UI Components:** Native components, shared components from `packages/ui`.
+    *   **Build/Configuration:** Managed by Expo CLI tools (`expo start`, `eas build`). Native project configuration (`android`/`ios` directories) abstracted unless prebuild/eject is used.
 *   **Shared UI (`packages/ui`):**
-    *   Purpose: Reusable React Native components.
-    *   Styling: **`StyleSheet` confirmed as the stable approach, using tokens from `./theme.ts`.** Previous attempts with NativeWind/styled-components were reverted due to instability.
+    *   Purpose: Reusable React Native components compatible with Expo and Web (via RNW).
+    *   Styling: **To Be Determined** (Needs alignment with chosen Native App styling approach). Theme tokens (`./theme.ts`) likely still applicable.
 *   **Shared Tailwind Config (`packages/tailwind-config`):**
-    *   Purpose: Base Tailwind config for `apps/web`.
-    *   Structure: `package.json` (no `type: module`), `tailwind.config.js` (CommonJS).
+    *   Purpose: Base Tailwind config primarily for `apps/web`. (Relevance for native depends on chosen styling solution, e.g., NativeWind v4).
 *   **Shared TS Config (`packages/typescript-config`):** Planned.
 *   **Shared State (`packages/store`):** Planned (Redux Toolkit).
 *   **Shared Types (`packages/types`):** Planned.
-*   **Build/Dev:** Turborepo, `pnpm run dev`, `pnpm run build` (Note: Production build currently has TS issues).
+*   **Build/Dev:** Turborepo, `pnpm run dev` (scripts TBD for Expo integration), Expo Go / Development Builds for native testing.
 
 ## 3. Backend Stack Details
 
@@ -66,12 +64,12 @@
 
 *   **Source Control:** Git.
 *   **Monorepo Management:** Turborepo.
-*   **Package Management:** pnpm (with `.npmrc` for non-Gradle related hoisting, e.g., `public-hoist-pattern[]=*react-native*`).
-*   **CI/CD:** GitHub Actions (backend). Frontend TBD.
-*   **Testing:** Jest.
-*   **Local Development:** `pnpm run dev` starts both app servers. Requires emulator/device and browser.
-*   **Debugging:** Flipper, Reactotron (Native); Next.js/React DevTools (Web); Standard Node.js debugging tools, Cloud Logging/Monitoring (Backend).
-*   **Secrets:** GCP Secret Manager for cloud credentials, `.env` files within specific apps/packages for local development as needed.
+*   **Package Management:** pnpm.
+*   **CI/CD:** GitHub Actions (backend). Frontend TBD (potentially EAS Build).
+*   **Testing:** Jest (Expo provides integration).
+*   **Local Development:** `pnpm run dev` (starts web and Expo dev client). Requires Expo Go / Development Build and browser.
+*   **Debugging:** Expo Dev Tools, React Native Debugger / Flipper (with config); Next.js/React DevTools (Web); Standard Node.js debugging tools, Cloud Logging/Monitoring (Backend).
+*   **Secrets:** GCP Secret Manager for cloud credentials, `.env` files (potentially managed via `expo-constants`).
 
 ## 5. Key Third-Party Services (Requires Vetting)
 
@@ -88,7 +86,7 @@
 
 *   **Compliance:** Strict adherence to Philippines DPA is mandatory. HIPAA compliance is a strategic goal.
 *   **Security:** High priority due to sensitive health data (SPI/PHI). Requires robust implementation of encryption, access control (RLS + backend checks), secure coding, etc.
-*   **Cross-Platform Consistency:** Core goal achieved via shared `packages/ui` styled with NativeWind. Requires careful component design and testing.
+*   **Cross-Platform Consistency:** Core goal achieved via shared `packages/ui`. Requires careful component design, styling strategy evaluation (Expo context), and testing.
 *   **Performance:** Needs proactive optimization (native rendering, web vitals, backend query/RLS performance).
 *   **Scalability:** Leverage managed services (Supabase, Cloud Run) but requires monitoring and appropriate configuration.
 *   **SEO:** Public web pages (Landing Pages, Directory in `apps/web`) must be discoverable, achieved via Next.js SSR/SSG.
@@ -103,15 +101,15 @@
     *   State Management: Redux Toolkit (planned, via `packages/store`).
     *   UI Components: Primarily Next.js components, potentially shared components from `packages/ui`.
 *   **Native App (`apps/nativeapp`):**
-    *   Framework: React Native CLI (v0.73.8)
+    *   **Framework:** Expo CLI (Managed Workflow TBD, SDK Version TBD)
     *   Language: TypeScript
-    *   Styling: **React Native `StyleSheet` confirmed.**
-    *   Navigation: React Navigation (planned).
+    *   Styling: **TBD - Evaluate Expo options** (e.g., `expo-styling`, NativeWind v4, `StyleSheet`).
+    *   Navigation: Expo Router (likely).
     *   State Management: Redux Toolkit (planned, via `packages/store`).
-    *   UI Components: Primarily native components, shared components from `packages/ui` (using StyleSheet).
+    *   UI Components: Primarily native components, shared components from `packages/ui`.
 *   **Shared UI (`packages/ui`):**
-    *   Purpose: House reusable React Native components for both web and native apps.
-    *   Styling: **Primarily uses React Native `StyleSheet` confirmed.** Requires a strategy for web compatibility/styling (e.g., platform-specific files, conditional logic, potentially leveraging RNW + Tailwind on web).
+    *   Purpose: House reusable React Native components for both Expo and Web.
+    *   Styling: **TBD - Must align with Native App strategy**.
 *   **Shared Config (`packages/config`):**
     *   `tailwind-config`: Shared Tailwind CSS configuration (used by `apps/web`).
     *   `typescript-config`: Shared `tsconfig.json` presets (planned).
@@ -120,14 +118,12 @@
 *   **Build/Dev:** Turborepo orchestrates builds, `pnpm run dev` starts both apps.
 
 **Frontend - Native (`apps/nativeapp`):**
-*   **Framework:** React Native (v0.73.8)
+*   **Framework:** Expo CLI (SDK Version TBD)
 *   **Language:** TypeScript
-*   **Styling:** **Standard `StyleSheet` confirmed.** (Removed ambiguity about pending decision).
-*   **Bundler:** Metro
-*   **Build:** Android build successful via Gradle (requires manual path adjustments in `settings.gradle` and `app/build.gradle` for monorepo `node_modules`).
-*   **Troubleshooting Notes:**
-    *   Metro `blockList` might need adjustments if core RN modules fail to resolve.
-    *   Persistent rendering errors (even with standard components) can indicate deep caching/build issues requiring aggressive cleaning (Gradle clean, delete `android/build` & `app/build`, delete all `node_modules` via explicit `rimraf` commands on Windows, reinstall). Monitor for `ERR_PNPM_EBUSY` on Windows and terminate blocking processes.
+*   **Styling:** **TBD - Evaluate Expo options** (e.g., `expo-styling`, NativeWind v4, `StyleSheet`).
+*   **Bundler:** Metro (Configured via `metro.config.js`, potentially simpler with Expo defaults).
+*   **Build:** Expo Application Services (EAS) Build, local builds via `npx expo run:[android|ios]` (after prebuild if needed). Configuration via `app.json`/`app.config.js`.
+*   **Troubleshooting Notes:** Expo-specific troubleshooting (Expo Doctor, checking `app.json`, EAS Build logs, Expo Go logs). Previous RN CLI issues (Gradle paths, specific Metro `blockList` entries) are likely irrelevant now.
 
 **Frontend - Web (`apps/web`):**
 *   **Framework:** Next.js (v?.? - Check package.json)
@@ -143,27 +139,29 @@
 
 **Shared Packages:**
 *   `packages/ui`:
-    *   Targeting both React Native and React (Web).
-    *   Currently uses basic `StyleSheet` for Button component (pending styling strategy decision).
-    *   `theme.ts` exists with basic tokens.
+    *   Targeting both Expo Native and React (Web).
+    *   Styling strategy TBD.
+    *   `theme.ts` likely reusable.
 *   Config packages (`eslint`, `typescript`, `tailwind`) ensure consistency.
 
 **Development Environment:**
-*   OS: Windows (requires careful handling of paths and processes, e.g., `rimraf` usage, `EBUSY` errors).
+*   OS: Windows (Expo generally offers smoother cross-platform setup than RN CLI).
 *   Editor: (User's choice, e.g., VS Code)
 *   Version Control: Git / GitHub
 
 **Tooling:**
 *   `pnpm` for package management.
 *   `Turborepo` for build/task orchestration.
+*   Expo CLI / EAS CLI.
 *   `eslint`, `prettier` for code quality.
 *   `typescript` for static typing.
 
 ## Learnings & Insights
 
+*   **Pivot Rationale:** Switched from React Native CLI to Expo CLI due to significant challenges with RN CLI monorepo setup (build complexity, dependency issues, styling instability). Expo aims to provide a more integrated and potentially simpler development experience.
+*   Monorepo setups still require careful configuration, but Expo may simplify native aspects (`metro.config.js`, native builds).
+*   Styling strategy needs re-evaluation in the Expo context.
+*   Icon management likely simpler with `@expo/vector-icons` (often pre-configured in Expo projects).
+*   Aggressive caching can still be an issue; standard cleaning procedures (`expo start -c`, clearing `node_modules`) remain relevant.
 *   Monorepo setups with RN + Web require careful configuration (`next.config.js` / `next.config.mjs` including `transpilePackages`, webpack aliases/loaders, `metro.config.js` settings, `pnpm` hoisting awareness in native build files like `build.gradle`).
-*   `react-native-vector-icons` is generally preferred over `@expo/vector-icons` in bare RN CLI projects to avoid needing extra Expo modules/config. Requires native setup (`fonts.gradle`) and web setup (`transpilePackages`, webpack font loader, potentially explicit `loadFont()` or `@font-face` CSS).
-*   ES Module (`"type": "module"`) in `package.json` requires config files like `next.config` to use `.mjs` extension and `import`/`export default` syntax. `__dirname` is not available.
-*   Next.js config files must use `.js`, `.mjs`, or `.ts` extensions; `.cjs` is not supported.
-*   Web hydration errors can often be caused by browser extensions modifying the DOM.
-*   Aggressive caching (Metro, Next.js, Gradle, node_modules) can mask file changes and require thorough cleaning. 
+*   `react-native-vector-icons` is generally preferred over `@expo/vector-icons` in bare RN CLI projects to avoid needing extra Expo modules/config. Requires native setup (`fonts.gradle`) and web setup (`

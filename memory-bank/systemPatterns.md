@@ -65,11 +65,11 @@ Access control is multi-layered:
 
 *   **Monorepo Structure:** The frontend is managed within a monorepo (e.g., Turborepo/pnpm), separating concerns into applications (`apps`) and shared code (`packages`).
 *   **Native Application (`apps/native`):**
-    *   Built using **React Native CLI**.
-    *   Contains native entry points (iOS/Android), native configurations.
-    *   Implements navigation using **React Navigation**.
+    *   Built using **Expo CLI** (Managed Workflow likely).
+    *   Configuration managed primarily via `app.json`/`app.config.js`.
+    *   Implements navigation using **Expo Router** (recommended).
     *   Consumes shared components from `packages/ui` and state logic from `packages/store`.
-    *   Uses **NativeWind Babel plugin** for styling compilation.
+    *   Styling approach **TBD** (evaluating Expo options like `expo-styling`, NativeWind v4, `StyleSheet`).
 *   **Web Application (`apps/web`):**
     *   Built using **Next.js**.
     *   Handles web routing (using **Next.js Router**), page structure, layouts, and API routes if needed.
@@ -78,18 +78,17 @@ Access control is multi-layered:
     *   Uses standard **Tailwind CSS + PostCSS** setup for styling, referencing the shared config.
     *   Consumes shared components from `packages/ui` and state logic from `packages/store`.
 *   **Shared UI Package (`packages/ui`):**
-    *   Contains reusable UI components built with **React Native primitives** (View, Text, Pressable, etc.).
-    *   Styled exclusively using **NativeWind `className` props**, referencing the shared Tailwind config.
+    *   Contains reusable UI components built with **React Native primitives** (View, Text, Pressable, etc.), compatible with Expo and Web (via RNW).
+    *   Styling **TBD**, needs to align with chosen Native App approach. Shared theme tokens likely reusable.
     *   Designed for maximum platform-agnosticism.
 *   **Shared Configuration (`packages/config`):**
-    *   Hosts the single source of truth `tailwind.config.js`.
-    *   May contain shared TypeScript `tsconfig.json` base configurations.
+    *   Hosts shared `tailwind.config.js` (relevance for native TBD).
 *   **Shared State (`packages/store`):**
     *   Contains shared **Redux Toolkit** slices, selectors, and store configuration logic.
 *   **Shared Types (`packages/types`):**
     *   Contains shared TypeScript interfaces and types.
-*   **Styling Approach:** **NativeWind** allows using Tailwind CSS utilities via `className` across both native and web, ensuring consistency through a shared `tailwind.config.js`.
-*   **Navigation Strategy:** Native app uses React Navigation; Web app uses Next.js Router. Shared components trigger navigation via callbacks passed from the platform-specific parent.
+*   **Styling Approach:** **TBD.** Previous attempts with RN CLI (NativeWind, StyleSheet) faced issues. Need to evaluate options within Expo context (e.g., `expo-styling`, NativeWind v4, `StyleSheet` + theme) aiming for consistency via shared `packages/ui`.
+*   **Navigation Strategy:** Native app uses Expo Router (recommended); Web app uses Next.js Router. Shared components trigger navigation via callbacks passed from the platform-specific parent.
 
 ## 6. Background Tasks Pattern
 

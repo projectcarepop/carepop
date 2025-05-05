@@ -1,51 +1,224 @@
 # Progress: CarePoP/QueerCare
 
+**IMPORTANT: Project Pivot (As of <Date_Placeholder>)**
+
+> Due to persistent difficulties with the React Native CLI monorepo setup (detailed in historical context below), the project has **pivoted to using Expo CLI** for native application development. The following sections reflect the state *before* and *after* this pivot.
+
+## Current Status (Expo CLI)
+
+*   **Status:** Initializing new monorepo structure using Expo CLI.
+*   **What Works (Expo):**
+    *   (To be updated as setup progresses - e.g., Expo app initialized, monorepo structure configured)
+*   **What's Left to Build (Immediate Focus - Expo Setup):**
+    *   Finalize Expo monorepo initialization (e.g., `create-expo-app` template or manual Turborepo/pnpm integration).
+    *   Configure shared packages (`ui`, `store`, etc.) for Expo compatibility.
+    *   Determine and implement native styling strategy (Evaluate `expo-styling`, NativeWind v4, `StyleSheet`).
+    *   Test basic shared UI component rendering in Expo Go / Dev Build.
+    *   Integrate Expo Router (if chosen).
+    *   Establish basic Expo build/dev workflows (`pnpm run dev`, EAS builds).
+*   **Known Issues (Expo):**
+    *   (To be updated as issues arise)
+*   **Decisions/Evolutions (Expo):**
+    *   Decision made to pivot from RN CLI to Expo CLI to mitigate build/config complexities.
+
+---
+
+## Historical Context (Pre-Expo Pivot - React Native CLI)
+
+> _The following sections describe the progress, issues, and decisions related to the **previous React Native CLI-based monorepo attempt**, which has now been superseded by the pivot to Expo CLI._
+
+### Progress Log (RN CLI)
+
+**Last Status (RN CLI):** Completed styling enhancements for core UI components (`Button`, `Card`, `TextInput`, `Checkbox`, `RadioButton`, `RadioGroup`, `Switch`) in `packages/ui` based on UI design guidelines. Monorepo build/dev environment was stable for web; native app required setup/stabilization and faced significant blockers.
+
+**What Worked (RN CLI):**
+*   **FE Monorepo:** Turborepo structure stable and functional.
+*   **FE Web (`apps/web`):
+    *   Built and ran.
+    *   Configured with Tailwind CSS and `react-native-web`.
+    *   Rendered shared UI components correctly, including the latest styling enhancements.
+*   **FE NativeApp (`apps/nativeapp` - RN CLI):
+    *   Previous builds successful *after* significant Gradle/Metro configuration workarounds.
+    *   Rendered basic shared UI (`StyleSheet`-based) after aggressive cleaning.
+*   **Shared UI (`packages/ui` - RN CLI Context):
+    *   `Button`, `Card`, `TextInput`, `Checkbox`, `RadioButton`, `RadioGroup`, `Switch` components implemented using `StyleSheet`.
+    *   Styling Enhanced based on UI guidelines.
+    *   Shared `theme.ts` defined and utilized.
+
+**What Was Left (RN CLI Focus):**
+*   Plan & Initialize Native App (Target RN version, setup).
+*   Verify Native Rendering (Ensuring enhanced components worked reliably).
+*   Resolve Native Metro Port Conflict (Port 8081 `EADDRINUSE`).
+*   Implement Google OAuth (Web).
+*   Expand Shared UI Library.
+*   Integrate UI in Apps.
+*   State Management setup.
+*   Authentication Flow implementation.
+
+**Known Issues (RN CLI):**
+*   Persistent TS/Linter errors for module resolution in IDE.
+*   Web app hydration errors sometimes.
+*   **BLOCKER: Native Metro Port Conflict:** Port 8081 (`EADDRINUSE`) blocked native development.
+*   Potential platform visual differences.
+*   General build fragility requiring frequent aggressive cleaning.
+
+**Decisions/Evolutions (RN CLI):**
+*   Confirmed `StyleSheet` + theme tokens as the *only stable* styling approach found for `packages/ui` in the RN CLI context.
+*   Completed styling enhancements for core UI components.
+*   Multiple attempts/reverts for styling (NativeWind, styled-components failed).
+*   Multiple monorepo restarts due to build/config issues.
+*   Extensive manual configuration required (Gradle paths, Metro config, pnpm overrides).
+
+### Progress & Current Status (RN CLI - Detailed Snapshot)
+
+#### What Worked (RN CLI)
+
+*   **Monorepo Structure:** Turborepo setup with pnpm was functional.
+*   **Web App (`apps/web`):** Basic Next.js app with Tailwind CSS ran correctly.
+*   **Native App (`apps/nativeapp` - RN CLI):
+    *   Basic React Native app ran on Android.
+    *   Builds succeeded *after* Gradle path modifications.
+    *   Metro bundler configured for monorepo ran.
+    *   Shared UI (`packages/ui`): Basic `Button` component using `StyleSheet` rendered correctly after resolving "Objects are not valid..." error.
+*   **Shared Theme (`packages/ui/src/theme.ts`):** Basic theme tokens defined.
+*   **Font Integration:** Inter font configured for web and native (manual linking).
+*   **React Version:** Forced to `18.2.0` via `pnpm.overrides`.
+
+#### What Was Left (RN CLI Immediate Focus)
+
+*   Test `Radio*` components.
+*   Expand Shared UI Library (`packages/ui`) using `StyleSheet`.
+*   Integrate UI in Apps.
+*   State Management (`packages/store`) setup.
+*   Authentication Flow UI.
+
+#### Current Status Summary (RN CLI - Before Pivot)
+
+The foundational RN CLI monorepo setup was achieved, but was fragile and required significant workarounds. The primary blocker (rendering shared UI in native) was resolved by reverting to `StyleSheet`, but other issues (Metro port conflict, build stability) remained.
+
+#### Known Issues (RN CLI - Before Pivot)
+
+*   TypeScript IDE/Linter errors for module resolution.
+*   Web app hydration errors.
+*   **BLOCKER: Native Metro Port Conflict:** Port 8081 (`EADDRINUSE`).
+*   Switch visual differences.
+
+#### Evolution of Decisions (RN CLI - Before Pivot)
+
+*   Abandonment of NativeWind and `styled-components` due to build/type/stability errors.
+*   Confirmation of `StyleSheet` + theme tokens as the reluctant but working approach.
+
+### What Worked (Overall - Before Pivot)
+
+*   Backend Infrastructure & Core Logic (Supabase + Cloud Run).
+*   Backend Auth Endpoints (Register, Login).
+*   Backend Profiles Table & Basic RLS.
+*   **Frontend Monorepo Structure (`carepop-monorepo`) established.**
+*   **`apps/web` Development Server functional.**
+*   **`apps/nativeapp` (RN CLI) Development Server started.**
+*   **`apps/nativeapp` (RN CLI) Android Build succeeded (with hacks).**
+
+### What Was Left (High Level - Before Pivot)
+
+*   **Frontend Monorepo Setup (RN CLI):**
+    *   Configure shared `packages/ui` (StyleSheet approach).
+    *   Test Shared UI reliably.
+    *   Configure shared `typescript-config`.
+    *   Configure shared `packages/store`.
+*   **Phase 1 (MVP) - Frontend Implementation (RN CLI):**
+    *   Implement Auth UI.
+    *   Implement Profile Management UI.
+    *   Implement Basic Appointment Scheduling UI.
+    *   Implement Basic Provider Directory UI.
+    *   Implement DPA Consent UI flow.
+*   **Phase 1 (MVP) - Backend Refinements:** (Unaffected by frontend pivot)
+    *   Refine RLS policies (Epic 3).
+    *   Implement Profile Update endpoint (Epic 4).
+    *   Implement foundational DPA consent logic (Epic 3).
+*   **Phase 2 & 3:** As previously outlined.
+
+*(Refer to `epics_and_tickets.md` for detailed task breakdown)*
+
+### Known Issues (RN CLI - Overall)
+
+*   Previous BLOCKERS related to Gradle/Metro resolved via specific workarounds (modifying Gradle paths, commenting Metro `blockList`).
+*   Peer Dependency Warnings.
+*   Potential Production Build issues.
+
+### Evolution of Project Decisions (RN CLI - Detailed)
+
+*   Initial state: Supabase + Cloud Run architecture.
+*   Initial Decision: Prioritize React Native CLI over Expo.
+*   (Other backend/state decisions...)
+*   **Decision:** Abandoned initial frontend attempts.
+*   **Decision:** Restarted frontend using RN CLI Monorepo (Turborepo/pnpm), Next.js, NativeWind.
+*   **Decision:** Multiple restarts/reconfigurations due to build errors (NativeWind, Gradle, Metro).
+*   **Decision:** Removed NativeWind, switched to `StyleSheet` for native.
+*   **Decision:** Resolved build issues via manual Gradle/Metro path/config adjustments.
+*   **Outcome (RN CLI):** Monorepo *technically* functional but fragile and complex to maintain.
+
+### Current Status (RN CLI - Component Level - Before Pivot)
+
+*   **Core UI Components (@repo/ui):** (`Button`, `Card`, `TextInput`, `Checkbox`, `RadioButton`/`Group`, `Switch`) functional using `StyleSheet`.
+*   **Platform Setup:** `apps/web` running. `apps/nativeapp` (RN CLI) setup, **Metro blocked by port 8081 conflict.**
+*   **Tooling:** Icons (`react-native-vector-icons`) working after complex setup.
+
+### What Worked (RN CLI - Component Level)
+
+*   Basic UI components rendered/functioned on web and native (when Metro could run).
+*   Theme colors applied.
+*   Monorepo shared UI code.
+*   Platform-specific file resolution worked.
+
+### What Was Left / Next Steps (RN CLI - Before Pivot)
+
+*   Implement User Registration Form.
+*   **Resolve Native Metro Port Conflict (BLOCKER).**
+*   Develop Core App Features.
+*   Add State Management.
+*   Backend Integration.
+*   Testing.
+
+## Progress: CarePoP/QueerCare
+
 ## Progress Log
 
-**Current Status:** Foundational shared Button component implemented and rendering correctly in both `nativeapp` (Android) and `apps/web`. Monorepo build/dev environment stabilized after troubleshooting.
+**Current Status:** Completed styling enhancements for core UI components (`Button`, `Card`, `TextInput`, `Checkbox`, `RadioButton`, `RadioGroup`, `Switch`) in `packages/ui` based on UI design guidelines. Monorepo build/dev environment remains stable for web; native app requires setup/stabilization.
 
 **What Works:**
 *   **FE Monorepo:** Turborepo structure stable and functional.
-*   **FE NativeApp (`apps/nativeapp`):
-    *   Builds and runs on Android.
-    *   Metro bundler configured and stable.
-    *   Renders shared UI (`Button` with variants, `Card`, `TextInput` with icons/disabled state) correctly using `react-native-vector-icons`.
 *   **FE Web (`apps/web`):
-    *   Builds and runs (using Webpack, Turbopack disabled for now).
-    *   Configured with Tailwind CSS.
-    *   Configured for `react-native-web`.
-    *   Renders shared UI (`Button` with variants, `Card`, `TextInput` with icons/disabled state) correctly using `react-native-vector-icons`.
+    *   Builds and runs.
+    *   Configured with Tailwind CSS and `react-native-web`.
+    *   Renders shared UI components correctly, including the latest styling enhancements.
+*   **FE NativeApp (`apps/nativeapp`):
+    *   Previous builds successful after Gradle/Metro configuration.
+    *   **Currently Needs Setup:** Requires setup/initialization for the target React Native version.
 *   **Shared UI (`packages/ui`):
-    *   `Button` component implemented with `primary`, `secondary-solid`, `secondary-outline` variants using `StyleSheet`.
-    *   `Card` component implemented using `StyleSheet`.
-    *   `TextInput` component implemented using `StyleSheet` with label, helper/error text, focus state, disabled state, and icon support.
-    *   `Checkbox` component implemented.
-    *   `RadioButton` and `RadioGroup` components implemented.
-    *   `Switch` component implemented.
-    *   Shared `theme.ts` defined with color palette, spacing, typography (using `sans-serif`), radii.
+    *   `Button`, `Card`, `TextInput`, `Checkbox`, `RadioButton`, `RadioGroup`, `Switch` components implemented using `StyleSheet`.
+    *   **Styling Enhanced:** All components updated based on UI guidelines (hierarchy, spacing, feedback, contrast, accessibility).
+    *   Shared `theme.ts` defined and utilized.
 
 **What's Left to Build (Immediate Focus):**
-*   **Test `Radio*`:** Integrate and test the new Radio components in both `nativeapp` and `apps/web`.
-*   **Expand Shared UI Library (`packages/ui`):**
-    *   Implement next core components (e.g., `Switch`, `Form`).
-*   **Integrate UI in Apps:** Start using shared components to build actual screens/pages.
+*   **Plan & Initialize Native App:** Determine target RN version and set up the `nativeapp` environment within the monorepo.
+*   **Verify Native Rendering:** Ensure enhanced shared UI components render correctly in the native app.
+*   **Resolve Native Metro Port Conflict:** Fix the port 8081 `EADDRINUSE` error.
+*   **Implement Google OAuth (Web):** Connect "Sign up with Google" button.
+*   **Expand Shared UI Library (`packages/ui`):** Implement next core components (e.g., `Form`, Modals).
+*   **Integrate UI in Apps:** Start using shared components to build actual screens/pages (e.g., Registration, Login).
 *   **State Management:** Set up shared state (`packages/store`).
-*   **Authentication Flow:** Implement UI screens.
-*   **(Lower Priority):** Revisit Turbopack issue in `apps/web`.
+*   **Authentication Flow:** Implement full UI screens and logic.
 
 **Known Issues:**
-*   Persistent TS/Linter errors for module resolution in IDE (e.g., `@repo/ui`, `react-native`), but runtime resolution works correctly.
-*   Web app sometimes shows hydration errors likely caused by browser extensions.
-*   **Native Metro Port Conflict:** Port 8081 (`EADDRINUSE`) prevents Metro bundler from starting. User has deferred resolution.
-*   **Switch Visual Difference:** Native switch doesn't have an icon in the thumb like the (now unused) web version design iteration.
+*   Persistent TS/Linter errors for module resolution in IDE.
+*   Web app hydration errors sometimes (likely browser extensions).
+*   **Native Metro Port Conflict:** Port 8081 (`EADDRINUSE`) blocks native development.
+*   Potential platform visual differences (e.g., Switch component).
 
 **Decisions/Evolutions:**
 *   Confirmed `StyleSheet` + theme tokens as the styling approach for `packages/ui`.
-*   Removed unused folders outside `carepop-monorepo`.
-*   Configured `next.config.js` for RNW.
-*   Installed `react-native-web` in `apps/web`.
-*   Added `--no-packager` flag to `nativeapp` android script.
-*   Switched button font from 'Inter' back to default `sans-serif`.
+*   Completed styling enhancements for all core UI components based on provided guidelines.
+*   Previous: Removed unused folders, configured RNW, added flags, reverted font changes.
 
 ## Progress & Current Status
 
