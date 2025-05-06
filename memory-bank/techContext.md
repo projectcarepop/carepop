@@ -1,43 +1,46 @@
-# Technology Context: CarePoP/QueerCare
+# Technical Context: CarePop/QueerCare
 
 ## 1. Core Technologies
 
-*   **Frontend Framework:** Expo CLI (for native app), Next.js (for web app)
-*   **Frontend Language:** TypeScript
-*   **Backend Language:** Node.js (with TypeScript)
-*   **Backend Hosting (Custom Logic):** Google Cloud Run
-*   **Database / BaaS:** Supabase (providing PostgreSQL, Authentication, RLS, Storage, Edge Functions)
+-   **Backend-as-a-Service (BaaS):** Supabase (PostgreSQL, Auth, Storage, Realtime, Edge Functions)
+-   **Custom Backend Logic:** Node.js, TypeScript, Express.js (or similar lightweight framework) on Google Cloud Run (Serverless Containers).
+-   **Native Mobile Application (`carepop-nativeapp/`):** React Native, Expo (Managed Workflow), TypeScript.
+-   **Web Application (`carepop-web/`):** Next.js (App Router), React, TypeScript, Tailwind CSS, Shadcn UI.
+-   **Version Control:** Git, GitHub.
+-   **Package Management:** npm (expected to be used within each project: `carepop-backend/`, `carepop-nativeapp/`, `carepop-web/`).
 
 ## 2. Frontend Stack Details
 
-*   **Monorepo:** Turborepo / pnpm monorepo (`carepop-monorepo`).
-*   **Package Manager:** pnpm (Note: RN CLI previously required specific Gradle path adjustments; Expo usage may simplify this).
-*   **Web App (`apps/web`):**
-    *   Framework: Next.js (v15.3.0, App Router)
-    *   Language: TypeScript
-    *   Styling: Tailwind CSS (v3.4.6, via `packages/config`, using relative path `require` in `tailwind.config.ts`).
-    *   State Management: Redux Toolkit (planned).
-    *   UI Components: Next.js components, shared components from `packages/ui` (via RNW).
-*   **Native App (`apps/nativeapp`):**
-    *   **Framework:** Expo CLI (Managed Workflow likely, SDK version TBD)
-    *   **Language:** TypeScript
-    *   **Entry Point:** (Likely `App.tsx` or similar, defined by Expo)
-    *   **Styling:** **To Be Determined.** (Previous RN CLI `StyleSheet` approach is an option. Expo offers other solutions like `expo-styling`/`nativewind` v4 which should be evaluated).
-    *   **Navigation:** Expo Router (recommended), or React Navigation (possible).
-    *   **State Management:** Redux Toolkit (planned).
-    *   **UI Components:** Native components, shared components from `packages/ui`.
-    *   **Build/Configuration:** Managed by Expo CLI tools (`expo start`, `eas build`). Native project configuration (`android`/`ios` directories) abstracted unless prebuild/eject is used.
-*   **Shared UI (`packages/ui`):**
-    *   Purpose: Reusable React Native components compatible with Expo and Web (via RNW).
-    *   Styling: **To Be Determined** (Needs alignment with chosen Native App styling approach). Theme tokens (`./theme.ts`) likely still applicable.
-*   **Shared Tailwind Config (`packages/tailwind-config`):**
-    *   Purpose: Base Tailwind config primarily for `apps/web`. (Relevance for native depends on chosen styling solution, e.g., NativeWind v4).
-*   **Shared TS Config (`packages/typescript-config`):** Planned.
-*   **Shared State (`packages/store`):** Planned (Redux Toolkit).
-*   **Shared Types (`packages/types`):** Planned.
-*   **Build/Dev:** Turborepo, `pnpm run dev` (scripts TBD for Expo integration), Expo Go / Development Builds for native testing.
+### A. Native Mobile Application (`carepop-nativeapp/`)
+    *   **Framework/Platform:** React Native with Expo (Managed Workflow).
+    *   **Language:** TypeScript.
+    *   **Navigation:** React Navigation.
+    *   **UI Components:** Core React Native components, custom components built with React Native primitives, styled with `StyleSheet`. UI components from the *old* `packages/ui` are now integrated directly into this project (e.g., in `carepop-nativeapp/src/components/`).
+    *   **State Management:** React Context API initially; consider Redux Toolkit or Zustand for complex global state.
+    *   **API Interaction:** `fetch` API or `axios`.
+    *   **Build/Deployment:** EAS Build & Submit (Expo Application Services).
+    *   **Location:** Top-level folder `carepop-nativeapp/` in the main Git repository.
 
-## 3. Backend Stack Details
+### B. Web Application (`carepop-web/`)
+    *   **Framework:** Next.js (App Router).
+    *   **Language:** TypeScript.
+    *   **Styling:** Tailwind CSS.
+    *   **UI Components:** Shadcn UI (built on Tailwind CSS and Radix UI), custom React components.
+    *   **State Management:** React Context API, React Query/SWR for server state; consider Zustand or Redux Toolkit for complex client-side global state.
+    *   **API Interaction:** Next.js data fetching methods, `fetch` API, React Query/SWR.
+    *   **Build/Deployment:** Vercel, Netlify, or other Next.js compatible hosting.
+    *   **Location:** Top-level folder `carepop-web/` in the main Git repository.
+
+### C. Obsolete Frontend Structures
+
+*   **`carepop-frontend` Monorepo:** The previous pnpm/Turborepo monorepo located at `carepop-frontend/` is now **DEPRECATED**. Its constituent parts have been handled as follows:
+    *   `apps/nativeapp/`: Codebase migrated to the new top-level `carepop-nativeapp/`.
+    *   `apps/web/` (Next.js with React Native for Web): This application is **DEPRECATED** and superseded by the new `carepop-web/` Next.js project.
+    *   `packages/ui/`: Native UI components from this package are now integrated directly within `carepop-nativeapp/`. The shared package itself is **DEPRECATED**.
+    *   `packages/eslint-config/`, `packages/typescript-config/`: These shared configurations are **DEPRECATED**. Each top-level project (`carepop-backend`, `carepop-nativeapp`, `carepop-web`) will manage its own linting and TypeScript configurations.
+*   **Standalone `carepop-web-nextjs` project:** The code from this temporary project (used to initialize the Next.js app) has been migrated into the top-level `carepop-web/` folder. The temporary standalone project is no longer needed.
+
+## 3. Backend Stack Details (`carepop-backend/`)
 
 *   **Supabase:**
     *   PostgreSQL Database (Managed)
@@ -60,108 +63,63 @@
     *   Uses validation libraries (e.g., Joi, validator.js).
     *   Uses logging libraries (e.g., Winston, Pino) configured for Cloud Logging.
 
-## 4. Development Setup & Tooling
+## 4. Development Setup & Tooling (Revised)
 
-*   **Source Control:** Git.
-*   **Monorepo Management:** Turborepo.
-*   **Package Management:** pnpm.
-*   **CI/CD:** GitHub Actions (backend). Frontend TBD (potentially EAS Build).
-*   **Testing:** Jest (Expo provides integration).
-*   **Local Development:** `pnpm run dev` (starts web and Expo dev client). Requires Expo Go / Development Build and browser.
-*   **Debugging:** Expo Dev Tools, React Native Debugger / Flipper (with config); Next.js/React DevTools (Web); Standard Node.js debugging tools, Cloud Logging/Monitoring (Backend).
-*   **Secrets:** GCP Secret Manager for cloud credentials, `.env` files (potentially managed via `expo-constants`).
+-   **Project Structure:** Three top-level directories in the main Git repository: `carepop-backend/`, `carepop-nativeapp/`, `carepop-web/`.
+-   **Version Control:** Git, with a central repository on GitHub (`https://github.com/projectcarepop/carepop.git`). The `main` branch history will be reset (force-pushed) to reflect this new structure.
+-   **Package Management:** Each of the three projects will use its own `package.json` and manage dependencies with `npm` (or `yarn`/`pnpm` if preferred *within* that specific project directory).
+-   **No Root-Level Monorepo Tooling (Currently):** Tools like Turborepo or pnpm workspaces are *not* currently configured at the root level to manage these three projects as a single monorepo. They are treated as independent projects co-located in one Git repository.
+-   **Local Development:**
+    *   **Backend:** `cd carepop-backend && npm install && npm run dev` (or equivalent).
+    *   **Native App:** `cd carepop-nativeapp && npm install && npx expo start` (or `npm run ios/android`). Requires Expo Go app or simulator/emulator.
+    *   **Web App:** `cd carepop-web && npm install && npm run dev`.
+-   **Linters/Formatters:** Each project will have its own ESLint, Prettier, and TypeScript configurations (e.g., `eslintrc.js`, `tsconfig.json` within each respective project folder).
+-   **Environment Variables:** Each project will manage its own environment variables (e.g., via `.env` files, not committed to Git).
 
-## 5. Key Third-Party Services (Requires Vetting)
+## 5. CI/CD & Deployment
 
-*   **Supabase:** (Core platform dependency)
-*   **Google Cloud Platform:** (Core infrastructure dependency)
-*   **Google Maps Platform:** (Mapping and Geocoding)
-*   **Notification Provider:** (TBD - e.g., Twilio, AWS SNS/FCM)
-*   **AI/NLP Service:** (TBD - e.g., AWS Comprehend Medical)
-*   **Payment Gateway:** (TBD - if needed)
+-   **`carepop-nativeapp/`:** EAS Build & Submit for app store deployment.
+-   **`carepop-web/`:** Vercel/Netlify (or similar) for web deployment.
+-   **`carepop-backend/`:** Google Cloud Build & Cloud Run for backend service deployment.
+-   CI/CD pipelines (e.g., GitHub Actions) will be set up to trigger builds and deployments based on changes within the respective `carepop-backend/`, `carepop-nativeapp/`, or `carepop-web/` directories.
 
-*Vetting Criteria:* Security posture, reliability, cost, and critically, compliance support (DPA guarantees, HIPAA BAA availability).
+## 6. API Documentation
 
-## 6. Technical Constraints & Considerations
+*   **Supabase:**
+    *   PostgreSQL Database (Managed)
+    *   Supabase Authentication (Handles user identity, JWTs)
+    *   Supabase Row Level Security (RLS - Core for data access control)
+    *   Supabase Storage (For files)
+    *   Supabase Edge Functions (Potential for simple, data-proximate logic)
+    *   Supabase SDK (Used by frontend and backend Cloud Run services - **Backend uses separate `anon` and `service_role` clients initialized in `supabaseClient.ts`**)
+*   **Google Cloud Platform (GCP):**
+    *   **Cloud Run:** Hosts Node.js/TypeScript backend services/functions for custom logic, integrations, sensitive processing, background jobs.
+    *   **Cloud Secret Manager:** Securely stores all API keys, database credentials, application encryption keys.
+    *   **Cloud Logging:** Centralized logging sink for Cloud Run and potentially Supabase logs.
+    *   **Cloud Monitoring:** Platform monitoring and alerting.
+    *   **Cloud Scheduler:** Triggers background tasks hosted on Cloud Run.
+    *   **(Future):** Cloud SQL (potential for backups), Cloud Storage (backups), Cloud CDN, Cloud Load Balancer.
+*   **Node.js/TypeScript (on Cloud Run):**
+    *   Minimal framework likely (Express/Fastify optional).
+    *   Uses Supabase JS SDK to interact with Supabase.
+    *   Uses Node.js `crypto` module for application-level AES-256-GCM encryption/decryption.
+    *   Uses validation libraries (e.g., Joi, validator.js).
+    *   Uses logging libraries (e.g., Winston, Pino) configured for Cloud Logging.
+
+## 7. Key Technical Decisions & Trade-offs (Summary)
+
+-   **Simplified Top-Level Structure:** Chosen over a complex monorepo to reduce tooling overhead and simplify individual project development, at the cost of potentially needing to manage cross-project dependencies or shared code more manually if that need arises significantly.
+-   **Force Push for History Reset:** Necessary to establish the clean new structure on `main`, accepting the loss of easily browsable prior monorepo history on that branch.
+-   **Supabase + Cloud Run:** Balances BaaS speed with custom logic flexibility.
+-   **Expo (Managed Workflow) for Native:** Simplifies native build and deployment.
+-   **Next.js for Web:** Strong for SSR/SSG, SEO, and modern web development with a rich ecosystem (Tailwind, Shadcn UI).
+-   **TypeScript:** For type safety and improved maintainability across all three projects.
+
+## 8. Technical Constraints & Considerations
 
 *   **Compliance:** Strict adherence to Philippines DPA is mandatory. HIPAA compliance is a strategic goal.
-*   **Security:** High priority due to sensitive health data (SPI/PHI). Requires robust implementation of encryption, access control (RLS + backend checks), secure coding, etc.
-*   **Cross-Platform Consistency:** Core goal achieved via shared `packages/ui`. Requires careful component design, styling strategy evaluation (Expo context), and testing.
-*   **Performance:** Needs proactive optimization (native rendering, web vitals, backend query/RLS performance).
-*   **Scalability:** Leverage managed services (Supabase, Cloud Run) but requires monitoring and appropriate configuration.
-*   **SEO:** Public web pages (Landing Pages, Directory in `apps/web`) must be discoverable, achieved via Next.js SSR/SSG.
-
-### Frontend (`carepop-monorepo`)
-
-*   **Structure:** Turborepo / pnpm monorepo.
-*   **Web App (`apps/web`):**
-    *   Framework: Next.js (App Router)
-    *   Language: TypeScript
-    *   Styling: Tailwind CSS (via `packages/config`), React Native Web (for potential `@repo/ui` component usage).
-    *   State Management: Redux Toolkit (planned, via `packages/store`).
-    *   UI Components: Primarily Next.js components, potentially shared components from `packages/ui`.
-*   **Native App (`apps/nativeapp`):**
-    *   **Framework:** Expo CLI (Managed Workflow TBD, SDK Version TBD)
-    *   Language: TypeScript
-    *   Styling: **TBD - Evaluate Expo options** (e.g., `expo-styling`, NativeWind v4, `StyleSheet`).
-    *   Navigation: Expo Router (likely).
-    *   State Management: Redux Toolkit (planned, via `packages/store`).
-    *   UI Components: Primarily native components, shared components from `packages/ui`.
-*   **Shared UI (`packages/ui`):**
-    *   Purpose: House reusable React Native components for both Expo and Web.
-    *   Styling: **TBD - Must align with Native App strategy**.
-*   **Shared Config (`packages/config`):**
-    *   `tailwind-config`: Shared Tailwind CSS configuration (used by `apps/web`).
-    *   `typescript-config`: Shared `tsconfig.json` presets (planned).
-*   **Shared State (`packages/store`):** Redux Toolkit slices and store configuration (planned).
-*   **Shared Types (`packages/types`):** TypeScript interfaces and types (planned).
-*   **Build/Dev:** Turborepo orchestrates builds, `pnpm run dev` starts both apps.
-
-**Frontend - Native (`apps/nativeapp`):**
-*   **Framework:** Expo CLI (SDK Version TBD)
-*   **Language:** TypeScript
-*   **Styling:** **TBD - Evaluate Expo options** (e.g., `expo-styling`, NativeWind v4, `StyleSheet`).
-*   **Bundler:** Metro (Configured via `metro.config.js`, potentially simpler with Expo defaults).
-*   **Build:** Expo Application Services (EAS) Build, local builds via `npx expo run:[android|ios]` (after prebuild if needed). Configuration via `app.json`/`app.config.js`.
-*   **Troubleshooting Notes:** Expo-specific troubleshooting (Expo Doctor, checking `app.json`, EAS Build logs, Expo Go logs). Previous RN CLI issues (Gradle paths, specific Metro `blockList` entries) are likely irrelevant now.
-
-**Frontend - Web (`apps/web`):**
-*   **Framework:** Next.js (v?.? - Check package.json)
-*   **Language:** TypeScript
-*   **Styling:** Tailwind CSS (configured via `postcss.config.mjs` and `tailwind.config.ts`)
-
-**Backend (`carepop-backend`):**
-*   **Framework:** Node.js / Express
-*   **Language:** TypeScript
-*   **Database:** Supabase (PostgreSQL)
-*   **Authentication:** Supabase Auth
-*   **Deployment:** (Likely GCP Cloud Run/Functions - TBD)
-
-**Shared Packages:**
-*   `packages/ui`:
-    *   Targeting both Expo Native and React (Web).
-    *   Styling strategy TBD.
-    *   `theme.ts` likely reusable.
-*   Config packages (`eslint`, `typescript`, `tailwind`) ensure consistency.
-
-**Development Environment:**
-*   OS: Windows (Expo generally offers smoother cross-platform setup than RN CLI).
-*   Editor: (User's choice, e.g., VS Code)
-*   Version Control: Git / GitHub
-
-**Tooling:**
-*   `pnpm` for package management.
-*   `Turborepo` for build/task orchestration.
-*   Expo CLI / EAS CLI.
-*   `eslint`, `prettier` for code quality.
-*   `typescript` for static typing.
-
-## Learnings & Insights
-
-*   **Pivot Rationale:** Switched from React Native CLI to Expo CLI due to significant challenges with RN CLI monorepo setup (build complexity, dependency issues, styling instability). Expo aims to provide a more integrated and potentially simpler development experience.
-*   Monorepo setups still require careful configuration, but Expo may simplify native aspects (`metro.config.js`, native builds).
-*   Styling strategy needs re-evaluation in the Expo context.
-*   Icon management likely simpler with `@expo/vector-icons` (often pre-configured in Expo projects).
-*   Aggressive caching can still be an issue; standard cleaning procedures (`expo start -c`, clearing `node_modules`) remain relevant.
-*   Monorepo setups with RN + Web require careful configuration (`next.config.js` / `next.config.mjs` including `transpilePackages`, webpack aliases/loaders, `metro.config.js` settings, `pnpm` hoisting awareness in native build files like `build.gradle`).
-*   `react-native-vector-icons` is generally preferred over `@expo/vector-icons` in bare RN CLI projects to avoid needing extra Expo modules/config. Requires native setup (`fonts.gradle`) and web setup (`
+*   **Security:** High priority due to sensitive health data (SPI/PHI). Requires robust implementation of encryption, access control (RLS + backend checks), secure coding, etc., across both frontend applications and the backend.
+*   **User Experience Across Platforms:** Aim for a consistent brand identity and core functional experience, while optimizing the UI/UX for each distinct platform (native mobile for focused, on-the-go tasks; web for broader access, detailed information, and administrative functions).
+*   **Performance:** Needs proactive optimization for both the native mobile app (rendering, startup time) and the web application (Core Web Vitals, server response times), as well as backend query/RLS performance.
+*   **Scalability:** Leverage managed services (Supabase, Cloud Run, and web app hosting platform) but requires monitoring and appropriate configuration.
+*   **SEO:** Public pages on the **new, separate Next.js web application** (Landing Pages, Directory) must be discoverable, achieved via Next.js SSR/SSG and other SEO best practices.

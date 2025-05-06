@@ -1,5 +1,14 @@
 # Conceptual Change Log
 
+*   **Timestamp:** <YYYY-MM-DDTHH:MM:SSZ_PLACEHOLDER> - **Action:** Initiated Major Project Restructure and Memory Bank Update.
+    *   **Description:** Decision made to restructure the project into three top-level applications (`carepop-backend/`, `carepop-nativeapp/`, `carepop-web/`) within the main Git repository. This involves abandoning the `carepop-frontend` monorepo. A force push to the `main` branch is planned to reset its history to this new structure. Memory Bank update is currently in progress to reflect these changes.
+    *   **Reason:** Simplify development, reduce monorepo tooling overhead, clarify project boundaries, and provide a cleaner baseline.
+*   **Timestamp:** <YYYY-MM-DDTHH:MM:SSZ_PLACEHOLDER> - **Action:** Completed Major Architectural Documentation Update.
+    *   **Description:** All core Memory Bank files (`projectbrief.md`, `productContext.md`, `activeContext.md`, `systemPatterns.md`, `techContext.md`, `progress.md`) and `epics_and_tickets.md` were revised to reflect the new dual-frontend architecture:
+        *   Native Mobile App: Expo (React Native) for iOS & Android.
+        *   Separate Web Application: New project (Next.js, Tailwind CSS, Shadcn UI).
+        *   Backend (Supabase + Cloud Run) serves both.
+    *   This completes the documentation phase of the architectural pivot. Next steps involve updating `tracker.md` and then planning the new web application.
 *   **Timestamp:** 2024-05-21T10:00:00Z (Placeholder) - **Action:** Completed FOUND-1 (Setup Code Repositories & Initial Project Structure). Conceptual commit approved. 
 *   **Timestamp:** 2024-05-21T10:05:00Z (Placeholder) - **Action:** Started FOUND-2: Initialized `package.json`, installed core dependencies (react, react-native, typescript, types), and created `tsconfig.json` for `carepop-frontend`.
 *   **Timestamp:** 2024-05-21T10:10:00Z (Placeholder) - **Action:** Continued FOUND-2: Initialized `package.json`, installed dependencies (@supabase/supabase-js, dotenv, typescript, types, ts-node-dev), and created `tsconfig.json` for `carepop-backend`. 
@@ -177,19 +186,4 @@
     - **Action:** Goal: Finalize basic UI components (Checkbox, RadioButton, Switch).
     - **Description:** Actions: Created `Checkbox` component, tested, refined style. Created `RadioButton` and `RadioGroup` components, tested, refined style. Created `Switch` component initially using RNSwitch. Updated theme colors based on user request (`primary`, `secondary`, `destructive`, `accent`). Troubleshooting: Addressed web rendering issue for Switch thumb color (browser defaults). Refactored Switch: Created `switch.native.tsx` (uses RNSwitch) and `switch.web.tsx` (custom div/Tailwind implementation) to achieve desired look (icon in thumb for web, specific colors). Revised Switch (web/native) again to simpler design (pink track, white thumb, no icon).
 *   **Date:** 2024-08-30 **Time:** <placeholder_timestamp>
-    - **Action:** State: Basic input components functional. Switch has platform-specific implementations. Native Metro server port 8081 conflict (`EADDRINUSE`) persists but user chose to defer resolution.
-    - **Description:** Next: Plan and implement Registration Form.
-*   **Date:** 2024-08-30 **Time:** <placeholder_timestamp>
-    - **Action:** Goal: Implement and test web registration form UI and backend connection.
-    - **Description:** Actions: Created web registration page (`register/page.tsx`) with form fields, state, validation. Implemented `fetch` call to backend `/api/auth/register`. Debugged and resolved `ERR_CONNECTION_REFUSED` by correcting backend port in fetch URL. Debugged and resolved CORS error by adding `cors` middleware to backend. Debugged and resolved backend startup error (`Cannot find module ./config/secrets`). Confirmed successful email/password registration via web UI. Added placeholder Google Sign-Up button UI to web form. Created native registration screen file (`RegisterScreen.tsx`) with initial UI/logic.
-    - **State:** Web email/password registration functional. Native form created but untested (pending navigation/port fix). Google login UI added, logic pending.
-    - **Next:** Implement Google OAuth logic.
-*   **Timestamp:** 2024-09-01T<time_utc>
-    **Action:** Enhanced UI component styling.
-    **Description:** Updated core UI components (`Button`, `Card`, `TextInput`, `Checkbox`, `RadioButton`, `RadioGroup`, `Switch`) in `packages/ui` based on provided UI design guidelines ([UX Collective](https://uxdesign.cc/58-rules-for-stunning-and-effective-user-interface-design-ea4b93f931f6), [UXDI](https://www.uxdesigninstitute.com/blog/10-user-interface-guidelines/)). Improvements focused on visual hierarchy, spacing, feedback, contrast, and accessibility. Committed changes: `feat(ui): enhance component styling based on UI guidelines`.
-*   **Timestamp:** 2024-09-01T<time_utc>
-    **Action:** Updated Memory Bank.
-    **Description:** Reviewed and updated `activeContext.md` and `progress.md` to reflect the completion of UI styling enhancements and shift the immediate focus to planning and initializing the React Native (`nativeapp`) setup. Updated `memorylog.md`.
-*   **Timestamp:** 2024-09-02T<current_utc_time_placeholder>
-    **Action:** Logged Decision: Immediate Pivot to Expo CLI.
-    **Description:** Recorded the immediate decision to pivot the frontend native application development from React Native CLI to **Expo CLI**. This decision stems from persistent difficulties encountered with the RN CLI monorepo setup (complex build configurations, dependency management, styling instability) documented previously. React Native CLI may be revisited in the future if time/resources permit. The actual migration is underway, and associated Memory Bank updates (`techContext.md`, `systemPatterns.md`, `progress.md`, `activeContext.md`) will follow to reflect this change. Current focus shifts to establishing and stabilizing the Expo CLI-based monorepo environment.
+    - **Action:** State: Basic input components functional. Switch has platform-specific implementations. Native Metro server port 8081 conflict (`

@@ -18,7 +18,12 @@ The platform addresses inefficiencies in manual healthcare workflows, lack of di
 
 ## 5. Solution Approach
 
-Develop an integrated, cross-platform (web and mobile) digital application using React Native. The platform will feature a user-centered design emphasizing accessibility, security, and inclusivity. A modern, visually appealing interface is required. The backend architecture will utilize a hybrid approach with Supabase (PostgreSQL DB, Auth, RLS, Storage, Functions) for core BaaS features and Google Cloud Run for custom backend logic, integrations, and background tasks. Rigorous security controls (application-level encryption, RLS) and compliance with the Philippines Data Privacy Act (DPA RA 10173) are mandatory. Public-facing web components (like the Provider Directory) must be discoverable via search engines (SEO).
+Develop three distinct top-level applications within a single Git repository:
+1.  **`carepop-nativeapp/`**: A **native mobile application (iOS/Android via Expo/React Native)** for a rich, on-the-go user experience. UI components previously in a shared package will be integrated directly.
+2.  **`carepop-web/`**: A **comprehensive web application (Next.js, Tailwind CSS, Shadcn UI)** for broader accessibility, public-facing information, and administrative functions.
+3.  **`carepop-backend/`**: A **backend system (Node.js/TypeScript on Google Cloud Run with Supabase for BaaS)** serving both the native mobile and web applications.
+
+This structure simplifies individual project management while keeping all code for the CarePoP ecosystem in a central repository. The platform will continue to feature a user-centered design emphasizing accessibility, security, and inclusivity. Modern, visually appealing interfaces are required for both frontend applications. Rigorous security controls (application-level encryption, RLS) and compliance with the Philippines Data Privacy Act (DPA RA 10173) are mandatory. Public-facing web components (like the Provider Directory on the web application) must be discoverable via search engines (SEO).
 
 ## 6. Target Audience
 
