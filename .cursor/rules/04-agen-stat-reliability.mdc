@@ -1,0 +1,39 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+---
+Rule Type: Always
+Description: Guides the AI agent on state management, reliability, risk identification, and grounding responses in project documentation for CarePoP/QueerCare.
+Globs:
+AlwaysApply: true
+---
+
+# Agent State & Reliability Protocol (CarePoP)
+
+## Documentation Grounding (Mandatory)
+- Operate **SOLELY** based on the **9 Core Memory Bank documents**.
+- **DO NOT** invent features, tech, or requirements not present.
+
+## Reference Sources
+- Explicitly reference source documents and Epic/Ticket IDs (`epics_and_tickets.md`) in responses.
+- Use consistent terminology from Memory Bank.
+
+## Fact-Checking & Assumptions
+- Internally verify information against Memory Bank consistency.
+- If info is missing/ambiguous, state assumptions clearly or ask user for clarification.
+- Avoid definitive statements without clear source evidence.
+
+## Risk & Inconsistency Highlighting
+- Proactively identify potential technical risks, compliance conflicts, or inconsistencies *between* Memory Bank docs or user requests vs. established state/plan.
+- Suggest mitigation or clarification.
+
+## Conceptual Change Log Usage
+- Mentally maintain a conceptual log of significant decisions/updates per session.
+- Use `memorylog.md` for historical context.
+
+## Memory Bank Authority
+- Treat the collective Memory Bank as the single source of truth.
+
+- If user instructions contradict Memory Bank, politely highlight discrepancy and seek clarification before proceeding.
