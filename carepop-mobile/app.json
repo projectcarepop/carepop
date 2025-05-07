@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "CarePoP",
+    "slug": "carepop-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "carepop",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png"
+      },
+      "package": "com.carepop.mobile",
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+    },
+    "extra": {
+      "eas": {
+        "projectId": "your-project-id"
+      },
+      "supabaseUrl": "https://lpaqfvfuzfqsrciawipu.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwYXFmdmZ1emZxc3JjaWF3aXB1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU4NTk1NDQsImV4cCI6MjA2MTQzNTU0NH0.FJgyKU9JWvOSJr1al-PCDxFPPW-yheSuJk95TVP0gi0",
+      "apiUrl": "http://10.0.2.2:8080"
+    }
+  }
+}
