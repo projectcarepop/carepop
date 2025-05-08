@@ -33,10 +33,10 @@ IMPORTANT NOTE ON CURRENT STATUS (As of TIMESTAMP_OF_MEMORY_BANK_AUG_2_2024_REVI
     *   [Done] FE-SETUP-1: Initialize \`carepop-nativeapp/\` (Expo) Project (MVP)  
     *   [Done] FE-SETUP-2: Initialize \`carepop-web/\` (Next.js) Project (MVP)  
     *   [In Progress] FE-SETUP-3: Implement Native App Navigation (\`carepop-nativeapp/\`) (MVP)  
-        *   Notes: Investigating navigation context within \`App.tsx\`. Main drawer and profile stack defined in \`App.tsx\`; debugging navigation from \`MyProfileScreen\` to \`EditProfileScreen\`.
+        *   Notes: Navigation structure primarily defined in \`App.tsx\`. Still blocked by persistent navigation error: \`MyProfileScreen\` cannot navigate to \`EditProfileScreen\`. Focus on \`App.tsx\` context/rendering.
     *   [Not Started] FE-SETUP-4: Implement Web App Navigation (\`carepop-web/\`) (MVP)  
     *   [In Progress] FE-SETUP-5: Integrate Native App Theme & Core UI Components (\`carepop-nativeapp/\`) (MVP)  
-        *   Notes: Components migrated, theme defined, usage verification encountering errors. Encountering "ViewManagerResolver returned null for ... ExpoLinearGradient".
+        *   Notes: Components migrated, theme defined. Drawer icons standardized to Ionicons.
     *   [Not Started] FE-SETUP-6: Setup Web App Styling & Base Components (\`carepop-web/\`) (MVP)  
     *   [Done] FE-SETUP-7: Debug ExpoLinearGradient Native View Manager Error (\`carepop-nativeapp/\`)
         *   Goal: Resolve the "ViewManagerResolver returned null for ViewManagerAdapter_ExpoLinearGradient" error.
@@ -69,7 +69,7 @@ IMPORTANT NOTE ON CURRENT STATUS (As of TIMESTAMP_OF_MEMORY_BANK_AUG_2_2024_REVI
 
 ## Epic AUTH: User Authentication (MVP - Implementation)  
 *   Goal: Implement secure user registration and login via direct Client-Supabase interaction.  
-*   Status: To Do (Requires implementation based on revised plan)
+*   Status: To Do (UI elements done, integration logic pending nav fix)
 
     *   [Not Started] AUTH-1: Integrate Supabase Registration (Native & Web Clients, Supabase Trigger) (MVP)  
         *   Notes: Frontend calls + Trigger verification needed.
@@ -78,13 +78,13 @@ IMPORTANT NOTE ON CURRENT STATUS (As of TIMESTAMP_OF_MEMORY_BANK_AUG_2_2024_REVI
     *   [Not Started] AUTH-3: Secure Supabase Session & Token Handling (Native & Web Clients) (MVP)  
         *   Notes: Client-side logic + Secure Storage needed.
     *   [In Progress] AUTH-4: Implement Login UI (\`carepop-nativeapp/\`) (MVP)  
-        *   Notes: UI refactored for aesthetics, needs connection logic update.
+        *   Notes: UI refactored with Ionicons, logo added. Connection logic needs implementation/verification pending navigation fix.
     *   [In Progress] AUTH-5: Implement Registration UI (\`carepop-nativeapp/\`) (MVP)  
-        *   Notes: UI refactored for aesthetics, First/Last name removed, needs connection logic update.
+        *   Notes: UI refactored, logo added. Connection logic needs implementation/verification pending navigation fix.
     *   [Not Started] AUTH-6: Implement Login UI (\`carepop-web/\`) (MVP)  
     *   [Not Started] AUTH-7: Implement Registration UI (\`carepop-web/\`) (MVP)  
     *   [In Progress] AUTH-8: Implement Password Reset Flow (BE Logic via Supabase, FE for Native & Web) (P2)  
-        *   Notes: Native UI for \`ForgotPasswordScreen.tsx\` updated with logo.
+        *   Notes: Native UI for \`ForgotPasswordScreen.tsx\` updated with logo. Backend/Supabase logic pending.
 
 ---
 
@@ -306,19 +306,18 @@ IMPORTANT NOTE ON CURRENT STATUS (As of TIMESTAMP_OF_MEMORY_BANK_AUG_2_2024_REVI
 *   Status: In Progress
 
     *   [In Progress] ONBOARDING-1: Implement Splash Screen (\`carepop-nativeapp/\`)
-        *   Notes: Located at \`screens/Onboarding/SplashScreen.tsx\`.
+        *   Notes: Located at \`screens/Onboarding/SplashScreen.tsx\`. Resolved potential text rendering warning issue.
     *   [In Progress] ONBOARDING-2: Implement Onboarding Screen One (\`carepop-nativeapp/\`)
-        *   Notes: Located at \`screens/Onboarding/OnboardingScreenOne.tsx\`. Uses smaller \`onboarding-1.png\` Image. Text styled separately. Swipe navigation.
+        *   Notes: Located at \`screens/Onboarding/OnboardingScreenOne.tsx\`. Uses smaller \`onboarding-1.png\` Image. Text styled separately. Swipe navigation. Unused navigation prop removed. Resolved potential text rendering warning issue.
     *   [In Progress] ONBOARDING-3: Implement Onboarding Screen Two (\`carepop-nativeapp/\`)
-        *   Notes: Located at \`screens/Onboarding/OnboardingScreenTwo.tsx\`. Uses smaller \`onboarding-2.png\` Image. Text styled separately. Swipe navigation.
+        *   Notes: Located at \`screens/Onboarding/OnboardingScreenTwo.tsx\`. Uses smaller \`onboarding-2.png\` Image. Text styled separately. Swipe navigation. Unused navigation prop removed. Resolved potential text rendering warning issue.
     *   [In Progress] ONBOARDING-4: Implement Onboarding Screen Three (\`carepop-nativeapp/\`)
-        *   Notes: Located at \`screens/Onboarding/OnboardingScreenThree.tsx\`. Uses smaller \`onboarding-3.png\` Image. Text and button styled separately. Final screen, uses "Get Started" button.
+        *   Notes: Located at \`screens/Onboarding/OnboardingScreenThree.tsx\`. Uses smaller \`onboarding-3.png\` Image. Text and button styled separately. Final screen, uses "Get Started" button. Unused navigation prop removed. Resolved potential text rendering warning issue.
     *   [In Progress] ONBOARDING-5: Integrate Onboarding Flow into App Logic (\`carepop-nativeapp/\`)
-        *   Notes: Involves \`App.tsx\` and AsyncStorage for completion state. Manages swipe navigation logic for carousel. App.tsx temporarily modified to always show onboarding.
+        *   Notes: Involves \`App.tsx\` and AsyncStorage for completion state. Manages swipe navigation logic via Carousel. App.tsx temporarily modified to always show onboarding. Text rendering warning resolved.
 
 ---
 
 ## Active Debugging Notes
--   **"NAVIGATE with payload {\"name\":\"EditProfile\"} was not handled by any navigator":** Persists despite payload correction. Current focus is on \`App.tsx\` navigator context and rendering logic.
--   **"Warning: Text strings must be rendered within a <Text> component":** Call stack points to \`App (<anonymous>)\`. Ongoing investigation in \`App.tsx\` and its child components.
+-   **"NAVIGATE with payload {\"name\":\"EditProfile\"} was not handled by any navigator":** Persists. Current focus is on \`App.tsx\` navigator context and rendering logic.
 

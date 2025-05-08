@@ -88,39 +88,32 @@ Note on Current Structure (Post-Major Restructure): This document reflects the p
 
 ---
 
-## Epic FE-SETUP: Frontend Applications Initialization & Core Structure (MVP)  
-*   Goal: Establish foundational setup for both the native mobile (\`carepop-nativeapp/\`) and web (\`carepop-web/\`) frontend applications.  
-*   Status: Partially Done
+## Epic FE-SETUP: Frontend Applications Initialization & Core Structure (MVP)
 
-    *   Ticket ID: FE-SETUP-1: Initialize \`carepop-nativeapp/\` (Expo) Project (MVP)  
-        *   Status: Done
+*   Goal: Establish foundational setup for both native mobile and web apps.  
+*   Status: Partially Done (Init done, Navigation & Theming integration needed)
 
-    *   Ticket ID: FE-SETUP-2: Initialize \`carepop-web/\` (Next.js) Project (MVP)  
-        *   Status: Done
+    *   Ticket ID: FE-SETUP-1: Initialize \`carepop-nativeapp/\` (Expo) Project (MVP) - Done
+
+    *   Ticket ID: FE-SETUP-2: Initialize \`carepop-web/\` (Next.js) Project (MVP) - Done
 
     *   Ticket ID: FE-SETUP-3: Implement Native App Navigation (\`carepop-nativeapp/\`) (MVP)  
-        *   Goal: Set up main navigation (Stack, Drawer/Tabs) using React Navigation.  
-        *   Location: \`carepop-nativeapp/src/navigation/\`  
-        *   Technology/Implementation Suggestions: Use \`@react-navigation/native-stack\` for performant screen transitions. Implement a root navigator (e.g., conditional or Switch-like) to show Auth screens (Login/Register) or the main App navigator (e.g., Drawer or Tabs containing Stacks) based on authentication state managed by \`AuthContext\`. Define navigation types using TypeScript for better type safety and developer experience. Consider lazy loading less critical screens.  
         *   Status: In Progress
+        *   Notes: Navigation structure primarily defined in \`App.tsx\`. Still blocked by persistent navigation error: \`MyProfileScreen\` cannot navigate to \`EditProfileScreen\`. Focus on \`App.tsx\` context/rendering.
+        *   Technology/Implementation Suggestions: React Navigation (Drawer, Stack, Bottom Tabs as needed). Define main navigators in \`App.tsx\` or a dedicated \`navigation/\` directory. Manage auth state for conditional rendering.
 
     *   Ticket ID: FE-SETUP-4: Implement Web App Navigation (\`carepop-web/\`) (MVP)  
-        *   Goal: Set up main navigation using Next.js App Router.  
-        *   Location: \`carepop-web/src/app/\`, \`carepop-web/src/components/layout/\`  
-        *   Technology/Implementation Suggestions: Utilize Next.js App Router \`layout.tsx\` files for shared UI (header, footer, sidebar). Use Route Groups \`(folder)\` to organize sections (e.g., \`(public)\`, \`(auth)\`, \`(app)\`, \`(admin)\`). Protect routes using Next.js Middleware for authentication checks or conditionally render layouts/components based on auth state fetched in Server Components. Use \`next/link\` for optimized client-side navigation.  
-        *   Status: To Do
+        *   Status: Not Started
 
     *   Ticket ID: FE-SETUP-5: Integrate Native App Theme & Core UI Components (\`carepop-nativeapp/\`) (MVP)  
-        *   Goal: Establish theme and integrate core UI components into the native app.  
-        *   Location: \`carepop-nativeapp/src/theme/\`, \`carepop-nativeapp/src/components/\`  
-        *   Technology/Implementation Suggestions: Define theme in a central TypeScript file (\`theme.ts\`) with constants/objects. Ensure migrated UI components (\`Button\`, \`TextInput\`, \`Card\` etc.) consistently use \`StyleSheet.create()\` and import tokens from \`theme.ts\`. Provide theme via React Context if dynamic theming (e.g., light/dark mode) is a future requirement. Prioritize simplicity for MVP.  
-        *   Status: In Progress (Component code migrated, theme applied, needs refinement)
+        *   Status: In Progress
+        *   Notes: Components migrated, theme defined. Drawer icons standardized to Ionicons.  
+        *   Technology/Implementation Suggestions: Define theme (colors, typography, spacing) in \`src/components/theme.ts\`. Create/adapt reusable components (Button, TextInput, Card etc.) in \`src/components/\`. Use \`ThemeProvider\` if necessary.
 
     *   Ticket ID: FE-SETUP-6: Setup Web App Styling & Base Components (\`carepop-web/\`) (MVP)  
-        *   Goal: Configure Tailwind CSS and set up base layout/components using Shadcn UI.  
-        *   Location: \`carepop-web/\` (e.g., \`tailwind.config.js\`, \`globals.css\`, \`app/layout.tsx\`, \`components/ui/\`)  
-        *   Technology/Implementation Suggestions: Ensure \`tailwind.config.js\` is configured, potentially including theme customizations. Implement base \`app/layout.tsx\`. Initialize essential Shadcn UI components using its CLI (\`npx shadcn-ui@latest add button input card ...\`). Create reusable layout components (\`Header\`, \`Footer\`, \`Sidebar\`).  
-        *   Status: To Do
+        *   Status: Not Started
+
+    *   Ticket ID: FE-SETUP-7: Debug ExpoLinearGradient Native View Manager Error (\`carepop-nativeapp/\`) - Done
 
 ---
 
@@ -145,66 +138,38 @@ Note on Current Structure (Post-Major Restructure): This document reflects the p
 
 ## Epic AUTH: User Authentication (MVP - Implementation)
 
-*   Goal: Implement secure user registration and login for both native (\`carepop-nativeapp/\`) and web (\`carepop-web/\`) applications by integrating directly with Supabase Authentication and handling session state.  
-*   Description: This epic focuses on the frontend implementation using the Supabase JS SDK and the backend profile creation trigger.  
-*   Depends on: FE-SETUP, FOUND-7, FOUND-8, FOUND-9 (Trigger)  
-*   Status: To Do (Requires code implementation based on new pattern)
+*   Goal: Implement secure user registration and login via direct Client-Supabase interaction.  
+*   Status: To Do (UI elements done, integration logic pending nav fix)
 
     *   Ticket ID: AUTH-1: Integrate Supabase Registration (Native & Web Clients, Supabase Trigger) (MVP)  
-        *   Goal: Implement client-side signup calls and verify profile trigger.  
-        *   Scope: Refactor client code (\`carepop-nativeapp/\` and \`carepop-web/\`) to use Supabase JS SDK \`supabase.auth.signUp()\`. Verify the Supabase trigger (FOUND-9) successfully creates the \`profiles\` entry.  
-        *   Location: \`carepop-nativeapp/src/services/authService.ts\` (or context), \`carepop-web/src/lib/auth.ts\` (or equivalent)  
-        *   Acceptance Criteria: Users can register via both clients. \`auth.users\` entry created. \`profiles\` table entry created via trigger. Email confirmation flow (if enabled) works.  
-        *   Technology/Implementation Suggestions: Supabase JS SDK \`supabase.auth.signUp\`. Pass necessary metadata (\`options.data\`) if trigger needs it beyond \`new.id\`, \`new.email\`. Handle potential errors from \`signUp\`.  
-        *   Status: To Do
+        *   Status: Not Started
+        *   Notes: Frontend calls + Trigger verification needed.
 
     *   Ticket ID: AUTH-2: Integrate Supabase Login (Native & Web Clients) (MVP)  
-        *   Goal: Implement client-side login calls using Supabase Auth.  
-        *   Scope: Refactor client code (\`carepop-nativeapp/\` and \`carepop-web/\`) to use Supabase JS SDK \`supabase.auth.signInWithPassword()\` (and/or \`signInWithOAuth\` for Google later).  
-        *   Location: \`carepop-nativeapp/src/services/authService.ts\` (or context), \`carepop-web/src/lib/auth.ts\` (or equivalent)  
-        *   Acceptance Criteria: Users can log in via both clients. Session (JWT) is received from Supabase SDK. Errors handled (invalid credentials etc.).  
-        *   Technology/Implementation Suggestions: Supabase JS SDK \`supabase.auth.signInWithPassword\`. Handle Supabase specific error codes/messages.  
-        *   Status: To Do
+        *   Status: Not Started
+        *   Notes: Frontend calls needed.
 
     *   Ticket ID: AUTH-3: Secure Supabase Session & Token Handling (Native & Web Clients) (MVP)  
-        *   Goal: Implement secure storage, usage, and state management of Supabase sessions/tokens.  
-        *   Scope: Implement logic in both clients (\`carepop-nativeapp/\` using \`AuthContext\` + Secure Storage; \`carepop-web/\` using similar context/hook + secure storage/cookies) to:  
-            *   Listen for auth state changes using \`supabase.auth.onAuthStateChange\`.  
-            *   Store session/token securely upon successful login (SEC-FE-1).  
-            *   Retrieve session/token on app load to check for existing session (\`supabase.auth.getSession\`).  
-            *   Provide auth state (user, session, isLoading) to the rest of the app via context/hooks.  
-            *   Clear session/token on logout using \`supabase.auth.signOut()\`.  
-            *   Ensure Supabase client initialization enables automatic token refresh.  
-        *   Location: \`carepop-nativeapp/src/context/AuthContext.tsx\`, \`carepop-web/src/lib/authContext.tsx\` (or equivalent auth hooks/provider structure)  
-        *   Technology/Implementation Suggestions: Supabase JS SDK (\`onAuthStateChange\`, \`getSession\`, \`setSession\`, \`signOut\`). React Context API or Zustand for state propagation. \`expo-secure-store\` (native). HttpOnly cookies or secure browser storage (web). Conditional rendering based on auth state.  
-        *   Status: To Do
+        *   Status: Not Started
+        *   Notes: Client-side logic + Secure Storage needed.
 
     *   Ticket ID: AUTH-4: Implement Login UI (\`carepop-nativeapp/\`) (MVP)  
-        *   Goal: Finalize the native mobile login UI, integrating with direct Supabase Auth.  
-        *   Scope: Connect UI-6's components to the login logic implemented in AUTH-2 and AUTH-3. Ensure loading states, error messages, and navigation on success/failure work correctly. Refactored for consistent aesthetic with Register screen.
-        *   Location: `carepop-nativeapp/src/screens/Auth/LoginScreen.tsx`
-        *   Status: In Progress (Needs connection logic update, UI refactor done)
+        *   Status: In Progress
+        *   Notes: UI refactored with Ionicons, logo added. Connection logic needs implementation/verification pending navigation fix.
 
     *   Ticket ID: AUTH-5: Implement Registration UI (\`carepop-nativeapp/\`) (MVP)  
-        *   Goal: Finalize the native mobile registration UI, integrating with direct Supabase Auth.
-        *   Scope: Connect UI-5's components to the registration logic implemented in AUTH-1. Handle success/failure messages and navigation. Refactored for consistent aesthetic with Login screen. Removed First Name and Last Name fields.
-        *   Location: `carepop-nativeapp/src/screens/Auth/RegisterScreen.tsx`
-        *   Status: In Progress (Needs connection logic update, UI refactor done)
+        *   Status: In Progress
+        *   Notes: UI refactored, logo added. Connection logic needs implementation/verification pending navigation fix.
 
     *   Ticket ID: AUTH-6: Implement Login UI (\`carepop-web/\`) (MVP)  
-        *   Goal: Create the login page UI for the web application, integrating with direct Supabase Auth.  
-        *   Scope: Develop UI using Next.js/Tailwind/Shadcn. Connect form submission to AUTH-2 logic (direct Supabase call) and AUTH-3 logic (session handling).  
-        *   Location: \`carepop-web/src/app/auth/login/page.tsx\`  
-        *   Status: To Do
+        *   Status: Not Started
 
     *   Ticket ID: AUTH-7: Implement Registration UI (\`carepop-web/\`) (MVP)  
-        *   Goal: Create the registration page UI for the web application, integrating with direct Supabase Auth.  
-        *   Scope: Develop UI using Next.js/Tailwind/Shadcn. Connect form submission to AUTH-1 logic (direct Supabase call) and ensure profile trigger (FOUND-9) works.  
-        *   Location: \`carepop-web/src/app/auth/register/page.tsx\`  
-        *   Status: To Do
+        *   Status: Not Started
 
     *   Ticket ID: AUTH-8: Implement Password Reset Flow (BE Logic via Supabase, FE for Native & Web) (P2)  
-        *   Status: To Do
+        *   Status: In Progress
+        *   Notes: Native UI for \`ForgotPasswordScreen.tsx\` updated with logo. Backend/Supabase logic pending.
 
 ---
 
@@ -463,59 +428,27 @@ Okay, here are the remaining Epics from \`epics_and_tickets.md\` with their tick
 ---
 
 ## Epic ONBOARDING: Native App Onboarding Flow (MVP)
-*   Goal: Implement a multi-step onboarding experience for new users in `carepop-nativeapp/`.
+*   Goal: Implement a multi-step onboarding experience for new users in \`carepop-nativeapp/\`.
 *   Status: In Progress
 
-    *   Ticket ID: ONBOARDING-1
-        *   Title: Implement Splash Screen (`carepop-nativeapp/`)
-        *   Scope: Create and display an initial splash screen.
-        *   Location: `carepop-nativeapp/screens/Onboarding/SplashScreen.tsx`
-        *   Acceptance Criteria: Splash screen displays correctly on app launch. Transitions appropriately.
+    *   Ticket ID: ONBOARDING-1: Implement Splash Screen (\`carepop-nativeapp/\`)  
         *   Status: In Progress
+        *   Notes: Located at \`screens/Onboarding/SplashScreen.tsx\`. Resolved potential text rendering warning issue.
+        *   Technology/Implementation Suggestions: Full-screen component, displays logo, potentially an activity indicator. Shown while app loads initial assets/checks auth state.
 
-    *   Ticket ID: ONBOARDING-2
-        *   Title: Implement Onboarding Screen One (`carepop-nativeapp/`)
-        *   Scope: Create the first screen of the onboarding carousel/flow using swipe navigation. Uses a smaller, distinct `Image` for `onboarding-1.png` (e.g., 250x250). Text (headline, body, tagline, progress indicator) styled and positioned separately from the image.
-            *   Asset: `carepop-mobile/assets/onboarding-1.png`.
-            *   Headline: "Welcome to CarePoP!"
-            *   Body Text: "Your journey to accessible, inclusive healthcare in Quezon City starts here. Find affirming providers, manage appointments, and take control of your well-being, all in one secure place."
-            *   Tagline: "Your Health. Your Choice. Your Space."
-            *   Progress Indicator: ● ○ ○.
-            *   Include visual cues for swipeability.
-        *   Location: `carepop-nativeapp/screens/Onboarding/OnboardingScreenOne.tsx`
-        *   Acceptance Criteria: Screen displays content and a distinct PNG asset as designed. Navigates to the next onboarding screen via swipe.
+    *   Ticket ID: ONBOARDING-2: Implement Onboarding Screen One (\`carepop-nativeapp/\`)  
         *   Status: In Progress
+        *   Notes: Located at \`screens/Onboarding/OnboardingScreenOne.tsx\`. Uses smaller \`onboarding-1.png\` Image. Text styled separately. Swipe navigation. Unused navigation prop removed. Resolved potential text rendering warning issue.
 
-    *   Ticket ID: ONBOARDING-3
-        *   Title: Implement Onboarding Screen Two (`carepop-nativeapp/`)
-        *   Scope: Create the second screen of the onboarding carousel/flow using swipe navigation. Uses a smaller, distinct `Image` for `onboarding-2.png`. Text styled and positioned separately.
-            *   Asset: `carepop-mobile/assets/onboarding-2.png`.
-            *   Headline: "Your Health Journey, Simplified."
-            *   Body Text: "Easily book appointments that fit your schedule. Find providers who understand your needs in our curated directory. Securely track your health goals, medications, and cycles to stay informed and empowered."
-            *   Tagline: "All Your Care Essentials, Right Here."
-            *   Progress Indicator: ○ ● ○.
-            *   Include visual cues for swipeability.
-        *   Location: `carepop-nativeapp/screens/Onboarding/OnboardingScreenTwo.tsx`
-        *   Acceptance Criteria: Screen displays content and a distinct PNG asset as designed. Navigates to the next onboarding screen via swipe.
+    *   Ticket ID: ONBOARDING-3: Implement Onboarding Screen Two (\`carepop-nativeapp/\`)  
         *   Status: In Progress
+        *   Notes: Located at \`screens/Onboarding/OnboardingScreenTwo.tsx\`. Uses smaller \`onboarding-2.png\` Image. Text styled separately. Swipe navigation. Unused navigation prop removed. Resolved potential text rendering warning issue.
 
-    *   Ticket ID: ONBOARDING-4
-        *   Title: Implement Onboarding Screen Three (`carepop-nativeapp/`)
-        *   Scope: Create the final screen of the onboarding carousel/flow. Uses a smaller, distinct `Image` for `onboarding-3.png`. Text and "Get Started" button styled and positioned separately. Includes a "Get Started" button for completion action.
-            *   Asset: `carepop-mobile/assets/onboarding-3.png`.
-            *   Headline: "Secure, Confidential & Proudly Inclusive."
-            *   Body Text: "Your privacy is our priority. We use strong security and encryption to protect your sensitive health information (adhering to DPA standards). CarePoP is a safe space for everyone, including the LGBTQIA+ community."
-            *   Tagline: "Healthcare with Respect & Confidentiality."
-            *   Progress Indicator: ○ ○ ●.
-            *   Button: "Get Started".
-        *   Location: `carepop-nativeapp/screens/Onboarding/OnboardingScreenThree.tsx`
-        *   Acceptance Criteria: Screen displays content and a distinct PNG asset as designed. "Get Started" button is present and triggers `onComplete` action, successfully transitioning user out of onboarding to the Auth flow.
+    *   Ticket ID: ONBOARDING-4: Implement Onboarding Screen Three (\`carepop-nativeapp/\`)  
         *   Status: In Progress
+        *   Notes: Located at \`screens/Onboarding/OnboardingScreenThree.tsx\`. Uses smaller \`onboarding-3.png\` Image. Text and button styled separately. Final screen, uses "Get Started" button. Unused navigation prop removed. Resolved potential text rendering warning issue.
 
-    *   Ticket ID: ONBOARDING-5
-        *   Title: Integrate Onboarding Flow into App Logic (`carepop-nativeapp/`)
-        *   Scope: Ensure the onboarding flow is shown only once to new users (standard behavior). Manage onboarding completion state (e.g., using AsyncStorage). **Temporarily modified in App.tsx to always show onboarding for testing.**
-        *   Location: `carepop-nativeapp/App.tsx` and related auth/navigation logic.
-        *   Acceptance Criteria: New users see the onboarding flow. Returning users who completed onboarding bypass it. State is persisted correctly.
+    *   Ticket ID: ONBOARDING-5: Integrate Onboarding Flow into App Logic (\`carepop-nativeapp/\`)  
         *   Status: In Progress
+        *   Notes: Involves \`App.tsx\` and AsyncStorage for completion state. Manages swipe navigation logic via Carousel. App.tsx temporarily modified to always show onboarding. Text rendering warning resolved.
 

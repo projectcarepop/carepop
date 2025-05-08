@@ -1,24 +1,16 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import { theme } from '../../src/components/theme';
-// import Svg from 'react-native-svg'; // Remove SVG import
-// TODO: Setup SVG transformer or load SVG content directly for illustration
-// import Onboarding1 from '../../assets/onboarding-1.svg'; 
 
-// Simplified props type
-interface OnboardingScreenOneProps {
-  navigation?: any; // Keep for potential future use, but not used for swipe
-}
-
-export const OnboardingScreenOne: React.FC<OnboardingScreenOneProps> = ({ navigation }) => {
+export const OnboardingScreenOne: React.FC = ({ /* navigation */ }) => {
   return (
-    <View style={styles.container}> {/* Main container */} 
-      <Image 
+    <View style={styles.container}>
+       <Image 
         source={require('../../assets/onboarding-1.png')} 
         style={styles.illustration} // Use illustration style for Image
         resizeMode="contain" 
       />
-      <View style={styles.textContainer}> {/* Container for all text content */}
+      <View style={styles.textContainer}> 
         <Text style={styles.headline}>Welcome to Carepop!</Text>
         <Text style={styles.bodyText}>
           Your journey to accessible, inclusive healthcare starts here. 
@@ -37,19 +29,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background, 
     alignItems: 'center',
-    justifyContent: 'center', // Center content vertically
+    justifyContent: 'center', 
     paddingHorizontal: theme.spacing.xl,
-    paddingVertical: theme.spacing.xl * 1.5, // Adjusted padding
+    paddingVertical: theme.spacing.xl * 1.5, 
   },
   illustration: { 
     width: 300, 
     height: 300, 
-    marginBottom: theme.spacing.xl, // Increased space below image
+    marginBottom: theme.spacing.xl, 
   },
   textContainer: { 
     alignItems: 'center',
     width: '100%',
-    marginBottom: theme.spacing.xl, // Space below text, above indicator
+    marginBottom: theme.spacing.xl, 
   },
   headline: {
     fontSize: theme.typography.heading,
@@ -70,7 +62,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: theme.colors.secondary, 
     textAlign: 'center',
-    marginBottom: theme.spacing.lg, // Add some margin below tagline
+    marginBottom: theme.spacing.lg, 
   },
   progressIndicator: {
     fontSize: theme.typography.heading,

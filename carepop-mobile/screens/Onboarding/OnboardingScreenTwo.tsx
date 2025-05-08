@@ -1,15 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import { theme } from '../../src/components/theme';
-// import Svg from 'react-native-svg'; // Remove SVG import
-// TODO: Setup SVG transformer or load SVG content directly for illustration
-// import Onboarding2 from '../../assets/onboarding-2.svg';
 
-interface OnboardingScreenTwoProps {
-  navigation?: any; // Keep for potential future use
-}
-
-export const OnboardingScreenTwo: React.FC<OnboardingScreenTwoProps> = ({ navigation }) => {
+export const OnboardingScreenTwo: React.FC = ({ /* navigation */ }) => {
   return (
     <View style={styles.container}> 
       <Image 

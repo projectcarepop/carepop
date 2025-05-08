@@ -78,7 +78,7 @@ const calculateAge = (dob: string | null | undefined): number | string => {
  */
 const getAddressPartName = (
     code: string | null | undefined,
-    list: Array<any>,
+    list: any[],
     codeKey: string,
     nameKey: string
 ): string => {
@@ -114,7 +114,6 @@ export function MyProfileScreen({ navigation }: MyProfileScreenProps) {
       <SafeAreaView style={[styles.safeArea, styles.centered]}>
         <MaterialIcons name="error-outline" size={48} color={theme.colors.destructive} />
         <Text style={styles.errorText}>Error loading profile: {authError.message}</Text>
-        {/* Optionally, add a retry button or sign-out button here */}
       </SafeAreaView>
     );
   }
@@ -127,8 +126,6 @@ export function MyProfileScreen({ navigation }: MyProfileScreenProps) {
         <Text style={styles.placeholderSubText}>
           Please complete your profile or try logging in again.
         </Text>
-        {/* TODO: Add a button to navigate to CreateProfileScreen if appropriate */}
-        {/* Or a sign out button from useAuth().signOut */} 
       </SafeAreaView>
     );
   }
@@ -151,7 +148,6 @@ export function MyProfileScreen({ navigation }: MyProfileScreenProps) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Header */}
       <View style={styles.headerBar}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={theme.colors.primary} />
@@ -162,47 +158,44 @@ export function MyProfileScreen({ navigation }: MyProfileScreenProps) {
 
       <ScrollView style={styles.container}>
         <View style={styles.profileHeaderContainer}>
-            <Image
-                // TODO: Replace with dynamic avatar_url from profile if available
-                source={{ uri: profile.avatar_url || 'https://via.placeholder.com/100' }} 
-                style={styles.profileImage}
-            />
             <Text style={styles.profileName}>{`${profile.first_name || ''} ${profile.last_name || ''}`.trim() || (profile.username || 'User Name')}</Text>
             {session?.user?.email && <Text style={styles.profileEmail}>{session.user.email}</Text>}
             <Button 
                 title="Edit Profile"
                 onPress={navigateToEditProfile}
-                variant="secondary" 
-                styleType="outline"
-                style={styles.editButton}
+                variant="primary" // Changed to primary for consistency?
+                styleType="outline" // Keep outline style?
+                style={styles.editButton} // Keep custom style for now
+                // textStyle={styles.editButtonText} // Removed textStyle prop
             />
         </View>
 
-        <Card style={styles.card}>
+        <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Personal Information</Text>
           <InfoRow label="Age:" value={age.toString()} />
           <InfoRow label="Date of Birth:" value={formattedDob} />
           <InfoRow label="Civil Status:" value={profile.civil_status || 'N/A'} />
           <InfoRow label="Religion:" value={profile.religion || 'N/A'} />
           <InfoRow label="Occupation:" value={profile.occupation || 'N/A'} />
-        </Card>
+        </View>
 
-        <Card style={styles.card}>
+        <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Contact Information</Text>
-          <InfoRow label="Contact No:" value={profile.contact_no || profile.phone_number || 'N/A'} />
-          {/* Email is shown in header, could be repeated here if desired */}
-        </Card>
+          {session?.user?.email && (
+            <InfoRow label="Email:" value={session.user.email} />
+          )}
+          <InfoRow label="Phone:" value={profile.contact_no || 'N/A'} />
+        </View>
 
-        <Card style={styles.card}>
+        <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Address</Text>
           <InfoRow label="Street:" value={profile.street || 'N/A'} />
           <InfoRow label="Barangay:" value={barangayName} />
           <InfoRow label="City/Municipality:" value={cityName} />
           <InfoRow label="Province:" value={provinceName} />
-          {/* <Text style={styles.fullAddressText}>{fullAddress}</Text> */}
-        </Card>
+        </View>
         
-        <Card style={styles.card}>
+        <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Identification</Text>
             <InfoRow 
                 label="PhilHealth No:" 
@@ -217,13 +210,7 @@ export function MyProfileScreen({ navigation }: MyProfileScreenProps) {
                     </TouchableOpacity>
                 }
             />
-        </Card>
-
-        {/* Placeholder sections for future data like Allergies, Medications from profile */}
-        {/* <Card style={styles.card}>
-          <Text style={styles.sectionTitle}>Health Information</Text>
-          <Text style={styles.placeholderText}>Allergies, Medications (To be implemented)</Text>
-        </Card> */}
+        </View>
 
       </ScrollView>
     </SafeAreaView>
@@ -246,7 +233,7 @@ const InfoRow: React.FC<{ label: string; value: string | number; trailingIcon?: 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.background, // Use background color
   },
   headerBar: {
     flexDirection: 'row',
@@ -256,7 +243,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
-    backgroundColor: theme.colors.card,
+    backgroundColor: theme.colors.card, // Or theme.colors.background?
   },
   backButton: {
     padding: theme.spacing.xs,
@@ -264,68 +251,85 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: theme.typography.subheading,
     fontWeight: 'bold',
-    color: theme.colors.secondary,
+    color: theme.colors.text, // Use default text color or secondary?
   },
   container: {
     flex: 1,
   },
   profileHeaderContainer: {
     alignItems: 'center',
-    padding: theme.spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-    marginBottom: theme.spacing.md,
-    backgroundColor: theme.colors.card,
+    paddingVertical: theme.spacing.xl, // More vertical padding
+    paddingHorizontal: theme.spacing.lg,
+    // borderBottomWidth: 1, // Remove border for seamless look?
+    // borderBottomColor: theme.colors.border,
+    marginBottom: theme.spacing.lg, // Space before first section
+    backgroundColor: theme.colors.card, // Keep card background for header?
   },
-  profileImage: {
+  avatarContainer: { // Container for avatar or icon
     width: 100,
     height: 100,
     borderRadius: 50,
+    backgroundColor: theme.colors.border, // Background for the icon container
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: theme.spacing.md,
-    backgroundColor: theme.colors.border,
+    overflow: 'hidden', // Ensure image stays rounded
+  },
+  profileImage: { // Style for actual image
+    width: '100%',
+    height: '100%',
   },
   profileName: {
-    fontSize: theme.typography.heading,
+    fontSize: theme.typography.heading, // Keep heading size
     fontWeight: 'bold',
-    color: theme.colors.secondary,
+    color: theme.colors.text, // Use default text color
     marginBottom: theme.spacing.xs,
+    marginTop: theme.spacing.lg, // Added margin top since avatar is removed
   },
   profileEmail: {
     fontSize: theme.typography.body,
     color: theme.colors.textMuted,
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.lg, // More space before button
   },
   editButton: {
     marginTop: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.md,
-    borderColor: theme.colors.primary,
+    paddingVertical: theme.spacing.xs, // Slightly less vertical padding
+    paddingHorizontal: theme.spacing.lg, // Keep horizontal padding
+    borderColor: theme.colors.primary, // Match primary button outline?
     borderWidth: 1,
+    borderRadius: theme.borderRadius.md, // Consistent rounding
   },
-  card: {
+  // Removed Card style, using sectionContainer instead
+  sectionContainer: {
+    backgroundColor: theme.colors.card, // Use card background
+    borderRadius: theme.borderRadius.md,
     marginHorizontal: theme.spacing.md,
-    marginBottom: theme.spacing.md,
-    padding: theme.spacing.md,
+    marginBottom: theme.spacing.lg, // Space between sections
+    padding: theme.spacing.lg, // More padding inside section
+    overflow: 'hidden', // For potential future styling
   },
   sectionTitle: {
     fontSize: theme.typography.subheading,
     fontWeight: 'bold',
-    color: theme.colors.secondary,
+    color: theme.colors.secondary, // Or primary?
     marginBottom: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-    paddingBottom: theme.spacing.sm,
+    // Removed border from section title, section container provides boundary
+    // borderBottomWidth: 1,
+    // borderBottomColor: theme.colors.border,
+    // paddingBottom: theme.spacing.sm,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: theme.spacing.sm,
+    paddingVertical: theme.spacing.sm, // Keep vertical padding
+    // borderBottomWidth: 1, // Optional: add subtle separator between rows
+    // borderBottomColor: theme.colors.borderLight, // Use a lighter border color
   },
   infoLabel: {
     fontSize: theme.typography.body,
     color: theme.colors.textMuted,
-    marginRight: theme.spacing.sm,
+    marginRight: theme.spacing.md, // More space after label
   },
   infoValueContainer: {
     flexDirection: 'row',
@@ -339,12 +343,6 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     marginLeft: theme.spacing.sm,
-  },
-  fullAddressText: {
-    fontSize: theme.typography.body,
-    color: theme.colors.text,
-    marginTop: theme.spacing.xs,
-    lineHeight: theme.typography.body * 1.4,
   },
   placeholderText: {
     fontSize: theme.typography.body,

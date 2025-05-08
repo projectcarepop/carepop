@@ -27,7 +27,7 @@ COMMENT ON COLUMN public.profiles.granular_consents IS '[SPI/PHI] Stores various
 
 -- Trigger to update 'updated_at' timestamp automatically
 CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.profiles
-  FOR EACH ROW EXECUTE PROCEDURE extensions.moddatetime(); -- Try calling from 'extensions' schema
+  FOR EACH ROW EXECUTE PROCEDURE extensions.moddatetime('updated_at');
 
 -- Enable Row Level Security (RLS) for the profiles table
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;

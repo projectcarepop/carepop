@@ -4,7 +4,6 @@ import { theme } from '../../src/components/theme';
 import { Button } from '../../src/components';
 
 interface OnboardingScreenThreeProps {
-  navigation?: any; // Basic navigation prop
   onComplete?: () => void; // Function to call when onboarding finishes
 }
 

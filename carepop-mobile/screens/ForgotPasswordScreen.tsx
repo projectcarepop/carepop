@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Image } from 'react-native';
-import { Button, TextInput, Card } from '../src/components';
+import { Button, TextInput, Card, theme } from '../src/components';
 import { supabase } from '../src/utils/supabase';
-import { theme } from '../src/components';
-import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../src/context/AuthContext';
 
 /**

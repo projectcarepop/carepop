@@ -39,6 +39,10 @@ interface AuthContextType {
   clearAuthError: () => void;
   // Add new signUp method
   signUpWithEmail: (credentials: SignUpWithPasswordCredentials) => Promise<{ user: User | null; error: Error | null }>;
+  /**
+   * Manually triggers a refresh of the user's profile data.
+   */
+  refreshUserProfile: () => Promise<void>;
 }
 
 /**
@@ -154,6 +158,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, []); // Empty dependency array means this runs once on mount
 
+  const refreshUserProfile = async () => {
+    if (!user) {
+      console.log('[AuthContext] refreshUserProfile called but no user session found.');
+      setProfile(null); // Ensure profile is cleared if no user
+      return;
+    }
+    console.log('[AuthContext] refreshUserProfile called for user:', user.id);
+    setIsLoading(true); // Indicate loading during profile refresh
+    try {
+      const fetchedProfile = await getUserProfile(user.id);
+      console.log('[AuthContext] Profile refreshed:', fetchedProfile ? fetchedProfile.user_id : 'null');
+      setProfile(fetchedProfile);
+      setAuthError(null);
+    } catch (error) {
+      console.error('[AuthContext] Error refreshing profile:', error);
+      // setProfile(null); // Optionally clear profile on refresh error, or keep stale data
+      setAuthError(error instanceof Error ? error : new Error('Failed to refresh profile'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const signOut = async () => {
     console.log('[AuthContext] signOut called. Setting isLoading to true.');
     setIsLoading(true); // Set loading true before sign out
@@ -221,7 +247,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   console.log('[AuthContext] Rendering AuthProvider. isLoading:', isLoading, 'Session User:', session?.user?.id || 'null');
 
   return (
-    <AuthContext.Provider value={{ isLoading, session, user, profile, authError, signOut, clearAuthError, signUpWithEmail }}>
+    <AuthContext.Provider
+      value={{
+        isLoading,
+        session,
+        user,
+        profile,
+        authError,
+        signOut,
+        clearAuthError,
+        signUpWithEmail,
+        refreshUserProfile,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

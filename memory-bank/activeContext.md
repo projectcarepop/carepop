@@ -3,7 +3,6 @@
 ## Current Work Focus
 
 Primary: Debugging the navigation error: \`The action 'NAVIGATE' with payload {"name":"EditProfile"} was not handled by any navigator.\` This occurs when \`MyProfileScreen\` attempts to navigate. Investigation is centered on \`carepop-mobile/App.tsx\`, specifically its navigation setup (\`MainAppDrawer\`, \`MyProfileStack\`) and conditional rendering logic in \`AppContent\` to ensure the correct navigator context is active.  
-Secondary: Investigating the \`Warning: Text strings must be rendered within a <Text> component.\` The call stack points to \`App (<anonymous>)\`, suggesting an issue within \`App.tsx\` or components it directly renders.
 
 ## Recent Changes & Decisions
 
@@ -16,28 +15,26 @@ Secondary: Investigating the \`Warning: Text strings must be rendered within a <
     *   Imported \`EditProfileScreen\` into \`App.tsx\`.
 -   Navigation Call (\`MyProfileScreen.tsx\`): Updated \`navigateToEditProfile\` to use \`navigation.navigate('EditProfile');\`.  
 -   UI Update (\`ForgotPasswordScreen.tsx\`): Replaced the text title with an \`Image\` component displaying \`carepop-logo-pink.png\`.
--   Linter Fixes (\`App.tsx\`): Resolved issue with \`theme.colors.white\` by using \`'#FFFFFF'\`.
+-   Text Rendering Warning Resolved: The \"Text strings must be rendered within a <Text> component\" warning (previously appearing during onboarding) was resolved by removing specific `{/* --- ... --- */}` comment patterns from onboarding screens.  
+-   Code Cleanup: Removed unused `navigation` props from onboarding screens; standardized Drawer icons in `App.tsx` to use `Ionicons`.
+-   Memory Bank Updated: All core files reviewed and updated to reflect current status (TIMESTAMP_OF_MEMORY_BANK_AUG_2_2024_REVIEW).
+-   Git Commit/Push: Recent changes including Memory Bank updates, UI changes, and code cleanup were committed and pushed (Commit: 9b848e6).
 
 ## Next Steps & Action Items (Immediate Focus)
 
-1.  Analyze \`AppContent\` Logs (\`App.tsx\`): Carefully review the console output for \`session\`, \`profile\`, \`isLoadingAuth\`, \`isAppLoading\`, and \`hasOnboarded\` states at the time \`AppContent\` renders. This is critical to confirm that the conditional logic correctly leads to rendering \`MainAppDrawer\` when expected.  
-2.  Debug "Text strings..." Warning:
-    *   Scrutinize the JSX in \`AppContent\` (\`App.tsx\`), especially around the \`Carousel\` and \`CustomSplashScreen\` rendering.
-    *   Inspect \`CustomSplashScreen.tsx\`, \`OnboardingScreenOne.tsx\`, \`OnboardingScreenTwo.tsx\`, \`OnboardingScreenThree.tsx\` for any direct string rendering outside \`<Text>\` components or issues with conditional string display.
-3.  Verify Navigation Path (\`App.tsx\`):
-    *   If console logs show \`MainAppDrawer\` *should* be active when \`MyProfileScreen\` is visible, but navigation still fails, re-verify that \`MyProfileScreen\` (rendered via \`MyProfileStack\` in \`MainAppDrawer\`) is indeed receiving its \`navigation\` prop from the \`MainAppDrawer\`'s navigation context.
-    *   Consider temporarily simplifying the rendering logic in \`AppContent\` to *only* render \`NavigationContainer > RootStack > MainAppDrawer\` (assuming a valid session and profile) to isolate navigation testing.
-4.  Address \`RootNavigator.tsx\`: Clarify the role of \`src/navigation/RootNavigator.tsx\`. If \`App.tsx\` is the definitive root, consider refactoring to remove redundant navigator definitions from \`RootNavigator.tsx\` or fully deprecate it to avoid future confusion.
+1.  Analyze \`AppContent\` Logs & Navigation Path (\`App.tsx\`): Focus on the persistent navigation error. Carefully review console output for \`session\`, \`profile\`, etc. states during rendering. Verify the navigation context received by \`MyProfileScreen\` when rendered via \`MainAppDrawer\`. Consider temporarily simplifying \`AppContent\` rendering logic *only* to the authenticated state (`NavigationContainer > RootStack > MainAppDrawer`) to isolate navigation testing.
+2.  Address \`RootNavigator.tsx\`: After resolving the primary navigation error, clarify the role of \`src/navigation/RootNavigator.tsx\`. If \`App.tsx\` is the definitive root, refactor to remove redundancy or deprecate the file.
 
 ## Active Decisions & Considerations
 
--   Three-Pillar Structure: This is the confirmed architecture. No root-level monorepo tooling is used.  
--   Direct Client-Supabase Auth + Trigger: The confirmed pattern for core authentication. Cloud Run's role is for other specific backend logic.  
--   Independent Frontend Development: \`carepop-nativeapp\` and \`carepop-web\` development proceeds independently, using distinct UI stacks but consuming the same \`carepop-backend\` APIs where applicable.  
--   Separate CI/CD: Pipelines need to be configured for each of the three projects.
+-   Three-Pillar Structure: Confirmed architecture.
+-   Direct Client-Supabase Auth + Trigger: Confirmed authentication pattern.
+-   Independent Frontend Development: Confirmed approach.
+-   Separate CI/CD: Required for each pillar.
 
 ## Learnings & Insights
 
--   Having multiple, potentially conflicting, root navigation setups (\`App.tsx\` vs. \`src/navigation/RootNavigator.tsx\`) can make debugging navigation context issues very challenging. A single, clear entry point and navigator hierarchy is crucial.  
--   Persistent errors, even after apparent fixes, often point to deeper issues like incorrect component hierarchy in the navigation tree, or stale state/props being used by the screen attempting to navigate.  
--   Console logging state variables at critical points in the rendering lifecycle is invaluable for debugging conditional navigation logic.
+-   Navigation context debugging in React Navigation with conditional rendering can be complex; isolating the active navigator is key.
+-   Persistent errors often point to component hierarchy or state/prop issues.
+-   Console logging is invaluable for debugging conditional logic.
+-   Unexpected build/bundler behavior can sometimes occur (e.g., the warning resolved by removing specific comment syntax), suggesting potential tooling quirks or the need for cache clearing.

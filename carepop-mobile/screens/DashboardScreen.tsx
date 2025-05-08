@@ -25,7 +25,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) 
   const { profile, isLoading, user } = useAuth();
 
   // Use first_name if available, fallback to username or 'User'
-  const displayName = profile?.username || user?.email || 'User';
+  const displayName = profile?.first_name || profile?.username || 'User';
 
   // Render function for each service item in the carousel
   const renderServiceItem = ({ item }: { item: typeof healthServicesData[0] }) => (

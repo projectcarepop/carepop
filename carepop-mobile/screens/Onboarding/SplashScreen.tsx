@@ -23,13 +23,6 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      {/* <LinearGradient
-        // Subtle white overlay gradient
-        colors={['rgba(255,255,255,0.2)', 'transparent', 'rgba(255,255,255,0.2)']}
-        style={StyleSheet.absoluteFill} // Fill the container
-      /> */}
-      {/* <Text style={styles.appName}>CarePoP</Text>
-      <ActivityIndicator size="large" color={theme.colors.background} /> */}
       <Image 
         source={require('../../assets/carepop-logo-white.png')} 
         style={styles.logo}
@@ -41,19 +34,13 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.primary, // Background color like Login button
+    backgroundColor: theme.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // appName: {
-  //   fontSize: theme.typography.heading * 1.5, // Made text bigger
-  //   fontWeight: 'bold',
-  //   color: theme.colors.background, // White text for contrast
-  //   marginBottom: theme.spacing.xl,
-  // },
   logo: {
-    width: 250, // Adjust as needed
-    height: 150, // Adjust as needed
+    width: 250, 
+    height: 150, 
     resizeMode: 'contain',
   }
 }); 

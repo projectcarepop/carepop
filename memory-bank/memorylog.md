@@ -197,6 +197,16 @@
 *   Timestamp: TIMESTAMP_OF_MEMORY_BANK_AUG_2_2024_REVIEW - Action: Changed primary application font from Inter to Space Grotesk.
     *   Description: Installed `@expo-google-fonts/space-grotesk`. Updated `App.tsx` to load `SpaceGrotesk_400Regular` and `SpaceGrotesk_700Bold` instead of the Inter variants. Updated `src/components/theme.ts` to reference the Space Grotesk font names in the `typography` section.
 
+*   Timestamp: TIMESTAMP_OF_MEMORY_BANK_AUG_2_2024_REVIEW - Action: Resolved 'Text string' warning and standardized icons.
+    *   Description: Debugged the `Warning: Text strings must be rendered within a <Text> component.` The warning was unexpectedly resolved by removing specific comment patterns (`{/* --- ... --- */}`) from the onboarding screen components. Unused `navigation` props were removed from onboarding screens. Drawer icons in `App.tsx` were standardized to use `Ionicons` instead of `MaterialIcons`.
+    *   Reason: Eliminate warning, improve code cleanliness and UI consistency.
+    *   Impact: Text warning resolved. Onboarding components cleaner. Drawer UI uses consistent icon set.
+
+*   Timestamp: TIMESTAMP_OF_MEMORY_BANK_AUG_2_2024_REVIEW - Action: Committed and pushed Memory Bank updates and recent code changes.
+    *   Description: Staged and committed changes including Memory Bank reformatting/updates, `App.tsx` navigation structure changes, `ForgotPasswordScreen` UI update, icon standardization, and onboarding prop cleanup. Pushed commit 9b848e6 to `origin main`.
+    *   Reason: Save progress and synchronize with remote repository.
+    *   Impact: Local and remote repositories reflect the latest state.
+
 ---
 ## Archived Context Snapshots from activeContext.md
 

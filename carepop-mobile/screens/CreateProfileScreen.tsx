@@ -224,75 +224,73 @@ export const CreateProfileScreen: React.FC<CreateProfileScreenProps> = ({ onProf
    * Validates data and attempts to insert it into the Supabase 'profiles' table.
    */
   const handleCreateProfile = async () => {
-    const validationErrors = validateProfileForm();
-    if (validationErrors) {
-      setErrors(validationErrors);
-      Alert.alert('Validation Error', 'Please check the highlighted fields.'); // General alert
+    const formValidationErrors = validateProfileForm();
+    if (formValidationErrors) {
+      setErrors(formValidationErrors);
+      Alert.alert("Validation Error", "Please correct the errors before submitting.");
       return;
     }
-    
+
     setLoading(true);
-    setErrors(null); // Clear errors before submitting
+    setErrors(null);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user logged in');
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-      // ---!!! IMPORTANT BACKEND BLOCKER !!!---
-      // The following insert operation WILL FAIL until the corresponding columns
-      // are added to the `public.profiles` table in Supabase via a migration.
-      // Required columns based on this form:
-      // - user_id (UUID, FK to auth.users.id, should exist)
-      // - first_name (TEXT)
-      // - middle_initial (TEXT, nullable)
-      // - last_name (TEXT)
-      // - date_of_birth (DATE)
-      // - age (INT4, nullable)
-      // - civil_status (TEXT, nullable)
-      // - religion (TEXT, nullable)
-      // - occupation (TEXT, nullable)
-      // - street (TEXT)
-      // - province_code (TEXT)
-      // - city_municipality_code (TEXT)
-      // - barangay_code (TEXT)
-      // - contact_no (TEXT)
-      // - philhealth_no (TEXT, nullable)
-      // -----------------------------------------
-      const profileDataToInsert = {
-        user_id: user.id,
-        first_name: state.firstName.trim(),
-        middle_initial: state.middleInitial.trim() || null,
-        last_name: state.lastName.trim(),
+      if (userError || !user) {
+        console.error("Error fetching user:", userError);
+        setErrors({ general: "Could not identify user. Please try logging out and back in." });
+        setLoading(false);
+        return;
+      }
+
+      // Ensure all fields match the Supabase 'profiles' table schema
+      // and that data types are correct (e.g., date as ISO string).
+      const profileDataToSave = {
+        user_id: user.id, // This is crucial
+        first_name: state.firstName,
+        middle_initial: state.middleInitial || null, // Handle empty string as null if DB expects null
+        last_name: state.lastName,
+        // Ensure date_of_birth is formatted as YYYY-MM-DD if your DB stores it as a date/text type
+        // If it's a timestamp, new Date().toISOString() is fine.
         date_of_birth: state.dateOfBirth ? state.dateOfBirth.toISOString().split('T')[0] : null,
         age: state.dateOfBirth ? calculateAge(state.dateOfBirth) : null,
-        civil_status: state.civilStatus || null, 
-        religion: state.religion.trim() || null,
-        occupation: state.occupation.trim() || null,
-        street: state.street.trim(),
-        province_code: state.selectedProvince, 
-        city_municipality_code: state.selectedCity, 
-        barangay_code: state.selectedBarangay, 
-        contact_no: state.contactNo.trim(),
-        philhealth_no: state.philhealthNo.trim() || null,
+        civil_status: state.civilStatus || null,
+        religion: state.religion || null,
+        occupation: state.occupation || null,
+        street: state.street || null,
+        province_code: state.selectedProvince || null,
+        city_municipality_code: state.selectedCity || null,
+        barangay_code: state.selectedBarangay || null,
+        contact_no: state.contactNo || null,
+        philhealth_no: state.philhealthNo || null,
+        // Add any other fields like avatar_url if applicable, defaulting to null or initial value
+        // username: state.username || null, // Example if you had a username field
       };
 
-      console.log('[CreateProfileScreen] Attempting to insert profile data:', profileDataToInsert);
+      console.log("[CreateProfileScreen] Attempting to update profile data:", JSON.stringify(profileDataToSave, null, 2));
 
-      // TODO: Uncomment and test thoroughly once backend migration is applied.
-      // const { error: insertError } = await supabase.from('profiles').insert(profileDataToInsert);
-      const insertError = { message: "Simulated Error: Backend migration not applied yet." }; // Simulate error until backend is ready
+      // Assuming your trigger created a row, we update it.
+      // If not, you might need an upsert or a check then insert/update.
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update(profileDataToSave)
+        .eq('user_id', user.id);
 
-      if (insertError) {
-        console.error("Error inserting profile:", insertError);
-        setErrors({ general: insertError.message }); // Set general error for insertion issues
+      if (updateError) {
+        console.error("Error updating profile:", updateError);
+        setErrors({ general: `Failed to update profile: ${updateError.message}` });
+        // Alert.alert("Error", `Failed to update profile: ${updateError.message}`);
       } else {
-        console.log("Profile created/updated successfully (Simulated)"); // Update log when real
-        // Optionally refetch profile in AuthContext if needed immediately after creation
-        onProfileCreated(); // Navigate away or indicate success
+        console.log("[CreateProfileScreen] Profile updated successfully!");
+        Alert.alert("Success", "Profile created successfully!");
+        onProfileCreated(); // Trigger context refresh and navigation
       }
-    } catch (err: any) {
-      console.error("Unexpected error creating profile:", err);
-      setErrors({ general: err.message || 'An unexpected error occurred.' });
+    } catch (e) {
+      console.error("Unexpected error in handleCreateProfile:", e);
+      const message = e instanceof Error ? e.message : "An unexpected error occurred.";
+      setErrors({ general: `An unexpected error occurred: ${message}` });
+      // Alert.alert("Error", "An unexpected error occurred. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -319,16 +317,19 @@ export const CreateProfileScreen: React.FC<CreateProfileScreenProps> = ({ onProf
   const civilStatusOptions = ['Single', 'Married', 'Widowed', 'Separated', 'Divorced', 'Other'];
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={styles.keyboardAvoidingContainer}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <Text style={styles.headerTitle}>Create Your Profile</Text>
-        <Text style={styles.subtitle}>Please provide your complete information.</Text>
-        
-        <Card style={styles.card}>
-          {/* Display general error if present */}
+      <ScrollView 
+        style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContentContainer}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.formContainer}> 
+          <Text style={styles.title}>Create Your Profile</Text>
+          <Text style={styles.subtitle}>Complete your details to personalize your experience.</Text>
+
           {errors?.general && (
             <View style={styles.errorContainer}>
               <Text style={styles.errorText}>{errors.general}</Text>
@@ -353,7 +354,6 @@ export const CreateProfileScreen: React.FC<CreateProfileScreenProps> = ({ onProf
             placeholder="e.g., D."
             containerStyle={styles.input}
             autoCapitalize="characters"
-            maxLength={1} // Corrected maxLength
             error={errors?.middleInitial}
           />
 
@@ -579,37 +579,42 @@ export const CreateProfileScreen: React.FC<CreateProfileScreenProps> = ({ onProf
             // Disable button if backend update is needed and not yet done?
             // disabled={true} // Example if we want to force block until backend ready
           />
-        </Card>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  keyboardAvoidingContainer: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.background, 
   },
-  scrollContent: {
-    flexGrow: 1,
-    padding: theme.spacing.lg,
+  scrollContainer: {
+    flex: 1,
   },
-  headerTitle: {
-    fontSize: theme.typography.heading,
+  scrollContentContainer: { // Renamed from mainContainer for clarity
+    flexGrow: 1, // Ensures content can scroll if it overflows
+    justifyContent: 'center', // Added back to match LoginScreen
+    padding: theme.spacing.lg * 1.5,  // Match LoginScreen padding
+    paddingTop: theme.spacing.xl * 3.5, // Removed extra top padding
+    paddingBottom: theme.spacing.lg * 3, // Match LoginScreen padding
+  },
+  formContainer: { // New container for form elements if more structure is needed
+    // Potentially add specific styles here if needed, for now it's structural
+  },
+  title: {
+    fontSize: theme.typography.heading, // Changed from title to heading
     fontWeight: 'bold',
     color: theme.colors.primary,
     textAlign: 'center',
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.md, // Increased margin
   },
   subtitle: {
-    fontSize: theme.typography.body,
+    fontSize: theme.typography.subheading,
     color: theme.colors.textMuted,
     textAlign: 'center',
-    marginBottom: theme.spacing.lg,
-  },
-  card: {
-    padding: theme.spacing.lg,
-    marginBottom: theme.spacing.xl, // Add margin at the bottom of the card
+    marginBottom: theme.spacing.xl, // Increased margin
   },
   input: {
     marginBottom: theme.spacing.md,

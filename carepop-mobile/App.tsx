@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, SafeAreaView, ActivityIndicator, TouchableOpacity, Dimensions } from 'react-native'; // Added ActivityIndicator, TouchableOpacity, and Dimensions
 import { theme, Button } from './src/components'; 
 import { supabase } from './src/utils/supabase'; // Removed unused getCurrentUser, getUserProfile
-import { MaterialIcons } from '@expo/vector-icons'; // Re-enable (ensure installed)
+import { Ionicons } from '@expo/vector-icons'; // Add Ionicons
 import {
   useFonts,
   // Inter_400Regular, // REMOVE
@@ -41,6 +41,8 @@ import { ForgotPasswordScreen } from './screens/ForgotPasswordScreen';
 import * as Linking from 'expo-linking'; // Added for deep link handling
 import * as ExpoSplashScreen from 'expo-splash-screen'; // Use alias for expo splash screen
 import { EditProfileScreen } from './src/screens/EditProfileScreen'; // Import EditProfileScreen
+import { ClinicFinderScreen } from './src/screens/ClinicFinderScreen'; // Import ClinicFinderScreen
+import { AboutUsScreen } from './src/screens/AboutUsScreen'; // Import AboutUsScreen
 
 // Import Onboarding Screens from new location
 import { SplashScreen as CustomSplashScreen } from './screens/Onboarding/SplashScreen'; // Corrected Path
@@ -74,11 +76,24 @@ type MainDrawerParamList = {
   'Make Appointment': undefined; // This will likely be a nested stack
   'Health Buddy': undefined; // This will likely be a nested stack
   'My Profile': undefined; // This will likely be a nested stack for MyProfileStack
+  'Clinic Finder': undefined; // Added for Clinic Finder
+  'About Us': undefined; // Added for About Us
 };
 
 type MyProfileStackParamList = {
   MyProfileMain: undefined;
   EditProfile: undefined;
+};
+
+// ADDED: ClinicFinderStackParamList
+type ClinicFinderStackParamList = {
+  ClinicFinderMain: undefined;
+  // Potentially ClinicDetails: { clinicId: string } later
+};
+
+// ADDED: AboutUsStackParamList
+type AboutUsStackParamList = {
+  AboutUsMain: undefined;
 };
 
 type RootStackParamList = {
@@ -95,24 +110,52 @@ const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AppointmentStackNav = createNativeStackNavigator(); // Specific stack for appointments
 const HealthBuddyStackNav = createNativeStackNavigator(); // Specific stack for health buddy
 const MyProfileStackNav = createNativeStackNavigator<MyProfileStackParamList>(); // Specific stack for profile sections
+const ClinicFinderStackNav = createNativeStackNavigator<ClinicFinderStackParamList>(); // ADDED: Specific stack for Clinic Finder
+const AboutUsStackNav = createNativeStackNavigator<AboutUsStackParamList>(); // ADDED: Specific stack for About Us
 
-// Re-enable Custom Drawer Content
+// Re-enable Custom Drawer Content - Modified for Bottom Logout
 function CustomDrawerContent(props: any) {
-  const { signOut } = useAuth(); // Use signOut from our context
+  const { signOut } = useAuth();
 
   return (
-    <DrawerContentScrollView {...props}>
-      <DrawerItemList {...props} />
-      <DrawerItem
-        label="Logout"
-        icon={({ color, size }: { color: string; size: number }) => (
-          <MaterialIcons name="logout" color={color} size={size} />
-        )}
-        onPress={async () => {
-          await signOut(); // Call context signOut directly
-        }}
-      />
-    </DrawerContentScrollView>
+    <View style={{ flex: 1 /* Take full height */ }}>
+      <DrawerContentScrollView {...props} style={{ flex: 1 }}>
+        {/* Render the auto-generated list first */}
+        <DrawerItemList {...props} />
+      </DrawerContentScrollView>
+      {/* Container for the fixed bottom items */}
+      <View style={styles.bottomDrawerSection}>
+        {/* My Profile Item - Moved Here */}
+        <DrawerItem
+          label="My Profile"
+          icon={({ color, size }: { color: string; size: number }) => (
+            <Ionicons name="person-outline" color={color} size={size} />
+          )}
+          onPress={() => {
+            // Navigate to the 'My Profile' screen stack
+            props.navigation.navigate('My Profile'); 
+          }}
+          style={{ marginVertical: theme.spacing.xs }}
+          labelStyle={{ fontSize: 16, fontWeight: '500' }}
+          inactiveTintColor={theme.colors.text}
+          inactiveBackgroundColor={'transparent'}
+        />
+        {/* Logout Item */}
+        <DrawerItem
+          label="Logout"
+          icon={({ color, size }: { color: string; size: number }) => (
+            <Ionicons name="log-out-outline" color={color} size={size} />
+          )}
+          onPress={async () => {
+            await signOut();
+          }}
+          style={{ marginVertical: theme.spacing.xs }}
+          labelStyle={{ fontSize: 16, fontWeight: '500' }}
+          inactiveTintColor={theme.colors.text}
+          inactiveBackgroundColor={'transparent'}
+        />
+      </View>
+    </View>
   );
 }
 
@@ -134,7 +177,7 @@ function AppContent() {
     SpaceGrotesk_700Bold, // ADD
   });
 
-  const { session, profile, isLoading: isLoadingAuth, signOut } = useAuth();
+  const { session, profile, isLoading: isLoadingAuth, signOut, refreshUserProfile } = useAuth();
   const [hasOnboarded, setHasOnboarded] = useState<boolean>(false); // ALWAYS SHOW ONBOARDING INITIALLY FOR TESTING
   const [isAppLoading, setIsAppLoading] = useState(true); // Technical loading (fonts, auth check)
   const [showCustomSplashOverride, setShowCustomSplashOverride] = useState(true); // Controls splash visibility after technical load
@@ -214,15 +257,23 @@ function AppContent() {
     };
   }, []);
 
-  const handleProfileCreated = () => {
+  const handleProfileCreated = async () => {
     // This function might still be useful if CreateProfileScreen needs to signal back.
     // However, AuthContext should ideally re-fetch/update profile upon user actions.
     // For now, let's assume AuthContext will reflect the new profile after creation.
-    console.log('[AppContent] Profile creation reported. AuthContext should update.');
+    console.log('[AppContent] Profile creation reported. Refreshing user profile...');
+    if (refreshUserProfile) { // Check if the function exists (it should)
+      await refreshUserProfile();
+    }
   };
 
   const handleOnboardingComplete = async () => {
     try {
+      // If a session exists when onboarding completes, sign out to ensure fresh auth flow
+      if (session) {
+        console.log('[AppContent] Existing session found on onboarding complete. Signing out.');
+        await signOut();
+      }
       await AsyncStorage.setItem(ONBOARDING_COMPLETE_KEY, 'true');
       setHasOnboarded(true); // This will now trigger the transition to Auth/Main
       console.log('[AppContent] Onboarding marked as complete.');
@@ -242,6 +293,7 @@ function AppContent() {
   // --- Conditional Rendering Logic ---
   // 1. Show Onboarding Carousel if not completed (and custom splash override is false)
   if (!hasOnboarded) { // ALWAYS TRUE INITIALLY FOR TESTING (until handleOnboardingComplete)
+    // --- TEMPORARILY COMMENT OUT CAROUSEL FOR DEBUGGING TEXT WARNING ---
     return (
       <Carousel
         ref={onboardingCarouselRef}
@@ -253,6 +305,22 @@ function AppContent() {
         scrollAnimationDuration={500}
         // onSnapToItem={(index) => console.log('Current onboarding slide index: ', index)}
         renderItem={({ item, index }) => {
+          // --- Debugging: Force render ONLY OnboardingScreenOne ---
+          // const ScreenComponent = OnboardingScreenOne; // Force Screen One
+          // const screenProps: any = {}; 
+          // We don't need the onComplete prop for this test
+          // if (item.id === 'three') { 
+          //     screenProps.onComplete = handleOnboardingComplete;
+          // }
+          // return (
+          //   <View style={{ flex: 1, width: screenWidth }}>
+          //     {/* <Text style={{position: 'absolute', top: 50, left: 20, backgroundColor: 'yellow'}}>DEBUG: Rendering Screen One Only</Text> */}
+          //     <ScreenComponent {...screenProps} />
+          //   </View>
+          // );
+          // --- End Debugging ---
+
+          // --- Original renderItem logic ---
           const ScreenComponent = item.component;
           const screenProps: any = {}; // Simpler props
 
@@ -264,9 +332,20 @@ function AppContent() {
               <ScreenComponent {...screenProps} />
             </View>
           );
+          // --- End Original ---
         }}
       />
     );
+    // --- END TEMP COMMENT OUT ---
+    
+    // --- TEMP RETURN FOR DEBUGGING ---
+    // return (
+    //   <View style={styles.loadingContainer}>
+    //     <ActivityIndicator size="large" color={theme.colors.primary} />
+    //     <Text style={styles.loadingText}>Loading Onboarding (Debug)...</Text>
+    //   </View>
+    // );
+    // --- END TEMP RETURN ---
   }
 
   // 2. If onboarding is done, proceed with Auth/Main flow
@@ -278,8 +357,8 @@ function AppContent() {
           {!session ? (
            // Onboarding done, no session --> Auth Flow
            <RootStack.Screen name="Auth" component={AuthScreens} />
-         ) : !profile ? (
-           // Onboarding done, session exists, but no profile yet --> Create Profile
+         ) : !profile || !profile.first_name ? (
+           // Onboarding done, session exists, but no profile yet OR profile is incomplete --> Create Profile
            <RootStack.Screen name="CreateProfile">
                 {(props) => <CreateProfileScreen {...props} onProfileCreated={handleProfileCreated} />}
            </RootStack.Screen>
@@ -317,6 +396,30 @@ function MyProfileStack() {
   );
 }
 
+function ClinicFinderStack() {
+  return (
+    <ClinicFinderStackNav.Navigator screenOptions={{ headerShown: false }}>
+      <ClinicFinderStackNav.Screen
+        name="ClinicFinderMain"
+        component={ClinicFinderScreen}
+        // options={{ title: 'Clinic Finder' }} // Header is not shown
+      />
+    </ClinicFinderStackNav.Navigator>
+  );
+}
+
+function AboutUsStack() {
+  return (
+    <AboutUsStackNav.Navigator screenOptions={{ headerShown: false }}>
+      <AboutUsStackNav.Screen
+        name="AboutUsMain"
+        component={AboutUsScreen}
+        // options={{ title: 'About Us' }} // Header is not shown as screen has its own
+      />
+    </AboutUsStackNav.Navigator>
+  );
+}
+
 function AppointmentStack() {
   return (
     <AppointmentStackNav.Navigator>
@@ -327,42 +430,56 @@ function AppointmentStack() {
   );
 }
 
-// --- Drawer Navigator Definition ---
+// --- Drawer Navigator Definition --- Modified drawerStyle
 function MainAppDrawer() {
+  const drawerWidth = Dimensions.get('window').width * 0.85; // Changed from 0.75 to 0.85
+
   return (
     <Drawer.Navigator 
       drawerContent={props => <CustomDrawerContent {...props} />}
       screenOptions={{
+        drawerStyle: { // Add drawerStyle
+          backgroundColor: theme.colors.background, 
+          width: drawerWidth, 
+        },
         headerStyle: { backgroundColor: theme.colors.primary },
         headerTintColor: '#FFFFFF',
         headerTitleStyle: { fontWeight: 'bold' },
         drawerActiveTintColor: theme.colors.primary,
         drawerInactiveTintColor: theme.colors.text,
-        drawerLabelStyle: { marginLeft: -20, fontSize: 16 }
+        drawerActiveBackgroundColor: theme.colors.primaryMuted,
+        drawerInactiveBackgroundColor: 'transparent',
+        drawerItemStyle: {
+           marginVertical: theme.spacing.xs,
+        },
+        drawerLabelStyle: { 
+          fontSize: 16, 
+          fontWeight: '500',
+        }
       }}
     >
       <Drawer.Screen 
         name="Dashboard" 
         component={DashboardScreen} 
         options={{ 
-          title: 'Home Dashboard',
-          drawerIcon: ({ color, size }) => <MaterialIcons name="dashboard" color={color} size={size} />
+          title: 'Dashboard',
+          drawerIcon: ({ color, size }) => <Ionicons name="home-outline" color={color} size={size} />
         }} 
       />
       <Drawer.Screen 
         name="My Bookings" 
         component={AppointmentStack} // Using AppointmentStack here
         options={{ 
-          title: 'My Appointments',
-          drawerIcon: ({ color, size }) => <MaterialIcons name="event" color={color} size={size} /> 
+          title: 'Appointments',
+          drawerIcon: ({ color, size }) => <Ionicons name="calendar-outline" color={color} size={size} />
         }} 
       />
       <Drawer.Screen 
         name="My Records" 
         component={MyRecordsScreen} 
         options={{ 
-          title: 'My Health Records',
-          drawerIcon: ({ color, size }) => <MaterialIcons name="folder-shared" color={color} size={size} /> 
+          title: 'Records',
+          drawerIcon: ({ color, size }) => <Ionicons name="folder-open-outline" color={color} size={size} />
         }} 
       />
        <Drawer.Screen 
@@ -370,23 +487,43 @@ function MainAppDrawer() {
         component={HealthServicesScreen} 
         options={{ 
           title: 'Book a Service',
-          drawerIcon: ({ color, size }) => <MaterialIcons name="medical-services" color={color} size={size} />
+          drawerIcon: ({ color, size }) => <Ionicons name="medkit-outline" color={color} size={size} />
         }} 
       />
       <Drawer.Screen 
         name="Health Buddy" 
         component={HealthBuddyStack} 
         options={{ 
-          title: 'AI Health Buddy',
-          drawerIcon: ({ color, size }) => <MaterialIcons name="chat" color={color} size={size} /> 
+          title: 'Health Buddy',
+          drawerIcon: ({ color, size }) => <Ionicons name="chatbubbles-outline" color={color} size={size} />
         }} 
       />
+      {/* Add My Profile screen for navigation, hide from default list */}
+      <Drawer.Screen
+        name="My Profile" // Must match the key in MainDrawerParamList and the navigate() call
+        component={MyProfileStack}
+        options={{
+          // This screen is navigated to by the custom DrawerItem,
+          // so hide it from the list generated by DrawerItemList.
+          drawerItemStyle: { display: 'none' },
+        }}
+      />
+      {/* ADDED: Clinic Finder Screen to Drawer */}
       <Drawer.Screen 
-        name="My Profile" 
-        component={MyProfileStack} // Using MyProfileStack here
+        name="Clinic Finder" 
+        component={ClinicFinderStack} 
         options={{ 
-          title: 'My Profile Settings',
-          drawerIcon: ({ color, size }) => <MaterialIcons name="person" color={color} size={size} /> 
+          title: 'Clinic Finder',
+          drawerIcon: ({ color, size }) => <Ionicons name="map-outline" color={color} size={size} />
+        }} 
+      />
+      {/* ADDED: About Us Screen to Drawer */}
+      <Drawer.Screen 
+        name="About Us" 
+        component={AboutUsStack} 
+        options={{ 
+          title: 'About Us',
+          drawerIcon: ({ color, size }) => <Ionicons name="information-circle-outline" color={color} size={size} />
         }} 
       />
     </Drawer.Navigator>
@@ -439,5 +576,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: theme.spacing.md,
   },
-  // Removed custom drawer styles
+  bottomDrawerSection: { // Renamed from logoutContainer
+    paddingBottom: theme.spacing.lg, // Add some padding at the very bottom
+    paddingHorizontal: theme.spacing.xs, // Align with item padding if needed
+    borderTopWidth: 1, // Add a separator line
+    borderTopColor: theme.colors.border,
+  },
 });
