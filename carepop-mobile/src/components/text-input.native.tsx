@@ -1,4 +1,4 @@
-'use client';
+// 'use client'; // Removed - Not applicable in React Native
 
 import React, { useState } from 'react';
 import {
@@ -11,52 +11,87 @@ import {
   Pressable,
 } from 'react-native';
 import { theme } from './theme';
-// import { MaterialIcons } from '@expo/vector-icons'; // Assuming icons will be passed as ReactNode
+// import { MaterialIcons } from '@expo/vector-icons'; // Icons are passed as ReactNode
 
+/**
+ * Props for the TextInput component.
+ * Extends standard React Native TextInputProps.
+ */
 interface TextInputProps extends RNTextInputProps {
+  /** Optional label displayed above the input field. */
   label?: string;
+  /** Optional error message displayed below the input field. Takes precedence over helperText. */
   error?: string;
+  /** Optional helper text displayed below the input field when there is no error. */
   helperText?: string;
+  /** Optional React node to display as an icon at the beginning of the input field. 
+   * Note: The node should be appropriately sized and styled by the parent. */
   leadingIcon?: React.ReactNode;
+  /** Optional React node to display as an icon at the end of the input field.
+   * Note: The node should be appropriately sized and styled by the parent. */
   trailingIcon?: React.ReactNode;
+  /** Optional style for the outermost container View. */
   containerStyle?: ViewStyle;
-  onPressTrailingIcon?: () => void; // Add callback for trailing icon press
+  /** Optional callback function triggered when the trailing icon is pressed. */
+  onPressTrailingIcon?: () => void;
 }
 
+/**
+ * A themed text input component with support for labels, errors, helper text, icons, and focus/disabled states.
+ * Wraps the standard React Native TextInput.
+ */
 export const TextInput: React.FC<TextInputProps> = ({
   label,
   error,
   helperText,
   leadingIcon,
   trailingIcon,
-  style,
-  containerStyle,
+  style, // Style for the actual RNTextInput element
+  containerStyle, // Style for the outer container View
   onFocus,
   onBlur,
   editable = true,
   onPressTrailingIcon,
-  ...rest
+  ...rest // Other RNTextInput props
 }) => {
   const [isFocused, setIsFocused] = useState(false);
   const isDisabled = !editable;
 
+  /**
+   * Handles the focus event for the TextInput.
+   * Sets the focused state and calls the original onFocus prop.
+   */
   const handleFocus: RNTextInputProps['onFocus'] = (e) => {
     setIsFocused(true);
     onFocus?.(e);
   };
 
+  /**
+   * Handles the blur event for the TextInput.
+   * Clears the focused state and calls the original onBlur prop.
+   */
   const handleBlur: RNTextInputProps['onBlur'] = (e) => {
     setIsFocused(false);
     onBlur?.(e);
   };
 
-  const getBorderColor = () => {
+  /**
+   * Determines the border color based on the input's state (error, focused).
+   * @returns {string} The calculated border color.
+   */
+  const getBorderColor = (): string => {
+    if (isDisabled) return theme.colors.border; // Use default border color when disabled
     if (error) return theme.colors.destructive;
     if (isFocused) return theme.colors.primary;
     return theme.colors.border;
   };
 
-  const getBorderWidth = () => {
+  /**
+   * Determines the border width based on the input's state (focused, error).
+   * @returns {number} The calculated border width.
+   */
+  const getBorderWidth = (): number => {
+    // TODO: Consider defining theme.borderWidth.sm and theme.borderWidth.md instead of hardcoding 1/1.5
     return isFocused || error ? 1.5 : 1; // Slightly thicker border on focus/error
   };
 
@@ -117,7 +152,7 @@ const styles = StyleSheet.create({
   label: {
     marginBottom: theme.spacing.xs,
     fontSize: theme.typography.body, // Use body size for label
-    color: theme.colors.text,
+    color: theme.colors.secondary,
     fontWeight: '500', // Slightly bolder label
     // fontFamily: theme.typography.fontFamily, // Needs font setup
   },

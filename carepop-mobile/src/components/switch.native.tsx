@@ -7,27 +7,38 @@ import {
 } from 'react-native';
 import { theme } from './theme';
 
+/**
+ * Props for the Switch component.
+ * Extends standard React Native SwitchProps.
+ */
 interface SwitchProps extends RNSwitchProps {
-  // Add any custom props if needed
+  /** Optional testID for testing purposes. */
   testID?: string;
 }
 
+/**
+ * A themed switch component that wraps the standard React Native Switch.
+ * Applies consistent theme colors for track and handles disabled state opacity.
+ */
 export const Switch: React.FC<SwitchProps> = ({
   value,
   onValueChange,
   disabled = false,
-  style, // Get style from props
+  style, // External style prop
   testID,
-  ...rest
+  ...rest // Other RNSwitchProps
 }) => {
   return (
     <RNSwitch
+      // Set track colors based on theme
       trackColor={{
-        false: theme.colors.disabledBackground, // Use disabled background for off track
-        true: theme.colors.primary, // Use primary color for the 'on' track
+        false: theme.colors.disabledBackground, // Color when switch is off
+        true: theme.colors.primary, // Color when switch is on
       }}
-      thumbColor={Platform.OS === 'android' ? theme.colors.background : ''} // Standard thumb colors
-      ios_backgroundColor={theme.colors.disabledBackground} // Background of the track on iOS
+      // Set thumb color (the sliding circle)
+      thumbColor={Platform.OS === 'android' ? theme.colors.background : ''} // White thumb on Android, default (white) on iOS
+      // Set the background color of the track area specifically for iOS
+      ios_backgroundColor={theme.colors.disabledBackground} 
       onValueChange={onValueChange}
       value={value}
       disabled={disabled}

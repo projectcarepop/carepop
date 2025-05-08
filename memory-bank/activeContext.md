@@ -1,53 +1,43 @@
-\# Active Context: CarePoP/QueerCare
+# Active Context: CarePoP/QueerCare
 
-\#\# Current Work Focus
+## Current Work Focus
 
-\*\*Implementing the core authentication flow based on the finalized three-pillar architecture.\*\* This involves:  
-1\.  Applying the \`handle\_new\_user\` database trigger in the \*\*Supabase\*\* project (\`carepop-backend\`).  
-2\.  Refactoring the authentication service/context and UI screens (Login, Registration) in the \*\*native mobile app\*\* (\`carepop-nativeapp/\`) to use direct Supabase JS SDK calls (\`signUp\`, \`signInWithPassword\`).  
-3\.  Implementing secure session/token storage and management within the \*\*native mobile app\*\* (\`carepop-nativeapp/\`) using the Supabase JS SDK and potentially \`expo-secure-store\`.  
-4\.  Thoroughly testing the end-to-end registration \-\> profile creation \-\> login \-\> session persistence \-\> logout flow on the native mobile app.
+Primary: Debugging the navigation error: \`The action 'NAVIGATE' with payload {"name":"EditProfile"} was not handled by any navigator.\` This occurs when \`MyProfileScreen\` attempts to navigate. Investigation is centered on \`carepop-mobile/App.tsx\`, specifically its navigation setup (\`MainAppDrawer\`, \`MyProfileStack\`) and conditional rendering logic in \`AppContent\` to ensure the correct navigator context is active.  
+Secondary: Investigating the \`Warning: Text strings must be rendered within a <Text> component.\` The call stack points to \`App (<anonymous>)\`, suggesting an issue within \`App.tsx\` or components it directly renders.
 
-\#\# Recent Changes & Decisions
+## Recent Changes & Decisions
 
-\-   \*\*MAJOR STRUCTURAL PIVOT (Completed):\*\*  
-    \*   Abandoned the previous complex \`carepop-frontend\` monorepo structure.  
-    \*   Adopted and implemented a simplified top-level folder structure within the single \`carepop\` Git repository:  
-        1\.  \`carepop-backend/\`: Existing backend application (Node.js/Cloud Run \+ Supabase).  
-        2\.  \`carepop-mobile/\`: The Expo (React Native) mobile application for iOS/Android ONLY. Code migrated from previous structure.  
-        3\.  \`carepop-web/\`: The separate Next.js, Tailwind CSS, Shadcn UI web application. Code migrated from previous standalone project.  
-    \*   This structure simplifies individual project development and build processes.  
-    \*   \*\*A force push to the \`main\` branch of the GitHub repository (\`https://github.com/projectcarepop/carepop.git\`) was performed\*\*, establishing this new structure as the baseline and resetting the \`main\` branch commit history.  
-    \*   All Memory Bank files (\`epics\_and\_tickets.md\`, \`techContext.md\`, \`systemPatterns.md\`, etc.) have been updated to reflect this new architecture.
+-   Supabase Trigger (FOUND-9): User confirmed the database trigger for automatic profile creation upon new user signup is implemented and functional.  
+-   Primary Mobile Navigator: \`carepop-mobile/App.tsx\` has been identified as the active root for navigation logic, rather than \`src/navigation/RootNavigator.tsx\`. Debugging and configuration efforts are now focused here.  
+-   Profile Navigation Setup (\`App.tsx\`):
+    *   Defined \`MyProfileStackParamList\` and \`MyProfileStackNav\`.
+    *   Implemented \`MyProfileStack()\` function, registering \`MyProfileScreen\` (as "MyProfileMain") and \`EditProfileScreen\` (as "EditProfile").
+    *   Integrated \`MyProfileStack\` as the component for the "My Profile" item in \`MainAppDrawer\`.
+    *   Imported \`EditProfileScreen\` into \`App.tsx\`.
+-   Navigation Call (\`MyProfileScreen.tsx\`): Updated \`navigateToEditProfile\` to use \`navigation.navigate('EditProfile');\`.  
+-   UI Update (\`ForgotPasswordScreen.tsx\`): Replaced the text title with an \`Image\` component displaying \`carepop-logo-pink.png\`.
+-   Linter Fixes (\`App.tsx\`): Resolved issue with \`theme.colors.white\` by using \`'#FFFFFF'\`.
 
-\-   \*\*Authentication Flow Decision (Finalized):\*\*  
-    \*   Removed the need for dedicated backend Cloud Run API endpoints for core User Registration and Login (originally FOUND-9, FOUND-10).  
-    \*   Frontend clients (\`carepop-nativeapp\` and \`carepop-web\`) will interact \*\*directly with Supabase Authentication\*\* using the Supabase JS SDK.  
-    \*   Initial user profile creation in the \`profiles\` table will be handled automatically by a \*\*Supabase database trigger\*\* linked to \`auth.users\` insertion (revised FOUND-9).
+## Next Steps & Action Items (Immediate Focus)
 
-\-   \*\*Native App Styling Decision:\*\*  
-    \*   \`carepop-nativeapp\` will use \*\*React Native \`StyleSheet\`\*\* for styling, leveraging a simple, centralized theme object (\`carepop-nativeapp/src/theme/\`), due to previous difficulties with more complex styling solutions in the monorepo context. NativeWind will not be used in the native app.
+1.  Analyze \`AppContent\` Logs (\`App.tsx\`): Carefully review the console output for \`session\`, \`profile\`, \`isLoadingAuth\`, \`isAppLoading\`, and \`hasOnboarded\` states at the time \`AppContent\` renders. This is critical to confirm that the conditional logic correctly leads to rendering \`MainAppDrawer\` when expected.  
+2.  Debug "Text strings..." Warning:
+    *   Scrutinize the JSX in \`AppContent\` (\`App.tsx\`), especially around the \`Carousel\` and \`CustomSplashScreen\` rendering.
+    *   Inspect \`CustomSplashScreen.tsx\`, \`OnboardingScreenOne.tsx\`, \`OnboardingScreenTwo.tsx\`, \`OnboardingScreenThree.tsx\` for any direct string rendering outside \`<Text>\` components or issues with conditional string display.
+3.  Verify Navigation Path (\`App.tsx\`):
+    *   If console logs show \`MainAppDrawer\` *should* be active when \`MyProfileScreen\` is visible, but navigation still fails, re-verify that \`MyProfileScreen\` (rendered via \`MyProfileStack\` in \`MainAppDrawer\`) is indeed receiving its \`navigation\` prop from the \`MainAppDrawer\`'s navigation context.
+    *   Consider temporarily simplifying the rendering logic in \`AppContent\` to *only* render \`NavigationContainer > RootStack > MainAppDrawer\` (assuming a valid session and profile) to isolate navigation testing.
+4.  Address \`RootNavigator.tsx\`: Clarify the role of \`src/navigation/RootNavigator.tsx\`. If \`App.tsx\` is the definitive root, consider refactoring to remove redundant navigator definitions from \`RootNavigator.tsx\` or fully deprecate it to avoid future confusion.
 
-\#\# Next Steps & Action Items (Immediate Focus)
+## Active Decisions & Considerations
 
-1\.  \*\*Apply Supabase Profile Trigger (Implement Revised FOUND-9):\*\* Execute the necessary SQL in the Supabase project to create the \`handle\_new\_user\` function and trigger. Verify its functionality.  
-2\.  \*\*Refactor Native App Auth Service/Context (Implement AUTH-1, AUTH-2, AUTH-3):\*\* Update code in \`carepop-nativeapp\` to use direct Supabase SDK calls (\`signUp\`, \`signInWithPassword\`) and manage Supabase session state (\`onAuthStateChange\`, \`getSession\`, \`signOut\`).  
-3\.  \*\*Implement Secure Token Storage (Implement SEC-FE-1 for Native):\*\* Integrate \`expo-secure-store\` or confirm Supabase SDK's default persistence mechanism is adequate for session tokens in Expo.  
-4\.  \*\*Connect Native Auth UI (Implement AUTH-4, AUTH-5):\*\* Connect the existing Login and Registration screens in \`carepop-nativeapp\` to the refactored auth service/context. Remove bypass logic.  
-5\.  \*\*End-to-End Authentication Test (Native App):\*\* Test the complete flow: Register \-\> Verify Profile Trigger \-\> Login \-\> Verify Session \-\> Logout.  
-6\.  \*\*Begin Web App Auth Implementation (\`carepop-web/\`):\*\* Start implementing equivalent direct Supabase Auth integration (Tickets AUTH-6, AUTH-7, WEB-SETUP-2) in the Next.js application.  
-7\.  \*\*Update \`tracker.md\`:\*\* Align the status and notes in \`tracker.md\` with these specific implementation tasks.
+-   Three-Pillar Structure: This is the confirmed architecture. No root-level monorepo tooling is used.  
+-   Direct Client-Supabase Auth + Trigger: The confirmed pattern for core authentication. Cloud Run's role is for other specific backend logic.  
+-   Independent Frontend Development: \`carepop-nativeapp\` and \`carepop-web\` development proceeds independently, using distinct UI stacks but consuming the same \`carepop-backend\` APIs where applicable.  
+-   Separate CI/CD: Pipelines need to be configured for each of the three projects.
 
-\#\# Active Decisions & Considerations
+## Learnings & Insights
 
-\-   \*\*Three-Pillar Structure:\*\* This is the confirmed architecture. No root-level monorepo tooling is used.  
-\-   \*\*Direct Client-Supabase Auth \+ Trigger:\*\* The confirmed pattern for core authentication. Cloud Run's role is for other specific backend logic.  
-\-   \*\*Independent Frontend Development:\*\* \`carepop-nativeapp\` and \`carepop-web\` development proceeds independently, using distinct UI stacks but consuming the same \`carepop-backend\` APIs where applicable.  
-\-   \*\*Separate CI/CD:\*\* Pipelines need to be configured for each of the three projects.
-
-\#\# Learnings & Insights
-
-\-   Simplifying project structure, even if it means separating applications previously intended for a monorepo, can significantly reduce tooling friction and cognitive overhead, especially when dealing with complex native build systems alongside web technologies.  
-\-   Leveraging BaaS features (like Supabase Auth and Triggers) directly can often simplify core application flows compared to building custom backend wrappers, provided the BaaS capabilities meet the requirements.  
-\-   Force pushes require careful coordination but can be valuable for establishing a clean baseline after major architectural changes.
-
+-   Having multiple, potentially conflicting, root navigation setups (\`App.tsx\` vs. \`src/navigation/RootNavigator.tsx\`) can make debugging navigation context issues very challenging. A single, clear entry point and navigator hierarchy is crucial.  
+-   Persistent errors, even after apparent fixes, often point to deeper issues like incorrect component hierarchy in the navigation tree, or stale state/props being used by the screen attempting to navigate.  
+-   Console logging state variables at critical points in the rendering lifecycle is invaluable for debugging conditional navigation logic.

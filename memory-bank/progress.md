@@ -1,47 +1,39 @@
-\# Project Progress: CarePop/QueerCare
+# Project Progress: CarePop/QueerCare
 
-\#\# Current Status (As of \<YYYY-MM-DDTHH:MM:SSZ\_PLACEHOLDER\>)
+## Current Status (As of TIMESTAMP_OF_MEMORY_BANK_AUG_2_2024_REVIEW)
 
-\*\*Major project restructure completed.\*\* The project now exists in a single Git repository (\`https://github.com/projectcarepop/carepop.git\`) with three distinct top-level application directories: \`carepop-backend/\`, \`carepop-nativeapp/\`, and \`carepop-web/\`. The \`main\` branch history has been reset via force push to reflect this structure. Project documentation (\`epics\_and\_tickets.md\`, Memory Bank files) has been updated to align with this new architecture and the finalized decision to use \*\*direct Client-Supabase Authentication\*\* with a database trigger for profile creation.
+Focus remains on resolving critical issues in the `carepop-mobile` application: the persistent navigation error from `MyProfileScreen` and the "Text strings must be rendered within a <Text> component" warning. `App.tsx` has been identified as the active navigation root, and configuration changes have been made there.
 
-\*\*Current focus is on implementing the core authentication flow\*\* within this new structure, primarily in \`carepop-nativeapp\` and the Supabase backend trigger.
+## What Works (Verified in Current Structure)
 
-\#\# What Works (Verified in New Structure)
+*   Supabase Trigger (FOUND-9): Implemented and confirmed by the user for automatic profile creation.
+*   `App.tsx` Navigation Structure (Initial):
+    *   `MyProfileStack` (containing `MyProfileScreen` as "MyProfileMain" and `EditProfileScreen` as "EditProfile") is defined.
+    *   This stack is integrated as the component for the "My Profile" drawer item in `MainAppDrawer`.
+    *   `EditProfileScreen` imported; `MyProfileScreen.tsx` navigation call updated to `navigation.navigate('EditProfile');`.
+*   UI Update (`ForgotPasswordScreen.tsx`): Text title successfully replaced with the app logo image.
+*   Core Project Structure & Basic Init: The three-pillar structure (\`carepop-backend/\`, \`carepop-mobile/\`, \`carepop-web/\`) is established. Basic app initialization for mobile and backend works.
 
-\-   \*\*Project Structure:\*\* The three top-level directories are in place in the Git repository.  
-\-   \*\*Basic Initialization:\*\*  
-    \*   \`carepop-backend/\`: Basic Node.js/TypeScript setup, Supabase client config present. Staging deployment via CI/CD to Cloud Run is functional.  
-    \*   \`carepop-nativeapp/\`: Expo project initializes, core dependencies installed. Basic "blank" app renders in Expo Go/simulator. Basic theme and integrated UI components (Button, Input, Card using StyleSheet) are present.  
-    \*   \`carepop-web/\`: Next.js project initializes with TypeScript, Tailwind CSS, Shadcn UI. Basic placeholder page runs via dev server.  
-\-   \*\*Core Infrastructure:\*\* Supabase project (Staging), GCP project with Cloud Run, Secret Manager, Logging configured for staging.  
-\-   \*\*Foundational Auth Setup (Backend):\*\* Supabase Auth configured with Email/Password provider. Foundational \`profiles\` table created with RLS allowing self-read/write (migration applied).
+## What's Left to Build (Immediate Focus from `tracker.md`)
 
-\#\# What's Left to Build (Immediate Focus from \`tracker.md\`)
+*   Resolve "NAVIGATE... not handled" Error: Determine why `MyProfileScreen`, when rendered via `App.tsx`'s `MainAppDrawer > MyProfileStack`, cannot navigate to "EditProfile". This involves analyzing `AppContent` state and rendering logic.
+*   Resolve "Text strings..." Warning: Identify and fix the source of raw string rendering within `App.tsx` or its child UI components (Onboarding, SplashScreen).
+*   Full Profile Flow (Post-Error Fix): Thoroughly test Create Profile -> View Profile (`MyProfileScreen`) -> Edit Profile (`EditProfileScreen`) -> Save Profile flow once navigation is unblocked.
+*   Stabilize Onboarding Flow: Re-enable and test AsyncStorage logic for `hasOnboarded` state persistence in `App.tsx` once current errors are cleared.
+*   Continue Implementing Other Features: Address other "To Do" tickets from `epics_and_tickets.md` once these foundational/blocking issues are resolved.
 
-\*Primary Focus: Core Authentication Flow\*
+## Known Issues & Blockers (Current)
 
-1\.  \*\*Apply Supabase Profile Trigger (Revised FOUND-9):\*\* Implement and test the SQL trigger function (\`handle\_new\_user\`) in the Supabase project. \*\*Status: To Do\*\*  
-2\.  \*\*Refactor Native App Auth Service/Context (AUTH-1, AUTH-2, AUTH-3):\*\* Rewrite \`carepop-nativeapp\` auth logic to use direct Supabase JS SDK calls (\`signUp\`, \`signInWithPassword\`, \`onAuthStateChange\`, etc.) and manage session state. \*\*Status: To Do\*\*  
-3\.  \*\*Implement Secure Token Storage (Native App \- SEC-FE-1 / AUTH-3):\*\* Integrate \`expo-secure-store\` or verify Supabase SDK session persistence. \*\*Status: To Do\*\*  
-4\.  \*\*Connect Native Auth UI (AUTH-4, AUTH-5):\*\* Link the Login/Register screens in \`carepop-nativeapp\` to the refactored auth logic. Remove any existing bypasses. \*\*Status: To Do\*\*  
-5\.  \*\*End-to-End Auth Test (Native App):\*\* Verify Signup \-\> Trigger \-\> Profile \-\> Login \-\> Session \-\> Logout flow. \*\*Status: To Do\*\*  
-6\.  \*\*(Next Priority) Web App Auth Implementation:\*\* Implement equivalent auth flow (direct SDK calls, context, UI connection) in \`carepop-web\`. \*\*Status: To Do\*\*  
-7\.  \*\*(Parallel/Next) Backend Enhancements:\*\* Implement RLS beyond basic profile access (COMPLIANCE-2), Cloud Run Auth Middleware (SEC-BE-2), Core RBAC Enforcement logic (SEC-BE-3). \*\*Status: Partially Done (RLS basics) / To Do\*\*
+1.  CRITICAL: Navigation Error: `The action 'NAVIGATE' with payload {"name":"EditProfile"} was not handled by any navigator.` Persists. Suspected cause: `MainAppDrawer` or `MyProfileStack` not being correctly active or available in the navigation context of `MyProfileScreen` due to `App.tsx`'s conditional rendering.
+2.  CRITICAL: Text Rendering Warning: `Warning: Text strings must be rendered within a <Text> component.` Call stack points to `App (<anonymous>)`, indicating an issue in `App.tsx` or components it renders (e.g., Onboarding, SplashScreen).
 
-\*(Other features from \`epics\_and\_tickets.md\` like Appointments, Directory, Tracking, Admin Portal, etc., remain largely "To Do" pending the completion of the core authentication flow and further backend/frontend implementation)\*
+## Key Decisions & Evolutions Log
 
-\#\# Known Issues & Blockers (Current)
+*   TIMESTAMP_OF_MEMORY_BANK_AUG_2_2024_REVIEW - Decision: `App.tsx` is the primary focus for mobile navigation setup and debugging. `src/navigation/RootNavigator.tsx` is likely unused or its role needs clarification.
+*   TIMESTAMP_OF_MEMORY_BANK_AUG_2_2024_REVIEW - Action: Supabase trigger for profile creation (`FOUND-9`) confirmed as implemented.
+*   TIMESTAMP_OF_MEMORY_BANK_AUG_2_2024_REVIEW - Action: `MyProfileStack` (with `MyProfileScreen`, `EditProfileScreen`) defined and integrated into `MainAppDrawer` within `App.tsx`.
+*   TIMESTAMP_OF_MEMORY_BANK_AUG_2_2024_REVIEW - Action: `ForgotPasswordScreen.tsx` UI updated to use logo.
+*   (Previous entries from existing `progress.md` remain relevant for overall project history - *See `memorylog.md` for full details*)
 
-\-   \*\*Native App Build Issues (Previously Resolved):\*\* Past issues with Android builds (linker errors, path issues) were resolved by moving to Expo and simplifying the structure. Need to monitor stability. \*\*Risk: Low (Post-Refactor)\*\*  
-\-   \*\*Authentication Logic:\*\* Core authentication flow needs implementation in the native app codebase based on the new direct-Supabase approach. \*\*Current Blocker for User Interaction.\*\*  
-\-   \*\*CI/CD for Native App:\*\* Pipeline setup for \`carepop-nativeapp\` using EAS Build needs full implementation and testing (FOUND-5). \*\*Blocker for Staging Deployments.\*\*  
-\-   \*\*Web Application Development:\*\* The \`carepop-web\` application is largely un-implemented beyond basic initialization. \*\*Needs Dedicated Effort.\*\*
 
-\#\# Key Decisions & Evolutions Log
-
-\-   \*\*\<YYYY-MM-DDTHH:MM:SSZ\_PLACEHOLDER\> \- Decision:\*\* Finalized authentication flow: Direct Client-Supabase Auth SDK calls \+ Supabase DB Trigger for profile creation. Removed dedicated Cloud Run auth endpoints (original FOUND-9/10). \*\*(Implementation Pending)\*\*  
-\-   \*\*\<YYYY-MM-DDTHH:MM:SSZ\_PLACEHOLDER\> \- Action:\*\* Completed Major Project Restructure. Established three top-level directories (\`carepop-backend\`, \`carepop-nativeapp\`, \`carepop-web\`). Force pushed new structure to \`main\` branch. Updated all Memory Bank docs.  
-\-   \*\*\<YYYY-MM-DDTHH:MM:SSZ\_PLACEHOLDER\> \- Decision:\*\* Adopt a simplified three-pillar top-level folder structure. Abandon the \`carepop-frontend\` monorepo. Plan to force push the new structure to \`main\`, resetting its history.  
-\-   \*\*(Previous Decision \- Documented):\*\* Shifted from React Native for Web to a separate Next.js/Tailwind/Shadcn UI web application. Native app to use Expo for iOS/Android only.  
-\-   \*\*(Previous Decision \- Documented):\*\* Shifted Native App Development from RN CLI to Expo CLI (Managed Workflow) due to persistent monorepo/native build difficulties.
-
+*(Older context removed for brevity - Focus is on the latest status above)*
