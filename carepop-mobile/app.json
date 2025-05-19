@@ -1,11 +1,10 @@
 {
   "expo": {
-    "name": "CarePoP",
+    "name": "carepop",
     "slug": "carepop-mobile",
     "version": "1.0.0",
     "entryPoint": "./index.ts",
     "orientation": "portrait",
-    "icon": "./assets/carepop-logo-pink.png",
     "scheme": "carepop",
     "userInterfaceStyle": "light",
     "splash": {
@@ -30,10 +29,11 @@
       },
       "supabaseUrl": "https://lpaqfvfuzfqsrciawipu.supabase.co",
       "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwYXFmdmZ1emZxc3JjaWF3aXB1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU4NTk1NDQsImV4cCI6MjA2MTQzNTU0NH0.FJgyKU9JWvOSJr1al-PCDxFPPW-yheSuJk95TVP0gi0",
-      "apiUrl": "http://10.0.2.2:8080"
+      "EXPO_PUBLIC_BACKEND_API_URL": "http://192.168.254.116:8080"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      "expo-secure-store"
     ]
   }
 }

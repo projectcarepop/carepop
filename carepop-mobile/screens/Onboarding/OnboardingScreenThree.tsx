@@ -5,6 +5,7 @@ import { Button } from '../../src/components';
 
 interface OnboardingScreenThreeProps {
   onComplete?: () => void; // Function to call when onboarding finishes
+  onSkip?: () => void; // Optional: To match other screens, even if not used
 }
 
 export const OnboardingScreenThree: React.FC<OnboardingScreenThreeProps> = ({ onComplete }) => {

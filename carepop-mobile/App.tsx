@@ -1,165 +1,29 @@
-import 'react-native-gesture-handler'; // Re-enable this import
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, SafeAreaView, ActivityIndicator, TouchableOpacity, Dimensions } from 'react-native'; // Added ActivityIndicator, TouchableOpacity, and Dimensions
-import { theme, Button } from './src/components'; 
-import { supabase } from './src/utils/supabase'; // Removed unused getCurrentUser, getUserProfile
-import { Ionicons } from '@expo/vector-icons'; // Add Ionicons
+import 'react-native-gesture-handler';
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, View, Dimensions, Text, Button as RNButton, Alert } from 'react-native';
+import { theme, Button } from './src/components';
 import {
   useFonts,
-  // Inter_400Regular, // REMOVE
-  // Inter_700Bold, // REMOVE
-} from '@expo-google-fonts/inter'; // Keep import line if other fonts might be added later, or remove
-import {
-  SpaceGrotesk_400Regular, // ADD
-  SpaceGrotesk_700Bold, // ADD
-} from '@expo-google-fonts/space-grotesk'; // ADD
-import { AuthNavigator } from './screens/AuthNavigator';
-import { NavigationContainer } from '@react-navigation/native'; // Re-enable
-import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList, DrawerItem } from '@react-navigation/drawer'; // Re-enable
-import { createNativeStackNavigator, NativeStackScreenProps } from '@react-navigation/native-stack'; // Import Stack Navigator
-import { DashboardScreen } from './screens/DashboardScreen';
-import { CreateProfileScreen } from './screens/CreateProfileScreen'; // Import the new screen
-import { BookingScreen } from './screens/BookingScreen'; // Import BookingScreen
-import { HealthServicesScreen } from './src/screens/HealthServicesScreen';
-import { HealthBuddyScreen } from './src/screens/HealthBuddyScreen';
-import { MyProfileScreen } from './src/screens/MyProfileScreen'; // Corrected import for renamed screen
-import { MyRecordsScreen } from './src/screens/MyRecordsScreen'; // Import the new screen
-import { PillTrackerScreen } from './src/screens/PillTrackerScreen';
-import { AddMedicationScreen } from './src/screens/AddMedicationScreen';
-import { MensTrackerScreen } from './src/screens/MensTrackerScreen';
-import { LogPeriodScreen } from './src/screens/LogPeriodScreen';
-import { LogSymptomsScreen } from './src/screens/LogSymptomsScreen';
-import { LogBloodPressureScreen } from './src/screens/LogBloodPressureScreen';
-import { PaymentMethodsScreen } from './src/screens/PaymentMethodsScreen';
-import type { Session } from '@supabase/supabase-js'; // Removed Subscription
+  SpaceGrotesk_400Regular,
+  SpaceGrotesk_700Bold,
+} from '@expo-google-fonts/space-grotesk';
+import { NavigationContainer } from '@react-navigation/native';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
-import { ServiceBookingScreen } from './src/screens/ServiceBookingScreen'; // Import the new screen
-import { LoginScreen } from './screens/LoginScreen'; // Import Auth Screens
-import { RegisterScreen } from './screens/RegisterScreen';
-import { ForgotPasswordScreen } from './screens/ForgotPasswordScreen';
-import * as Linking from 'expo-linking'; // Added for deep link handling
-import * as ExpoSplashScreen from 'expo-splash-screen'; // Use alias for expo splash screen
-import { EditProfileScreen } from './src/screens/EditProfileScreen'; // Import EditProfileScreen
-import { ClinicFinderScreen } from './src/screens/ClinicFinderScreen'; // Import ClinicFinderScreen
-import { AboutUsScreen } from './src/screens/AboutUsScreen'; // Import AboutUsScreen
-
-// Import Onboarding Screens from new location
-import { SplashScreen as CustomSplashScreen } from './screens/Onboarding/SplashScreen'; // Corrected Path
-import { OnboardingScreenOne } from './screens/Onboarding/OnboardingScreenOne'; // Corrected Path
-import { OnboardingScreenTwo } from './screens/Onboarding/OnboardingScreenTwo'; // Corrected Path
-import { OnboardingScreenThree } from './screens/Onboarding/OnboardingScreenThree'; // Import Screen Three
-
-// Import AsyncStorage
+import * as Linking from 'expo-linking';
+import * as ExpoSplashScreen from 'expo-splash-screen';
+import { SplashScreen as CustomSplashScreen } from './screens/Onboarding/SplashScreen';
+import { OnboardingScreenOne } from './screens/Onboarding/OnboardingScreenOne';
+import { OnboardingScreenTwo } from './screens/Onboarding/OnboardingScreenTwo';
+import { OnboardingScreenThree } from './screens/Onboarding/OnboardingScreenThree';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-// Import Carousel
 import Carousel from 'react-native-reanimated-carousel';
-
-// Prevent native splash screen from auto-hiding
-ExpoSplashScreen.preventAutoHideAsync();
+import { RootAppNavigator } from './src/navigation/AppNavigator';
 
 const ONBOARDING_COMPLETE_KEY = 'hasOnboarded';
-const { width: screenWidth } = Dimensions.get('window');
 
-// --- Define Param Lists ---
-type AuthStackParamList = {
-  Login: undefined;
-  Register: undefined;
-  ForgotPassword: undefined;
-};
+// Keep the splash screen visible while we fetch resources
+ExpoSplashScreen.preventAutoHideAsync();
 
-type MainDrawerParamList = {
-  Dashboard: undefined;
-  'My Bookings': undefined;
-  'My Records': undefined;
-  'Make Appointment': undefined; // This will likely be a nested stack
-  'Health Buddy': undefined; // This will likely be a nested stack
-  'My Profile': undefined; // This will likely be a nested stack for MyProfileStack
-  'Clinic Finder': undefined; // Added for Clinic Finder
-  'About Us': undefined; // Added for About Us
-};
-
-type MyProfileStackParamList = {
-  MyProfileMain: undefined;
-  EditProfile: undefined;
-};
-
-// ADDED: ClinicFinderStackParamList
-type ClinicFinderStackParamList = {
-  ClinicFinderMain: undefined;
-  // Potentially ClinicDetails: { clinicId: string } later
-};
-
-// ADDED: AboutUsStackParamList
-type AboutUsStackParamList = {
-  AboutUsMain: undefined;
-};
-
-type RootStackParamList = {
-  Loading: undefined;
-  Auth: undefined; // Refers to AuthStack
-  Main: undefined; // Refers to MainDrawer
-  CreateProfile: undefined; // Screen shown between Auth and Main
-};
-
-// --- Navigators ---
-const Drawer = createDrawerNavigator<MainDrawerParamList>();
-const AuthStackNav = createNativeStackNavigator<AuthStackParamList>();
-const RootStack = createNativeStackNavigator<RootStackParamList>();
-const AppointmentStackNav = createNativeStackNavigator(); // Specific stack for appointments
-const HealthBuddyStackNav = createNativeStackNavigator(); // Specific stack for health buddy
-const MyProfileStackNav = createNativeStackNavigator<MyProfileStackParamList>(); // Specific stack for profile sections
-const ClinicFinderStackNav = createNativeStackNavigator<ClinicFinderStackParamList>(); // ADDED: Specific stack for Clinic Finder
-const AboutUsStackNav = createNativeStackNavigator<AboutUsStackParamList>(); // ADDED: Specific stack for About Us
-
-// Re-enable Custom Drawer Content - Modified for Bottom Logout
-function CustomDrawerContent(props: any) {
-  const { signOut } = useAuth();
-
-  return (
-    <View style={{ flex: 1 /* Take full height */ }}>
-      <DrawerContentScrollView {...props} style={{ flex: 1 }}>
-        {/* Render the auto-generated list first */}
-        <DrawerItemList {...props} />
-      </DrawerContentScrollView>
-      {/* Container for the fixed bottom items */}
-      <View style={styles.bottomDrawerSection}>
-        {/* My Profile Item - Moved Here */}
-        <DrawerItem
-          label="My Profile"
-          icon={({ color, size }: { color: string; size: number }) => (
-            <Ionicons name="person-outline" color={color} size={size} />
-          )}
-          onPress={() => {
-            // Navigate to the 'My Profile' screen stack
-            props.navigation.navigate('My Profile'); 
-          }}
-          style={{ marginVertical: theme.spacing.xs }}
-          labelStyle={{ fontSize: 16, fontWeight: '500' }}
-          inactiveTintColor={theme.colors.text}
-          inactiveBackgroundColor={'transparent'}
-        />
-        {/* Logout Item */}
-        <DrawerItem
-          label="Logout"
-          icon={({ color, size }: { color: string; size: number }) => (
-            <Ionicons name="log-out-outline" color={color} size={size} />
-          )}
-          onPress={async () => {
-            await signOut();
-          }}
-          style={{ marginVertical: theme.spacing.xs }}
-          labelStyle={{ fontSize: 16, fontWeight: '500' }}
-          inactiveTintColor={theme.colors.text}
-          inactiveBackgroundColor={'transparent'}
-        />
-      </View>
-    </View>
-  );
-}
-
-// App Root Component
 export default function App() {
   return (
     <AuthProvider>
@@ -168,88 +32,68 @@ export default function App() {
   );
 }
 
-// --- Main App Content Component --- 
 function AppContent() {
   let [fontsLoaded, fontError] = useFonts({
-    // Inter_400Regular, // REMOVE
-    // Inter_700Bold, // REMOVE
-    SpaceGrotesk_400Regular, // ADD
-    SpaceGrotesk_700Bold, // ADD
+    SpaceGrotesk_400Regular,
+    SpaceGrotesk_700Bold,
   });
 
-  const { session, profile, isLoading: isLoadingAuth, signOut, refreshUserProfile } = useAuth();
-  const [hasOnboarded, setHasOnboarded] = useState<boolean>(false); // ALWAYS SHOW ONBOARDING INITIALLY FOR TESTING
-  const [isAppLoading, setIsAppLoading] = useState(true); // Technical loading (fonts, auth check)
-  const [showCustomSplashOverride, setShowCustomSplashOverride] = useState(true); // Controls splash visibility after technical load
+  const { isLoading: isLoadingAuth, session, user, isAwaitingEmailConfirmation, refreshUserProfile, signOut } = useAuth();
+  const [hasOnboarded, setHasOnboarded] = useState<boolean | null>(null);
+  const [initialChecksDone, setInitialChecksDone] = useState(false);
+  const [showCustomSplashOverride, setShowCustomSplashOverride] = useState(true);
   const onboardingCarouselRef = useRef<any>(null);
+  const [alertShownForUnconfirmedUser, setAlertShownForUnconfirmedUser] = useState(false);
+  const alertInitiatedThisCycleRef = useRef(false); // Ref to track alert initiation
 
-  console.log('[AppContent] Rendering. Session:', session ? 'exists' : 'null/undefined', 'Profile:', profile ? 'exists' : 'null/undefined', 'isLoadingAuth:', isLoadingAuth, 'isAppLoading:', isAppLoading, 'hasOnboarded (state):', hasOnboarded, 'showCustomSplashOverride:', showCustomSplashOverride );
-
-  // Updated onboarding screens data
   const onboardingScreens = [
-    // SplashScreen is now primarily the initial native one + loading view
     { id: 'one', component: OnboardingScreenOne },
     { id: 'two', component: OnboardingScreenTwo },
-    { id: 'three', component: OnboardingScreenThree }, // Added Screen Three
+    { id: 'three', component: OnboardingScreenThree },
   ];
 
-  // Check Onboarding Status on Mount
   useEffect(() => {
     const checkOnboardingStatus = async () => {
       try {
-        // TEMPORARILY DISABLE READING FROM ASYNCSTORAGE FOR ONBOARDING
-        // const value = await AsyncStorage.getItem(ONBOARDING_COMPLETE_KEY);
-        // setHasOnboarded(value === 'true');
-        // console.log('[AppContent] Onboarding status loaded:', value === 'true');
-        console.log('[AppContent] Onboarding check skipped for testing. Forcing show.');
+        const value = await AsyncStorage.getItem(ONBOARDING_COMPLETE_KEY);
+        const alreadyOnboarded = value === 'true';
+        setHasOnboarded(alreadyOnboarded);
       } catch (e) {
-        console.error('[AppContent] Failed to load onboarding status (during test override):', e);
-        // setHasOnboarded(false); // Already set to false initially
+        console.error('[AppContent] Failed to load onboarding status:', e);
+        setHasOnboarded(false);
       }
     };
     checkOnboardingStatus();
   }, []);
 
-  // --- Splash Screen Hiding & App Loading Logic ---
   useEffect(() => {
     const prepareApp = async () => {
-      await ExpoSplashScreen.preventAutoHideAsync(); 
-      
-      if ((fontsLoaded || fontError) && !isLoadingAuth) {
-        console.log('[AppContent] Technical loading complete. Hiding native splash screen.');
+      if ((fontsLoaded || fontError) && !isLoadingAuth && hasOnboarded !== null) {
+        setInitialChecksDone(true);
         await ExpoSplashScreen.hideAsync();
-        setIsAppLoading(false); // Technical loading is done
 
-        // Now, set a timer for the custom JS splash screen to stay longer
         const customSplashTimer = setTimeout(() => {
-          console.log('[AppContent] Custom JS splash override timer finished.');
           setShowCustomSplashOverride(false);
-        }, 2000); // Show JS splash for an additional 2 seconds AFTER native hides & assets load
+        }, 1000);
 
-        return () => clearTimeout(customSplashTimer); // Cleanup timer
+        return () => clearTimeout(customSplashTimer);
       }
-    }
+    };
     prepareApp();
-  }, [fontsLoaded, fontError, isLoadingAuth]); 
+  }, [fontsLoaded, fontError, isLoadingAuth, hasOnboarded]);
 
-  // --- Deep Link Handling --- 
   useEffect(() => {
     const handleDeepLink = (event: { url: string }) => {
       const { url } = event;
-      console.log('[AppContent] Received deep link URL:', url);
-      // Supabase client might automatically pick up session from URL if tokens are in fragment.
-      // We rely on onAuthStateChange in AuthContext to update the session.
-      // No explicit supabase.auth.setSession or getSessionFromUrl here for now.
+      // console.log('[AppContent] Received deep link URL:', url);
     };
 
-    // Get the initial URL if the app was opened with one
     Linking.getInitialURL().then(initialUrl => {
       if (initialUrl) {
         handleDeepLink({ url: initialUrl });
       }
     });
 
-    // Listen for subsequent URLs
     const subscription = Linking.addEventListener('url', handleDeepLink);
 
     return () => {
@@ -258,328 +102,169 @@ function AppContent() {
   }, []);
 
   const handleProfileCreated = async () => {
-    // This function might still be useful if CreateProfileScreen needs to signal back.
-    // However, AuthContext should ideally re-fetch/update profile upon user actions.
-    // For now, let's assume AuthContext will reflect the new profile after creation.
-    console.log('[AppContent] Profile creation reported. Refreshing user profile...');
-    if (refreshUserProfile) { // Check if the function exists (it should)
-      await refreshUserProfile();
-    }
+    console.log('[AppContent] Profile created/updated. Refreshing user profile in AuthContext...');
+    await refreshUserProfile();
   };
 
   const handleOnboardingComplete = async () => {
+    console.log('[AppContent] Onboarding complete. Setting flag and state.');
     try {
-      // If a session exists when onboarding completes, sign out to ensure fresh auth flow
-      if (session) {
-        console.log('[AppContent] Existing session found on onboarding complete. Signing out.');
-        await signOut();
-      }
       await AsyncStorage.setItem(ONBOARDING_COMPLETE_KEY, 'true');
-      setHasOnboarded(true); // This will now trigger the transition to Auth/Main
-      console.log('[AppContent] Onboarding marked as complete.');
+      setHasOnboarded(true);
     } catch (e) {
       console.error('[AppContent] Failed to save onboarding status:', e);
-      // Still proceed to set state to true to allow app progression even if save fails
       setHasOnboarded(true);
     }
   };
 
-  // --- Loading View ---
-  // Show CustomSplashScreen if technical loading is happening OR if override timer is active
-  if (isAppLoading || showCustomSplashOverride) { 
+  useEffect(() => {
+    // If we are not in a state where confirmation is awaited, or no user,
+    // reset flags for the next potential cycle.
+    if (!user || !isAwaitingEmailConfirmation) {
+      alertInitiatedThisCycleRef.current = false;
+      // Only reset alertShownForUnconfirmedUser if it's currently true,
+      // to avoid unnecessary state updates if it's already false.
+      if (alertShownForUnconfirmedUser) {
+        setAlertShownForUnconfirmedUser(false);
+      }
+      return; // Early exit, no alert to show or manage further in this effect run
+    }
+
+    // Conditions to show the alert:
+    // 1. User exists and is awaiting confirmation.
+    // 2. The user has NOT YET acknowledged this type of alert (alertShownForUnconfirmedUser is false).
+    // 3. An alert has NOT YET been initiated in the current run of this confirmation state (alertInitiatedThisCycleRef.current is false).
+    if (user && isAwaitingEmailConfirmation && !alertShownForUnconfirmedUser && !alertInitiatedThisCycleRef.current) {
+      alertInitiatedThisCycleRef.current = true; // Mark that we are initiating an alert in this cycle.
+      
+      console.log('[AppContent] Preparing to show confirmation alert for user:', user.id);
+      Alert.alert(
+        "Registration Successful!",
+        `Please check your email (${user.email || 'your email address'}) to confirm your account. You will now be taken to the login screen.`,
+        [
+          {
+            text: "OK",
+            onPress: async () => {
+              setAlertShownForUnconfirmedUser(true); // User has acknowledged.
+              if (signOut) {
+                await signOut();
+              }
+            },
+          },
+        ],
+        { cancelable: false }
+      );
+    }
+  }, [user, isAwaitingEmailConfirmation, alertShownForUnconfirmedUser, signOut]);
+
+  // Show custom JS splash screen if:
+  // 1. Initial checks aren't done (e.g. first load, waiting for fonts/auth/onboarding status)
+  // 2. Override to show custom splash is active (e.g., for minimum display time on first load)
+  // 3. Fonts are not loaded yet (and no font error)
+  // 4. OR if auth is currently loading (e.g. sign-in, sign-out in progress) - ensure fonts are loaded to avoid errors in splash itself
+  if (
+    !initialChecksDone || 
+    showCustomSplashOverride || 
+    (!fontsLoaded && !fontError) ||
+    (isLoadingAuth && fontsLoaded && !fontError) // ADDED/MODIFIED: Explicitly show splash if auth is loading
+  ) {
     return <CustomSplashScreen />;
   }
 
-  // --- Conditional Rendering Logic ---
-  // 1. Show Onboarding Carousel if not completed (and custom splash override is false)
-  if (!hasOnboarded) { // ALWAYS TRUE INITIALLY FOR TESTING (until handleOnboardingComplete)
-    // --- TEMPORARILY COMMENT OUT CAROUSEL FOR DEBUGGING TEXT WARNING ---
+  // If fonts failed to load (and checks are done), display an error message.
+  if (fontError) {
     return (
-      <Carousel
-        ref={onboardingCarouselRef}
-        loop={false}
-        width={screenWidth}
-        height={Dimensions.get('window').height} // Use full height
-        autoPlay={false}
-        data={onboardingScreens} 
-        scrollAnimationDuration={500}
-        // onSnapToItem={(index) => console.log('Current onboarding slide index: ', index)}
-        renderItem={({ item, index }) => {
-          // --- Debugging: Force render ONLY OnboardingScreenOne ---
-          // const ScreenComponent = OnboardingScreenOne; // Force Screen One
-          // const screenProps: any = {}; 
-          // We don't need the onComplete prop for this test
-          // if (item.id === 'three') { 
-          //     screenProps.onComplete = handleOnboardingComplete;
-          // }
-          // return (
-          //   <View style={{ flex: 1, width: screenWidth }}>
-          //     {/* <Text style={{position: 'absolute', top: 50, left: 20, backgroundColor: 'yellow'}}>DEBUG: Rendering Screen One Only</Text> */}
-          //     <ScreenComponent {...screenProps} />
-          //   </View>
-          // );
-          // --- End Debugging ---
-
-          // --- Original renderItem logic ---
-          const ScreenComponent = item.component;
-          const screenProps: any = {}; // Simpler props
-
-          if (item.id === 'three') { 
-              screenProps.onComplete = handleOnboardingComplete;
-          }
-          return (
-            <View style={{ flex: 1, width: screenWidth }}>
-              <ScreenComponent {...screenProps} />
-            </View>
-          );
-          // --- End Original ---
-        }}
-      />
+      <View style={styles.centeredError}>
+        <Text style={styles.errorText}>Error loading fonts!</Text>
+        <Text style={styles.errorDetails}>{fontError.message}</Text>
+      </View>
     );
-    // --- END TEMP COMMENT OUT ---
-    
-    // --- TEMP RETURN FOR DEBUGGING ---
-    // return (
-    //   <View style={styles.loadingContainer}>
-    //     <ActivityIndicator size="large" color={theme.colors.primary} />
-    //     <Text style={styles.loadingText}>Loading Onboarding (Debug)...</Text>
-    //   </View>
-    // );
-    // --- END TEMP RETURN ---
   }
 
-  // 2. If onboarding is done, proceed with Auth/Main flow
-  // ... (rest of the existing logic for session, profile, etc.)
-  return (
-    <NavigationContainer>
-       <RootStack.Navigator screenOptions={{ headerShown: false }}>
-         {/* Onboarding handled above, removed from RootStack navigation */}
-          {!session ? (
-           // Onboarding done, no session --> Auth Flow
-           <RootStack.Screen name="Auth" component={AuthScreens} />
-         ) : !profile || !profile.first_name ? (
-           // Onboarding done, session exists, but no profile yet OR profile is incomplete --> Create Profile
-           <RootStack.Screen name="CreateProfile">
-                {(props) => <CreateProfileScreen {...props} onProfileCreated={handleProfileCreated} />}
-           </RootStack.Screen>
-         ) : (
-            // Onboarding done, session and profile exist --> Main App Drawer
-           <RootStack.Screen name="Main" component={MainAppDrawer} />
-         )}
-       </RootStack.Navigator>
-    </NavigationContainer>
-  );
-}
+  // After all loading checks:
+  // If user is authenticated and has completed onboarding, show the main app.
+  // Crucially, fonts must be loaded here.
+  if (fontsLoaded && session && user && hasOnboarded) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        <NavigationContainer theme={theme}>
+          <RootAppNavigator onProfileCreated={handleProfileCreated} />
+        </NavigationContainer>
+      </View>
+    );
+  }
 
-// --- Stack Navigators --- 
-
-function HealthBuddyStack() {
-  return (
-    <HealthBuddyStackNav.Navigator screenOptions={{ headerShown: false }}>
-      <HealthBuddyStackNav.Screen name="HealthBuddyMain" component={HealthBuddyScreen} options={{ title: 'Health Buddy' }} />
-    </HealthBuddyStackNav.Navigator>
-  );
-}
-
-function MyProfileStack() {
-  return (
-    <MyProfileStackNav.Navigator screenOptions={{ headerShown: false }}>
-      <MyProfileStackNav.Screen
-        name="MyProfileMain"
-        component={MyProfileScreen}
-      />
-      <MyProfileStackNav.Screen
-        name="EditProfile"
-        component={EditProfileScreen}
-      />
-    </MyProfileStackNav.Navigator>
-  );
-}
-
-function ClinicFinderStack() {
-  return (
-    <ClinicFinderStackNav.Navigator screenOptions={{ headerShown: false }}>
-      <ClinicFinderStackNav.Screen
-        name="ClinicFinderMain"
-        component={ClinicFinderScreen}
-        // options={{ title: 'Clinic Finder' }} // Header is not shown
-      />
-    </ClinicFinderStackNav.Navigator>
-  );
-}
-
-function AboutUsStack() {
-  return (
-    <AboutUsStackNav.Navigator screenOptions={{ headerShown: false }}>
-      <AboutUsStackNav.Screen
-        name="AboutUsMain"
-        component={AboutUsScreen}
-        // options={{ title: 'About Us' }} // Header is not shown as screen has its own
-      />
-    </AboutUsStackNav.Navigator>
-  );
-}
-
-function AppointmentStack() {
-  return (
-    <AppointmentStackNav.Navigator>
-      <AppointmentStackNav.Screen name="ServiceBooking" component={ServiceBookingScreen} options={{ title: 'Book Service' }}/>
-      <AppointmentStackNav.Screen name="BookingScreen" component={BookingScreen} options={{ title: 'My Bookings Main' }} />
-      {/* Example: <AppointmentStackNav.Screen name="BookingDetail" component={BookingDetailScreen} /> */}
-    </AppointmentStackNav.Navigator>
-  );
-}
-
-// --- Drawer Navigator Definition --- Modified drawerStyle
-function MainAppDrawer() {
-  const drawerWidth = Dimensions.get('window').width * 0.85; // Changed from 0.75 to 0.85
-
-  return (
-    <Drawer.Navigator 
-      drawerContent={props => <CustomDrawerContent {...props} />}
-      screenOptions={{
-        drawerStyle: { // Add drawerStyle
-          backgroundColor: theme.colors.background, 
-          width: drawerWidth, 
-        },
-        headerStyle: { backgroundColor: theme.colors.primary },
-        headerTintColor: '#FFFFFF',
-        headerTitleStyle: { fontWeight: 'bold' },
-        drawerActiveTintColor: theme.colors.primary,
-        drawerInactiveTintColor: theme.colors.text,
-        drawerActiveBackgroundColor: theme.colors.primaryMuted,
-        drawerInactiveBackgroundColor: 'transparent',
-        drawerItemStyle: {
-           marginVertical: theme.spacing.xs,
-        },
-        drawerLabelStyle: { 
-          fontSize: 16, 
-          fontWeight: '500',
-        }
-      }}
-    >
-      <Drawer.Screen 
-        name="Dashboard" 
-        component={DashboardScreen} 
-        options={{ 
-          title: 'Dashboard',
-          drawerIcon: ({ color, size }) => <Ionicons name="home-outline" color={color} size={size} />
-        }} 
-      />
-      <Drawer.Screen 
-        name="My Bookings" 
-        component={AppointmentStack} // Using AppointmentStack here
-        options={{ 
-          title: 'Appointments',
-          drawerIcon: ({ color, size }) => <Ionicons name="calendar-outline" color={color} size={size} />
-        }} 
-      />
-      <Drawer.Screen 
-        name="My Records" 
-        component={MyRecordsScreen} 
-        options={{ 
-          title: 'Records',
-          drawerIcon: ({ color, size }) => <Ionicons name="folder-open-outline" color={color} size={size} />
-        }} 
-      />
-       <Drawer.Screen 
-        name="Make Appointment" // This could also directly be AppointmentStack if preferred
-        component={HealthServicesScreen} 
-        options={{ 
-          title: 'Book a Service',
-          drawerIcon: ({ color, size }) => <Ionicons name="medkit-outline" color={color} size={size} />
-        }} 
-      />
-      <Drawer.Screen 
-        name="Health Buddy" 
-        component={HealthBuddyStack} 
-        options={{ 
-          title: 'Health Buddy',
-          drawerIcon: ({ color, size }) => <Ionicons name="chatbubbles-outline" color={color} size={size} />
-        }} 
-      />
-      {/* Add My Profile screen for navigation, hide from default list */}
-      <Drawer.Screen
-        name="My Profile" // Must match the key in MainDrawerParamList and the navigate() call
-        component={MyProfileStack}
-        options={{
-          // This screen is navigated to by the custom DrawerItem,
-          // so hide it from the list generated by DrawerItemList.
-          drawerItemStyle: { display: 'none' },
-        }}
-      />
-      {/* ADDED: Clinic Finder Screen to Drawer */}
-      <Drawer.Screen 
-        name="Clinic Finder" 
-        component={ClinicFinderStack} 
-        options={{ 
-          title: 'Clinic Finder',
-          drawerIcon: ({ color, size }) => <Ionicons name="map-outline" color={color} size={size} />
-        }} 
-      />
-      {/* ADDED: About Us Screen to Drawer */}
-      <Drawer.Screen 
-        name="About Us" 
-        component={AboutUsStack} 
-        options={{ 
-          title: 'About Us',
-          drawerIcon: ({ color, size }) => <Ionicons name="information-circle-outline" color={color} size={size} />
-        }} 
-      />
-    </Drawer.Navigator>
-  );
-}
-
-// --- Auth Stack Navigator ---
-function AuthScreens() {
-  return (
-    <AuthStackNav.Navigator screenOptions={{ headerShown: false }}>
-       <AuthStackNav.Screen name="Login">
-         {(props) => <LoginScreen {...props} navigateToRegister={() => props.navigation.navigate('Register')} navigateToForgotPassword={() => props.navigation.navigate('ForgotPassword')} />}
-       </AuthStackNav.Screen>
-       <AuthStackNav.Screen name="Register">
-         {(props) => <RegisterScreen {...props} navigateToLogin={() => props.navigation.navigate('Login')} />}
-       </AuthStackNav.Screen>
-      <AuthStackNav.Screen name="ForgotPassword">
-        {(props) => <ForgotPasswordScreen {...props} navigateToLogin={() => props.navigation.navigate('Login')} />}
-      </AuthStackNav.Screen>
-    </AuthStackNav.Navigator>
-  );
+  // If user is not authenticated (session is null, user is null) OR has not completed onboarding:
+  // Show login or onboarding flow.
+  // Crucially, fonts must be loaded here.
+  if (fontsLoaded && (!session || !hasOnboarded)) {
+    if (hasOnboarded === false) { // Explicitly false means checked and not onboarded
+      const width = Dimensions.get('window').width;
+      return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
+          <Carousel
+            ref={onboardingCarouselRef}
+            loop={false}
+            width={width}
+            height={Dimensions.get('window').height}
+            data={onboardingScreens}
+            scrollAnimationDuration={500}
+            renderItem={({ item }) => (
+              <item.component 
+                onComplete={handleOnboardingComplete} 
+                onSkip={handleOnboardingComplete} 
+              />
+            )}
+            style={{ width: '100%' }}
+          />
+        </View>
+      );
+    } else { // hasOnboarded is null (still checking) or true (but no session, go to login)
+      // This case should ideally be covered by the loading state or RootAppNavigator's auth handling
+      // For safety, rendering RootAppNavigator which will redirect to Auth screens.
+      return (
+        <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+          <NavigationContainer theme={theme}>
+            <RootAppNavigator onProfileCreated={handleProfileCreated} />
+          </NavigationContainer>
+        </View>
+      );
+    }
+  }
+  
+  // Fallback / Default case - should ideally not be reached if logic above is exhaustive.
+  // Render only if fonts are loaded.
+  if (fontsLoaded) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        <NavigationContainer theme={theme}>
+          <RootAppNavigator onProfileCreated={handleProfileCreated} />
+        </NavigationContainer>
+      </View>
+    );
+  }
+  // If fonts are not loaded and there is no font error, CustomSplashScreen is already returned earlier.
+  // If there is a fontError, that is also handled earlier.
+  // This path should theoretically not be reached if the above logic is complete.
+  return null; 
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  loadingContainer: {
+  centeredError: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.background,
-    padding: theme.spacing.lg,
+    padding: 20,
   },
-  loadingText: {
-    marginTop: theme.spacing.md,
-    color: theme.colors.textMuted,
-    fontSize: theme.typography.body, // Slightly larger?
-  },
-  errorTitle: { // Style for error titles
-    fontSize: theme.typography.subheading,
+  errorText: {
+    fontSize: 18,
     fontWeight: 'bold',
-    color: theme.colors.destructive,
-    marginBottom: theme.spacing.sm,
-    textAlign: 'center',
+    color: 'red',
+    marginBottom: 10,
   },
-  errorText: { 
-    color: theme.colors.destructive,
+  errorDetails: {
+    fontSize: 14,
+    color: 'red',
     textAlign: 'center',
-    marginBottom: theme.spacing.md,
-  },
-  bottomDrawerSection: { // Renamed from logoutContainer
-    paddingBottom: theme.spacing.lg, // Add some padding at the very bottom
-    paddingHorizontal: theme.spacing.xs, // Align with item padding if needed
-    borderTopWidth: 1, // Add a separator line
-    borderTopColor: theme.colors.border,
   },
 });

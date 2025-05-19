@@ -1,103 +1,145 @@
-import Image from "next/image";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { HeartPulse, Stethoscope, Activity, Users } from 'lucide-react';
 
 export default function Home() {
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <>
+      {/* Hero Section */}
+      <section className="w-full py-4 md:py-10 lg:py-12 xl:py-16 bg-card border border-border rounded-lg">
+        <div className="container mx-auto px-4 md:px-6">
+          {/* Hero Text Content */}
+          <div className="grid gap-6 lg:grid-cols-1">
+            <div className="flex flex-col justify-center space-y-4">
+              <div className="space-y-2">
+                <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none font-space-grotesk text-primary">
+                  Personalized Medical Services for Better Health
+                </h1>
+                <p className="max-w-[600px] text-secondary md:text-xl font-inter">
+                  Accessible and inclusive healthcare. Find providers, schedule appointments, and manage your health with ease.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 min-[400px]:flex-row">
+                <Link href="/appointments" passHref>
+                  <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                    Schedule an Appointment
+                  </Button>
+                </Link>
+                {/* <Link href="/services" passHref>
+                  <Button size="lg" variant="outline">
+                    Learn More
+                  </Button>
+                </Link> */}
+              </div>
+            </div>
+          </div>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+          {/* Four Cards Section (Now inside Hero) */}
+          <div className="mt-8 md:mt-12 lg:mt-16"> {/* Container for cards with top margin */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card className="bg-background shadow-lg transition-transform duration-200 ease-in-out hover:scale-105">
+                <div className="h-32 bg-border flex items-center justify-center rounded-t-lg">
+                  <p className="text-sm text-muted-foreground">Image</p>
+                </div>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4">
+                  <CardTitle className="text-sm font-medium">
+                    Expert Care
+                  </CardTitle>
+                  <HeartPulse className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xs text-muted-foreground">
+                    Access top-tier medical professionals and services.
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="bg-background shadow-lg transition-transform duration-200 ease-in-out hover:scale-105">
+                <div className="h-32 bg-border flex items-center justify-center rounded-t-lg">
+                  <p className="text-sm text-muted-foreground">Image</p>
+                </div>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4">
+                  <CardTitle className="text-sm font-medium">
+                    Full Diagnostics
+                  </CardTitle>
+                  <Stethoscope className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xs text-muted-foreground">
+                    Comprehensive health check-ups and detailed reports.
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="bg-background shadow-lg transition-transform duration-200 ease-in-out hover:scale-105">
+                <div className="h-32 bg-border flex items-center justify-center rounded-t-lg">
+                  <p className="text-sm text-muted-foreground">Image</p>
+                </div>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4">
+                  <CardTitle className="text-sm font-medium">
+                    Wellness Tracking
+                  </CardTitle>
+                  <Activity className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xs text-muted-foreground">
+                    Monitor your health and progress with our tools.
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="bg-background shadow-lg transition-transform duration-200 ease-in-out hover:scale-105">
+                <div className="h-32 bg-border flex items-center justify-center rounded-t-lg">
+                  <p className="text-sm text-muted-foreground">Image</p>
+                </div>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4">
+                  <CardTitle className="text-sm font-medium">
+                    Community Support
+                  </CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xs text-muted-foreground">
+                    Connect with others and share your journey.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      </section>
+
+      {/* TODO: Add other sections from the inspiration image below */}
+      {/* For example: Partners/Community Section */}
+      <section className="w-full py-12 md:py-24 lg:py-32 bg-background">
+        <div className="container mx-auto px-4 md:px-6 text-center">
+          <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl font-space-grotesk mb-4">
+            Join Our Community
+          </h2>
+          <p className="text-muted-foreground md:text-lg font-inter mb-8">
+            Trusted by thousands for accessible and inclusive healthcare.
+          </p>
+          {/* Placeholder for logos */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-8 items-center">
+            <div className="bg-muted h-20 flex items-center justify-center rounded-lg text-muted-foreground font-inter">Logo 1</div>
+            <div className="bg-muted h-20 flex items-center justify-center rounded-lg text-muted-foreground font-inter">Logo 2</div>
+            <div className="bg-muted h-20 flex items-center justify-center rounded-lg text-muted-foreground font-inter">Logo 3</div>
+            <div className="bg-muted h-20 flex items-center justify-center rounded-lg text-muted-foreground font-inter">Logo 4</div>
+            <div className="bg-muted h-20 flex items-center justify-center rounded-lg text-muted-foreground font-inter">Logo 5</div>
+          </div>
+        </div>
+      </section>
+
+      {/* TODO: "What medical service we offer" Section */}
+      {/* TODO: "Optimize Your Workflow..." Section */}
+      {/* TODO: "Let's meet with expert doctors" Section */}
+      {/* TODO: Call to Action Section */}
+      {/* TODO: Stats/Metrics Section */}
+      {/* TODO: Testimonial Section */}
+
+    </>
   );
 }

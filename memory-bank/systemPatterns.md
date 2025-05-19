@@ -64,7 +64,8 @@ Rationale: Maximizes development speed by leveraging Supabase BaaS for common ne
 
 -   **`carepop-nativeapp/` (Expo/React Native for iOS & Android):**  
     *   Focus: Delivering a polished, performant, and intuitive native mobile experience. Utilizes device capabilities where beneficial via Expo SDK.  
-    *   Stack: React Native, Expo (Managed Workflow), TypeScript, React Navigation (Native Stack recommended).  
+    *   Stack: React Native, Expo (Managed Workflow), TypeScript, React Navigation.
+    *   Structure: \`App.tsx\` handles initialization (fonts, splash, context providers) and the onboarding UI flow. Core application navigation (stacks, drawers, conditional routing) is managed by \`src/navigation/AppNavigator.tsx\`.
     *   UI: Native components styled with React Native \`StyleSheet\`. Reusable UI components integrated directly into \`carepop-nativeapp/src/components/\` using a defined theme (\`carepop-nativeapp/src/theme/\`).  
     *   State Management: React Context API for simple/auth state; Zustand or Redux Toolkit considered for complex global state needs if they arise.  
     *   Data Fetching: Direct Supabase JS SDK calls for auth and simple RLS-protected reads. \`fetch\` or \`axios\` for calls to custom \`carepop-backend/\` Cloud Run APIs.
@@ -95,13 +96,14 @@ Principle: Enforce permissions at the lowest possible layer (database via RLS fi
 ## 5. Authentication Pattern: Direct Client-Supabase Auth + Trigger
 
 *   Flow:  
-    1.  Client Initiation: Frontend apps (\`nativeapp\` or \`web\`) use the Supabase JS SDK to call \`supabase.auth.signUp()\` or \`supabase.auth.signInWithPassword()\` (or OAuth methods).  
-    2.  Supabase Handles Auth: Supabase Auth service processes the request, verifies credentials/identity, handles email confirmations (if enabled), and creates an entry in the \`auth.users\` table.  
+    1.  Client Initiation: Frontend apps (`nativeapp` or `web`) use the Supabase JS SDK to call `supabase.auth.signUp()` or `supabase.auth.signInWithPassword()` (or OAuth methods).  
+    2.  Supabase Handles Auth: Supabase Auth service processes the request, verifies credentials/identity, handles email confirmations (if enabled), and creates an entry in the `auth.users` table.  
     3.  Supabase Returns Session: Supabase Auth returns a session object (including JWT access token and refresh token) directly to the client via the SDK.  
-    4.  Profile Trigger (Backend - Supabase): An \`AFTER INSERT\` trigger on the \`auth.users\` table executes the \`handle_new_user\` PostgreSQL function within Supabase.  
-    5.  Profile Creation (Backend - Supabase): The \`handle_new_user\` function inserts a new row into the \`public.profiles\` table, linking it to the new user ID (\`NEW.id\`) and copying necessary initial data (like \`NEW.email\`).  
-    6.  Client Session Management: The client securely stores/manages the received session using SDK helpers and secure storage mechanisms (SEC-FE-1), attaching the access token to subsequent authenticated requests (either direct Supabase data calls or calls to the Cloud Run backend APIs).  
-*   Rationale: Simplifies the core authentication flow, reduces latency, leverages Supabase's core strengths, and removes the need for specific backend auth endpoint wrappers for simple cases. Profile creation remains automated.
+    4.  Profile Trigger (Backend - Supabase): An `AFTER INSERT` trigger (`on_auth_user_created`) on the `auth.users` table executes the `public.handle_new_user()` PostgreSQL function within Supabase. This trigger is defined in the migration file `carepop-backend/supabase/migrations/20240815120000_create_handle_new_user_trigger.sql`.  
+    5.  **Initial Profile Stub Creation (Backend - Supabase):** The `public.handle_new_user()` function inserts a new, basic row (a "stub") into the `public.profiles` table, linking it to the new user ID (`NEW.id`) and copying necessary initial non-sensitive data (like `NEW.email`).  
+    6.  Client Session Management: The client securely stores/manages the received session using SDK helpers and secure storage mechanisms (SEC-FE-1), attaching the access token to subsequent authenticated requests (either direct Supabase data calls or calls to the Cloud Run backend APIs).
+    7.  **Detailed Profile Completion & Encryption (Client + Backend API):** After initial signup and login, the client application prompts the user to provide additional profile details. For fields requiring Application-Level Encryption (ALE), such as certain sensitive PII, these details are sent to a dedicated backend API (e.g., `updateUserProfileService`). The backend service then encrypts these fields using the `EncryptionService` before saving them to the `public.profiles` table.  
+*   Rationale: Simplifies the core authentication flow, leverages Supabase's core strengths for initial user creation and profile stubbing. The subsequent client-driven call to a backend API for sensitive fields ensures these fields are properly encrypted using the centralized `EncryptionService` before database persistence. Profile creation remains automated for basic details, with enhanced security for sensitive data.
 
 ## 6. Security Architecture Pattern: Defense-in-Depth
 
@@ -152,6 +154,21 @@ Backend services hosted on Cloud Run will expose RESTful APIs designed to be con
 -   UI Components: Independent per platform (\`carepop-nativeapp/src/components\` vs. \`carepop-web/src/components\`). No direct code sharing.  
 -   Types/Interfaces/Utilities: Currently independent per project. If significant overlap arises, consider creating a dedicated \`packages/shared-types\` or \`packages/shared-utils\` directory at the root, potentially managed with pnpm workspaces *only if* the overhead is justified. For now, maintain separation.  
 -   Configuration: Each project manages its own ESLint, Prettier, TypeScript config.
+
+### User Profile Management
+
+-   **Data Storage**: User profile data is stored in the Supabase `profiles` table, linked to `auth.users` via `user_id`.
+-   **Initial Profile Creation (Trigger)**: A Supabase database trigger (`on_auth_user_created` executing `public.handle_new_user()`, defined in migration `20240815120000_create_handle_new_user_trigger.sql`) automatically creates a basic profile entry (stub with non-sensitive data like email) when a new user signs up via Supabase Auth.
+-   **Detailed Profile Completion & Encryption (Client + Backend API)**: After initial signup, users are typically routed to a `CreateProfileScreen` (or similar flow) to fill in more detailed information. Data for fields requiring Application-Level Encryption (e.g., `genderIdentity`, `pronouns`, `assignedSexAtBirth`, `philhealth_no`, etc.) is sent to the backend (`updateUserProfileService`), which encrypts these fields before saving them.
+-   **Profile Updates (Backend API)**: For authenticated users, profile updates (text-based fields) are handled via a dedicated backend API (`PATCH /api/users/profile` in `carepop-backend`). This API uses `authMiddleware` for authentication and `profileService` to interact with the Supabase database. Fields requiring encryption are encrypted by the service before saving.
+    -   The backend API, upon successful update, returns the complete updated profile object (with sensitive fields decrypted). This response object wraps the profile data within a `data` key (e.g., `{"data": {...profile_object...}, "message": "..."}`). Frontend consumers must access `responseData.data` to get the actual profile entity.
+-   **Profile Viewing (Backend API Recommended for Decryption)**: Profile data is displayed on screens like `MyProfileScreen`. To ensure sensitive fields are decrypted, fetching profile data should ideally go through a backend service (like `getUserProfileService`) that handles decryption. If direct client-Supabase reads are used for non-sensitive parts, a separate call to a backend decryption service might be needed for sensitive fields, or sensitive fields might not be displayed directly without this step.
+-   **Client-Side Updates (Legacy/Specific Cases)**: Certain non-text updates (like avatar uploads, previously) might be handled directly by the client interacting with Supabase services (e.g., Storage), followed by an update to the `profiles` table (either via backend or client-side call if RLS allows).
+
+### Native Mobile App (`carepop-mobile`)
+
+-   **Navigation**: Managed by `react-navigation`. Core navigation logic is centralized in `src/navigation/AppNavigator.tsx`. This includes a `RootStack.Navigator` that handles the top-level flow (Loading, Auth, CreateProfile, Main App Drawer).
+    -   The `RootStack.Navigator` checks `!session` first. If a session exists, it then checks `!profile || !profile.first_name` (note: `first_name` is snake_case, matching the `Profile` interface from `supabase.ts`) to determine if the user needs to complete their profile via `CreateProfileScreen` or can proceed to the `MainAppDrawer`.
 ```
 
 **END OF FILE: systemPatterns.md (Final Version)**

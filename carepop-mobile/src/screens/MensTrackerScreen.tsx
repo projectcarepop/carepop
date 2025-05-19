@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, Alert, TouchableOpacity } from 'react-native';
 import { theme } from '../components';
 import { Card, Button } from '../components'; // Import Card and Button
-import { MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 
 // Placeholder screen for Menstrual Cycle Tracking
 export function MensTrackerScreen({ navigation }: any) {

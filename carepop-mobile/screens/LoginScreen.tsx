@@ -1,181 +1,177 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Image } from 'react-native';
 import { Button, TextInput, Card, theme } from '../src/components';
-// import * as SecureStore from 'expo-secure-store'; // No longer needed here
-import { useAuth } from '../src/context/AuthContext'; // Import useAuth to access authError and clearAuthError
-import { supabase } from '../src/utils/supabase'; // Import supabase client
-// import Constants from 'expo-constants'; // Import Constants - Removed as BASE_API_URL is commented out
-import * as WebBrowser from 'expo-web-browser'; // Import expo-web-browser
-import * as AuthSession from 'expo-auth-session'; // Import AuthSession
-import { Ionicons } from '@expo/vector-icons'; // Ensure Ionicons is imported
-// import * as AuthSession from 'expo-auth-session'; // Removed as it was only for the temporary log
-
-// Get base backend URL from app.json extra
-// const BASE_API_URL = Constants.expoConfig?.extra?.apiUrl;
-// if (!BASE_API_URL) {
-//   console.error("ERROR: Missing API URL in app.json extra section!");
-// }
-
-// const AUTH_TOKEN_KEY = 'authToken'; // No longer needed here
+import { useAuth } from '../src/context/AuthContext';
+import { supabase } from '../src/utils/supabase';
+import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { AuthStackParamList } from '../src/navigation/AppNavigator'; // Corrected path
 
 /**
  * Props for the LoginScreen component.
+ * No longer needs navigation props.
  */
 interface LoginScreenProps {
-  /** Function to navigate to the registration screen. */
-  navigateToRegister: () => void;
-  /** Function to navigate to the forgot password screen. */
-  navigateToForgotPassword: () => void;
-  // Add a prop or context function to update auth state if needed
-  // onLoginSuccess: (token: string) => void;
+  // navigateToRegister: () => void; // Removed
+  // navigateToForgotPassword: () => void; // Removed
 }
+
+// Define navigation prop type
+type LoginScreenNavigationProp = NativeStackNavigationProp<
+  AuthStackParamList,
+  'Login' // This screen's name in the stack
+>;
 
 /**
  * LoginScreen component provides UI for user authentication via email/password and Google OAuth.
- * It handles form input, validation, and communication with Supabase for authentication.
+ * It interacts with AuthContext for authentication operations and state management.
  */
-export const LoginScreen: React.FC<LoginScreenProps> = ({
-  navigateToRegister,
-  navigateToForgotPassword,
-  // onLoginSuccess, // Example
-}) => {
-  // Removed the temporary useEffect hook for logging
+export const LoginScreen: React.FC<LoginScreenProps> = () => {
+  // Removed props: { navigateToRegister, navigateToForgotPassword }
+  const navigation = useNavigation<LoginScreenNavigationProp>(); // Get navigation object
 
-  const { authError, clearAuthError } = useAuth(); // Access error state from AuthContext
+  // Use AuthContext for auth operations, global loading, and error state
+  const { signInWithPassword, isLoading: isAuthLoading, authError, clearAuthError } = useAuth();
+
+  // Local state for form inputs and local validation errors
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null); // For form validation errors
+  const [localLoading, setLocalLoading] = useState(false); // For controlling local UI elements like button disable
   const [isPasswordVisible, setIsPasswordVisible] = useState(false); // State for password visibility
+
+  // Effect to clear local error when global auth error changes (or is cleared)
+  useEffect(() => {
+    if (authError) {
+      setLocalError(null); // Let the global error display
+    } 
+  }, [authError]);
 
   /**
    * Validates the login form inputs (email and password).
+   * Sets local error state if validation fails.
    * @returns {boolean} True if the form is valid, false otherwise.
    */
   const validateForm = (): boolean => {
+    if (authError) clearAuthError(); // Clear previous global auth error on new attempt
+    setLocalError(null); // Clear previous local error
+    
     if (!email || !password) {
-      setError('Email and password are required.');
+      setLocalError('Email and password are required.');
       return false;
     }
      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { // Stricter email validation
-        setError('Please enter a valid email address.');
+        setLocalError('Please enter a valid email address.');
         return false;
     }
-    setError(null); // Clear previous error
-    if (authError) clearAuthError(); // Clear global auth error if starting a new attempt
     return true;
   };
 
   /**
    * Handles the email and password login process.
-   * Validates input, calls Supabase signInWithPassword, and manages loading/error states.
+   * Validates input, calls signInWithPassword from AuthContext, and manages local loading state.
+   * Relies on AuthContext to handle global loading, errors, and navigation on success.
    */
   const handleEmailLogin = async () => {
     if (!validateForm()) {
       return;
     }
-    setLoading(true);
-    setError(null);
-    try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: password,
-      });
+    setLocalLoading(true);
+    // clearAuthError() was called in validateForm
+    // setLocalError(null) was called in validateForm
 
-      if (signInError) {
-        console.error('[LoginScreen] Supabase sign-in error:', signInError.message);
-        setError(signInError.message || 'Failed to log in. Please check your credentials.');
-      } else {
-        console.log('[LoginScreen] Supabase sign-in successful. AuthContext will handle navigation.');
-        // Navigation will be handled by onAuthStateChange in AuthContext
-      }
-    } catch (catchError: any) {
-      console.error('[LoginScreen] Unexpected error during sign-in:', catchError);
-      setError(catchError.message || 'An unexpected error occurred. Please try again.');
-    }
-    setLoading(false);
+    // console.log('[LoginScreen] Calling signInWithPassword from AuthContext...');
+    await signInWithPassword({ email, password });
+    // AuthContext will set its isLoading state during the async operation.
+    // AuthContext will set its authError state if the operation fails.
+    // AuthContext's onAuthStateChange listener will handle navigation on success.
+    setLocalLoading(false); // Reset local loading once the async call is initiated/returned
+                          // AuthContext.isLoading will reflect the true auth operation status.
   };
 
   /**
    * Handles the Google OAuth login process.
-   * Uses Supabase signInWithOAuth and WebBrowser to open the Google authentication flow.
-   * Relies on a custom URL scheme ('carepop') for redirecting back to the app.
+   * Uses Supabase client from AuthContext for signInWithOAuth.
+   * Relies on AuthContext for state updates and error handling post-redirect.
    */
   const handleGoogleLogin = async () => {
-    setLoading(true);
-    setError(null);
+    setLocalLoading(true);
+    setLocalError(null);
     if (authError) clearAuthError(); 
-    console.log('[LoginScreen] Attempting Google login (using custom scheme)...');
+    // console.log('[LoginScreen] Attempting Google login (using custom scheme)...');
+
+    // Need Supabase client instance for OAuth call
+    if (!supabase) {
+        setLocalError("Authentication service is not available.");
+        setLocalLoading(false);
+        return;
+    }
 
     try {
       const redirectUri = AuthSession.makeRedirectUri({
-        scheme: 'carepop', // Defined in app.json's expo.scheme
-        // path: 'auth/callback' // Optional: if your callback handling requires a specific path
+        scheme: 'carepop', // Ensure this matches app.json
       });
-      console.log('[LoginScreen] Using custom scheme Redirect URI for Google OAuth:', redirectUri);
+      // console.log('[LoginScreen] Using custom scheme Redirect URI for Google OAuth:', redirectUri);
 
       const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUri,
-          //queryParams: { access_type: 'offline', prompt: 'consent' }, // Optional: if needed for refresh tokens or specific Google behavior
         },
       });
 
-      console.log('[LoginScreen] supabase.auth.signInWithOAuth response:', { dataUrl: data?.url, oauthErrorMessage: oauthError?.message || null });
+      // console.log('[LoginScreen] supabase.auth.signInWithOAuth response:', { dataUrl: data?.url, oauthErrorMessage: oauthError?.message || null });
 
       if (oauthError) {
         console.error('[LoginScreen] Google sign-in initiation error from Supabase:', oauthError.message);
-        setError(oauthError.message || 'Failed to initiate Google Sign-In with Supabase.');
-        setLoading(false);
+        // Let AuthContext handle setting the error, just update local state
+        setLocalError(oauthError.message || 'Failed to initiate Google Sign-In.'); 
+        setLocalLoading(false);
         return;
       }
 
       if (data?.url) {
-        console.log('[LoginScreen] Google sign-in initiated. Opening auth session with URL:', data.url);
-        // WebBrowser.openAuthSessionAsync opens the Google sign-in page.
-        // After successful authentication with Google, Google redirects to the Supabase callback URL.
-        // Supabase then processes this and redirects back to the `redirectUri` (our custom scheme `carepop://`).
-        // The Expo app, listening for this custom scheme, will receive the URL containing session info in the fragment (#access_token=...).
-        // The Supabase client (configured with a Linking adapter or similar) automatically handles this incoming URL
-        // to establish the session. The onAuthStateChange logic within the AuthContext will then process this new session.
+        // console.log('[LoginScreen] Google sign-in initiated. Opening auth session with URL:', data.url);
         const authSessionResult = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
-        console.log('[LoginScreen] WebBrowser.openAuthSessionAsync result (custom scheme flow):', authSessionResult);
+        // console.log('[LoginScreen] WebBrowser.openAuthSessionAsync result (custom scheme flow):', authSessionResult);
 
         if (authSessionResult.type === 'success') {
-          console.log('[LoginScreen] WebBrowser.openAuthSessionAsync success. URL:', authSessionResult.url);
-          // At this point, the app should have received the redirect via the custom scheme.
-          // The Supabase client is expected to handle the URL fragment and establish the session.
-          // No explicit token handling is needed here. AuthContext will reflect the new state.
-          // setLoading will be managed by AuthContext's isLoading once the session is processed or if an error occurs during that phase.
+          // console.log('[LoginScreen] WebBrowser.openAuthSessionAsync success. URL:', authSessionResult.url);
+          // Session will be handled by Supabase client and AuthContext's onAuthStateChange.
+          // isAuthLoading from context will manage the loading state during this phase.
         } else if (authSessionResult.type === 'cancel' || authSessionResult.type === 'dismiss') {
-          console.log('[LoginScreen] User cancelled or dismissed Google Sign-In session via WebBrowser.');
-          setError('Google Sign-In was cancelled by the user.');
-          setLoading(false); 
+          // console.log('[LoginScreen] User cancelled or dismissed Google Sign-In session via WebBrowser.');
+          setLocalError('Google Sign-In was cancelled.');
+          setLocalLoading(false); 
         } else {
-          // This case includes authSessionResult.type === 'error' or any other unexpected type.
-          console.log('[LoginScreen] WebBrowser.openAuthSessionAsync returned type:', authSessionResult.type, 'with details (if any):', authSessionResult);
-          setError('Google Sign-In did not complete as expected. Please try again.');
-          setLoading(false); 
+          // console.log('[LoginScreen] WebBrowser.openAuthSessionAsync returned type:', authSessionResult.type);
+          setLocalError('Google Sign-In failed or was interrupted.');
+          setLocalLoading(false); 
         }
       } else {
         console.error('[LoginScreen] Google sign-in initiated but no URL returned from Supabase.');
-        setError('Failed to get the Google Sign-In URL from Supabase.');
-        setLoading(false);
+        setLocalError('Could not get the Google Sign-In URL.');
+        setLocalLoading(false);
       }
-      // setLoading(false) is intentionally not set here for the success path of openAuthSessionAsync,
-      // as the AuthContext's isLoading state will take over once the deep link is processed and session established (or fails to establish).
-      // For explicit cancel/error from WebBrowser, setLoading(false) is called above.
     } catch (catchError: any) {
       console.error('[LoginScreen] Unexpected error during Google sign-in process (custom scheme):', catchError);
-      let errorMessage = 'An unexpected error occurred during Google sign-in.';
-      if (catchError.message) {
-        errorMessage += ` Details: ${catchError.message}`;
+      setLocalError(catchError.message || 'An unexpected error occurred during Google sign-in.');
+      setLocalLoading(false);
+    } finally {
+      // Ensure local loading is false if not handled by specific paths above
+      // However, for the success path, we rely on isAuthLoading from context.
+      // This might need refinement depending on desired UX.
+      if (localLoading && !isAuthLoading) { // Only set if locally loading but context isn't
+         // setLocalLoading(false); // Re-evaluating if this finally block is best place
       }
-      setError(errorMessage);
-      setLoading(false); // Ensure loading is reset on unexpected errors
     }
   };
+
+  // Combine local loading state with global auth loading state for disabling UI
+  const combinedLoading = localLoading || isAuthLoading;
 
   return (
     <KeyboardAvoidingView
@@ -194,9 +190,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         <Card style={styles.card}>
           <Text style={styles.title}>Log In</Text>
           
-          {error && (
+          {/* Display local validation error OR global auth error */}         
+          {(localError || authError) && (
             <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{error}</Text>
+              <Text style={styles.errorText}>{localError || authError?.message || 'An error occurred'}</Text>
             </View>
           )}
 
@@ -208,7 +205,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             keyboardType="email-address"
             autoCapitalize="none"
             containerStyle={styles.input}
-            editable={!loading}
+            editable={!combinedLoading} // Use combined loading state
             placeholderTextColor={theme.colors.textMuted}
           />
 
@@ -219,7 +216,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             placeholder="Enter your password"
             secureTextEntry={!isPasswordVisible}
             containerStyle={styles.input}
-            editable={!loading}
+            editable={!combinedLoading} // Use combined loading state
             placeholderTextColor={theme.colors.textMuted}
             trailingIcon={
               <Ionicons 
@@ -233,7 +230,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
           <TouchableOpacity 
             style={styles.forgotPasswordContainer}
-            onPress={navigateToForgotPassword}
+            onPress={() => navigation.navigate('ForgotPassword')}
+            disabled={combinedLoading} // Use combined loading state
           >
             <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
           </TouchableOpacity>
@@ -242,9 +240,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             title="Log In"
             variant="primary"
             onPress={handleEmailLogin}
-            isLoading={loading}
+            isLoading={combinedLoading} // Use combined loading state
             style={styles.loginButton}
-            disabled={loading}
+            disabled={combinedLoading} // Use combined loading state
           />
 
           <View style={styles.orContainer}>
@@ -258,15 +256,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             variant="secondary"
             styleType="outline"
             onPress={handleGoogleLogin}
-            isLoading={loading}
+            isLoading={combinedLoading} // Use combined loading state
             style={styles.googleButton}
-            disabled={loading}
+            disabled={combinedLoading} // Use combined loading state
             icon={<Ionicons name="logo-google" size={20} color={theme.colors.secondary} />}
           />
 
           <View style={styles.registerContainer}>
             <Text style={styles.registerPromptText}>Don&apos;t have an account? </Text>
-            <TouchableOpacity onPress={navigateToRegister} disabled={loading}>
+            <TouchableOpacity onPress={() => navigation.navigate('Register')} disabled={combinedLoading}>
               <Text style={styles.registerLink}>Sign Up</Text>
             </TouchableOpacity>
           </View>
@@ -344,10 +342,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   registerPromptText: {
-    color: theme.colors.secondary,
-    fontSize: theme.typography.caption,
-  },
-  registerText: {
     color: theme.colors.secondary,
     fontSize: theme.typography.caption,
   },

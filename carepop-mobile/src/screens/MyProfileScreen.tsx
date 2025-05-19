@@ -4,7 +4,9 @@ import { theme, Card, Button } from '../components'; // Assuming theme is also e
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext'; // Import useAuth
 import type { Profile } from '../utils/supabase'; // Import the updated Profile type directly
-import type { NavigationProp } from '@react-navigation/native'; // For navigation prop typing
+import { useNavigation } from '@react-navigation/native'; // Import useNavigation
+import { NativeStackNavigationProp } from '@react-navigation/native-stack'; // Import navigation prop type
+import { MyProfileStackParamList } from '../navigation/AppNavigator'; // Corrected Import Path to AppNavigator
 
 // Data for address pickers - temporary until we decide how to display full names
 import provinceJson from '../data/province.json';
@@ -46,14 +48,7 @@ const provinceData: Province[] = provinceJson as Province[];
 const cityData: CityMunicipality[] = cityJson as CityMunicipality[];
 const barangayData: Barangay[] = barangayJson as Barangay[];
 
-/**
- * Props for the MyProfileScreen component.
- */
-interface MyProfileScreenProps {
-  /** React Navigation prop for navigating to other screens. */
-  navigation: NavigationProp<any>; // Use a more specific type if your route params are defined
-}
-
+// Re-add calculateAge function
 /**
  * Calculates age based on a date of birth string.
  * @param {string | null | undefined} dob - The date of birth string (e.g., "YYYY-MM-DD").
@@ -73,6 +68,7 @@ const calculateAge = (dob: string | null | undefined): number | string => {
   return age >= 0 ? age : "N/A";
 };
 
+// Re-add getAddressPartName function
 /**
  * Helper to get the display name for a selected code from a list.
  */
@@ -82,22 +78,24 @@ const getAddressPartName = (
     codeKey: string,
     nameKey: string
 ): string => {
-    if (!code) return 'N/A';
+    if (!code) return '-'; // Return dash instead of N/A for missing parts
     const item = list.find(i => i[codeKey] === code);
     return item?.[nameKey] || code; // Return code if name not found for robustness
 };
 
 /**
- * MyProfileScreen displays the authenticated user's profile information.
+ * @description Screen to display the user's profile information.
  * It fetches data from AuthContext and provides navigation to edit the profile.
  */
-export function MyProfileScreen({ navigation }: MyProfileScreenProps) {
-  const { profile, isLoading, authError, session } = useAuth();
+export function MyProfileScreen() {
+  const { profile, isLoading, authError, session, signOut } = useAuth();
   const [isPhilHealthVisible, setIsPhilHealthVisible] = useState(false);
+  // Use the useNavigation hook with the specific stack param list and screen name
+  const navigation = useNavigation<NativeStackNavigationProp<MyProfileStackParamList, 'MyProfileMain'>>();
 
   const navigateToEditProfile = () => {
-    // TODO: Confirm 'EditProfileScreen' is the correct route name in MyProfileStackNav
-    navigation.navigate('EditProfile'); 
+    console.log('[MyProfileScreen] Navigating to EditProfile...');
+    navigation.navigate('EditProfile'); // Use the navigation object from the hook
   };
 
   if (isLoading) {
@@ -130,31 +128,25 @@ export function MyProfileScreen({ navigation }: MyProfileScreenProps) {
     );
   }
 
+  // Calculate display values using helpers
+  const displayAge = calculateAge(profile.date_of_birth);
+  const displayBarangay = getAddressPartName(profile.barangay_code, barangayData, 'brgy_code', 'brgy_name');
+  const displayCity = getAddressPartName(profile.city_municipality_code, cityData, 'city_code', 'city_name');
+  const displayProvince = getAddressPartName(profile.province_code, provinceData, 'province_code', 'province_name');
+
   // Format date of birth for display
   const formattedDob = profile.date_of_birth ? new Date(profile.date_of_birth).toLocaleDateString() : 'N/A';
-  const age = calculateAge(profile.date_of_birth);
 
   // Construct full address (basic example)
-  const provinceName = getAddressPartName(profile.province_code, provinceData, 'province_code', 'province_name');
-  const cityName = getAddressPartName(profile.city_municipality_code, cityData, 'city_code', 'city_name');
-  const barangayName = getAddressPartName(profile.barangay_code, barangayData, 'brgy_code', 'brgy_name');
-  
   const fullAddress = [
     profile.street,
-    barangayName !== profile.barangay_code ? barangayName : null, // Show name if resolved, otherwise it might be shown by code if not found
-    cityName !== profile.city_municipality_code ? cityName : null,
-    provinceName !== profile.province_code ? provinceName : null,
+    displayBarangay !== profile.barangay_code ? displayBarangay : null, // Show name if resolved, otherwise it might be shown by code if not found
+    displayCity !== profile.city_municipality_code ? displayCity : null,
+    displayProvince !== profile.province_code ? displayProvince : null,
   ].filter(Boolean).join(', ') || 'N/A';
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={theme.colors.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Profile</Text>
-        <View style={{ width: 24 }} /> {/* Spacer for centering title */}
-      </View>
 
       <ScrollView style={styles.container}>
         <View style={styles.profileHeaderContainer}>
@@ -172,8 +164,12 @@ export function MyProfileScreen({ navigation }: MyProfileScreenProps) {
 
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Personal Information</Text>
-          <InfoRow label="Age:" value={age.toString()} />
+          <InfoRow label="Age:" value={displayAge.toString()} />
           <InfoRow label="Date of Birth:" value={formattedDob} />
+          <InfoRow label="Middle Initial:" value={profile.middle_initial || 'N/A'} />
+          <InfoRow label="Gender Identity:" value={profile.gender_identity || 'N/A'} />
+          <InfoRow label="Pronouns:" value={profile.pronouns || 'N/A'} />
+          <InfoRow label="Assigned Sex at Birth:" value={profile.assigned_sex_at_birth || 'N/A'} />
           <InfoRow label="Civil Status:" value={profile.civil_status || 'N/A'} />
           <InfoRow label="Religion:" value={profile.religion || 'N/A'} />
           <InfoRow label="Occupation:" value={profile.occupation || 'N/A'} />
@@ -190,9 +186,9 @@ export function MyProfileScreen({ navigation }: MyProfileScreenProps) {
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Address</Text>
           <InfoRow label="Street:" value={profile.street || 'N/A'} />
-          <InfoRow label="Barangay:" value={barangayName} />
-          <InfoRow label="City/Municipality:" value={cityName} />
-          <InfoRow label="Province:" value={provinceName} />
+          <InfoRow label="Barangay:" value={displayBarangay} />
+          <InfoRow label="City/Municipality:" value={displayCity} />
+          <InfoRow label="Province:" value={displayProvince} />
         </View>
         
         <View style={styles.sectionContainer}>
@@ -258,29 +254,22 @@ const styles = StyleSheet.create({
   },
   profileHeaderContainer: {
     alignItems: 'center',
-    paddingVertical: theme.spacing.xl, // More vertical padding
-    paddingHorizontal: theme.spacing.lg,
-    // borderBottomWidth: 1, // Remove border for seamless look?
-    // borderBottomColor: theme.colors.border,
-    marginBottom: theme.spacing.lg, // Space before first section
-    backgroundColor: theme.colors.card, // Keep card background for header?
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.md,
+    backgroundColor: theme.colors.card, // Or another suitable background
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    marginBottom: theme.spacing.md,
   },
-  avatarContainer: { // Container for avatar or icon
+  avatar: { // Style for the avatar image
     width: 100,
     height: 100,
-    borderRadius: 50,
-    backgroundColor: theme.colors.border, // Background for the icon container
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderRadius: 50, // Makes it circular
     marginBottom: theme.spacing.md,
-    overflow: 'hidden', // Ensure image stays rounded
-  },
-  profileImage: { // Style for actual image
-    width: '100%',
-    height: '100%',
+    backgroundColor: theme.colors.border, // Placeholder background color
   },
   profileName: {
-    fontSize: theme.typography.heading, // Keep heading size
+    fontSize: theme.typography.heading, // Corrected: Use heading instead of h2
     fontWeight: 'bold',
     color: theme.colors.text, // Use default text color
     marginBottom: theme.spacing.xs,

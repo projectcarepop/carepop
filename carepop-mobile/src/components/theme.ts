@@ -24,6 +24,7 @@ const colors = {
   disabledBackground: '#E9ECEF', // Background for disabled interactive elements
   success: '#198754', // Color for success states/messages
   warning: '#FFC107', // Color for warning states/messages
+  notification: '#ff4d6d', // Added to conform to NavigationTheme
 };
 
 /**
@@ -65,12 +66,34 @@ const typography = {
   fontFamilyBold: 'SpaceGrotesk_700Bold',    // UPDATED
 };
 
+// Type for fontWeight to satisfy React Navigation Theme
+type FontWeight = 'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900';
+
 /**
  * The combined theme object containing colors, spacing, border radius, and typography constants.
  * Used throughout the application for consistent styling.
  */
 export const theme = {
+  dark: false, // Added to conform to NavigationTheme
   colors,
+  fonts: { // ADDED to conform to NavigationTheme
+    regular: {
+      fontFamily: typography.fontFamily, // SpaceGrotesk_400Regular
+      fontWeight: '400' as FontWeight, 
+    },
+    medium: {
+      fontFamily: typography.fontFamily, // Fallback to regular or use bold if medium isn't loaded
+      fontWeight: '500' as FontWeight, 
+    },
+    bold: {
+      fontFamily: typography.fontFamilyBold, // SpaceGrotesk_700Bold
+      fontWeight: '700' as FontWeight, 
+    },
+    heavy: {
+      fontFamily: typography.fontFamilyBold, // Fallback to bold if heavy isn't loaded
+      fontWeight: '800' as FontWeight, 
+    },
+  },
   spacing,
   borderRadius,
   typography,

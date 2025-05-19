@@ -3,22 +3,30 @@ import { StyleSheet, View, Text, TouchableOpacity, ScrollView, KeyboardAvoidingV
 import { Button, TextInput, Card, theme } from '../src/components';
 import { supabase } from '../src/utils/supabase';
 import { useAuth } from '../src/context/AuthContext';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { AuthStackParamList } from '../src/navigation/AppNavigator';
+import { Ionicons } from '@expo/vector-icons';
 
 /**
  * Props for the ForgotPasswordScreen component.
  */
 interface ForgotPasswordScreenProps {
-  /** Function to navigate back to the login screen. */
-  navigateToLogin: () => void;
+  // navigateToLogin: () => void; // Removed
 }
+
+// Define navigation prop type
+type ForgotPasswordScreenNavigationProp = NativeStackNavigationProp<
+  AuthStackParamList,
+  'ForgotPassword' // This screen's name in the stack
+>;
 
 /**
  * ForgotPasswordScreen component provides UI for users to request a password reset link.
  * It collects the user's email and uses Supabase to send reset instructions.
  */
-export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({
-  navigateToLogin,
-}) => {
+export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = () => {
+  const navigation = useNavigation<ForgotPasswordScreenNavigationProp>(); // Get navigation object
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -126,10 +134,12 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({
           />
 
           <TouchableOpacity 
-            style={styles.backToLoginContainer}
-            onPress={navigateToLogin}
+            style={styles.backButton}
+            onPress={() => navigation.navigate('Login')} 
+            disabled={loading}
           >
-            <Text style={styles.backToLoginText}>Back to Login</Text>
+            <Ionicons name="arrow-back-outline" size={20} color={loading ? theme.colors.textMuted : theme.colors.primary} />
+            <Text style={[styles.backButtonText, loading && styles.disabledText]}>Back to Login</Text>
           </TouchableOpacity>
         </Card>
       </ScrollView>
@@ -183,13 +193,17 @@ const styles = StyleSheet.create({
   resetButton: {
     marginBottom: theme.spacing.lg,
   },
-  backToLoginContainer: {
+  backButton: {
     alignItems: 'center',
+    padding: theme.spacing.md,
   },
-  backToLoginText: {
-    color: theme.colors.secondary,
+  backButtonText: {
+    color: theme.colors.primary,
     fontSize: theme.typography.button,
     fontWeight: 'bold',
+  },
+  disabledText: {
+    color: theme.colors.textMuted,
   },
   errorContainer: {
     backgroundColor: '#FFEBEE',

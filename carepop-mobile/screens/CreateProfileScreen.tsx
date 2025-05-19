@@ -1,10 +1,15 @@
-import React, { useState, useEffect, useReducer } from 'react';
-import { View, Text, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useReducer, useMemo, useCallback } from 'react';
+import { View, Text, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity, ActivityIndicator, SafeAreaView, Modal } from 'react-native';
 import { Button, TextInput, Card, theme } from '../src/components';
 import { supabase, Profile as SupabaseProfile } from '../src/utils/supabase'; // Renamed imported Profile
 // import { useAuth } from '../src/context/AuthContext'; // Not strictly needed here if we get user from supabase.auth.getUser()
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native'; // Added imports
+import { NativeStackNavigationProp } from '@react-navigation/native-stack'; // Added import
+import { RootStackParamList } from '../src/navigation/AppNavigator'; // Corrected path
+import { z } from 'zod'; // Import Zod
+import { Ionicons } from '@expo/vector-icons'; // Added Ionicons
 
 // Import local JSON data with explicit typing
 import provinceJson from '../src/data/province.json';
@@ -42,11 +47,14 @@ const barangayData: Barangay[] = barangayJson as Barangay[];
 
 /**
  * Props for the CreateProfileScreen component.
+ * No longer receives props directly, uses route.params.
  */
-interface CreateProfileScreenProps {
-  /** Callback function triggered after successful profile creation/update attempt. */
-  onProfileCreated: () => void;
-}
+// interface CreateProfileScreenProps {
+//   onProfileCreated: () => void;
+// }
+
+// Define route prop type
+type CreateProfileScreenRouteProp = RouteProp<RootStackParamList, 'CreateProfile'>;
 
 // --- State Management (useReducer) ---
 
@@ -59,6 +67,9 @@ interface ProfileFormData {
   lastName: string;
   dateOfBirth: Date | null;
   displayAge: string;
+  genderIdentity: string;
+  pronouns: string;
+  assignedSexAtBirth: string;
   civilStatus: string;
   religion: string;
   occupation: string;
@@ -78,7 +89,10 @@ type FormAction =
   | { type: 'SET_DATE'; value: Date | null }
   | { type: 'SET_PROVINCE'; value: string }
   | { type: 'SET_CITY'; value: string }
-  | { type: 'SET_BARANGAY'; value: string };
+  | { type: 'SET_BARANGAY'; value: string }
+  | { type: 'SET_GENDER_IDENTITY'; value: string }
+  | { type: 'SET_PRONOUNS'; value: string }
+  | { type: 'SET_ASSIGNED_SEX'; value: string };
 
 const initialState: ProfileFormData = {
   firstName: '',
@@ -86,6 +100,9 @@ const initialState: ProfileFormData = {
   lastName: '',
   dateOfBirth: null,
   displayAge: '',
+  genderIdentity: '',
+  pronouns: '',
+  assignedSexAtBirth: '',
   civilStatus: '',
   religion: '',
   occupation: '',
@@ -131,6 +148,12 @@ const formReducer = (state: ProfileFormData, action: FormAction): ProfileFormDat
       return { ...state, selectedCity: action.value, selectedBarangay: '' };
     case 'SET_BARANGAY':
       return { ...state, selectedBarangay: action.value };
+    case 'SET_GENDER_IDENTITY':
+      return { ...state, genderIdentity: action.value };
+    case 'SET_PRONOUNS':
+      return { ...state, pronouns: action.value };
+    case 'SET_ASSIGNED_SEX':
+      return { ...state, assignedSexAtBirth: action.value };
     default:
       return state;
   }
@@ -145,9 +168,13 @@ type FormErrors = Partial<Record<keyof ProfileFormData | 'general', string>>;
 /**
  * Screen component for users to create their initial profile after registration.
  */
-export const CreateProfileScreen: React.FC<CreateProfileScreenProps> = ({ onProfileCreated }) => {
+// export const CreateProfileScreen: React.FC<CreateProfileScreenProps> = ({ onProfileCreated }) => {
+export const CreateProfileScreen: React.FC = () => {
+  const route = useRoute<CreateProfileScreenRouteProp>(); // Get route object
+  const { onProfileCreated } = route.params; // Extract params
+
   const [state, dispatch] = useReducer(formReducer, initialState);
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // Renamed from 'loading' to avoid conflict if we use a more specific submitting state
   const [errors, setErrors] = useState<FormErrors | null>(null); // Store validation errors per field
 
   // State for controlling date/picker visibility (remains useState)
@@ -156,16 +183,18 @@ export const CreateProfileScreen: React.FC<CreateProfileScreenProps> = ({ onProf
   const [showProvincePicker, setShowProvincePicker] = useState(false);
   const [showCityPicker, setShowCityPicker] = useState(false);
   const [showBarangayPicker, setShowBarangayPicker] = useState(false);
+  const [showPronounsPicker, setShowPronounsPicker] = useState(false);
+  const [showAssignedSexPicker, setShowAssignedSexPicker] = useState(false);
 
   // Memoized lists for pickers based on selections
   const [provinces] = useState<Province[]>(provinceData); // Static list
 
-  const citiesMunicipalities = React.useMemo(() => {
+  const citiesMunicipalities = useMemo(() => {
     if (!state.selectedProvince) return [];
     return cityData.filter((city) => city.province_code === state.selectedProvince);
   }, [state.selectedProvince]);
 
-  const barangaysList = React.useMemo(() => {
+  const barangaysList = useMemo(() => {
     if (!state.selectedCity) return [];
     return barangayData.filter((barangay) => barangay.city_code === state.selectedCity);
   }, [state.selectedCity]);
@@ -173,51 +202,60 @@ export const CreateProfileScreen: React.FC<CreateProfileScreenProps> = ({ onProf
   /**
    * Handles changes from the DateTimePicker.
    */
-  const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+  const handleDateChange = useCallback((event: DateTimePickerEvent, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
-      setShowDatePicker(false);
+        setShowDatePicker(false);
     }
     if (event.type === 'set' && selectedDate) {
       dispatch({ type: 'SET_DATE', value: selectedDate });
-      // Auto-close picker on iOS after selection
-      if (Platform.OS === 'ios') { 
-          setShowDatePicker(false);
+      if (Platform.OS === 'ios') { // Ensure iOS picker also closes after selection
+        setShowDatePicker(false);
       }
     } else if (event.type === 'dismissed') {
-      // User cancelled the picker
-      setShowDatePicker(false); 
+      setShowDatePicker(false);
     }
-  };
+  }, []);
 
   /**
    * Validates the profile form data.
    * @returns {FormErrors | null} An object containing errors per field, or null if valid.
    */
-  const validateProfileForm = (): FormErrors | null => {
-    const currentErrors: FormErrors = {};
-    if (!state.firstName.trim()) currentErrors.firstName = 'First name is required.';
-    if (!state.lastName.trim()) currentErrors.lastName = 'Last name is required.';
-    if (!state.dateOfBirth) currentErrors.dateOfBirth = 'Date of birth is required.';
-    if (!state.street.trim()) currentErrors.street = 'Street address is required.';
-    if (!state.selectedProvince) currentErrors.selectedProvince = 'Province is required.';
-    if (!state.selectedCity) currentErrors.selectedCity = 'City/Municipality is required.';
-    if (!state.selectedBarangay) currentErrors.selectedBarangay = 'Barangay is required.';
-    if (!state.contactNo.trim()) {
-        currentErrors.contactNo = 'Contact number is required.';
-    } else if (!/^09\d{9}$/.test(state.contactNo.trim())) { // Basic PH mobile format
-        currentErrors.contactNo = 'Please enter a valid 11-digit mobile number starting with 09.';
+  const profileFormSchema = z.object({
+    firstName: z.string().trim().min(1, { message: "First name is required." }),
+    middleInitial: z.string().trim().max(1, { message: "Middle initial should be a single letter." }).optional().or(z.literal('')),
+    lastName: z.string().trim().min(1, { message: "Last name is required." }),
+    dateOfBirth: z.date({ required_error: "Date of birth is required." }),
+    displayAge: z.string(), // Not directly validated, derived
+    genderIdentity: z.string().trim().optional().or(z.literal('')),
+    pronouns: z.string().optional().or(z.literal('')),
+    assignedSexAtBirth: z.string().optional().or(z.literal('')),
+    civilStatus: z.string().min(1, { message: "Civil status is required."}), // Made required for consistency if EditProfileScreen has it as such
+    religion: z.string().optional().or(z.literal('')),
+    occupation: z.string().optional().or(z.literal('')),
+    street: z.string().trim().min(1, { message: "Street address is required." }),
+    selectedProvince: z.string().min(1, { message: "Province is required." }),
+    selectedCity: z.string().min(1, { message: "City/Municipality is required." }),
+    selectedBarangay: z.string().min(1, { message: "Barangay is required." }),
+    contactNo: z.string().trim().min(1, { message: "Contact number is required." })
+                 .regex(/^09\d{9}$/, { message: "Please enter a valid 11-digit mobile number starting with 09." }),
+    philhealthNo: z.string().trim().optional().or(z.literal('')),
+  });
+  
+  const validateProfileForm = useCallback((): FormErrors | null => {
+    const result = profileFormSchema.safeParse(state);
+    if (!result.success) {
+      const fieldErrors: FormErrors = {};
+      for (const issue of result.error.issues) {
+        if (issue.path.length > 0) {
+          fieldErrors[issue.path[0] as keyof ProfileFormData] = issue.message;
+        } else {
+          fieldErrors.general = issue.message; // For global errors, if any from Zod refinement
+        }
+      }
+      return fieldErrors;
     }
-    if (state.middleInitial.trim().length > 1) {
-      currentErrors.middleInitial = 'Middle initial should be a single letter.';
-    }
-    // Optional: Add PhilHealth format validation if needed
-    // const philhealthRegex = /^\d{2}-\d{9}-\d{1}$/;
-    // if (state.philhealthNo.trim() && !philhealthRegex.test(state.philhealthNo.trim())) {
-    //   currentErrors.philhealthNo = 'Invalid PhilHealth format (e.g., 12-345678901-2).';
-    // }
-
-    return Object.keys(currentErrors).length > 0 ? currentErrors : null;
-  };
+    return null;
+  }, [state, profileFormSchema]);
 
   /**
    * Handles the submission of the profile form.
@@ -227,72 +265,142 @@ export const CreateProfileScreen: React.FC<CreateProfileScreenProps> = ({ onProf
     const formValidationErrors = validateProfileForm();
     if (formValidationErrors) {
       setErrors(formValidationErrors);
-      Alert.alert("Validation Error", "Please correct the errors before submitting.");
+      Alert.alert("Validation Error", "Please check the form for errors.");
       return;
     }
-
-    setLoading(true);
     setErrors(null);
+    setIsLoading(true);
 
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const { data: userResponse, error: userError } = await supabase.auth.getUser();
+      if (userError || !userResponse.user) {
+        Alert.alert("Error", "Could not get user session. Please try logging in again.");
+        setIsLoading(false);
+        return;
+      }
+      const user = userResponse.user;
 
-      if (userError || !user) {
-        console.error("Error fetching user:", userError);
-        setErrors({ general: "Could not identify user. Please try logging out and back in." });
-        setLoading(false);
+      // IMPORTANT BACKEND BLOCKER:
+      // The following Supabase insert is now replaced by a call to the backend API.
+      // Ensure the backend /api/users/profile PATCH endpoint is ready and
+      // Constants.expoConfig.extra.backendApiUrl is correctly configured.
+
+      const profilePayload = {
+        // Personal Information
+        firstName: state.firstName,
+        middleInitial: state.middleInitial,
+        lastName: state.lastName,
+        dateOfBirth: state.dateOfBirth ? state.dateOfBirth.toISOString().split('T')[0] : null, // Format as YYYY-MM-DD
+        age: state.dateOfBirth ? calculateAge(state.dateOfBirth) : null, // Recalculate here or ensure state.displayAge is numeric
+        
+        // SOGIE Information
+        genderIdentity: state.genderIdentity,
+        pronouns: state.pronouns,
+        assignedSexAtBirth: state.assignedSexAtBirth,
+
+        // Other Details
+        civilStatus: state.civilStatus,
+        religion: state.religion,
+        occupation: state.occupation,
+        
+        // Address
+        street: state.street,
+        barangayCode: state.selectedBarangay,
+        cityMunicipalityCode: state.selectedCity,
+        provinceCode: state.selectedProvince,
+        
+        // Contact & PhilHealth
+        contactNo: state.contactNo,
+        philhealthNo: state.philhealthNo,
+        
+        // email and user_id are typically not sent in an update payload from client
+        // as they are identified by the session/token on the backend.
+        // The backend will use the authenticated user's ID.
+      };
+      
+      console.log("[CreateProfileScreen] Payload to be sent to backend:", JSON.stringify(profilePayload, null, 2));
+      
+      // Filter out any null or empty string values if the backend expects only provided fields
+      // Or ensure backend handles them appropriately
+      // Attempting a fix for the linter error by being more explicit with types
+      const definedProfilePayload = Object.entries(profilePayload).reduce<{[K in keyof typeof profilePayload]?: string | number}>((acc, [key, value]) => {
+        if (value !== null && value !== '') {
+          // Ensure value is only string or number before assigning
+          if (typeof value === 'string' || typeof value === 'number') {
+            // The key is asserted to be a key of profilePayload, and thus a key of acc.
+            acc[key as keyof typeof profilePayload] = value;
+          }
+        }
+        return acc;
+      }, {});
+
+
+      // TODO: Replace with actual API call structure from your project
+      // Assuming Constants.expoConfig.extra.backendApiUrl is set up
+      const backendApiUrl = process.env.EXPO_PUBLIC_BACKEND_API_URL; // Example using Expo env var
+      if (!backendApiUrl) {
+          Alert.alert("Configuration Error", "Backend API URL is not configured.");
+          setIsLoading(false);
+          return;
+      }
+      
+      const response = await fetch(`${backendApiUrl}/api/users/profile`, {
+          method: 'PATCH',
+          headers: {
+              'Content-Type': 'application/json',
+              // The backend's authMiddleware should handle extracting the token from Supabase session
+              // or you might need to explicitly pass the access token if your setup requires it.
+              // For now, assuming the middleware handles it based on Supabase client-side session.
+              'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+          },
+          body: JSON.stringify(definedProfilePayload),
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        // console.error("Profile update error response:", responseData);
+        console.error("[CreateProfileScreen] Profile update failed. Status:", response.status, "Response Data:", JSON.stringify(responseData));
+        
+        let alertMessage = responseData.message || `An error occurred. Status: ${response.status}`;
+        if (responseData.errors) {
+          // Map backend errors to frontend errors state
+          const backendFieldErrors: FormErrors = {};
+          for (const field in responseData.errors) {
+            if (Array.isArray(responseData.errors[field]) && responseData.errors[field].length > 0) {
+              backendFieldErrors[field as keyof ProfileFormData] = responseData.errors[field][0]; // Take the first error message
+            }
+          }
+          setErrors(backendFieldErrors); // Update frontend errors state
+          alertMessage = "Please check the form for errors."; // General alert if specific field errors are now shown
+        }
+
+        Alert.alert(
+          "Profile Update Failed", 
+          alertMessage
+        );
+        setIsLoading(false);
         return;
       }
 
-      // Ensure all fields match the Supabase 'profiles' table schema
-      // and that data types are correct (e.g., date as ISO string).
-      const profileDataToSave = {
-        user_id: user.id, // This is crucial
-        first_name: state.firstName,
-        middle_initial: state.middleInitial || null, // Handle empty string as null if DB expects null
-        last_name: state.lastName,
-        // Ensure date_of_birth is formatted as YYYY-MM-DD if your DB stores it as a date/text type
-        // If it's a timestamp, new Date().toISOString() is fine.
-        date_of_birth: state.dateOfBirth ? state.dateOfBirth.toISOString().split('T')[0] : null,
-        age: state.dateOfBirth ? calculateAge(state.dateOfBirth) : null,
-        civil_status: state.civilStatus || null,
-        religion: state.religion || null,
-        occupation: state.occupation || null,
-        street: state.street || null,
-        province_code: state.selectedProvince || null,
-        city_municipality_code: state.selectedCity || null,
-        barangay_code: state.selectedBarangay || null,
-        contact_no: state.contactNo || null,
-        philhealth_no: state.philhealthNo || null,
-        // Add any other fields like avatar_url if applicable, defaulting to null or initial value
-        // username: state.username || null, // Example if you had a username field
-      };
-
-      console.log("[CreateProfileScreen] Attempting to update profile data:", JSON.stringify(profileDataToSave, null, 2));
-
-      // Assuming your trigger created a row, we update it.
-      // If not, you might need an upsert or a check then insert/update.
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update(profileDataToSave)
-        .eq('user_id', user.id);
-
-      if (updateError) {
-        console.error("Error updating profile:", updateError);
-        setErrors({ general: `Failed to update profile: ${updateError.message}` });
-        // Alert.alert("Error", `Failed to update profile: ${updateError.message}`);
-      } else {
-        console.log("[CreateProfileScreen] Profile updated successfully!");
-        Alert.alert("Success", "Profile created successfully!");
-        onProfileCreated(); // Trigger context refresh and navigation
+      Alert.alert("Profile Created/Updated", "Your profile has been successfully saved.");
+      // Call the callback passed via route params
+      if (onProfileCreated) {
+        onProfileCreated();
       }
-    } catch (e) {
-      console.error("Unexpected error in handleCreateProfile:", e);
-      const message = e instanceof Error ? e.message : "An unexpected error occurred.";
-      setErrors({ general: `An unexpected error occurred: ${message}` });
-      // Alert.alert("Error", "An unexpected error occurred. Please try again.");
+      // navigation.navigate('MainAppDrawer'); // Or whatever the next screen is
+
+    } catch (error) {
+      // console.error("Error creating profile:", error);
+      // Log the full error object to the console for more details
+      console.error("Full error object during profile creation:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
+      let errorMessage = 'No specific message available.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      Alert.alert("Error", `An unexpected error occurred. Details: ${errorMessage}`);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -304,412 +412,515 @@ export const CreateProfileScreen: React.FC<CreateProfileScreenProps> = ({ onProf
    * @param nameKey The key in the list items containing the display name.
    * @returns The display name or undefined.
    */
-  const getSelectedName = (
+  const getSelectedName = useCallback((
       code: string,
-      list: Array<any>,
+      list: Array<Record<string, any>>,
       codeKey: string,
       nameKey: string
   ): string | undefined => {
-      return list.find(item => item[codeKey] === code)?.[nameKey];
-  };
+      const foundItem = list.find(item => item[codeKey] === code);
+      if (foundItem) {
+          const value = foundItem[nameKey];
+          if (typeof value === 'string' || typeof value === 'number') {
+              return String(value);
+          }
+      }
+      return undefined;
+  }, []);
 
   // Civil status options
   const civilStatusOptions = ['Single', 'Married', 'Widowed', 'Separated', 'Divorced', 'Other'];
+  const pronounOptions = ["She/Her", "He/Him", "They/Them", "Prefer to self-describe", "Prefer not to say"];
+  const assignedSexOptions = ["Female", "Male", "Prefer not to say"];
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.keyboardAvoidingContainer}
-    >
-      <ScrollView 
-        style={styles.scrollContainer}
-        contentContainerStyle={styles.scrollContentContainer}
-        keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
       >
-        <View style={styles.formContainer}> 
-          <Text style={styles.title}>Create Your Profile</Text>
-          <Text style={styles.subtitle}>Complete your details to personalize your experience.</Text>
+        <Modal
+          transparent={true}
+          animationType="none"
+          visible={isLoading} // Use isLoading state for modal visibility
+          onRequestClose={() => { /* Modal cannot be closed by user action */ }}
+        >
+          <View style={styles.modalBackground}>
+            <View style={styles.activityIndicatorWrapper}>
+              <ActivityIndicator animating={isLoading} size="large" color={theme.colors.primary} />
+              <Text style={styles.modalLoadingText}>Saving Profile...</Text>
+            </View>
+          </View>
+        </Modal>
+
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.contentContainer}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Text style={styles.title}>Create Profile</Text>
+          <Text style={styles.subtitle}>Please complete your profile to continue.</Text>
 
           {errors?.general && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{errors.general}</Text>
-            </View>
+            <Text style={styles.generalErrorText}>{errors.general}</Text>
           )}
 
-          <TextInput
-            label="First Name *"
-            value={state.firstName}
-            // Use dispatch to update state
-            onChangeText={(value) => dispatch({ type: 'SET_FIELD', field: 'firstName', value })}
-            placeholder="e.g., Juan"
-            containerStyle={styles.input}
-            autoCapitalize="words"
-            error={errors?.firstName} // Show field-specific error
-          />
-
-          <TextInput
-            label="Middle Initial (Optional)"
-            value={state.middleInitial}
-            onChangeText={(value) => dispatch({ type: 'SET_FIELD', field: 'middleInitial', value })}
-            placeholder="e.g., D."
-            containerStyle={styles.input}
-            autoCapitalize="characters"
-            error={errors?.middleInitial}
-          />
-
-          <TextInput
-            label="Last Name *"
-            value={state.lastName}
-            onChangeText={(value) => dispatch({ type: 'SET_FIELD', field: 'lastName', value })}
-            placeholder="e.g., Dela Cruz"
-            containerStyle={styles.input}
-            autoCapitalize="words"
-            error={errors?.lastName}
-          />
-
-          {/* Date of Birth Picker */}
-          <Text style={[styles.label, errors?.dateOfBirth && styles.errorLabel]}>Date of Birth *</Text>
-          <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.datePickerButton}>
-            <Text style={styles.datePickerText}>
-              {state.dateOfBirth ? state.dateOfBirth.toLocaleDateString() : 'Select Date'}
-            </Text>
-          </TouchableOpacity>
-          {/* Display field-specific error below button */}
-          {errors?.dateOfBirth && <Text style={styles.inlineErrorText}>{errors.dateOfBirth}</Text>}
-          {showDatePicker && (
-            <DateTimePicker
-              testID="dateTimePicker"
-              value={state.dateOfBirth || new Date()} // Default to today if null
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={handleDateChange}
-              maximumDate={new Date()} // Prevent selecting future dates
+          <Card style={styles.card}>
+            <Text style={styles.sectionTitle}>Personal Information</Text>
+            <TextInput
+              label="First Name"
+              value={state.firstName}
+              onChangeText={(text) => dispatch({ type: 'SET_FIELD', field: 'firstName', value: text })}
+              placeholder="Enter your first name"
+              error={errors?.firstName}
+              containerStyle={styles.input}
+              placeholderTextColor={theme.colors.textMuted}
             />
-          )}
-
-          <TextInput
-            label="Age"
-            value={state.displayAge}
-            placeholder="--"
-            editable={false} // Age is calculated
-            containerStyle={styles.input}
-            error={errors?.displayAge} // Although not directly validated, show error if DOB has one?
-          />
-          
-          {/* Civil Status Picker */}
-          <Text style={[styles.label, errors?.civilStatus && styles.errorLabel]}>Civil Status (Optional)</Text>
-          <TouchableOpacity 
-            onPress={() => setShowCivilStatusPicker(!showCivilStatusPicker)}
-            style={styles.customPickerButton}
-          >
-            <Text style={styles.customPickerButtonText}>
-              {state.civilStatus || 'Select Civil Status...'}
+            <TextInput
+              label="Middle Initial"
+              value={state.middleInitial}
+              onChangeText={(text) => dispatch({ type: 'SET_FIELD', field: 'middleInitial', value: text })}
+              placeholder="M.I."
+              maxLength={1}
+              error={errors?.middleInitial}
+              containerStyle={styles.input}
+              placeholderTextColor={theme.colors.textMuted}
+            />
+            <TextInput
+              label="Last Name"
+              value={state.lastName}
+              onChangeText={(text) => dispatch({ type: 'SET_FIELD', field: 'lastName', value: text })}
+              placeholder="Enter your last name"
+              error={errors?.lastName}
+              containerStyle={styles.input}
+              placeholderTextColor={theme.colors.textMuted}
+            />
+            <Text style={[styles.label, errors?.dateOfBirth ? styles.labelError : null]}>
+              Date of Birth {errors?.dateOfBirth ? '*' : ''}
             </Text>
-          </TouchableOpacity>
-          {errors?.civilStatus && <Text style={styles.inlineErrorText}>{errors.civilStatus}</Text>}
-          {showCivilStatusPicker && (
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={state.civilStatus}
-                onValueChange={(itemValue) => {
-                  dispatch({ type: 'SET_FIELD', field: 'civilStatus', value: itemValue });
-                  // Consider auto-hiding picker on selection
-                  // setShowCivilStatusPicker(false);
-                }}
-                style={styles.picker}
-              >
-                <Picker.Item label="Select Civil Status..." value="" style={styles.pickerItemPlaceholder} />
-                {civilStatusOptions.map((option) => (
-                  <Picker.Item key={option} label={option} value={option} style={styles.pickerItem}/>
-                ))}
-              </Picker>
+            <View style={styles.fieldGroup}>
+              <TouchableOpacity style={[styles.pickerTrigger, errors?.dateOfBirth ? styles.inputErrorBorder : null]} onPress={() => setShowDatePicker(true)}>
+                <Text style={styles.pickerText}>{state.dateOfBirth ? state.dateOfBirth.toLocaleDateString() : 'Select Date'}</Text>
+                <Ionicons name="calendar-outline" size={20} color={theme.colors.text} />
+              </TouchableOpacity>
+              {errors?.dateOfBirth && <Text style={styles.errorText}>{errors.dateOfBirth}</Text>}
             </View>
-          )}
-          
-          <TextInput
-            label="Religion (Optional)"
-            value={state.religion}
-            onChangeText={(value) => dispatch({ type: 'SET_FIELD', field: 'religion', value })}
-            placeholder="e.g., Roman Catholic"
-            containerStyle={styles.input}
-            autoCapitalize="words"
-            error={errors?.religion}
-          />
+            {showDatePicker && (
+              <DateTimePicker
+                value={state.dateOfBirth || new Date()}
+                mode="date"
+                display="default"
+                onChange={handleDateChange}
+                maximumDate={new Date()}
+              />
+            )}
+            <TextInput
+              label="Age"
+              value={state.displayAge}
+              editable={false}
+              placeholder="Age"
+              containerStyle={styles.input}
+              placeholderTextColor={theme.colors.textMuted}
+            />
+          </Card>
 
-          <TextInput
-            label="Occupation (Optional)"
-            value={state.occupation}
-            onChangeText={(value) => dispatch({ type: 'SET_FIELD', field: 'occupation', value })}
-            placeholder="e.g., Software Engineer"
-            containerStyle={styles.input}
-            autoCapitalize="words"
-            error={errors?.occupation}
-          />
-
-          {/* Address Section */}
-          <Text style={styles.sectionHeader}>Address *</Text>
-          <TextInput
-            label="Street Address / House No. *"
-            value={state.street}
-            onChangeText={(value) => dispatch({ type: 'SET_FIELD', field: 'street', value })}
-            placeholder="e.g., 123 Rizal St., Sitio Example"
-            containerStyle={styles.input}
-            autoCapitalize="words"
-            error={errors?.street}
-          />
-          
-          {/* Province Picker */}
-          <Text style={[styles.label, errors?.selectedProvince && styles.errorLabel]}>Province *</Text>
-          <TouchableOpacity 
-            onPress={() => setShowProvincePicker(!showProvincePicker)}
-            style={styles.customPickerButton}
-          >
-            <Text style={styles.customPickerButtonText}>
-              {getSelectedName(state.selectedProvince, provinces, 'province_code', 'province_name') || 'Select Province...'}
+          <Card style={styles.card}>
+            <Text style={styles.sectionTitle}>SOGIE & Civil Status</Text>
+            <TextInput
+              label="Gender Identity"
+              value={state.genderIdentity}
+              onChangeText={(text) => dispatch({ type: 'SET_GENDER_IDENTITY', value: text })}
+              placeholder="e.g., Woman, Non-binary, Man"
+              error={errors?.genderIdentity}
+              containerStyle={styles.input}
+              placeholderTextColor={theme.colors.textMuted}
+            />
+            <Text style={[styles.label, errors?.pronouns ? styles.labelError : null]}>
+              Pronouns {errors?.pronouns ? '*' : ''}
             </Text>
-          </TouchableOpacity>
-          {errors?.selectedProvince && <Text style={styles.inlineErrorText}>{errors.selectedProvince}</Text>}
-          {showProvincePicker && (
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={state.selectedProvince}
-                onValueChange={(itemValue) => {
-                  dispatch({ type: 'SET_PROVINCE', value: itemValue });
-                  setShowProvincePicker(false);
-                }}
-                style={styles.picker}
+            <View style={styles.fieldGroup}>
+              <TouchableOpacity 
+                style={[styles.pickerTrigger, errors?.pronouns ? styles.inputErrorBorder : null]} 
+                onPress={() => setShowPronounsPicker(true)}
               >
-                <Picker.Item label="Select Province..." value="" style={styles.pickerItemPlaceholder} />
-                {provinces.map((prov) => (
-                  <Picker.Item key={prov.province_code} label={prov.province_name} value={prov.province_code} style={styles.pickerItem}/>
-                ))}
-              </Picker>
+                <Text style={styles.pickerText}>{state.pronouns || "Select Pronouns..."}</Text>
+                <Ionicons name="caret-down-outline" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+              {errors?.pronouns && <Text style={styles.errorText}>{errors.pronouns}</Text>}
             </View>
-          )}
-
-          {/* City/Municipality Picker */}
-          <Text style={[styles.label, errors?.selectedCity && styles.errorLabel]}>City / Municipality *</Text>
-          <TouchableOpacity 
-            onPress={() => setShowCityPicker(!showCityPicker)}
-            style={[styles.customPickerButton, !state.selectedProvince && styles.disabledPickerButton]} 
-            disabled={!state.selectedProvince}
-          >
-            <Text style={styles.customPickerButtonText}>
-              {getSelectedName(state.selectedCity, citiesMunicipalities, 'city_code', 'city_name') || 'Select City/Municipality...'}
+            {showPronounsPicker && (
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={state.pronouns}
+                  onValueChange={(itemValue) => {
+                    if (itemValue) dispatch({ type: 'SET_PRONOUNS', value: itemValue });
+                    setShowPronounsPicker(false);
+                  }}
+                  style={{ width: '100%' }} itemStyle={styles.pickerItem}
+                >
+                  <Picker.Item label="Select Pronouns..." value="" />
+                  {pronounOptions.map((option) => (
+                    <Picker.Item key={option} label={option} value={option} />
+                  ))}
+                </Picker>
+              </View>
+            )}
+            <Text style={[styles.label, errors?.assignedSexAtBirth ? styles.labelError : null]}>
+              Assigned Sex at Birth {errors?.assignedSexAtBirth ? '*' : ''}
             </Text>
-          </TouchableOpacity>
-          {errors?.selectedCity && <Text style={styles.inlineErrorText}>{errors.selectedCity}</Text>}
-          {showCityPicker && !!state.selectedProvince && (
-            <View style={styles.pickerContainer}>
-              <Picker
+            <View style={styles.fieldGroup}>
+              <TouchableOpacity 
+                style={[styles.pickerTrigger, errors?.assignedSexAtBirth ? styles.inputErrorBorder : null]}
+                onPress={() => setShowAssignedSexPicker(true)}
+              >
+                <Text style={styles.pickerText}>{state.assignedSexAtBirth || "Select Assigned Sex..."}</Text>
+                <Ionicons name="caret-down-outline" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+              {errors?.assignedSexAtBirth && <Text style={styles.errorText}>{errors.assignedSexAtBirth}</Text>}
+            </View>
+            {showAssignedSexPicker && (
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={state.assignedSexAtBirth}
+                  onValueChange={(itemValue) => {
+                    if (itemValue) dispatch({ type: 'SET_ASSIGNED_SEX', value: itemValue });
+                    setShowAssignedSexPicker(false);
+                  }}
+                  style={{ width: '100%' }} itemStyle={styles.pickerItem}
+                >
+                  <Picker.Item label="Select Assigned Sex..." value="" />
+                  {assignedSexOptions.map((option) => (
+                    <Picker.Item key={option} label={option} value={option} />
+                  ))}
+                </Picker>
+              </View>
+            )}
+            <Text style={[styles.label, errors?.civilStatus ? styles.labelError : null]}>
+              Civil Status {errors?.civilStatus ? '*' : ''}
+            </Text>
+            <View style={styles.fieldGroup}>
+              <TouchableOpacity 
+                style={[styles.pickerTrigger, errors?.civilStatus ? styles.inputErrorBorder : null]} 
+                onPress={() => setShowCivilStatusPicker(true)}
+              >
+                <Text style={styles.pickerText}>{state.civilStatus || 'Select Civil Status'}</Text>
+                <Ionicons name="caret-down-outline" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+              {errors?.civilStatus && <Text style={styles.errorText}>{errors.civilStatus}</Text>}
+            </View>
+            {showCivilStatusPicker && (
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={state.civilStatus}
+                  onValueChange={(itemValue) => {
+                    if (itemValue) dispatch({ type: 'SET_FIELD', field: 'civilStatus', value: itemValue });
+                    setShowCivilStatusPicker(false);
+                  }}
+                  style={{ width: '100%' }} itemStyle={styles.pickerItem}
+                >
+                  <Picker.Item label="Select Civil Status..." value="" />
+                  {civilStatusOptions.map((option) => (
+                    <Picker.Item key={option} label={option} value={option} />
+                  ))}
+                </Picker>
+              </View>
+            )}
+          </Card>
+          
+          <Card style={styles.card}>
+            <Text style={styles.sectionTitle}>Additional Details</Text>
+            <TextInput
+              label="Religion"
+              value={state.religion}
+              onChangeText={(text) => dispatch({ type: 'SET_FIELD', field: 'religion', value: text })}
+              placeholder="Enter your religion (optional)"
+              error={errors?.religion}
+              containerStyle={styles.input}
+              placeholderTextColor={theme.colors.textMuted}
+            />
+            <TextInput
+              label="Occupation"
+              value={state.occupation}
+              onChangeText={(text) => dispatch({ type: 'SET_FIELD', field: 'occupation', value: text })}
+              placeholder="Enter your occupation (optional)"
+              error={errors?.occupation}
+              containerStyle={styles.input}
+              placeholderTextColor={theme.colors.textMuted}
+            />
+          </Card>
+
+          <Card style={styles.card}>
+            <Text style={styles.sectionTitle}>Address</Text>
+            <TextInput
+              label="Street Address"
+              value={state.street}
+              onChangeText={(text) => dispatch({ type: 'SET_FIELD', field: 'street', value: text })}
+              placeholder="House No., Street Name"
+              error={errors?.street}
+              containerStyle={styles.input}
+              placeholderTextColor={theme.colors.textMuted}
+            />
+            <Text style={[styles.label, errors?.selectedProvince ? styles.labelError : null]}>
+              Province {errors?.selectedProvince ? '*' : ''}
+            </Text>
+            <View style={styles.fieldGroup}>
+              <TouchableOpacity 
+                style={[styles.pickerTrigger, errors?.selectedProvince ? styles.inputErrorBorder : null]} 
+                onPress={() => setShowProvincePicker(true)}
+              >
+                <Text style={styles.pickerText}>{getSelectedName(state.selectedProvince, provinces, 'province_code', 'province_name') || 'Select Province'}</Text>
+                <Ionicons name="caret-down-outline" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+              {errors?.selectedProvince && <Text style={styles.errorText}>{errors.selectedProvince}</Text>}
+            </View>
+            {showProvincePicker && (
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={state.selectedProvince}
+                  onValueChange={(itemValue) => {
+                    if (itemValue) dispatch({ type: 'SET_PROVINCE', value: itemValue });
+                    setShowProvincePicker(false);
+                  }}
+                  style={{ width: '100%' }} itemStyle={styles.pickerItem}
+                >
+                  <Picker.Item label="Select Province..." value="" />
+                  {provinces.map((province) => (
+                    <Picker.Item key={province.province_code} label={province.province_name} value={province.province_code} />
+                  ))}
+                </Picker>
+              </View>
+            )}
+            <Text style={[styles.label, errors?.selectedCity ? styles.labelError : null]}>
+              City/Municipality {errors?.selectedCity ? '*' : ''}
+            </Text>
+            <View style={styles.fieldGroup}>
+              <TouchableOpacity
+                style={[styles.pickerTrigger, errors?.selectedCity ? styles.inputErrorBorder : null, !state.selectedProvince ? styles.pickerDisabled : null]}
+                onPress={() => state.selectedProvince && setShowCityPicker(true)}
+                disabled={!state.selectedProvince}
+              >
+                <Text style={styles.pickerText}>{getSelectedName(state.selectedCity, citiesMunicipalities, 'city_code', 'city_name') || 'Select City/Municipality'}</Text>
+                <Ionicons name="caret-down-outline" size={24} color={!state.selectedProvince ? theme.colors.disabled : theme.colors.text} />
+              </TouchableOpacity>
+              {errors?.selectedCity && <Text style={styles.errorText}>{errors.selectedCity}</Text>}
+            </View>
+            {showCityPicker && (
+              <View style={styles.pickerContainer}>
+                <Picker
                   selectedValue={state.selectedCity}
                   onValueChange={(itemValue) => {
-                      dispatch({ type: 'SET_CITY', value: itemValue });
-                      setShowCityPicker(false);
+                    if (itemValue) dispatch({ type: 'SET_CITY', value: itemValue });
+                    setShowCityPicker(false);
                   }}
-                  style={styles.picker}
-                  enabled={citiesMunicipalities.length > 0}
+                  enabled={!!state.selectedProvince}
+                  style={{ width: '100%' }} itemStyle={styles.pickerItem}
                 >
-                  <Picker.Item label="Select City/Municipality..." value="" style={styles.pickerItemPlaceholder} />
+                  <Picker.Item label="Select City/Municipality..." value="" />
                   {citiesMunicipalities.map((city) => (
-                    <Picker.Item key={city.city_code} label={city.city_name} value={city.city_code} style={styles.pickerItem}/>
+                    <Picker.Item key={city.city_code} label={city.city_name} value={city.city_code} />
                   ))}
-              </Picker>
-            </View>
-          )}
-
-          {/* Barangay Picker */}
-          <Text style={[styles.label, errors?.selectedBarangay && styles.errorLabel]}>Barangay *</Text>
-          <TouchableOpacity 
-            onPress={() => setShowBarangayPicker(!showBarangayPicker)}
-            style={[styles.customPickerButton, !state.selectedCity && styles.disabledPickerButton]} 
-            disabled={!state.selectedCity}
-          >
-            <Text style={styles.customPickerButtonText}>
-              {getSelectedName(state.selectedBarangay, barangaysList, 'brgy_code', 'brgy_name') || 'Select Barangay...'}
+                </Picker>
+              </View>
+            )}
+            <Text style={[styles.label, errors?.selectedBarangay ? styles.labelError : null]}>
+              Barangay {errors?.selectedBarangay ? '*' : ''}
             </Text>
-          </TouchableOpacity>
-          {errors?.selectedBarangay && <Text style={styles.inlineErrorText}>{errors.selectedBarangay}</Text>}
-          {showBarangayPicker && !!state.selectedCity && (
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={state.selectedBarangay}
-                onValueChange={(itemValue) => {
-                    dispatch({ type: 'SET_BARANGAY', value: itemValue });
-                    setShowBarangayPicker(false);
-                }}
-                style={styles.picker}
-                enabled={barangaysList.length > 0}
+            <View style={styles.fieldGroup}>
+              <TouchableOpacity
+                style={[styles.pickerTrigger, errors?.selectedBarangay ? styles.inputErrorBorder : null, !state.selectedCity ? styles.pickerDisabled : null]}
+                onPress={() => state.selectedCity && setShowBarangayPicker(true)}
+                disabled={!state.selectedCity}
               >
-                <Picker.Item label="Select Barangay..." value="" style={styles.pickerItemPlaceholder} />
-                {barangaysList.map((brgy) => (
-                    <Picker.Item key={brgy.brgy_code} label={brgy.brgy_name} value={brgy.brgy_code} style={styles.pickerItem}/>
-                  ))}
-              </Picker>
+                <Text style={styles.pickerText}>{getSelectedName(state.selectedBarangay, barangaysList, 'brgy_code', 'brgy_name') || 'Select Barangay'}</Text>
+                <Ionicons name="caret-down-outline" size={24} color={!state.selectedCity ? theme.colors.disabled : theme.colors.text} />
+              </TouchableOpacity>
+              {errors?.selectedBarangay && <Text style={styles.errorText}>{errors.selectedBarangay}</Text>}
             </View>
-          )}
-
-          <TextInput
-            label="Contact Number *"
-            value={state.contactNo}
-            onChangeText={(value) => dispatch({ type: 'SET_FIELD', field: 'contactNo', value })}
-            placeholder="e.g., 09123456789"
-            containerStyle={styles.input}
-            keyboardType="phone-pad"
-            maxLength={11}
-            error={errors?.contactNo}
-          />
-
-          <TextInput
-            label="PhilHealth No. (Optional)"
-            value={state.philhealthNo}
-            onChangeText={(value) => dispatch({ type: 'SET_FIELD', field: 'philhealthNo', value })}
-            placeholder="e.g., 12-345678901-2"
-            containerStyle={styles.input}
-            keyboardType="numeric"
-            error={errors?.philhealthNo}
-          />
+            {showBarangayPicker && (
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={state.selectedBarangay}
+                  onValueChange={(itemValue) => {
+                    if (itemValue) dispatch({ type: 'SET_BARANGAY', value: itemValue });
+                    setShowBarangayPicker(false);
+                  }}
+                  enabled={!!state.selectedCity}
+                  style={{ width: '100%' }} itemStyle={styles.pickerItem}
+                >
+                  <Picker.Item label="Select Barangay..." value="" />
+                  {barangaysList.map((barangay) => (
+                    <Picker.Item key={barangay.brgy_code} label={barangay.brgy_name} value={barangay.brgy_code} />
+                  ))}
+                </Picker>
+              </View>
+            )}
+          </Card>
+          
+          <Card style={styles.card}>
+            <Text style={styles.sectionTitle}>Contact & Identification</Text>
+            <TextInput
+              label="Contact Number"
+              value={state.contactNo}
+              onChangeText={(text) => dispatch({ type: 'SET_FIELD', field: 'contactNo', value: text.replace(/[^0-9]/g, '') })}
+              placeholder="e.g., 09171234567"
+              keyboardType="phone-pad"
+              error={errors?.contactNo}
+              containerStyle={styles.input}
+              placeholderTextColor={theme.colors.textMuted}
+              maxLength={11}
+            />
+            <TextInput
+              label="PhilHealth Number (Optional)"
+              value={state.philhealthNo}
+              onChangeText={(text) => dispatch({ type: 'SET_FIELD', field: 'philhealthNo', value: text })}
+              placeholder="Enter your PhilHealth number"
+              error={errors?.philhealthNo}
+              containerStyle={styles.input}
+              placeholderTextColor={theme.colors.textMuted}
+            />
+          </Card>
 
           <Button
-            title="Save Profile"
             variant="primary"
+            title="Save Profile"
             onPress={handleCreateProfile}
-            isLoading={loading}
+            disabled={isLoading}
             style={styles.button}
-            // Disable button if backend update is needed and not yet done?
-            // disabled={true} // Example if we want to force block until backend ready
           />
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  keyboardAvoidingContainer: {
+  safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background, 
+    backgroundColor: theme.colors.background,
   },
-  scrollContainer: {
+  container: {
     flex: 1,
   },
-  scrollContentContainer: { // Renamed from mainContainer for clarity
-    flexGrow: 1, // Ensures content can scroll if it overflows
-    justifyContent: 'center', // Added back to match LoginScreen
-    padding: theme.spacing.lg * 1.5,  // Match LoginScreen padding
-    paddingTop: theme.spacing.xl * 3.5, // Removed extra top padding
-    paddingBottom: theme.spacing.lg * 3, // Match LoginScreen padding
-  },
-  formContainer: { // New container for form elements if more structure is needed
-    // Potentially add specific styles here if needed, for now it's structural
+  contentContainer: {
+    padding: theme.spacing.lg,
+    backgroundColor: theme.colors.background,
+    flexGrow: 1,
   },
   title: {
-    fontSize: theme.typography.heading, // Changed from title to heading
+    fontSize: theme.typography.heading,
     fontWeight: 'bold',
     color: theme.colors.primary,
+    marginBottom: theme.spacing.xs,
     textAlign: 'center',
-    marginBottom: theme.spacing.md, // Increased margin
+    marginTop: theme.spacing.lg,
   },
   subtitle: {
-    fontSize: theme.typography.subheading,
+    fontSize: theme.typography.body,
     color: theme.colors.textMuted,
     textAlign: 'center',
-    marginBottom: theme.spacing.xl, // Increased margin
+    marginBottom: theme.spacing.lg * 2,
+  },
+  card: {
+    marginBottom: theme.spacing.lg,
+    padding: theme.spacing.lg,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: theme.spacing.lg,
+    color: theme.colors.secondary,
   },
   input: {
     marginBottom: theme.spacing.md,
   },
   label: {
-    marginBottom: theme.spacing.xs,
     fontSize: theme.typography.body,
-    color: theme.colors.text,
     fontWeight: '500',
-  },
-  errorLabel: { // Style for labels associated with an error
-    color: theme.colors.destructive,
-  },
-  inlineErrorText: { // Style for errors displayed directly below the input/picker button
-    marginTop: -theme.spacing.sm + 4, // Adjust negative margin to position below button
-    marginBottom: theme.spacing.sm, // Add space before next element
-    fontSize: theme.typography.caption,
-    color: theme.colors.destructive,
-    marginLeft: theme.spacing.xs, // Align slightly with input text
-  },
-  sectionHeader: {
-    fontSize: theme.typography.subheading,
-    fontWeight: 'bold',
     color: theme.colors.secondary,
-    marginTop: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-    paddingBottom: theme.spacing.xs,
+    marginBottom: theme.spacing.xs,
   },
-  datePickerButton: {
+  labelError: {
+    color: theme.colors.destructive,
+  },
+  fieldGroup: {
+    marginBottom: theme.spacing.md,
+  },
+  pickerTrigger: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: theme.colors.inputBackground,
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.sm,
-    marginBottom: theme.spacing.md,
-    height: 44, // Match TextInput height
-    justifyContent: 'center',
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    height: 48,
   },
-  datePickerText: {
-    fontSize: theme.typography.body,
+  pickerText: {
+    fontSize: 16,
     color: theme.colors.text,
   },
-  customPickerButton: {
+  pickerContainer: {
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.sm,
     marginBottom: theme.spacing.md,
-    height: 44,
-    justifyContent: 'center',
     backgroundColor: theme.colors.inputBackground,
   },
-  disabledPickerButton: {
-    backgroundColor: theme.colors.disabledBackground,
-    borderColor: theme.colors.border,
-  },
-  customPickerButtonText: {
-    fontSize: theme.typography.body,
-    color: theme.colors.text,
-  },
-  pickerContainer: { // Optional container for styling the picker area if needed
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    marginBottom: theme.spacing.md,
-    overflow: 'hidden', // Helps contain the picker visuals
-  },
-  picker: {
-    // Style the picker itself if needed (height, color etc)
-    // Note: Styling Picker directly has limitations across platforms
-    // backgroundColor: theme.colors.inputBackground, // May not work reliably
-    height: Platform.OS === 'ios' ? 150 : 50, // Adjust height as needed, especially for iOS wheel
-  },
   pickerItem: {
-    // Style picker items if needed (e.g., font size on iOS)
-    // fontSize: theme.typography.body, // Example for iOS
   },
-  pickerItemPlaceholder: {
-    // Style the placeholder item specifically
-    color: theme.colors.textMuted,
-    // fontSize: theme.typography.body, // Example for iOS
+  pickerDisabled: {
+    backgroundColor: theme.colors.disabledBackground,
   },
-  button: {
-    marginTop: theme.spacing.lg,
-  },
-  errorContainer: {
-    backgroundColor: '#FFEBEE',
-    padding: theme.spacing.sm,
-    borderRadius: theme.borderRadius.sm,
-    marginBottom: theme.spacing.md,
+  inputErrorBorder: {
+    borderColor: theme.colors.destructive,
   },
   errorText: {
     color: theme.colors.destructive,
     fontSize: theme.typography.caption,
-    fontWeight: 'bold',
+    marginTop: theme.spacing.xs,
   },
+  generalErrorText: {
+    color: theme.colors.destructive,
+    textAlign: 'center',
+    marginBottom: theme.spacing.md,
+    fontSize: theme.typography.body,
+  },
+  button: {
+    marginTop: theme.spacing.lg,
+  },
+  iosPickerDoneButton: {
+    alignSelf: 'flex-end',
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.sm,
+  },
+  iosPickerDoneButtonText: {
+    color: theme.colors.primary,
+    fontSize: theme.typography.body,
+    fontWeight: '600',
+  },
+  modalBackground: {
+    flex: 1,
+    alignItems: 'center',
+    flexDirection: 'column',
+    justifyContent: 'space-around',
+    backgroundColor: '#00000040'
+  },
+  activityIndicatorWrapper: {
+    backgroundColor: '#FFFFFF',
+    height: 150,
+    width: 150,
+    borderRadius: theme.borderRadius.lg,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingVertical: theme.spacing.lg,
+  },
+  modalLoadingText: {
+    marginTop: theme.spacing.md,
+    fontSize: theme.typography.button,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+  }
 }); 

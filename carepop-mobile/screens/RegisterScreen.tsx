@@ -8,6 +8,9 @@ import * as WebBrowser from 'expo-web-browser'; // For Google Sign-Up
 import * as AuthSession from 'expo-auth-session'; // For Google Sign-Up
 import { useAuth } from '../src/context/AuthContext'; // Import useAuth
 import { supabase } from '../src/utils/supabase'; // Re-import for Google Sign Up
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { AuthStackParamList } from '../src/navigation/AppNavigator'; // Corrected path
 
 // Get backend URL from app.json extra - Currently not used in this screen.
 // const BASE_API_URL = Constants.expoConfig?.extra?.apiUrl;
@@ -19,23 +22,37 @@ import { supabase } from '../src/utils/supabase'; // Re-import for Google Sign U
  * Props for the RegisterScreen component.
  */
 interface RegisterScreenProps {
-  /** Function to navigate to the login screen. */
-  navigateToLogin: () => void;
+  // navigateToLogin: () => void; // Removed
 }
+
+// Define navigation prop type
+type RegisterScreenNavigationProp = NativeStackNavigationProp<
+  AuthStackParamList,
+  'Register' // This screen's name in the stack
+>;
 
 /**
  * RegisterScreen component provides UI for new user registration via email/password and Google OAuth.
  * It handles form input, validation, terms acceptance, and communication with Supabase for account creation.
  */
-export const RegisterScreen: React.FC<RegisterScreenProps> = ({
-  navigateToLogin,
-}) => {
+export const RegisterScreen: React.FC<RegisterScreenProps> = () => {
+  const navigation = useNavigation<RegisterScreenNavigationProp>(); // Get navigation object
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  // const [confirmPassword, setConfirmPassword] = useState(''); // Removed
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null); // For form validation errors
   const [showConfirmationMessage, setShowConfirmationMessage] = useState(false);
+
+  // New state for password
+  const [isLengthValid, setIsLengthValid] = useState(false);
+  const [hasUppercase, setHasUppercase] = useState(false);
+  const [hasLowercase, setHasLowercase] = useState(false);
+  const [hasNumber, setHasNumber] = useState(false);
+  const [hasSpecialChar, setHasSpecialChar] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState(0); // Score 0-5
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  // const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false); // Removed
 
   const { signUpWithEmail, isLoading, authError, clearAuthError } = useAuth(); // Access global auth state and supabase client
 
@@ -45,6 +62,44 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
       setLocalError(null); // Clear local form errors if a global auth error is set
     }
   }, [authError]);
+
+  /**
+   * Checks the strength and validity of the given password against defined criteria.
+   * Updates individual criteria states and overall password strength score.
+   * @param {string} pass The password string to check.
+   */
+  const checkPasswordStrength = (pass: string) => {
+    const minLength = 8;
+    const uppercaseRegex = /[A-Z]/;
+    const lowercaseRegex = /[a-z]/;
+    const numberRegex = /[0-9]/;
+    const specialCharRegex = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~]/; // Escaped special characters
+
+    const lengthValid = pass.length >= minLength;
+    const uppercaseValid = uppercaseRegex.test(pass);
+    const lowercaseValid = lowercaseRegex.test(pass);
+    const numberValid = numberRegex.test(pass);
+    const specialCharValid = specialCharRegex.test(pass);
+
+    setIsLengthValid(lengthValid);
+    setHasUppercase(uppercaseValid);
+    setHasLowercase(lowercaseValid);
+    setHasNumber(numberValid);
+    setHasSpecialChar(specialCharValid);
+
+    const strength = [lengthValid, uppercaseValid, lowercaseValid, numberValid, specialCharValid].filter(Boolean).length;
+    setPasswordStrength(strength);
+  };
+  
+  /**
+   * Handles password input change.
+   * Updates the password state and checks its strength.
+   * @param {string} text The new password text.
+   */
+  const handlePasswordChange = (text: string) => {
+    setPassword(text);
+    checkPasswordStrength(text);
+  };
 
   /**
    * Validates the registration form inputs.
@@ -57,22 +112,26 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
     setLocalError(null); // Clear local form error
 
     if (!isGoogleSignUp) {
-      if (!email || !password || !confirmPassword) {
-        setLocalError('Please fill out all required fields.');
+      if (!email || !password) { // Removed confirmPassword from check
+        setLocalError('Please fill out all required fields (Email, Password).'); // Updated error message
         return false;
       }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         setLocalError('Please enter a valid email address.');
         return false;
       }
-      if (password !== confirmPassword) {
-        setLocalError('Passwords do not match.');
+
+      // Password validation using the new criteria states
+      if (!isLengthValid || !hasUppercase || !hasLowercase || !hasNumber || !hasSpecialChar) {
+        setLocalError('Password does not meet all requirements. Please check the list below.');
+        // The individual requirement list will visually guide the user.
         return false;
       }
-      if (password.length < 6) {
-        setLocalError('Password must be at least 6 characters long.');
-        return false;
-      }
+
+      // if (password !== confirmPassword) { // Removed confirm password check
+      //   setLocalError('Passwords do not match.');
+      //   return false;
+      // }
     }
 
     if (!termsAccepted) {
@@ -244,24 +303,88 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
           />
           <TextInput
             label="Password"
-            placeholder="Create a password (min. 6 characters)"
+            placeholder="Create a password"
             value={password}
-            onChangeText={setPassword}
-            secureTextEntry
+            onChangeText={handlePasswordChange}
+            secureTextEntry={!isPasswordVisible}
             containerStyle={styles.input}
             editable={!isLoading}
             placeholderTextColor={theme.colors.textMuted}
+            trailingIcon={
+              <Ionicons 
+                name={isPasswordVisible ? 'eye-off-outline' : 'eye-outline'} 
+                size={24} 
+                color={theme.colors.textMuted} 
+              />
+            }
+            onPressTrailingIcon={() => setIsPasswordVisible(!isPasswordVisible)}
           />
-          <TextInput
-            label="Confirm Password"
-            placeholder="Confirm your password"
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            secureTextEntry
-            containerStyle={styles.input}
-            editable={!isLoading}
-            placeholderTextColor={theme.colors.textMuted}
-          />
+
+          {/* Password Strength Meter and Requirements List START */} 
+          {password.length > 0 && (
+            <View style={styles.passwordCriteriaContainer}>
+              <View style={styles.strengthMeterContainer}>
+                {Array.from({ length: 5 }).map((_, index) => {
+                  let segmentColor = theme.colors.border; // Use theme.colors.border for empty/default segment
+                  if (index < passwordStrength) {
+                    if (passwordStrength <= 1) segmentColor = theme.colors.destructive; // Weak (was error)
+                    else if (passwordStrength <= 2) segmentColor = theme.colors.warning; // Fair
+                    else if (passwordStrength <= 3) segmentColor = theme.colors.warning; // Medium (using warning again)
+                    else if (passwordStrength <= 4) segmentColor = theme.colors.secondary; // Good (was info, using secondary as an alternative)
+                    else segmentColor = theme.colors.success; // Strong
+                  }
+                  return (
+                    <View 
+                      key={`strength-segment-${index}`}
+                      style={[
+                        styles.strengthMeterSegment,
+                        { 
+                          backgroundColor: segmentColor,
+                          width: `${100 / 5}%`, // Each segment is 20%
+                        }
+                      ]}
+                    />
+                  );
+                })}
+              </View>
+              <Text style={styles.criteriaTitle}>Password must contain:</Text>
+              <View>
+                {[{
+                    label: `At least 8 characters long`,
+                    isValid: isLengthValid
+                  },
+                  {
+                    label: 'At least one uppercase letter (A-Z)',
+                    isValid: hasUppercase
+                  },
+                  {
+                    label: 'At least one lowercase letter (a-z)',
+                    isValid: hasLowercase
+                  },
+                  {
+                    label: 'At least one number (0-9)',
+                    isValid: hasNumber
+                  },
+                  {
+                    label: 'At least one special character (e.g., !@#$%^&*)',
+                    isValid: hasSpecialChar
+                  }
+                ].map(item => (
+                  <View key={item.label} style={styles.requirementItem}>
+                    <Ionicons 
+                      name={item.isValid ? 'checkmark-circle' : 'close-circle-outline'} 
+                      size={18} 
+                      color={item.isValid ? theme.colors.success : theme.colors.destructive /* Was theme.colors.error */}
+                    />
+                    <Text style={[styles.requirementText, { color: item.isValid ? theme.colors.success : theme.colors.textMuted }]}>
+                      {item.label}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+          {/* Password Strength Meter and Requirements List END */} 
 
           <View style={styles.termsContainer}>
             <Checkbox
@@ -309,9 +432,9 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
           />
 
           <View style={styles.loginLinkContainer}>
-            <Text style={styles.loginPromptText}>Already have an account? </Text>
-            <TouchableOpacity onPress={navigateToLogin} disabled={isLoading}>
-              <Text style={styles.linkText}>Login</Text>
+            <Text style={styles.loginLinkText}>Already have an account? </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Login')} disabled={isLoading}>
+              <Text style={styles.loginLink}>Log In</Text>
             </TouchableOpacity>
           </View>
         </Card>
@@ -332,10 +455,11 @@ const styles = StyleSheet.create({
     padding: theme.spacing.lg,
   },
   logo: {
-    width: 200,
-    height: 100,
+    width: 150,
+    height: 150,
     resizeMode: 'contain',
-    marginBottom: theme.spacing.xl,
+    alignSelf: 'center',
+    marginBottom: 20,
   },
   card: {
     width: '100%',
@@ -399,9 +523,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
   },
-  loginPromptText: {
+  loginLinkText: {
     color: theme.colors.secondary,
     fontSize: theme.typography.caption,
+  },
+  loginLink: {
+    color: theme.colors.primary,
+    fontWeight: 'bold',
+    fontSize: theme.typography.caption,
+    textDecorationLine: 'underline',
   },
   errorContainer: {
     backgroundColor: '#FFEBEE',
@@ -422,5 +552,36 @@ const styles = StyleSheet.create({
   successText: {
     color: '#2E7D32',
     fontSize: theme.typography.caption,
+  },
+  passwordCriteriaContainer: {
+    marginBottom: theme.spacing.md,
+    paddingHorizontal: theme.spacing.xs,
+  },
+  strengthMeterContainer: {
+    flexDirection: 'row',
+    height: 10,
+    backgroundColor: theme.colors.border,
+    borderRadius: theme.borderRadius.sm,
+    overflow: 'hidden',
+    marginBottom: theme.spacing.sm,
+  },
+  strengthMeterSegment: {
+    height: '100%',
+  },
+  criteriaTitle: {
+    fontSize: 14,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
+    fontWeight: 'bold',
+  },
+  requirementItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.xs, // Changed from xxs to xs to fix linter error
+  },
+  requirementText: {
+    fontSize: 13,
+    marginLeft: theme.spacing.sm,
+    // color: theme.colors.text, // Color will be dynamic
   },
 }); 

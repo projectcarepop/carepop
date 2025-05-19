@@ -1,10 +1,23 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, FlatList, TouchableOpacity, Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native'; // Import useNavigation
+import type { NavigationProp } from '@react-navigation/native';
 import { theme } from '../components';
 import { Card, Button } from '../components'; // Import Card and Button if needed
 import { MaterialIcons, Ionicons } from '@expo/vector-icons'; // Added Ionicons for more icon choices
 
-export function HealthBuddyScreen({ navigation }: any) {
+// Define param list for navigation type safety (if possible)
+// Consider creating a dedicated HealthBuddyStackParamList if not already done
+type HealthBuddyNavigationProp = NavigationProp<{
+  PillTrackerScreen: undefined; // Assuming this is the screen name
+  MensTrackerScreen: undefined; // Assuming this is the screen name
+  LogBloodPressureScreen: undefined; // Assuming this is the screen name
+  // Add routes for Comorbidities and Allergies if screens exist
+}>;
+
+export function HealthBuddyScreen() { // Remove navigation prop if using hook
+  const navigation = useNavigation<HealthBuddyNavigationProp>(); // Use the hook
+
   // TODO: Add state and logic for tracking data
 
   // Helper function to create a section with icon and title
@@ -25,7 +38,7 @@ export function HealthBuddyScreen({ navigation }: any) {
         <Text style={styles.screenTitle}>Your Health Buddy</Text>
         <Text style={styles.screenSubtitle}>Trackers and insights to support your well-being.</Text>
 
-        {/* Pill Tracker Section */}
+        {/* Pill Tracker Section - Updated onPress */}
         <Card style={styles.card}>
           {renderSectionHeader("Pill Tracker", "medical-services")}
           <Text style={styles.cardContent}>Stay on top of your medication schedule. Log doses and set reminders.</Text>
@@ -33,70 +46,87 @@ export function HealthBuddyScreen({ navigation }: any) {
             title="Manage Pill Tracker"
             variant="secondary"
             styleType="solid"
-            onPress={() => navigation.navigate('PillTrackerHome')}
+            onPress={() => navigation.navigate('PillTrackerScreen')} // Navigate to PillTrackerScreen
             style={styles.cardButton}
             icon={<MaterialIcons name="arrow-forward" size={16} color={theme.colors.background} />}
           />
         </Card>
 
-        {/* Menstrual Tracker Section */}
+        {/* Menstrual Tracker Section - Updated onPress */}
         <Card style={styles.card}>
           {renderSectionHeader("Menstrual Cycle", "female", "Ionicons")}
-          <Text style={styles.cardContent}>Track your cycle, log symptoms, and view predictions. Current prediction: Oct 5, 2024</Text>
+          <Text style={styles.cardContent}>Track your cycle, log symptoms, and view predictions.</Text> 
+          {/* Removed hardcoded date */}
           <Button 
             title="Manage Menstrual Tracker"
             variant="secondary"
             styleType="solid"
-            onPress={() => navigation.navigate('MensTrackerHome')}
+            onPress={() => navigation.navigate('MensTrackerScreen')} // Navigate to MensTrackerScreen
             style={styles.cardButton}
             icon={<MaterialIcons name="arrow-forward" size={16} color={theme.colors.background} />}
           />
         </Card>
 
-        {/* Activity Tracker Section */}
+        {/* ADDED Comorbidities Section */}
         <Card style={styles.card}>
-          {renderSectionHeader("Activity Goals", "directions-run")}
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>4,567</Text>
-              <Text style={styles.statLabel}>Steps Today</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>8,000</Text>
-              <Text style={styles.statLabel}>Goal</Text>
-            </View>
-          </View>
-          <Text style={styles.cardContentMuted}>Connect your fitness app for more details.</Text>
+          {renderSectionHeader("Comorbidities", "list-alt", "MaterialIcons")}
+          <Text style={styles.cardContent}>Log and manage any existing health conditions.</Text>
+          {/* TODO: Add onPress navigation when screen exists */}
+          <Button 
+            title="Log Comorbidities"
+            variant="secondary"
+            styleType="outline"
+            onPress={() => { Alert.alert('Coming Soon', 'Ability to log comorbidities is under development.'); }}
+            style={styles.cardButton}
+            icon={<Ionicons name="add-circle-outline" size={16} color={theme.colors.secondary} />}
+          />
         </Card>
 
-        {/* Blood Pressure Tracker Section */}
+        {/* ADDED Allergies Section */}
+        <Card style={styles.card}>
+          {renderSectionHeader("Allergies", "warning-amber", "MaterialIcons")}
+          <Text style={styles.cardContent}>Keep track of your known allergies.</Text>
+          {/* TODO: Add onPress navigation when screen exists */}
+          <Button 
+            title="Log Allergies"
+            variant="secondary"
+            styleType="outline"
+            onPress={() => { Alert.alert('Coming Soon', 'Ability to log allergies is under development.'); }}
+            style={styles.cardButton}
+            icon={<Ionicons name="add-circle-outline" size={16} color={theme.colors.secondary} />}
+          />
+        </Card>
+
+        {/* Blood Pressure Tracker Section - Updated onPress */}
         <Card style={styles.card}>
           {renderSectionHeader("Blood Pressure", "favorite-border")}
-          <Text style={styles.cardContent}>Last reading: 125/82 mmHg (Sep 30). Monitor your blood pressure regularly.</Text>
+          <Text style={styles.cardContent}>Monitor your blood pressure regularly.</Text>
+          {/* Removed last reading text */}
           <Button 
             title="Log New Reading" 
             variant="secondary"
             styleType="outline"
-            onPress={() => navigation.navigate('LogBloodPressure')}
+            onPress={() => navigation.navigate('LogBloodPressureScreen')} // Navigate to LogBloodPressureScreen
             style={styles.cardButton}
             icon={<MaterialIcons name="add-circle-outline" size={16} color={theme.colors.secondary} />}
           />
         </Card>
 
-        {/* Health Insights Section */}
+        {/* Health Insights Section - Kept as is */}
         <Card style={styles.card}>
           {renderSectionHeader("Health Insights", "lightbulb-outline")}
+          {/* Placeholder insights */}
           <View style={styles.insightItem}>
             <Ionicons name="checkmark-circle-outline" size={18} color={theme.colors.success} style={styles.insightIcon} />
-            <Text style={styles.insightText}>You have met your step goal 3 times this week!</Text>
+            <Text style={styles.insightText}>Placeholder health insight 1.</Text>
           </View>
           <View style={styles.insightItem}>
             <Ionicons name="alert-circle-outline" size={18} color={theme.colors.warning} style={styles.insightIcon} />
-            <Text style={styles.insightText}>Consider scheduling a follow-up based on recent logs.</Text>
+            <Text style={styles.insightText}>Placeholder health insight 2.</Text>
           </View>
            <View style={styles.insightItem}>
-            <Ionicons name="alarm-outline" size={18} color={theme.colors.primary} style={styles.insightIcon} />
-            <Text style={styles.insightText}>Remember to take your medication around 8:00 AM.</Text>
+            <Ionicons name="information-circle-outline" size={18} color={theme.colors.primary} style={styles.insightIcon} />
+            <Text style={styles.insightText}>Placeholder health insight 3.</Text>
           </View>
         </Card>
 

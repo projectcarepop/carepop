@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, Linking, TouchableOpacity } from 'react-native';
 import { theme } from '../components'; // Assuming theme is also exported from ../components/index.ts
-import { Ionicons, MaterialIcons } from '@expo/vector-icons'; // For icons
+import { Ionicons } from '@expo/vector-icons'; // For icons
 import type { NavigationProp } from '@react-navigation/native';
 
 interface AboutUsScreenProps {
@@ -23,13 +23,6 @@ export function AboutUsScreen({ navigation }: AboutUsScreenProps) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={theme.colors.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>About FPOP</Text>
-        <View style={{ width: 24 }} /> {/* Spacer */}
-      </View>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.mainTitle}>Family Planning Organization of the Philippines (FPOP)</Text>
         
@@ -131,7 +124,7 @@ const styles = StyleSheet.create({
   mainTitle: {
     fontSize: theme.typography.heading,
     fontWeight: 'bold',
-    color: theme.colors.primary,
+    color: theme.colors.secondary,
     marginBottom: theme.spacing.md,
     textAlign: 'center',
   },
