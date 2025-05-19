@@ -39,24 +39,29 @@
 *   `FE-PROFILE-2`: Dashboard Page (Web) - Updated to use `camelCase` fields from `AuthContext.Profile`. Ready for testing.
 
 **Recent Changes/Decisions:**
-*   **`carepop-web/src/app/create-profile/page.tsx` address dropdowns fixed:**
+*   **`carepop-web/src/app/create-profile/page.tsx` address fields temporarily changed to Text Inputs:**
+    *   Due to persistent issues with `Select` dropdowns (key warnings, not populating), the `provinceCode`, `cityMunicipalityCode`, and `barangayCode` fields were converted to use standard `Input` components as a temporary workaround.
+    *   Associated state variables (`provincesList`, `citiesMunicipalitiesList`, `barangaysList`) and `useEffect` hooks for fetching/managing dropdown data have been commented out.
+    *   The `AddressSelectItem` interface was removed as it became unused.
+    *   This allows users to input address information as free text, bypassing the problematic dropdowns for now.
+*   **`carepop-web/src/app/create-profile/page.tsx` address dropdowns fixed:** // This entry is now outdated by the change above.
     *   Clarified that the dynamic `Select` components for Province, City/Municipality, and Barangay fetch data from *local JSON files* (`provinces.json`, `cities-municipalities.json`, `barangays.json`) located in `carepop-web/public/data/psgc/`. This corrects previous notes that may have indicated an external API for these specific fields.
     *   User has confirmed placing/renaming these files correctly in the `carepop-web/public/data/psgc/` directory.
     *   This resolves the issue where these dropdowns might not have been populating correctly due to missing data sources.
     *   The `useEffect` hook in `create-profile/page.tsx` for populating the form with `initialProfile` data correctly sets `provinceCode`, `cityMunicipalityCode`, and `barangayCode`, which then triggers the cascading loading of dropdowns from the local JSON files if editing an existing profile.
 
 **Next Immediate Steps:**
-*   **User to test** the `create-profile` page functionality on `carepop-web/src/app/create-profile/page.tsx`, specifically the dynamic address fields, to ensure they populate and function correctly with the newly added local JSON data.
-*   Review overall form validation after address fields are confirmed working.
+*   **User to test** the `create-profile` page functionality on `carepop-web/src/app/create-profile/page.tsx`, specifically the address fields now being text inputs.
 *   **Proceed with commit and push of all changes to GitHub as requested by the user.**
 *   Update `progress.md` and `memorylog.md` (Memory Log updated, Progress update will follow this).
 
 **Risks/Blockers:**
-*   Correctness and completeness of the data within the user-provided PSGC JSON files. If the data is malformed or incomplete, dropdowns might still have issues.
-*   Reliability and rate limiting of the external PSGC API. If the API becomes unavailable or restrictive, it will impact profile creation/editing.
+*   Free-text address input may lead to inconsistent data formats. The original dropdown issue (likely non-unique keys in JSON data or other data issues) still needs to be investigated when time permits.
+*   Correctness and completeness of the data within the user-provided PSGC JSON files. If the data is malformed or incomplete, dropdowns might still have issues. // Less relevant now that they are text inputs
 
 **Key Learnings:**
-*   Successfully integrated chained loading of dependent dropdowns from local JSON files in a Next.js client component.
+*   Pivoted to text inputs as a temporary workaround for complex component issues to maintain progress.
+*   Successfully integrated chained loading of dependent dropdowns from local JSON files in a Next.js client component. // This learning is from the previous attempt, keep for now but note it's not the current implementation.
 *   Handled loading and error states for multiple asynchronous operations related to form inputs.
 
 **Memory Bank Files Status:**

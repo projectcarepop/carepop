@@ -191,20 +191,17 @@ The `create-profile` page has undergone substantial enhancements:
 *   It now correctly maps data to `snake_case` for Supabase.
 *   The redundant `sogie` textarea has been removed.
 *   Fields like `civilStatus`, `pronouns`, and `assignedSexAtBirth` use `Select` components.
-*   Most significantly, the address fields (Province, City/Municipality, Barangay) have been converted from static inputs to dynamic, `Select` components. These now fetch data from local JSON files (`provinces.json`, `cities-municipalities.json`, `barangays.json`) in `carepop-web/public/data/psgc/`, with chained loading based on user selections. The user has confirmed these files are in place.
+*   **Temporary Change:** The address fields (Province, City/Municipality, Barangay) on the `create-profile` page have been temporarily changed to use standard `Input` (text) fields instead of `Select` dropdowns due to persistent issues with the dropdown implementation. Related data fetching logic has been commented out.
 
 The `dashboard` page correctly displays profile data using `camelCase` fields from the updated `AuthContext.Profile`.
 
-Both profile-related pages (`create-profile`, `dashboard`) are now ready for thorough testing, especially the new dynamic address functionality and overall data flow.
+Both profile-related pages (`create-profile`, `dashboard`) are now ready for thorough testing, with address fields on the profile page now being text inputs.
 
 **Key Accomplishments Recently:**
-*   **`carepop-web/src/app/create-profile/page.tsx` Major Update:** 
-    *   Implemented dynamic, API-driven `Select` components for Province, City/Municipality, and Barangay using an external PSGC API (`jeffreybernadas/psgc-api`).
-    *   Established chained API calls for dependent address dropdowns.
-    *   Added comprehensive state management for API data, loading, and errors for the address section.
-    *   Ensured `initialProfile` data correctly populates and triggers these dynamic dropdowns in an edit scenario.
-    *   Changed `civilStatus`, `pronouns`, `assignedSexAtBirth` fields to `Select` components.
-    *   Removed redundant `sogie` textarea.
+*   **`carepop-web/src/app/create-profile/page.tsx` Update:** 
+    *   Temporarily converted Province, City/Municipality, and Barangay fields to text inputs as a workaround for dropdown issues.
+    *   Previously implemented dynamic, API-driven `Select` components for Province, City/Municipality, and Barangay using an external PSGC API (`jeffreybernadas/psgc-api`).
+    *   Previously updated to use local JSON files for address dropdowns (provinces.json, cities-municipalities.json, barangays.json).
 *   **`carepop-web/src/app/dashboard/page.tsx` Update:** Display logic aligned with `camelCase` fields in `AuthContext.Profile`.
 *   **`AuthContext.tsx` Update:** `Profile` interface refactored for mobile consistency (`camelCase`, specific SOGIE fields).
 

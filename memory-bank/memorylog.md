@@ -24,6 +24,12 @@
     *   **Reasoning:** To provide a reliable and local data source for PSGC information, ensuring the address selection dropdowns function as intended without external API dependencies for this part.
     *   **Impact:** The address selection dropdowns on the user profile page are now expected to be functional. This is a key step for `FE-PROFILE-1`. Further testing by the user is the next step for these fields.
 
+*   **YYYY-MM-DD (AUTO_UPDATE_DATE):** Temporarily Changed Address Fields to Text Inputs on Web Profile Page
+    *   **Context:** Ongoing issues with dropdowns (key warnings, not populating) for Province, City/Municipality, and Barangay on `carepop-web/src/app/create-profile/page.tsx`.
+    *   **Decision/Change:** Modified `create-profile/page.tsx` to use simple `Input` (text) fields for `provinceCode`, `cityMunicipalityCode`, and `barangayCode` instead of `Select` components. Commented out related state variables and `useEffect` hooks for fetching/managing address list data.
+    *   **Reasoning:** To allow user to proceed with profile creation/editing and other dependent tasks by bypassing the complex dropdown functionality for now. The root cause of dropdown issues (potentially non-unique keys in JSON data) can be investigated separately.
+    *   **Impact:** Address fields are now free-text inputs. This simplifies the form temporarily but removes the structured selection. The `AddressSelectItem` interface was also removed as it became unused.
+
 ---
 
 *This log will be updated with significant decisions and changes throughout the project lifecycle.*

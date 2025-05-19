@@ -16,11 +16,6 @@ import { cn } from '@/lib/utils';
 
 const supabase = createSupabaseBrowserClient();
 
-interface AddressSelectItem {
-  code: string;
-  name: string;
-}
-
 interface StepConfig {
   title: string;
   subtitle: string;
@@ -67,16 +62,16 @@ export default function CreateProfileWizardPage() {
 
   const [formData, setFormData] = useState<Partial<FormProfile>>({});
 
-  // Address Info - API Data Lists
-  const [provincesList, setProvincesList] = useState<AddressSelectItem[]>([]);
-  const [citiesMunicipalitiesList, setCitiesMunicipalitiesList] = useState<AddressSelectItem[]>([]);
-  const [barangaysList, setBarangaysList] = useState<AddressSelectItem[]>([]);
+  // Address Info - API Data Lists - COMMENTED OUT
+  // const [provincesList, setProvincesList] = useState<AddressSelectItem[]>([]);
+  // const [citiesMunicipalitiesList, setCitiesMunicipalitiesList] = useState<AddressSelectItem[]>([]);
+  // const [barangaysList, setBarangaysList] = useState<AddressSelectItem[]>([]);
 
-  // Address Info - API Loading States
-  const [provincesLoading, setProvincesLoading] = useState(false);
-  const [citiesMunicipalitiesLoading, setCitiesMunicipalitiesLoading] = useState(false);
-  const [barangaysLoading, setBarangaysLoading] = useState(false);
-  const [addressApiError, setAddressApiError] = useState<string | null>(null);
+  // Address Info - API Loading States - COMMENTED OUT
+  // const [provincesLoading, setProvincesLoading] = useState(false);
+  // const [citiesMunicipalitiesLoading, setCitiesMunicipalitiesLoading] = useState(false);
+  // const [barangaysLoading, setBarangaysLoading] = useState(false);
+  // const [addressApiError, setAddressApiError] = useState<string | null>(null);
 
   const [pageLoading, setPageLoading] = useState(false); // For form submission
   const [error, setError] = useState<string | null>(null);
@@ -118,98 +113,98 @@ export default function CreateProfileWizardPage() {
       }
     }, [authError]);
 
-  // Fetch all provinces on mount
-  useEffect(() => {
-    const fetchProvinces = async () => {
-      setProvincesLoading(true);
-      setAddressApiError(null);
-      try {
-        const response = await fetch('/data/psgc/provinces.json'); // Changed path
-        if (!response.ok) throw new Error(`Failed to load provinces.json: ${response.status} ${response.statusText}`);
-        const data = await response.json();
-        setProvincesList(Array.isArray(data) ? data : []);
-      } catch (err) {
-        console.error("Failed to fetch local provinces.json:", err);
-        const fetchError = err as { message?: string };
-        setAddressApiError(`Failed to load provinces: ${fetchError.message}`);
-        setProvincesList([]);
-      }
-      setProvincesLoading(false);
-    };
-    fetchProvinces();
-  }, []);
+  // Fetch all provinces on mount - COMMENTED OUT
+  // useEffect(() => {
+  //   const fetchProvinces = async () => {
+  //     setProvincesLoading(true);
+  //     setAddressApiError(null);
+  //     try {
+  //       const response = await fetch('/data/psgc/provinces.json');
+  //       if (!response.ok) throw new Error(`Failed to load provinces.json: ${response.status} ${response.statusText}`);
+  //       const data = await response.json();
+  //       setProvincesList(Array.isArray(data) ? data : []);
+  //     } catch (err) {
+  //       console.error("Failed to fetch local provinces.json:", err);
+  //       const fetchError = err as { message?: string };
+  //       setAddressApiError(`Failed to load provinces: ${fetchError.message}`);
+  //       setProvincesList([]);
+  //     }
+  //     setProvincesLoading(false);
+  //   };
+  //   fetchProvinces();
+  // }, []);
 
-  // Load and filter cities/municipalities when provinceCode changes from formData
-  useEffect(() => {
-    const currentProvinceCode = formData.provinceCode;
-    if (currentProvinceCode) {
-      const loadAndFilterCities = async () => {
-        setCitiesMunicipalitiesLoading(true);
-        setAddressApiError(null);
-        setCitiesMunicipalitiesList([]);
-        try {
-          const response = await fetch('/data/psgc/cities-municipalities.json'); // Changed path
-          if (!response.ok) throw new Error(`Failed to load cities-municipalities.json: ${response.status} ${response.statusText}`);
-          const allCities = await response.json();
-          if (Array.isArray(allCities)) {
-            const filteredCities = allCities.filter(city => city.province_code === currentProvinceCode);
-            setCitiesMunicipalitiesList(filteredCities);
-          } else {
-            setCitiesMunicipalitiesList([]);
-            throw new Error('Cities data is not an array');
-          }
-        } catch (err) {
-          console.error("Failed to load/filter local cities-municipalities.json:", err);
-          const fetchError = err as { message?: string };
-          setAddressApiError(`Failed to load cities/municipalities: ${fetchError.message}`);
-          setCitiesMunicipalitiesList([]);
-        }
-        setCitiesMunicipalitiesLoading(false);
-      };
-      loadAndFilterCities();
-    } else {
-      setCitiesMunicipalitiesList([]);
-      handleInputChange('cityMunicipalityCode', '');
-      setBarangaysList([]);
-      handleInputChange('barangayCode', '');
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.provinceCode]);
+  // Load and filter cities/municipalities when provinceCode changes from formData - COMMENTED OUT
+  // useEffect(() => {
+  //   const currentProvinceCode = formData.provinceCode;
+  //   if (currentProvinceCode) {
+  //     const loadAndFilterCities = async () => {
+  //       setCitiesMunicipalitiesLoading(true);
+  //       setAddressApiError(null);
+  //       setCitiesMunicipalitiesList([]);
+  //       try {
+  //         const response = await fetch('/data/psgc/cities-municipalities.json');
+  //         if (!response.ok) throw new Error(`Failed to load cities-municipalities.json: ${response.status} ${response.statusText}`);
+  //         const allCities = await response.json();
+  //         if (Array.isArray(allCities)) {
+  //           const filteredCities = allCities.filter(city => city.province_code === currentProvinceCode);
+  //           setCitiesMunicipalitiesList(filteredCities);
+  //         } else {
+  //           setCitiesMunicipalitiesList([]);
+  //           throw new Error('Cities data is not an array');
+  //         }
+  //       } catch (err) {
+  //         console.error("Failed to load/filter local cities-municipalities.json:", err);
+  //         const fetchError = err as { message?: string };
+  //         setAddressApiError(`Failed to load cities/municipalities: ${fetchError.message}`);
+  //         setCitiesMunicipalitiesList([]);
+  //       }
+  //       setCitiesMunicipalitiesLoading(false);
+  //     };
+  //     loadAndFilterCities();
+  //   } else {
+  //     setCitiesMunicipalitiesList([]);
+  //     handleInputChange('cityMunicipalityCode', '');
+  //     setBarangaysList([]);
+  //     handleInputChange('barangayCode', '');
+  //   }
+  // // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [formData.provinceCode]);
 
-  // Load and filter barangays when cityMunicipalityCode changes from formData
-  useEffect(() => {
-    const currentCityMunicipalityCode = formData.cityMunicipalityCode;
-    if (currentCityMunicipalityCode) {
-      const loadAndFilterBarangays = async () => {
-        setBarangaysLoading(true);
-        setAddressApiError(null);
-        setBarangaysList([]);
-        try {
-          const response = await fetch('/data/psgc/barangays.json'); // Changed path
-          if (!response.ok) throw new Error(`Failed to load barangays.json: ${response.status} ${response.statusText}`);
-          const allBarangays = await response.json();
-          if (Array.isArray(allBarangays)) {
-            const filteredBarangays = allBarangays.filter(bgy => bgy.city_municipality_code === currentCityMunicipalityCode);
-            setBarangaysList(filteredBarangays);
-          } else {
-            setBarangaysList([]);
-            throw new Error('Barangays data is not an array');
-          }
-        } catch (err) {
-          console.error("Failed to load/filter local barangays.json:", err);
-          const fetchError = err as { message?: string };
-          setAddressApiError(`Failed to load barangays: ${fetchError.message}`);
-          setBarangaysList([]);
-        }
-        setBarangaysLoading(false);
-      };
-      loadAndFilterBarangays();
-    } else {
-      setBarangaysList([]);
-      handleInputChange('barangayCode', '');
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.cityMunicipalityCode]);
+  // Load and filter barangays when cityMunicipalityCode changes from formData - COMMENTED OUT
+  // useEffect(() => {
+  //   const currentCityMunicipalityCode = formData.cityMunicipalityCode;
+  //   if (currentCityMunicipalityCode) {
+  //     const loadAndFilterBarangays = async () => {
+  //       setBarangaysLoading(true);
+  //       setAddressApiError(null);
+  //       setBarangaysList([]);
+  //       try {
+  //         const response = await fetch('/data/psgc/barangays.json');
+  //         if (!response.ok) throw new Error(`Failed to load barangays.json: ${response.status} ${response.statusText}`);
+  //         const allBarangays = await response.json();
+  //         if (Array.isArray(allBarangays)) {
+  //           const filteredBarangays = allBarangays.filter(bgy => bgy.city_municipality_code === currentCityMunicipalityCode);
+  //           setBarangaysList(filteredBarangays);
+  //         } else {
+  //           setBarangaysList([]);
+  //           throw new Error('Barangays data is not an array');
+  //         }
+  //       } catch (err) {
+  //         console.error("Failed to load/filter local barangays.json:", err);
+  //         const fetchError = err as { message?: string };
+  //         setAddressApiError(`Failed to load barangays: ${fetchError.message}`);
+  //         setBarangaysList([]);
+  //       }
+  //       setBarangaysLoading(false);
+  //     };
+  //     loadAndFilterBarangays();
+  //   } else {
+  //     setBarangaysList([]);
+  //     handleInputChange('barangayCode', '');
+  //   }
+  // // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [formData.cityMunicipalityCode]);
 
 
   const handleInputChange = (field: keyof FormProfile, value: string) => {
@@ -217,12 +212,12 @@ export default function CreateProfileWizardPage() {
     if (field === 'provinceCode') {
         // Reset dependent fields when province changes
         setFormData(prev => ({ ...prev, cityMunicipalityCode: '', barangayCode: '' }));
-        setCitiesMunicipalitiesList([]);
-        setBarangaysList([]);
+        // Reset dependent fields when province changes
+        setFormData(prev => ({ ...prev, cityMunicipalityCode: '', barangayCode: '' }));
     } else if (field === 'cityMunicipalityCode') {
         // Reset barangay when city/municipality changes
         setFormData(prev => ({ ...prev, barangayCode: '' }));
-        setBarangaysList([]);
+        setFormData(prev => ({ ...prev, barangayCode: '' }));
     }
   };
 
@@ -405,39 +400,17 @@ export default function CreateProfileWizardPage() {
         case 'provinceCode':
         case 'cityMunicipalityCode':
         case 'barangayCode':
-          let list: AddressSelectItem[] = [];
-          let isLoadingList = false;
-          let placeholderText = '';
-          if (field === 'provinceCode') {
-            list = provincesList;
-            isLoadingList = provincesLoading;
-            placeholderText = 'Select Province';
-          } else if (field === 'cityMunicipalityCode') {
-            list = citiesMunicipalitiesList;
-            isLoadingList = citiesMunicipalitiesLoading;
-            placeholderText = 'Select City/Municipality';
-          } else { // barangayCode
-            list = barangaysList;
-            isLoadingList = barangaysLoading;
-            placeholderText = 'Select Barangay';
-          }
           return (
-            <div key={field} className="space-y-1.5">
-              <Label htmlFor={field} className="text-sm font-medium">
+            <div key={field} className="space-y-2">
+              <Label htmlFor={field}>
                 {field === 'provinceCode' ? 'Province' : field === 'cityMunicipalityCode' ? 'City/Municipality' : 'Barangay'}
               </Label>
-              <Select
+              <Input
+                id={field}
                 value={formData[field] || ''}
-                onValueChange={(value) => handleInputChange(field, value)}
-                disabled={isLoadingList || (field === 'cityMunicipalityCode' && !formData.provinceCode) || (field === 'barangayCode' && !formData.cityMunicipalityCode)}
-              >
-                <SelectTrigger id={field}>
-                  <SelectValue placeholder={isLoadingList ? 'Loading...' : placeholderText} />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.isArray(list) ? list.map(item => <SelectItem key={item.code} value={item.code}>{item.name}</SelectItem>) : null}
-                </SelectContent>
-              </Select>
+                onChange={(e) => handleInputChange(field, e.target.value)}
+                placeholder={field === 'provinceCode' ? 'Enter Province' : field === 'cityMunicipalityCode' ? 'Enter City/Municipality' : 'Enter Barangay'}
+              />
             </div>
           );
         default:
@@ -531,12 +504,12 @@ export default function CreateProfileWizardPage() {
                 </motion.div>
               </AnimatePresence>
               
-              {addressApiError && (
+              {/* addressApiError && (
                 <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-300 rounded-md flex items-center">
                   <AlertTriangle className="h-5 w-5 mr-2 shrink-0" />
                   <p className="text-sm">{addressApiError}</p>
                 </div>
-              )}
+              )} */}
 
             </form>
           </CardContent>
