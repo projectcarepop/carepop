@@ -14,6 +14,7 @@ const app: Express = express();
 // Middleware
 const allowedOrigins = [
   'http://localhost:3000', // For carepop-web local development
+  'http://localhost:3001', // For carepop-web local development (when port 3000 is in use)
   // Add other origins as needed, e.g., your deployed frontend URL
   // For mobile development, the origin can sometimes be tricky.
   // Allowing the specific IP of your development machine (if emulator connects via it)

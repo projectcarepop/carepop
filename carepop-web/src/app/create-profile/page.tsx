@@ -10,11 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress"; // For step indication
 import { User as UserIcon, AlertTriangle, CheckCircle, Loader2, ArrowLeft, ArrowRight, Building, Map, UserCircle, HeartPulse } from 'lucide-react';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from '@/lib/utils';
-
-const supabase = createSupabaseBrowserClient();
 
 interface StepConfig {
   title: string;
@@ -55,7 +52,7 @@ const stepsConfig: StepConfig[] = [
 ];
 
 export default function CreateProfileWizardPage() {
-  const { user, profile: initialProfile, fetchProfile, isLoading: authLoading, error: authError } = useAuth();
+  const { user, session, profile: initialProfile, fetchProfile, isLoading: authLoading, error: authError } = useAuth();
   const router = useRouter();
 
   const [currentStep, setCurrentStep] = useState(0); // 0-indexed
@@ -223,82 +220,80 @@ export default function CreateProfileWizardPage() {
 
   const calculateAge = (dob: string | undefined): number | null => {
     if (!dob) return null;
-    const birthDate = new Date(dob);
-    if (isNaN(birthDate.getTime())) return null;
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
+    try {
+      const birthDate = new Date(dob);
+      if (isNaN(birthDate.getTime())) return null; 
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      return age >= 0 ? age : null;
+    } catch (e) {
+      console.error("Error calculating age:", e);
+      return null;
     }
-    return age >= 0 ? age : null;
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!user || !session?.access_token) {
+      setError('User not authenticated or session expired. Please log in.');
+      setPageLoading(false);
+      return;
+    }
+
     setPageLoading(true);
     setError(null);
     setSuccess(null);
 
-    if (!user) {
-      setError('User not authenticated. Please log in again.');
-      setPageLoading(false);
-      router.push('/login');
-      return;
+    const profileDataToSubmit: Partial<Profile> = { ...formData };
+
+    if (formData.dateOfBirth) {
+      const age = calculateAge(formData.dateOfBirth);
+      if (age !== null) {
+        profileDataToSubmit.age = age;
+      }
     }
-
-    const age = calculateAge(formData.dateOfBirth);
-    const profileDataToSave = {
-      ...formData,
-      user_id: user.id,
-      email: user.email, // Include email from user object
-      age: age, // Add calculated age
-      updated_at: new Date().toISOString(),
-      // Ensure snake_case for Supabase if needed, but AuthContext Profile is camelCase
-      // The Profile interface in AuthContext uses camelCase, matching Supabase client expectations.
-      // If Supabase table uses snake_case, a mapping might be needed here or server-side via function/trigger.
-      // Assuming current setup expects camelCase or handles it.
-       first_name: formData.firstName,
-       middle_initial: formData.middleInitial,
-       last_name: formData.lastName,
-       date_of_birth: formData.dateOfBirth,
-       gender_identity: formData.genderIdentity,
-       assigned_sex_at_birth: formData.assignedSexAtBirth,
-       civil_status: formData.civilStatus,
-       contact_no: formData.contactNo,
-       philhealth_no: formData.philhealthNo,
-       province_code: formData.provinceCode,
-       city_municipality_code: formData.cityMunicipalityCode,
-       barangay_code: formData.barangayCode,
-    };
     
-    // Remove undefined keys to prevent issues with Supabase client
-    Object.keys(profileDataToSave).forEach(key => {
-        const typedKey = key as keyof typeof profileDataToSave;
-        if (profileDataToSave[typedKey] === undefined) {
-            delete profileDataToSave[typedKey];
-        }
-    });
-
-
     try {
-      const { error: upsertError } = await supabase
-        .from('profiles')
-        .upsert(profileDataToSave, { onConflict: 'user_id' });
+      const token = session.access_token;
 
-      if (upsertError) {
-        console.error('Error saving profile:', upsertError);
-        throw upsertError;
+      const apiUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL;
+      
+      if (!apiUrl) {
+        console.error("Backend API URL is not configured. Please set NEXT_PUBLIC_BACKEND_API_URL.");
+        setError("Application configuration error: Backend URL missing.");
+        setPageLoading(false);
+        return;
       }
 
-      setSuccess('Profile saved successfully!');
-      await fetchProfile(user); // Refresh profile in AuthContext
-      router.push('/dashboard');
+      const response = await fetch(`${apiUrl}/api/users/profile`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(profileDataToSubmit),
+      });
 
+      const result = await response.json();
+
+      if (!response.ok) {
+        console.error("Profile update failed. Status:", response.status, "Result:", result);
+        throw new Error(result.message || `Failed to update profile. Status: ${response.status}`);
+      }
+
+      setSuccess('Profile updated successfully!');
+      if (fetchProfile) {
+        await fetchProfile(user);
+      }
+      router.push('/dashboard');
     } catch (err) {
-      console.error('Submission error:', err);
-      const error = err as { message?: string }; // More specific type
-      setError(error.message || 'An unexpected error occurred. Please try again.');
+      console.error('Error submitting profile:', err);
+      const error = err as Error;
+      setError(error.message || 'An unexpected error occurred.');
     } finally {
       setPageLoading(false);
     }

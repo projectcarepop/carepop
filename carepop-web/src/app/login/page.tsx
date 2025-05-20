@@ -2,17 +2,15 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-// import { useRouter } from 'next/navigation'; // Removed unused import
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react'; // Added Eye, EyeOff icons
-import GoogleIcon from '@/components/ui/GoogleIcon'; // Added GoogleIcon import
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react'; 
+import GoogleIcon from '@/components/ui/GoogleIcon';
 
 export default function LoginPage() {
-  // const router = useRouter(); // Removed unused variable
   const { signInWithEmail, isLoading, error, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,6 +19,14 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    console.log('[LoginPage] handleLogin triggered. Email:', email);
+
+    // Add this guard clause
+    if (!email && !password) { // Or a more specific check if needed, e.g., !email
+      console.warn('[LoginPage] handleLogin: Called with empty email and password, likely a premature trigger. Aborting.');
+      return; 
+    }
+
     setMessage('');
     // Adapt this to the correct AuthContext method for email/password
     const { error: signInError } = await signInWithEmail(email, password); 
@@ -29,6 +35,7 @@ export default function LoginPage() {
       // Error is set in AuthContext, also setting local message for more specific feedback if needed
       setMessage(`Login failed: ${signInError.message}`); 
     } else {
+      console.log('[LoginPage] signInWithEmail returned success. Setting success message.');
       setMessage('Login successful! Redirecting...');
       // router.push('/dashboard'); // Redirect handled by AuthContext or useEffect watching user state
     }

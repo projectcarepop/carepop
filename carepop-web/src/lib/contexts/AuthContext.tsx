@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-import type { User, AuthError, PostgrestError } from '@supabase/supabase-js';
+import { User, AuthError, PostgrestError, Session } from '@supabase/supabase-js';
 import { useRouter, usePathname } from 'next/navigation';
 
 export interface Profile {
@@ -36,6 +36,7 @@ export interface Profile {
 
 interface AuthContextType {
   user: User | null;
+  session: Session | null;
   profile: Profile | null;
   isLoading: boolean;
   error: AuthError | PostgrestError | Error | null;
@@ -43,7 +44,7 @@ interface AuthContextType {
   signUpWithPassword: (email: string, password: string) => Promise<{ user: User | null; error: AuthError | null }>;
   signInWithGoogle: () => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<{ error: AuthError | null }>;
-  fetchProfile: (user: User) => Promise<Profile | null>;
+  fetchProfile: (user: User, session: Session | null) => Promise<Profile | null>;
   sendPasswordResetEmail: (email: string) => Promise<{ error: AuthError | null }>;
 }
 
@@ -54,212 +55,371 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
+  const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<AuthError | PostgrestError | Error | null>(null);
 
   useEffect(() => {
-    const getInitialSessionAndProfile = async () => {
-      setIsLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
-      let currentProfile: Profile | null = null;
-      if (session?.user) {
-        currentProfile = await fetchProfile(session.user);
-      }
-      
-      // Redirect logic after initial load
-      if (session?.user && (!currentProfile || !currentProfile.firstName)) {
-        if (pathname !== '/create-profile') {
-          console.log('[AuthContext] Initial load: User logged in, profile incomplete. Redirecting to /create-profile.');
-          router.push('/create-profile');
+    console.log('[AuthContext] Main useEffect triggered. Pathname:', pathname);
+
+    // Handle deferred sign-out for just confirmed email
+    if (pathname === '/login' && sessionStorage.getItem('justConfirmedEmail') === 'true') {
+      sessionStorage.removeItem('justConfirmedEmail');
+      const performDelayedSignOut = async () => {
+        console.log('[AuthContext] Login page: justConfirmedEmail flag found. Checking session for sign out.');
+        setIsLoading(true); // Indicate activity
+        const { data: { session: activeSession } } = await supabase.auth.getSession(); // Re-check current session
+        if (activeSession) {
+          console.log('[AuthContext] Login page: Active session found with justConfirmedEmail flag. Signing out now.');
+          await supabase.auth.signOut();
+          // Explicitly clear state here too, to prevent UI flicker or race conditions
+          // although onAuthStateChange for SIGNED_OUT should also do this.
+          setUser(null);
+          setCurrentSession(null);
+          setProfile(null);
+          console.log('[AuthContext] Login page: States explicitly cleared after signOut call.');
+        } else {
+          console.log('[AuthContext] Login page: No active session found with justConfirmedEmail flag. Proceeding normally.');
         }
+        setIsLoading(false); // Done with this specific handling
+      };
+      performDelayedSignOut();
+      // The function will continue, and onAuthStateChange will eventually handle the SIGNED_OUT event
+    }
+
+    console.log('[AuthContext] useEffect for session/profile triggered. Pathname:', pathname);
+    const getInitialSessionAndProfile = async () => {
+      console.log('[AuthContext] getInitialSessionAndProfile: START, setting isLoading=true');
+      setIsLoading(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log('[AuthContext] getInitialSessionAndProfile: Got session', session ? '(exists)' : '(null)');
+        setCurrentSession(session);
+        setUser(session?.user ?? null);
+        let currentProfile: Profile | null = null;
+        if (session?.user) {
+          console.log('[AuthContext] getInitialSessionAndProfile: Fetching profile for user:', session.user.id);
+          currentProfile = await fetchProfile(session.user, session);
+          console.log('[AuthContext] getInitialSessionAndProfile: Profile fetched', currentProfile ? 'OK' : 'NULL/Error');
+        }
+        
+        if (session?.user && (!currentProfile || !currentProfile.firstName)) {
+          if (pathname !== '/create-profile' && pathname !== '/auth/callback') {
+            console.log('[AuthContext] Initial load: User logged in, profile incomplete. Redirecting to /create-profile.');
+            router.push('/create-profile');
+          }
+        }
+      } catch (e) {
+        console.error('[AuthContext] getInitialSessionAndProfile: CRITICAL ERROR', e);
+        const typedError = e instanceof Error ? e : new Error('Failed to initialize session or profile');
+        setError(typedError);
+      } finally {
+        console.log('[AuthContext] getInitialSessionAndProfile: FINALLY, setting isLoading=false');
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     getInitialSessionAndProfile();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      console.log(`[AuthContext] onAuthStateChange: EVENT: ${_event}, setting isLoading=true. Session:`, session ? '(exists)' : '(null)');
       setIsLoading(true);
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      
-      let currentProfile: Profile | null = null;
-      if (currentUser) {
-        currentProfile = await fetchProfile(currentUser);
-      } else {
-        setProfile(null);
-      }
+      const previousUserEmailConfirmedAt = user?.email_confirmed_at; 
 
-      // Redirect logic on auth state change
-      if (currentUser && (_event === 'SIGNED_IN' || _event === 'USER_UPDATED')) {
-        if ((!currentProfile || !currentProfile.firstName)) {
-          if (pathname !== '/create-profile') {
-            console.log('[AuthContext] Auth event: User signed in/updated, profile incomplete. Redirecting to /create-profile.');
-            router.push('/create-profile');
-          }
-        } else if (currentProfile?.firstName && pathname === '/login') {
-          console.log('[AuthContext] Auth event: User signed in, profile complete, on login page. Redirecting to /dashboard.');
-          router.push('/dashboard');
+      try {
+        const currentUser = session?.user ?? null;
+        setUser(currentUser); 
+        setCurrentSession(session);
+        console.log('[AuthContext] onAuthStateChange: User set to:', currentUser ? currentUser.id : 'null');
+        
+        let currentProfile: Profile | null = null;
+
+        if (currentUser && 
+            (_event === 'USER_UPDATED') && 
+            currentUser.email_confirmed_at && 
+            !previousUserEmailConfirmedAt && 
+            (!profile || !profile.firstName) 
+        ) {
+          console.log('[AuthContext] onAuthStateChange: Email confirmed event detected. Setting flag and redirecting to login.');
+          sessionStorage.setItem('justConfirmedEmail', 'true');
+          // DO NOT signOut() here, DO NOT clear user/session/profile here directly
+          router.push('/login?status=email_confirmed'); 
+          setIsLoading(false); // Done with this event's special handling
+          return; // Exit early to prevent standard profile fetching/redirect logic for this specific event
         }
+
+        // Existing profile fetching logic
+        if (currentUser) {
+          console.log('[AuthContext] onAuthStateChange: Fetching profile for user:', currentUser.id);
+          currentProfile = await fetchProfile(currentUser, session);
+          console.log('[AuthContext] onAuthStateChange: Profile fetched after fetchProfile call:', currentProfile ? JSON.stringify(currentProfile, null, 2) : 'NULL');
+        } else {
+          setProfile(null);
+          console.log('[AuthContext] onAuthStateChange: No current user, profile set to null');
+        }
+
+        if (currentUser && (_event === 'SIGNED_IN' || _event === 'USER_UPDATED')) {
+          console.log('[AuthContext] onAuthStateChange: SIGNED_IN or USER_UPDATED event (standard handling).');
+          console.log('[AuthContext] onAuthStateChange: currentProfile before redirect check:', JSON.stringify(currentProfile, null, 2));
+          console.log(`[AuthContext] onAuthStateChange: currentProfile.firstName value: ${currentProfile?.firstName}`);
+
+          if ((!currentProfile || !currentProfile.firstName)) {
+            if (pathname !== '/create-profile' && pathname !== '/auth/callback') {
+              console.log('[AuthContext] onAuthStateChange: User signed in/updated, profile incomplete. Redirecting to /create-profile.');
+              router.push('/create-profile');
+            }
+          } else if (currentProfile?.firstName && (pathname === '/login' || pathname === '/register' || pathname === '/auth/callback')) {
+            console.log(`[AuthContext] onAuthStateChange: User signed in, profile complete, on ${pathname}. Redirecting to /dashboard.`);
+            router.push('/dashboard');
+          }
+        }
+      } catch (e) {
+        console.error('[AuthContext] onAuthStateChange: CRITICAL ERROR', e);
+        const typedError = e instanceof Error ? e : new Error('Failed during auth state change processing');
+        setError(typedError);
+      } finally {
+        console.log(`[AuthContext] onAuthStateChange: FINALLY for event ${_event}, setting isLoading=false`);
+        setIsLoading(false); 
       }
-      setIsLoading(false); 
     });
 
     return () => {
+      console.log('[AuthContext] useEffect cleanup: Unsubscribing auth listener.');
       authListener?.subscription.unsubscribe();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, router, pathname]);
 
-  const fetchProfile = async (user: User): Promise<Profile | null> => {
-    if (!user) {
+  const fetchProfile = async (userParam: User, sessionParam: Session | null): Promise<Profile | null> => {
+    if (!userParam || !sessionParam?.access_token) {
+      console.log('[AuthContext] fetchProfile: Called with no user or no access token, setting profile to null.');
       setProfile(null);
       return null;
     }
+    console.log('[AuthContext] fetchProfile: Fetching from backend API for user:', userParam.id);
+    
+    const apiUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL;
+    console.log('[AuthContext] fetchProfile: Using API URL:', apiUrl);
+    if (!apiUrl) {
+      console.error("[AuthContext] fetchProfile: Backend API URL is not configured.");
+      setError(new Error("Application configuration error: Backend URL missing."));
+      setProfile(null);
+      return null;
+    }
+
     try {
-      const { data: supabaseData, error: profileError, status } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+      const response = await fetch(`${apiUrl}/api/users/profile`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${sessionParam.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-      if (profileError && status !== 406) {
-        console.error('Error fetching profile. Status from response:', status, 'Raw profileError object:', profileError);
-        console.error('profileError keys:', Object.keys(profileError));
-        console.error('profileError message:', profileError.message);
-        console.error('profileError details:', profileError.details);
-        console.error('profileError hint:', profileError.hint);
-        console.error('profileError code:', profileError.code);
-
-        if (profileError.message) {
-          setError(profileError);
-        } else {
-          setError(new Error(`Error fetching profile. Status: ${status}. Error: ${JSON.stringify(profileError)}`));
-        }
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response' }));
+        console.error(`[AuthContext] fetchProfile: API error fetching profile for ${userParam.id}. Status: ${response.status}`, errorData);
+        setError(new Error(errorData.message || `API Error: ${response.status}`));
         setProfile(null);
         return null;
       }
 
-      if (supabaseData) {
-        // Transform snake_case from Supabase to camelCase for the Profile interface
-        const transformedProfile: Profile = {
-          user_id: supabaseData.user_id,
-          username: supabaseData.username,
-          avatar_url: supabaseData.avatar_url,
-          firstName: supabaseData.first_name,
-          middleInitial: supabaseData.middle_initial,
-          lastName: supabaseData.last_name,
-          dateOfBirth: supabaseData.date_of_birth,
-          age: supabaseData.age,
-          genderIdentity: supabaseData.gender_identity,
-          pronouns: supabaseData.pronouns,
-          assignedSexAtBirth: supabaseData.assigned_sex_at_birth,
-          civilStatus: supabaseData.civil_status,
-          religion: supabaseData.religion,
-          occupation: supabaseData.occupation,
-          street: supabaseData.street,
-          barangayCode: supabaseData.barangay_code,
-          cityMunicipalityCode: supabaseData.city_municipality_code,
-          provinceCode: supabaseData.province_code,
-          contactNo: supabaseData.contact_no,
-          philhealthNo: supabaseData.philhealth_no,
-        };
-        setProfile(transformedProfile);
-        return transformedProfile;
+      const responseData = await response.json();
+      
+      const rawProfileData = responseData.data || responseData;
+
+      if (!rawProfileData || Object.keys(rawProfileData).length === 0) { 
+        console.error(`[AuthContext] fetchProfile: Profile data is empty or not found in API response for ${userParam.id}. Response:`, responseData);
+        setProfile(null);
+        return null;
       }
-      setProfile(null);
-      return null;
+
+      // Map snake_case to camelCase
+      const fetchedProfileData: Profile = {
+        user_id: rawProfileData.user_id,
+        username: rawProfileData.username,
+        avatar_url: rawProfileData.avatar_url,
+        firstName: rawProfileData.first_name,
+        middleInitial: rawProfileData.middle_initial,
+        lastName: rawProfileData.last_name,
+        dateOfBirth: rawProfileData.date_of_birth,
+        age: rawProfileData.age,
+        genderIdentity: rawProfileData.gender_identity,
+        pronouns: rawProfileData.pronouns,
+        assignedSexAtBirth: rawProfileData.assigned_sex_at_birth,
+        civilStatus: rawProfileData.civil_status,
+        religion: rawProfileData.religion,
+        occupation: rawProfileData.occupation,
+        street: rawProfileData.street,
+        barangayCode: rawProfileData.barangay_code,
+        cityMunicipalityCode: rawProfileData.city_municipality_code,
+        provinceCode: rawProfileData.province_code,
+        contactNo: rawProfileData.contact_no,
+        philhealthNo: rawProfileData.philhealth_no,
+        // Ensure all fields from the Profile interface are mapped here
+      };
+
+      console.log('[AuthContext] fetchProfile: Mapped fetchedProfileData (camelCase) before setting state:', JSON.stringify(fetchedProfileData, null, 2));
+      console.log(`[AuthContext] fetchProfile: Does MAPPED fetchedProfileData have firstName? ${fetchedProfileData && fetchedProfileData.hasOwnProperty('firstName') ? fetchedProfileData.firstName : 'No or undefined'}`);
+
+      console.log(`[AuthContext] fetchProfile: Successfully fetched profile data from API for ${userParam.id}`);
+      setProfile(fetchedProfileData);
+      setError(null);
+      return fetchedProfileData;
+
     } catch (e: unknown) {
-      console.error('Unexpected error fetching profile:', e);
-      if (e instanceof Error) {
-        setError(new Error('Failed to fetch profile: ' + e.message));
-      } else {
-        setError(new Error('Failed to fetch profile due to an unknown error.'));
-      }
+      console.error(`[AuthContext] fetchProfile: Unexpected error during API call for user ${userParam.id}:`, e);
+      const typedError = e instanceof Error ? e : new Error('Failed to fetch profile from API.');
+      setError(typedError);
       setProfile(null);
       return null;
     }
   };
 
+  const exposedFetchProfile = async (userForProfile: User): Promise<Profile | null> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return fetchProfile(userForProfile, session);
+  };
+
   const signInWithEmail = async (email: string, password?: string) => {
+    console.log('[AuthContext] signInWithEmail called. Email:', email);
     setIsLoading(true);
     setError(null);
+    try {
+      if (!password) {
+        console.error("Password is required for email/password sign-in.");
+        const err = { name: "AuthInvalidCredentialsError", message: "Password is required." } as AuthError;
+        setError(err);
+        return { error: err };
+      }
 
-    if (!password) {
-      console.error("Password is required for email/password sign-in.");
-      const err = { name: "AuthInvalidCredentialsError", message: "Password is required." } as AuthError;
-      setError(err);
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) {
+        console.error('Login error:', signInError);
+        setError(signInError);
+      }
+      return { error: signInError };
+    } finally {
       setIsLoading(false);
-      return { error: err };
     }
-
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (signInError) {
-      console.error('Login error:', signInError);
-      setError(signInError);
-    }
-    return { error: signInError };
   };
 
   const signUpWithPassword = async (email: string, password: string) => {
     setIsLoading(true);
     setError(null);
-    const { data: { user: newUser }, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-      },
-    });
-    if (signUpError) setError(signUpError);
-    return { user: newUser, error: signUpError };
+    let userToReturn = null;
+    let errorToReturn = null;
+    try {
+      const { data: { user: newUser }, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`,
+        },
+      });
+      if (signUpError) {
+        setError(signUpError);
+        errorToReturn = signUpError;
+      } else {
+        userToReturn = newUser;
+      }
+    } catch (catchError: unknown) {
+      console.error('Caught an unexpected error during signUpWithPassword:', catchError);
+      const typedError = catchError instanceof AuthError ? catchError : (catchError instanceof Error ? catchError : new Error('Unexpected error during sign up'));
+      setError(typedError);
+      errorToReturn = typedError instanceof AuthError ? typedError : { name: 'SignUpCatchError', message: typedError.message } as AuthError;
+    } finally {
+      setIsLoading(false);
+    }
+    return { user: userToReturn, error: errorToReturn };
   };
 
   const signInWithGoogle = async () => {
     setIsLoading(true);
     setError(null);
-    const { error: googleError } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`,
-      },
-    });
-    if (googleError) {
-      console.error('Google Sign-In error:', googleError);
-      setError(googleError);
+    try {
+      const { error: googleError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`,
+        },
+      });
+      if (googleError) {
+        console.error('Google Sign-In error:', googleError);
+        setError(googleError);
+      }
+      if (googleError) setIsLoading(false); 
+      return { error: googleError };
+    } catch (catchError: unknown) {
+        console.error('Caught an unexpected error during signInWithGoogle:', catchError);
+        const typedError = catchError instanceof AuthError ? catchError : (catchError instanceof Error ? catchError : new Error('Unexpected error during Google sign in'));
+        setError(typedError);
+        setIsLoading(false);
+        return { error: typedError instanceof AuthError ? typedError : { name: 'GoogleSignInCatchError', message: typedError.message } as AuthError };
     }
-    return { error: googleError };
   };
 
   const sendPasswordResetEmail = async (email: string) => {
     setIsLoading(true);
     setError(null);
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/update-password`,
-    });
-    if (resetError) {
-      console.error('Password Reset error:', resetError);
-      setError(resetError);
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/update-password`,
+      });
+      if (resetError) {
+        console.error('Password Reset error:', resetError);
+        setError(resetError);
+      }
+      return { error: resetError };
+    } catch (catchError: unknown) {
+      console.error('Caught an unexpected error during sendPasswordResetEmail:', catchError);
+      const typedError = catchError instanceof AuthError ? catchError : (catchError instanceof Error ? catchError : new Error('Unexpected error during password reset email'));
+      setError(typedError);
+      return { error: typedError instanceof AuthError ? typedError : { name: 'PasswordResetCatchError', message: typedError.message } as AuthError };
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
-    return { error: resetError };
   };
 
   const signOut = async () => {
     setIsLoading(true);
     setError(null);
-    const { error: signOutError } = await supabase.auth.signOut();
-    if (signOutError) setError(signOutError);
-    return { error: signOutError };
+    try {
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) {
+        setError(signOutError);
+      } else {
+        setProfile(null);
+      }
+      return { error: signOutError };
+    } catch (catchError: unknown) {
+      console.error('Caught an unexpected error during signOut:', catchError);
+      const typedError = catchError instanceof AuthError ? catchError : (catchError instanceof Error ? catchError : new Error('Unexpected error during sign out'));
+      setError(typedError);
+      return { error: typedError instanceof AuthError ? typedError : { name: 'SignOutCatchError', message: typedError.message } as AuthError };
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, isLoading, error, signInWithEmail, signUpWithPassword, signInWithGoogle, signOut, fetchProfile, sendPasswordResetEmail }}>
+    <AuthContext.Provider value={{
+      user,
+      session: currentSession,
+      profile,
+      isLoading,
+      error,
+      signInWithEmail,
+      signUpWithPassword,
+      signInWithGoogle,
+      signOut,
+      fetchProfile: exposedFetchProfile,
+      sendPasswordResetEmail
+    }}>
       {children}
     </AuthContext.Provider>
   );

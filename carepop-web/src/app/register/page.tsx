@@ -2,26 +2,39 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+// import { useRouter } from 'next/navigation'; // Removed unused import
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Mail, Lock } from 'lucide-react'; // Icons
 import GoogleIcon from '@/components/ui/GoogleIcon'; // Added GoogleIcon import
 
 export default function RegisterPage() {
-  const router = useRouter();
+  // const router = useRouter(); // Removed unused constant
   const { signUpWithPassword, isLoading, error, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [message, setMessage] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
 
   const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setMessage('');
+    setModalMessage('');
+
     if (password !== confirmPassword) {
       setMessage('Passwords do not match.');
       return;
@@ -33,18 +46,33 @@ export default function RegisterPage() {
       console.error('Registration failed:', signUpError.message);
       setMessage(`Registration failed: ${signUpError.message}`);
     } else if (user) {
-      setMessage('Registration successful! Redirecting to login...'); // Or dashboard if auto-login
-      // Supabase automatically logs in the user on successful signup.
-      // The onAuthStateChange listener in AuthContext should pick this up.
-      // We can redirect to dashboard or login page.
-      // For now, let's assume we want them to see the login page or a message.
-      router.push('/login'); // Or router.push('/dashboard');
+      setModalMessage('Registration successful! Please check your email to confirm your account and complete the process.');
+      setShowSuccessModal(true);
+      setEmail('');
+      setPassword('');
+      setConfirmPassword('');
+      setMessage('');
+    }
+  };
+
+  const handleGoogleSignUp = async () => {
+    setMessage('');
+    setModalMessage('');
+    // For Google Sign-Up, if email confirmation is required for OAuth users too,
+    // Supabase will handle sending the email. The user flow will be similar.
+    // We might want to show a generic processing or check email message here too,
+    // but it's harder to coordinate with the redirect flow of OAuth.
+    // For now, rely on AuthContext to eventually show errors if Google sign-in fails before redirect.
+    const { error: googleError } = await signInWithGoogle();
+    if (googleError) {
+        // If signInWithGoogle itself returns an error (e.g. popup closed, network issue before redirect)
+        setMessage(`Google sign-up failed: ${googleError.message}`);
     } else {
-        setMessage('Registration completed. You can now log in.');
-        // setEmail('');
-        // setPassword('');
-        // setConfirmPassword('');
-        // router.push('/login'); // Good practice to redirect to login
+        // Potentially set a general message, though user is likely being redirected.
+        // setMessage("Redirecting to Google for sign-up..."); 
+        // It might be better to set a modal for Google sign-up as well, 
+        // indicating to check email if that's the flow.
+        // For now, if no immediate error, assume redirect or onAuthStateChange will handle.
     }
   };
 
@@ -69,6 +97,7 @@ export default function RegisterPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   className="pl-10"
+                  disabled={isLoading || showSuccessModal} // Disable while loading or modal is shown
                 />
               </div>
             </div>
@@ -85,6 +114,7 @@ export default function RegisterPage() {
                   required
                   minLength={6} // Supabase default minimum
                   className="pl-10"
+                  disabled={isLoading || showSuccessModal} // Disable while loading or modal is shown
                 />
               </div>
             </div>
@@ -100,12 +130,13 @@ export default function RegisterPage() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                   className="pl-10"
+                  disabled={isLoading || showSuccessModal} // Disable while loading or modal is shown
                 />
               </div>
             </div>
             {error && <p className="text-sm text-destructive">{error.message}</p>}
-            {message && <p className={`text-sm ${error || password !== confirmPassword ? 'text-destructive' : 'text-primary'}`}>{message}</p>}
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            {message && <p className={`text-sm ${error || (password !== confirmPassword && message === 'Passwords do not match.') ? 'text-destructive' : 'text-primary'}`}>{message}</p>}
+            <Button type="submit" className="w-full" disabled={isLoading || showSuccessModal}>
               {isLoading ? 'Registering...' : 'Register'}
             </Button>
           </form>
@@ -119,10 +150,7 @@ export default function RegisterPage() {
               </span>
             </div>
           </div>
-          <Button variant="outline" className="w-full" onClick={async () => {
-            await signInWithGoogle(); 
-            // Error handling will be managed by AuthContext or page might navigate away
-          }} disabled={isLoading}>
+          <Button variant="outline" className="w-full" onClick={handleGoogleSignUp} disabled={isLoading || showSuccessModal}>
             <GoogleIcon className="mr-2 h-4 w-4" />
             Sign up with Google
           </Button>
@@ -136,6 +164,21 @@ export default function RegisterPage() {
           </p>
         </CardFooter>
       </Card>
+
+      <AlertDialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Registration Submitted</AlertDialogTitle>
+            <AlertDialogDescription>
+              {modalMessage}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowSuccessModal(false)}>OK</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 } 

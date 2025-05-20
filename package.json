@@ -3,6 +3,7 @@
     "tailwindcss-animate": "^1.0.7"
   },
   "dependencies": {
+    "cors": "^2.8.5",
     "framer-motion": "^12.12.1"
   }
 }
