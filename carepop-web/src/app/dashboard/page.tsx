@@ -2,16 +2,47 @@
 
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Loader2, UserCircle, Edit3, AlertCircle } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 
+// Define AddressSelectItem and Barangay types (can be moved to a shared types file later)
+// interface AddressSelectItem { // Removed as it's not used on this page
+// value: string;
+// label: string;
+// }
+
+interface Barangay {
+  brgy_code: string;
+  brgy_name: string;
+  city_code: string;
+  province_code: string;
+  // Add other fields if necessary from your JSON structure, e.g., region_code
+}
+interface CityMunicipality {
+    city_code: string;
+    city_name: string;
+    province_code: string;
+    // Add other fields if necessary
+}
+interface Province {
+    province_code: string;
+    province_name: string;
+    // Add other fields if necessary
+}
+
 export default function DashboardPage() {
-  const { user, profile, isLoading: authLoading, signOut } = useAuth();
+  const { user, profile, isLoading: authLoading } = useAuth();
   const router = useRouter();
+
+  // State for PSGC data
+  const [provinces, setProvinces] = useState<Province[]>([]);
+  const [citiesMunicipalities, setCitiesMunicipalities] = useState<CityMunicipality[]>([]);
+  const [barangays, setBarangays] = useState<Barangay[]>([]);
+  const [psgcLoading, setPsgcLoading] = useState(true);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -19,7 +50,57 @@ export default function DashboardPage() {
     }
   }, [authLoading, user, router]);
 
-  if (authLoading) {
+  // Fetch PSGC data on mount
+  useEffect(() => {
+    const fetchPsgcData = async () => {
+      try {
+        setPsgcLoading(true);
+        const [provRes, cityMunRes, bgyRes] = await Promise.all([
+          fetch('/data/psgc/provinces.json'),
+          fetch('/data/psgc/cities-municipalities.json'),
+          fetch('/data/psgc/barangays.json'),
+        ]);
+
+        if (!provRes.ok || !cityMunRes.ok || !bgyRes.ok) {
+          console.error('Failed to fetch PSGC data');
+          // Handle error appropriately, maybe set an error state
+          return;
+        }
+
+        const provData = await provRes.json();
+        const cityMunData = await cityMunRes.json();
+        const bgyData = await bgyRes.json();
+
+        setProvinces(Array.isArray(provData) ? provData : []);
+        setCitiesMunicipalities(Array.isArray(cityMunData) ? cityMunData : []);
+        setBarangays(Array.isArray(bgyData) ? bgyData : []);
+
+      } catch (error) {
+        console.error('Error fetching PSGC data:', error);
+      } finally {
+        setPsgcLoading(false);
+      }
+    };
+    fetchPsgcData();
+  }, []);
+
+  // Helper functions to get names from codes
+  const getProvinceName = (code?: string) => {
+    if (!code) return 'N/A';
+    return provinces.find(p => p.province_code === code)?.province_name || code;
+  };
+
+  const getCityMunicipalityName = (code?: string) => {
+    if (!code) return 'N/A';
+    return citiesMunicipalities.find(c => c.city_code === code)?.city_name || code;
+  };
+
+  const getBarangayName = (code?: string) => {
+    if (!code) return 'N/A';
+    return barangays.find(b => b.brgy_code === code)?.brgy_name || code;
+  };
+
+  if (authLoading || psgcLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
@@ -58,9 +139,6 @@ export default function DashboardPage() {
           </h1>
           <p className="text-muted-foreground">This is your personal dashboard.</p>
         </div>
-        <Button onClick={signOut} variant="outline">
-          Sign Out
-        </Button>
       </div>
 
       {!profileComplete && (
@@ -157,8 +235,8 @@ export default function DashboardPage() {
             <div>
                 <Label htmlFor="address" className="text-sm font-medium text-muted-foreground">Address</Label>
                 <p id="address" className="text-lg">
-                    {profile?.street || 'N/A'}, Brgy: {profile?.barangayCode || 'N/A'}, 
-                    City/Mun: {profile?.cityMunicipalityCode || 'N/A'}, Prov: {profile?.provinceCode || 'N/A'}
+                    {profile?.street || 'N/A'}, {getBarangayName(profile?.barangayCode)}, 
+                    {getCityMunicipalityName(profile?.cityMunicipalityCode)}, {getProvinceName(profile?.provinceCode)}
                 </p>
             </div>
           </div>

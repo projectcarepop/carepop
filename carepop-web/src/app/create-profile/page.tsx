@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, FormEvent } from 'react';
+import React, { useState, useEffect, FormEvent, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, Profile } from '@/lib/contexts/AuthContext'; // Assuming Profile is exported
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,42 +12,68 @@ import { Progress } from "@/components/ui/progress"; // For step indication
 import { User as UserIcon, AlertTriangle, CheckCircle, Loader2, ArrowLeft, ArrowRight, Building, Map, UserCircle, HeartPulse } from 'lucide-react';
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from '@/lib/utils';
+import { Combobox } from "@/components/ui/combobox"; // Added Combobox import
 
 interface StepConfig {
   title: string;
   subtitle: string;
   icon: React.ElementType;
   fields: (keyof Profile)[]; // Fields for this step
+  requiredFields?: (keyof FormProfile)[]; // Optional: Fields required for this step
+  label: string;
 }
 
 // Define profile fields as used in the form, matching the Profile interface
 type FormProfile = Omit<Profile, 'user_id' | 'age' | 'username' | 'avatar_url'>;
 
+// Define AddressSelectItem type
+interface AddressSelectItem {
+  value: string;
+  label: string;
+}
+
+// Define Barangay type based on observed data structure
+interface Barangay {
+  brgy_code: string;
+  brgy_name: string;
+  city_code: string;
+  province_code: string;
+  region_code: string; // Assuming this is also present or might be useful
+  // Add other fields if necessary based on barangays.json structure
+}
 
 const stepsConfig: StepConfig[] = [
   {
     title: "Personal Details",
     subtitle: "Let's start with some basic information about you.",
     icon: UserCircle,
-    fields: ['firstName', 'middleInitial', 'lastName', 'dateOfBirth', 'contactNo']
+    fields: ['firstName', 'middleInitial', 'lastName', 'dateOfBirth', 'contactNo'],
+    requiredFields: ['firstName', 'lastName', 'dateOfBirth', 'contactNo'],
+    label: "Personal Details"
   },
   {
     title: "Gender Identity",
     subtitle: "Help us understand you better.",
     icon: HeartPulse,
-    fields: ['genderIdentity', 'pronouns', 'assignedSexAtBirth', 'civilStatus', 'religion']
+    fields: ['genderIdentity', 'pronouns', 'assignedSexAtBirth', 'civilStatus', 'religion'],
+    requiredFields: ['genderIdentity', 'pronouns', 'assignedSexAtBirth', 'civilStatus'], // religion can be optional
+    label: "Gender Identity"
   },
   {
     title: "Professional & Health ID",
     subtitle: "A little more about your professional life and health coverage.",
     icon: Building,
-    fields: ['occupation', 'philhealthNo']
+    fields: ['occupation', 'philhealthNo'],
+    requiredFields: ['occupation'], // philhealthNo can be optional
+    label: "Professional & Health ID"
   },
   {
     title: "Your Address",
     subtitle: "Where can we reach you or send information?",
     icon: Map,
-    fields: ['provinceCode', 'cityMunicipalityCode', 'barangayCode', 'street']
+    fields: ['provinceCode', 'cityMunicipalityCode', 'barangayCode', 'street'],
+    requiredFields: ['provinceCode', 'cityMunicipalityCode', 'barangayCode', 'street'],
+    label: "Your Address"
   }
 ];
 
@@ -58,17 +84,18 @@ export default function CreateProfileWizardPage() {
   const [currentStep, setCurrentStep] = useState(0); // 0-indexed
 
   const [formData, setFormData] = useState<Partial<FormProfile>>({});
+  const [stepErrors, setStepErrors] = useState<Record<string, string>>({}); // For inline field errors
 
-  // Address Info - API Data Lists - COMMENTED OUT
-  // const [provincesList, setProvincesList] = useState<AddressSelectItem[]>([]);
-  // const [citiesMunicipalitiesList, setCitiesMunicipalitiesList] = useState<AddressSelectItem[]>([]);
-  // const [barangaysList, setBarangaysList] = useState<AddressSelectItem[]>([]);
+  // Address Info - API Data Lists
+  const [provincesList, setProvincesList] = useState<AddressSelectItem[]>([]);
+  const [citiesMunicipalitiesList, setCitiesMunicipalitiesList] = useState<AddressSelectItem[]>([]);
+  const [barangaysList, setBarangaysList] = useState<AddressSelectItem[]>([]);
 
-  // Address Info - API Loading States - COMMENTED OUT
-  // const [provincesLoading, setProvincesLoading] = useState(false);
-  // const [citiesMunicipalitiesLoading, setCitiesMunicipalitiesLoading] = useState(false);
-  // const [barangaysLoading, setBarangaysLoading] = useState(false);
-  // const [addressApiError, setAddressApiError] = useState<string | null>(null);
+  // Address Info - API Loading States
+  const [provincesLoading, setProvincesLoading] = useState(false);
+  const [citiesMunicipalitiesLoading, setCitiesMunicipalitiesLoading] = useState(false);
+  const [barangaysLoading, setBarangaysLoading] = useState(false);
+  const [addressApiError, setAddressApiError] = useState<string | null>(null);
 
   const [pageLoading, setPageLoading] = useState(false); // For form submission
   const [error, setError] = useState<string | null>(null);
@@ -110,110 +137,167 @@ export default function CreateProfileWizardPage() {
       }
     }, [authError]);
 
-  // Fetch all provinces on mount - COMMENTED OUT
-  // useEffect(() => {
-  //   const fetchProvinces = async () => {
-  //     setProvincesLoading(true);
-  //     setAddressApiError(null);
-  //     try {
-  //       const response = await fetch('/data/psgc/provinces.json');
-  //       if (!response.ok) throw new Error(`Failed to load provinces.json: ${response.status} ${response.statusText}`);
-  //       const data = await response.json();
-  //       setProvincesList(Array.isArray(data) ? data : []);
-  //     } catch (err) {
-  //       console.error("Failed to fetch local provinces.json:", err);
-  //       const fetchError = err as { message?: string };
-  //       setAddressApiError(`Failed to load provinces: ${fetchError.message}`);
-  //       setProvincesList([]);
-  //     }
-  //     setProvincesLoading(false);
-  //   };
-  //   fetchProvinces();
-  // }, []);
+  // Fetch all provinces on mount
+  useEffect(() => {
+    const fetchProvinces = async () => {
+      setProvincesLoading(true);
+      setAddressApiError(null);
+      try {
+        const response = await fetch('/data/psgc/provinces.json'); // Use local public file
+        if (!response.ok) throw new Error(`Failed to load provinces.json: ${response.status} ${response.statusText}`);
+        const data = await response.json();
+        setProvincesList(Array.isArray(data) ? data.map((p: { province_code: string; province_name: string; }) => ({ value: p.province_code, label: p.province_name || '' })).sort((a,b) => a.label.localeCompare(b.label)) : []);
+      } catch (err) {
+        console.error("Failed to fetch local provinces.json:", err);
+        const fetchError = err as { message?: string };
+        setAddressApiError(`Failed to load provinces: ${fetchError.message}`);
+        setProvincesList([]);
+      }
+      setProvincesLoading(false);
+    };
+    fetchProvinces();
+  }, []);
 
-  // Load and filter cities/municipalities when provinceCode changes from formData - COMMENTED OUT
-  // useEffect(() => {
-  //   const currentProvinceCode = formData.provinceCode;
-  //   if (currentProvinceCode) {
-  //     const loadAndFilterCities = async () => {
-  //       setCitiesMunicipalitiesLoading(true);
-  //       setAddressApiError(null);
-  //       setCitiesMunicipalitiesList([]);
-  //       try {
-  //         const response = await fetch('/data/psgc/cities-municipalities.json');
-  //         if (!response.ok) throw new Error(`Failed to load cities-municipalities.json: ${response.status} ${response.statusText}`);
-  //         const allCities = await response.json();
-  //         if (Array.isArray(allCities)) {
-  //           const filteredCities = allCities.filter(city => city.province_code === currentProvinceCode);
-  //           setCitiesMunicipalitiesList(filteredCities);
-  //         } else {
-  //           setCitiesMunicipalitiesList([]);
-  //           throw new Error('Cities data is not an array');
-  //         }
-  //       } catch (err) {
-  //         console.error("Failed to load/filter local cities-municipalities.json:", err);
-  //         const fetchError = err as { message?: string };
-  //         setAddressApiError(`Failed to load cities/municipalities: ${fetchError.message}`);
-  //         setCitiesMunicipalitiesList([]);
-  //       }
-  //       setCitiesMunicipalitiesLoading(false);
-  //     };
-  //     loadAndFilterCities();
-  //   } else {
-  //     setCitiesMunicipalitiesList([]);
-  //     handleInputChange('cityMunicipalityCode', '');
-  //     setBarangaysList([]);
-  //     handleInputChange('barangayCode', '');
-  //   }
-  // // eslint-disable-next-line react-hooks/exhaustive-deps
-  // }, [formData.provinceCode]);
+  // Load and filter cities/municipalities when provinceCode changes from formData
+  useEffect(() => {
+    const currentProvinceCode = formData.provinceCode;
+    if (currentProvinceCode) {
+      const loadAndFilterCitiesMunicipalities = async () => {
+        console.log('[Debug] loadAndFilterCitiesMunicipalities: START for provinceCode:', currentProvinceCode); // DEBUG LOG
+        setCitiesMunicipalitiesLoading(true);
+        setAddressApiError(null);
+        setCitiesMunicipalitiesList([]); // Clear previous list
+        try {
+          const response = await fetch('/data/psgc/cities-municipalities.json'); // Use local public file
+          console.log('[Debug] loadAndFilterCitiesMunicipalities: Fetch response status:', response.status, response.statusText); // DEBUG LOG
+          if (!response.ok) throw new Error(`Failed to load cities-municipalities.json: ${response.status} ${response.statusText}`);
+          const allCitiesMunicipalities = await response.json();
+          console.log('[Debug] loadAndFilterCitiesMunicipalities: Raw data after response.json():', allCitiesMunicipalities); // DEBUG LOG
+          console.log('[Debug] loadAndFilterCitiesMunicipalities: Is raw data an array?', Array.isArray(allCitiesMunicipalities)); // DEBUG LOG
+          
+          if (Array.isArray(allCitiesMunicipalities)) {
+            const filtered = allCitiesMunicipalities
+              .filter((item: { province_code: string; }) => {
+                // console.log('[Debug] Filtering city/mun item:', item, 'against provinceCode:', currentProvinceCode); // Optional: very verbose log
+                return item.province_code === currentProvinceCode;
+              });
+            console.log('[Debug] loadAndFilterCitiesMunicipalities: Filtered list before map:', filtered); // DEBUG LOG
+            
+            const mappedList = filtered.map((item: { city_code: string; city_name: string; }) => {
+                // console.log('City/Mun Item:', item); // Keep this if needed for individual item structure
+                return { value: item.city_code, label: item.city_name || '' };
+              })
+              .sort((a,b) => a.label.localeCompare(b.label));
+            setCitiesMunicipalitiesList(mappedList);
+          } else {
+            setCitiesMunicipalitiesList([]);
+            console.error('[Debug] loadAndFilterCitiesMunicipalities: Data is not an array!'); // DEBUG LOG
+            throw new Error('Cities/Municipalities data is not an array');
+          }
+        } catch (err) {
+          console.error("Failed to load/filter local cities-municipalities.json:", err);
+          const fetchError = err as { message?: string };
+          setAddressApiError(`Failed to load cities/municipalities: ${fetchError.message}`);
+          setCitiesMunicipalitiesList([]);
+        }
+        setCitiesMunicipalitiesLoading(false);
+      };
+      loadAndFilterCitiesMunicipalities();
+    } else {
+      setCitiesMunicipalitiesList([]);
+      setBarangaysList([]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.provinceCode]);
 
-  // Load and filter barangays when cityMunicipalityCode changes from formData - COMMENTED OUT
-  // useEffect(() => {
-  //   const currentCityMunicipalityCode = formData.cityMunicipalityCode;
-  //   if (currentCityMunicipalityCode) {
-  //     const loadAndFilterBarangays = async () => {
-  //       setBarangaysLoading(true);
-  //       setAddressApiError(null);
-  //       setBarangaysList([]);
-  //       try {
-  //         const response = await fetch('/data/psgc/barangays.json');
-  //         if (!response.ok) throw new Error(`Failed to load barangays.json: ${response.status} ${response.statusText}`);
-  //         const allBarangays = await response.json();
-  //         if (Array.isArray(allBarangays)) {
-  //           const filteredBarangays = allBarangays.filter(bgy => bgy.city_municipality_code === currentCityMunicipalityCode);
-  //           setBarangaysList(filteredBarangays);
-  //         } else {
-  //           setBarangaysList([]);
-  //           throw new Error('Barangays data is not an array');
-  //         }
-  //       } catch (err) {
-  //         console.error("Failed to load/filter local barangays.json:", err);
-  //         const fetchError = err as { message?: string };
-  //         setAddressApiError(`Failed to load barangays: ${fetchError.message}`);
-  //         setBarangaysList([]);
-  //       }
-  //       setBarangaysLoading(false);
-  //     };
-  //     loadAndFilterBarangays();
-  //   } else {
-  //     setBarangaysList([]);
-  //     handleInputChange('barangayCode', '');
-  //   }
-  // // eslint-disable-next-line react-hooks/exhaustive-deps
-  // }, [formData.cityMunicipalityCode]);
+  // Load and filter barangays when cityMunicipalityCode changes from formData
+  const loadAndFilterBarangays = useCallback(async (cityCode: string | undefined) => {
+    if (!cityCode) {
+      setBarangaysList([]);
+      // Reset barangayCode in formData if city is cleared
+      setFormData(prev => ({ ...prev, barangayCode: '' })); 
+      return;
+    }
+    console.log('[Debug] loadAndFilterBarangays: START for city_code:', cityCode);
+    setBarangaysLoading(true);
+    setAddressApiError(null);
+    try {
+      // Corrected fetch path to local JSON file
+      const response = await fetch('/data/psgc/barangays.json'); 
+      if (!response.ok) {
+        console.error('[Debug] loadAndFilterBarangays: Fetch error! Status:', response.status);
+        setAddressApiError(`Failed to load barangays: ${response.statusText}`);
+        setBarangaysList([]);
+        setBarangaysLoading(false); // Ensure loading is set to false on error
+        return;
+      }
+      const rawData: Barangay[] = await response.json();
+      console.log('[Debug] loadAndFilterBarangays: Raw data length:', rawData.length);
+      console.log('[Debug] loadAndFilterBarangays: First 5 items of raw data:', rawData.slice(0, 5));
+      console.log('[Debug] loadAndFilterBarangays: Is raw data an array?', Array.isArray(rawData));
 
+      const targetCodeExists = rawData.some(item => item.city_code === cityCode);
+      console.log(`[Debug] loadAndFilterBarangays: Does city_code '${cityCode}' exist in rawData? ${targetCodeExists}`);
+      
+      if (!targetCodeExists && cityCode) {
+        const provinceCodePrefix = cityCode.substring(0, 4); 
+        const barangaysInProvince = rawData.filter(item => item.province_code === provinceCodePrefix);
+        if (barangaysInProvince.length > 0) {
+          const uniqueCityCodesInProvince = new Set(
+            barangaysInProvince.map(item => item.city_code)
+          );
+          console.log(`[Debug] loadAndFilterBarangays: Sample of unique city_codes in barangay data for province ${provinceCodePrefix}:`, Array.from(uniqueCityCodesInProvince).slice(0, 20));
+        } else {
+          console.log(`[Debug] loadAndFilterBarangays: No barangays found in rawData with province_code ${provinceCodePrefix}. Cannot show sample city_codes.`);
+        }
+      }
+
+      const filtered = rawData.filter((item: Barangay) => item.city_code === cityCode);
+      console.log('[Debug] loadAndFilterBarangays: Filtered list before map:', filtered);
+      
+      const mappedList = filtered
+        .map((item: Barangay) => ({ value: item.brgy_code, label: item.brgy_name || '' }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+      
+      setBarangaysList(mappedList);
+
+    } catch (err) {
+      console.error("Failed to load/filter local barangays.json:", err);
+      const fetchError = err as { message?: string };
+      setAddressApiError(`Failed to load barangays: ${fetchError.message}`);
+      setBarangaysList([]);
+    }
+    setBarangaysLoading(false);
+  }, []); // Empty dependency array for useCallback as it doesn't depend on external state/props not listed
+
+  // useEffect to call loadAndFilterBarangays when formData.cityMunicipalityCode changes
+  useEffect(() => {
+    const currentCityCode = formData.cityMunicipalityCode;
+    if (currentCityCode) {
+      loadAndFilterBarangays(currentCityCode);
+    } else {
+      // Clear barangays if city/municipality is not selected
+      setBarangaysList([]);
+      setFormData(prev => ({ ...prev, barangayCode: '' }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.cityMunicipalityCode, loadAndFilterBarangays]);
 
   const handleInputChange = (field: keyof FormProfile, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    // Clear error for this field when user types
+    if (stepErrors[field]) {
+      setStepErrors(prev => ({
+        ...prev,
+        [field]: ''
+      }));
+    }
+
     if (field === 'provinceCode') {
-        // Reset dependent fields when province changes
-        setFormData(prev => ({ ...prev, cityMunicipalityCode: '', barangayCode: '' }));
         // Reset dependent fields when province changes
         setFormData(prev => ({ ...prev, cityMunicipalityCode: '', barangayCode: '' }));
     } else if (field === 'cityMunicipalityCode') {
         // Reset barangay when city/municipality changes
-        setFormData(prev => ({ ...prev, barangayCode: '' }));
         setFormData(prev => ({ ...prev, barangayCode: '' }));
     }
   };
@@ -257,6 +341,8 @@ export default function CreateProfileWizardPage() {
       }
     }
     
+    console.log('[CreateProfilePage] handleSubmit: profileDataToSubmit:', JSON.stringify(profileDataToSubmit, null, 2)); // Log data being sent
+
     try {
       const token = session.access_token;
 
@@ -286,8 +372,8 @@ export default function CreateProfileWizardPage() {
       }
 
       setSuccess('Profile updated successfully!');
-      if (fetchProfile) {
-        await fetchProfile(user);
+      if (fetchProfile && user && session) {
+        await fetchProfile(user, session);
       }
       router.push('/dashboard');
     } catch (err) {
@@ -300,12 +386,37 @@ export default function CreateProfileWizardPage() {
   };
 
   const nextStep = () => {
-    // Add validation logic here if needed before proceeding
+    const currentStepConfig = stepsConfig[currentStep];
+    const required = currentStepConfig.requiredFields || [];
+    let hasErrors = false;
+    const newErrors: Record<string, string> = {};
+
+    required.forEach(field => {
+      if (!formData[field] || String(formData[field]).trim() === '') {
+        newErrors[field] = 'This field is required.';
+        hasErrors = true;
+      }
+    });
+
+    // Clear previous errors for non-failing fields in this step before setting new ones
+    const currentStepFields = currentStepConfig.fields;
+    const updatedStepErrors = { ...stepErrors };
+    currentStepFields.forEach(f => {
+      if (!newErrors[f]) { // If not a new error for this field
+        delete updatedStepErrors[f]; // Remove any old error for this field
+      }
+    });
+
+    setStepErrors({...updatedStepErrors, ...newErrors});
+
+    if (hasErrors) {
+      return; // Stop if there are validation errors
+    }
+
     if (currentStep < stepsConfig.length - 1) {
-      setCurrentStep(prev => prev + 1);
+      setCurrentStep(currentStep + 1);
     } else {
-      // This is the final step, so submit
-      handleSubmit(new Event('submit') as unknown as FormEvent);
+      console.log("Final step reached, form ready for submission.");
     }
   };
 
@@ -333,7 +444,6 @@ export default function CreateProfileWizardPage() {
       const field = fieldKey as keyof FormProfile; // Type assertion
       switch (field) {
         case 'firstName':
-        case 'middleInitial':
         case 'lastName':
         case 'street':
         case 'religion':
@@ -349,8 +459,8 @@ export default function CreateProfileWizardPage() {
                 id={field}
                 value={formData[field] || ''}
                 onChange={(e) => handleInputChange(field, e.target.value)}
-                maxLength={field === 'middleInitial' ? 1 : undefined}
               />
+              {stepErrors[field] && <p className="text-xs text-red-500 mt-1">{stepErrors[field]}</p>}
             </div>
           );
         case 'dateOfBirth':
@@ -363,6 +473,7 @@ export default function CreateProfileWizardPage() {
                 value={formData[field] || ''}
                 onChange={(e) => handleInputChange(field, e.target.value)}
               />
+              {stepErrors[field] && <p className="text-xs text-red-500 mt-1">{stepErrors[field]}</p>}
             </div>
           );
         case 'genderIdentity':
@@ -390,21 +501,61 @@ export default function CreateProfileWizardPage() {
                   {(optionsMap[field] || []).map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
                 </SelectContent>
               </Select>
+              {stepErrors[field] && <p className="text-xs text-red-500 mt-1">{stepErrors[field]}</p>}
             </div>
           );
         case 'provinceCode':
         case 'cityMunicipalityCode':
         case 'barangayCode':
+          const list = field === 'provinceCode' ? provincesList : field === 'cityMunicipalityCode' ? citiesMunicipalitiesList : barangaysList;
+          const isLoading = field === 'provinceCode' ? provincesLoading : field === 'cityMunicipalityCode' ? citiesMunicipalitiesLoading : barangaysLoading;
+          const placeholderText = field === 'provinceCode' ? 'Select Province' : field === 'cityMunicipalityCode' ? 'Select City/Municipality' : 'Select Barangay';
+          const labelText = field === 'provinceCode' ? 'Province' : field === 'cityMunicipalityCode' ? 'City/Municipality' : 'Barangay';
+
+          // Check for duplicate values
+          if (list && list.length > 0) {
+            const valueCounts = list.reduce((acc, item) => {
+              acc[item.value] = (acc[item.value] || 0) + 1;
+              return acc;
+            }, {} as Record<string, number>);
+
+            const duplicates: Record<string, number> = {};
+            for (const code in valueCounts) {
+              if (valueCounts[code] > 1) {
+                duplicates[code] = valueCounts[code];
+              }
+            }
+            if (Object.keys(duplicates).length > 0) {
+              console.warn(`Duplicate values found in list for ${field}:`, duplicates);
+            }
+          }
+
           return (
-            <div key={field} className="space-y-2">
-              <Label htmlFor={field}>
-                {field === 'provinceCode' ? 'Province' : field === 'cityMunicipalityCode' ? 'City/Municipality' : 'Barangay'}
-              </Label>
+            <div key={field} className="space-y-1.5">
+              <Label htmlFor={field} className="text-sm font-medium">{labelText}</Label>
+              <Combobox
+                options={list}
+                value={formData[field] || ''}
+                onChange={(value) => handleInputChange(field, value)}
+                placeholder={isLoading ? "Loading..." : placeholderText}
+                searchPlaceholder={`Search ${labelText.toLowerCase()}...`}
+                emptyStateMessage={`No ${labelText.toLowerCase()} found.`}
+                disabled={isLoading || (field === 'cityMunicipalityCode' && !formData.provinceCode) || (field === 'barangayCode' && !formData.cityMunicipalityCode)}
+              />
+              {stepErrors[field] && <p className="text-xs text-red-500 mt-1">{stepErrors[field]}</p>}
+            </div>
+          );
+        case 'middleInitial':
+          return (
+            <div key={field} className="space-y-1.5">
+              <Label htmlFor={field}>Middle Initial</Label>
               <Input
                 id={field}
+                type="text"
                 value={formData[field] || ''}
                 onChange={(e) => handleInputChange(field, e.target.value)}
-                placeholder={field === 'provinceCode' ? 'Enter Province' : field === 'cityMunicipalityCode' ? 'Enter City/Municipality' : 'Enter Barangay'}
+                maxLength={2}
+                placeholder="e.g., D"
               />
             </div>
           );
@@ -499,12 +650,12 @@ export default function CreateProfileWizardPage() {
                 </motion.div>
               </AnimatePresence>
               
-              {/* addressApiError && (
+              {addressApiError && (
                 <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-300 rounded-md flex items-center">
                   <AlertTriangle className="h-5 w-5 mr-2 shrink-0" />
                   <p className="text-sm">{addressApiError}</p>
                 </div>
-              )} */}
+              )}
 
             </form>
           </CardContent>
@@ -534,7 +685,7 @@ export default function CreateProfileWizardPage() {
               </Button>
               <Button
                 type="button"
-                onClick={nextStep}
+                onClick={currentStep === stepsConfig.length - 1 ? handleSubmit : nextStep}
                 disabled={pageLoading}
                 className="w-full sm:w-auto"
               >

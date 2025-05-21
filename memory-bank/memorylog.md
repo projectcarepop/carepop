@@ -60,6 +60,47 @@
     *   **Reasoning:** The browser's CORS mechanism prevents cross-origin HTTP requests unless the server explicitly allows them via correct CORS headers. The `TypeError: Failed to fetch` is the client-side manifestation of this blocked request.
     *   **Impact:** Profile fetching and subsequent user flows on `carepop-web` are blocked when connecting to the deployed Cloud Run backend. The next steps are to ensure the deployed backend has the correct CORS configuration from `server.ts` active and to verify Cloud Run logs for specific CORS errors or messages.
 
+*   **YYYY-MM-DD (AUTO_UPDATE_DATE):** Committed and Pushed All Workspace Changes
+    *   **Context:** Ongoing efforts to resolve CORS issue between local `carepop-web` and deployed `carepop-backend-staging`. Changes included Memory Bank updates, potential refinements in `AuthContext.tsx`, and ensuring `carepop-backend/src/server.ts` has the correct CORS configuration.
+    *   **Decision/Change:** All changes in the workspace were staged (`git add .`), committed (`git commit -m "Fix: Refine CORS setup and auth logic, update memory bank"`), and pushed to the remote repository.
+    *   **Reasoning:** To ensure the remote repository is up-to-date, which is crucial for CI/CD pipelines that deploy `carepop-backend` to Google Cloud Run. This step aims to get the latest backend code (including CORS configurations) into the deployment pipeline.
+    *   **Impact:** The CI/CD pipeline should now be triggered to deploy the latest version of `carepop-backend` to the `carepop-backend-staging` service on Cloud Run. The next step is to monitor this deployment and then re-test the frontend to Cloud Run connection, checking Cloud Run logs for CORS behavior.
+
+*   **YYYY-MM-DD (AUTO_UPDATE_DATE):** Critical: Cloud Run Backend Failing - Missing Supabase/KMS Environment Variables
+    *   **Context:** Despite pushing CORS changes, `carepop-web` still encountered "Failed to fetch" when calling the deployed `carepop-backend-staging` on Cloud Run.
+    *   **Decision/Change:** Analysis of Cloud Run logs for `carepop-backend-staging` revealed the core issue: the backend service is failing to initialize due to missing critical environment variables: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and various KMS-related keys (`KMS_PROJECT_ID`, `KMS_KEY_RING_ID`, `KMS_KEY_ID`, `KMS_LOCATION_ID`). The container was exiting with code 1.
+    *   **Reasoning:** The backend application cannot function without these configurations, leading to crashes or an inability to process requests correctly, thus preventing proper responses (including CORS headers) to the frontend.
+    *   **Impact:** All API calls from the frontend to the deployed backend are failing. The immediate next step is to ensure these environment variables are correctly configured in the Cloud Run service, likely by referencing secrets from GCP Secret Manager, and that the service account has permissions to access them. This is a higher priority than further CORS debugging until the service is healthy.
+
+*   **YYYY-MM-DD (AUTO_UPDATE_DATE):** Backend 500 Error Root Cause: KMS Config Error in EncryptionService due to Mismatched ENV VAR Name
+    *   **Context:** `PATCH /api/users/profile` consistently returns HTTP 500. Detailed Cloud Run logs for the PATCH request revealed the specific error: `KMS configuration is incomplete. Cannot encrypt.`, thrown by `EncryptionService.encrypt()`.
+    *   **Decision/Change:** Analysis of `carepop-backend/src/config/config.ts` showed that the KMS project ID is expected from the environment variable `GCP_PROJECT_ID`. The `EncryptionService` was failing because it likely wasn't receiving this value under the correct name.
+    *   **Reasoning:** The `EncryptionService.encrypt()` method checks for `projectId`, `locationId`, `keyRingId`, and `keyId` (derived from environment variables via `getConfig()`). If any are missing (due to the Cloud Run environment providing, for example, `KMS_PROJECT_ID` instead of the expected `GCP_PROJECT_ID`), the service throws the observed error.
+    *   **Impact:** Profile creation/update is failing. The immediate next step is to correct the environment variable name for the KMS project ID in the Cloud Run service configuration for `carepop-backend-staging` from any other name (e.g., `KMS_PROJECT_ID`) to `GCP_PROJECT_ID`, ensuring it references the correct secret. All other KMS and Supabase env var names also need to be double-checked against `config/config.ts`.
+    *   **Next Step:** User to update Cloud Run service environment variables to match exactly what `config/config.ts` expects (especially `GCP_PROJECT_ID`), redeploy, monitor startup logs for absence of KMS config warnings, and then re-test the PATCH profile operation.
+
+*   **YYYY-MM-DD (AUTO_UPDATE_DATE):** Session End Memory Bank Synchronization
+    *   **Context:** User indicated the end of the current work session and requested a full Memory Bank update.
+    *   **Decision/Change:** All 9 core Memory Bank files were reviewed. `tracker.md`, `progress.md`, and `activeContext.md` were updated to precisely reflect the critical blocker: the HTTP 500 error on `PATCH /api/users/profile` due to the `carepop-backend-staging` service expecting the KMS Project ID via an environment variable named `GCP_PROJECT_ID` (as per `config/config.ts`), which was likely mismatched in the Cloud Run service configuration. The `memorylog.md` (this entry) was updated to record this synchronization. Other core files (`projectbrief.md`, `productContext.md`, `systemPatterns.md`, `techContext.md`, `epics_and_tickets.md`) were confirmed to be consistent with this understanding.
+    *   **Reasoning:** To ensure the Memory Bank is perfectly synchronized with the latest project state, the identified root cause of the critical blocker, and the explicit next steps for the user before the session concludes. This provides a clear and accurate foundation for the next work session.
+    *   **Impact:** The Memory Bank is up-to-date. The user has a clear, documented path to resolving the backend KMS configuration issue upon their return.
+
+*   **YYYY-MM-DD (AUTO_UPDATE_DATE):** CRITICAL BACKEND FIX: `PATCH /api/users/profile` Now Functional
+    *   **Context:** The `carepop-web` application was blocked by an HTTP 500 error when attempting to create or update user profiles via `PATCH /api/users/profile` on the `carepop-backend-staging` service. The root cause was an incorrect environment variable name for the KMS Project ID in the Cloud Run service configuration (expected `GCP_PROJECT_ID` as per `config/config.ts`).
+    *   **Decision/Change:** User confirmed that the environment variable configurations on the `carepop-backend-staging` Cloud Run service have been corrected. The `PATCH /api/users/profile` endpoint is now functioning correctly.
+    *   **Reasoning:** Correcting the environment variable names, particularly ensuring `GCP_PROJECT_ID` was used as expected by the backend's `EncryptionService`, resolved the KMS configuration error that led to the HTTP 500 responses.
+    *   **Impact:** This fix unblocks all profile creation and update functionalities on `carepop-web`. `TICKET-WEB-PROF-1` and `TICKET-WEB-DASH-1` can now proceed to full E2E testing. The project can now confidently move forward with web application development and testing.
+
+*   **YYYY-MM-DD (AUTO_UPDATE_DATE):** Web UI/UX Enhancements and Fixes (Profile & Dashboard)
+    *   **Context:** Addressing usability and functional issues on `carepop-web` related to profile creation, dashboard display, and theme consistency.
+    *   **Decision/Change:**
+        1.  **Profile Submit Button Fixed:** Corrected the `onClick` handler for the submit button on the final step of `/create-profile` to call `handleSubmit` instead of `nextStep`.
+        2.  **Address Selection Combobox:** Replaced `Select` dropdowns for Province, City/Municipality, and Barangay on `/create-profile` with a new reusable `Combobox` component (`carepop-web/src/components/ui/combobox.tsx`) utilizing `cmdk` and Shadcn UI `Command` & `Popover` components. This provides a searchable dropdown experience.
+        3.  **Dashboard Address Display:** Modified `/dashboard` page to fetch PSGC JSON data and map address codes (province, city, barangay) to their full names for display.
+        4.  **Theme Hover Color:** Updated the `--accent` CSS variable in `globals.css` to use a lighter shade of the `--primary` color for both light and dark themes, improving hover state consistency across components.
+    *   **Reasoning:** To improve user experience, fix functional bugs, and enhance visual consistency according to user feedback and standard UI practices.
+    *   **Impact:** Improved usability of the profile creation form. Clearer address information on the dashboard. More brand-consistent hover effects throughout the web application. These changes address key aspects of `TICKET-WEB-PROF-1` and `TICKET-WEB-DASH-1`.
+
 ---
 
 *This log will be updated with significant decisions and changes throughout the project lifecycle.*

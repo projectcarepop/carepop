@@ -1,18 +1,45 @@
 'use client';
 
-import { useEffect, Suspense } from 'react';
+import { useEffect, Suspense, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/AuthContext';
 
 function AuthCallbackContent() {
   const router = useRouter();
-  const { user, profile, isLoading, error } = useAuth();
+  const { user, profile, isLoading, error, signOut } = useAuth();
+  const [isEmailVerification, setIsEmailVerification] = useState(false);
+  const [handled, setHandled] = useState(false);
 
   useEffect(() => {
+    if (typeof window !== "undefined" && !isEmailVerification) {
+      const hash = window.location.hash;
+      if (hash.includes("type=signup")) {
+        console.log('Auth Callback: Detected email verification (type=signup).');
+        setIsEmailVerification(true);
+      } else if (hash.includes("type=email_change")) {
+        console.log('Auth Callback: Detected email change confirmation.');
+        setIsEmailVerification(true);
+      }
+    }
+  }, [isEmailVerification]);
+
+  useEffect(() => {
+    if (handled) return;
+
     const currentUser = user;
     const currentIsLoading = isLoading;
 
+    if (isEmailVerification && currentUser) {
+      console.log('Auth Callback: Handling email verification. Signing out and redirecting to login.');
+      setHandled(true);
+      signOut().then(() => {
+        router.push('/login?status=email_verification_success');
+      });
+      return;
+    }
+
     if (!currentIsLoading) {
+      setHandled(true);
       if (error) {
         console.error('Auth Callback Error:', error);
         setTimeout(() => router.push('/login'), 3000);
@@ -35,7 +62,7 @@ function AuthCallbackContent() {
         }, 1500);
       }
     }
-  }, [user, profile, isLoading, error, router]);
+  }, [user, profile, isLoading, error, router, signOut]);
 
   if (isLoading) {
     return <div>Verifying your email and processing session... Please wait.</div>;

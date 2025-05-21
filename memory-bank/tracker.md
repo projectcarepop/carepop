@@ -29,8 +29,8 @@
 | EPIC-001    | TICKET-009       | Basic Profile Viewing Page (Web)                          | In Progress | Czar     | Covered by TICKET-WEB-DASH-1                                          |
 | EPIC-LEGAL  | TICKET-LEGAL-W-1 | Create Terms of Service Page (Web)                    | To Do       | Czar     | Placeholder, focus shifted                                            |
 | EPIC-LEGAL  | TICKET-LEGAL-W-2 | Create Privacy Policy Page (Web)                      | To Do       | Czar     | Placeholder, focus shifted                                            |
-| EPIC-WEB-PROFILE | TICKET-WEB-PROF-1 | Implement Create/Edit Profile Page (Web)                | In Progress | Czar     | Relies on AuthContext.tsx. Redirect loop fixed. Address fields text inputs. Blocked by CORS issue when fetching profile from deployed backend. |
-| EPIC-WEB-DASH    | TICKET-WEB-DASH-1 | Implement Dashboard Profile Display & Prompts (Web)     | In Progress | Czar     | Relies on AuthContext.tsx. Redirect loop fixed. Displays profile info. Blocked by CORS issue when fetching profile from deployed backend. |
+| EPIC-WEB-PROFILE | TICKET-WEB-PROF-1 | Implement Create/Edit Profile Page (Web)                | In Progress | Czar     | Submit button fixed. Address fields now use Combobox. Backend PATCH fixed. Theme hover color updated. Ready for E2E testing. |
+| EPIC-WEB-DASH    | TICKET-WEB-DASH-1 | Implement Dashboard Profile Display & Prompts (Web)     | In Progress | Czar     | Displays full address names (not codes). Backend PATCH fixed. Theme hover color updated. Ready for E2E testing. |
 
 ---
 

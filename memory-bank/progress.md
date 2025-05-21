@@ -3,45 +3,52 @@
 **Last Updated:** YYYY-MM-DD (AUTO_UPDATE_DATE)
 
 ## Overall Project Status:
-*   **Focus:** Diagnosing and resolving CORS issue preventing `carepop-web` (local) from fetching profiles from the deployed `carepop-backend-staging` on Cloud Run.
-*   **Previous Success:** The redirect loop between profile creation and dashboard on `carepop-web` was resolved.
-*   **Current Blocker:** `TypeError: Failed to fetch` when `AuthContext.tsx` calls the backend API, identified as a CORS issue by browser dev tools.
-*   **Backend:** Supabase `handle_new_user` trigger is stable. Cloud Run environment variables (KMS, Supabase URL/Key) were previously reviewed and believed to be set.
+*   **BACKEND FIXED:** The `carepop-backend-staging` service's `PATCH /api/users/profile` endpoint is now functional. The HTTP 500 error (caused by KMS configuration issues, specifically the `GCP_PROJECT_ID` environment variable mismatch) has been resolved by the user.
+*   **Focus:** Comprehensive E2E testing of `carepop-web` authentication, profile creation/editing, and dashboard flows. Theme hover color updated.
 
 ## Epic-Level Status Summary (from `tracker.md`):
-*   **EPIC-001 (Foundational Setup & User Authentication):** Web auth/profile/dashboard features (`TICKET-004`, `TICKET-005`, `TICKET-WEB-PROF-1`, `TICKET-WEB-DASH-1`) are currently **blocked** by the CORS issue with the deployed backend. The redirect loop fix remains in place.
-*   **EPIC-LEGAL (Legal Pages):** To Do.
+*   **EPIC-001 (Foundational Setup & User Authentication):** Web profile creation/update (`TICKET-WEB-PROF-1`) and Dashboard display (`TICKET-WEB-DASH-1`) have seen significant UI and functional improvements. Both are ready for E2E testing.
 
 ## What Works:
-*   Native app: Core auth and profile features remain stable.
-*   Supabase: `handle_new_user` trigger.
-*   `carepop-web` (conceptually, when not blocked):
-    *   Resolved redirect loop for profile completion.
-    *   `AuthContext.tsx` has improved logic for session management and profile fetching (key mapping).
-*   `carepop-backend` (local `server.ts`): Contains a CORS configuration that should allow `http://localhost:3000`.
+*   `carepop-backend-staging` is fully operational, including `PATCH /api/users/profile` for profile updates with encryption.
+*   GET requests to `/api/users/profile` are processed.
+*   Local `carepop-web` and `carepop-mobile` can run.
+*   Local `carepop-backend` (with local .env) should be functional.
+*   `carepop-web` profile creation/editing page: Submit button works, address fields use searchable Combobox.
+*   `carepop-web` dashboard: Displays full address names.
+*   Theme-wide hover/accent color updated to a lighter primary shade.
 
 ## What's Next (Immediate Focus based on `activeContext.md`):
-1.  **Resolve CORS issue with deployed `carepop-backend-staging`:**
-    *   Ensure the deployed backend code on Cloud Run accurately reflects the CORS configuration in the local `server.ts`.
-    *   Verify Cloud Run logs for the deployed service for any CORS-related messages or other errors when the frontend attempts to connect.
-    *   Examine browser network tab for `OPTIONS` preflight request details.
+1.  **Comprehensive E2E Testing of `carepop-web`:**
+    *   User Registration (TICKET-004)
+    *   User Login (TICKET-005)
+    *   Profile Creation & Editing (TICKET-WEB-PROF-1)
+    *   Dashboard Display & Prompts (TICKET-WEB-DASH-1)
+2.  **Plan & Implement Address Dropdown Solution** for the profile page.
+3.  **Update `epics_and_tickets.md` and `tracker.md`** based on testing and new tasks.
 
 ## Known High-Level Issues/Blockers:
-*   **Primary Blocker: CORS issue** preventing `carepop-web` from communicating with the deployed `carepop-backend-staging` for profile data.
-*   Address input on `carepop-web/create-profile` is a temporary text field solution (secondary to CORS).
-*   Full email-related auth flow testing requires Supabase email provider setup by the user.
+*   **None critical.** The primary backend blocker is resolved.
+*   Address fields on `carepop-web` profile page are still temporary text inputs.
 
 ## Key Achievements Recently:
-*   **Diagnosed `TypeError: Failed to fetch` as a CORS issue** when local frontend connects to deployed Cloud Run backend.
-*   Previously fixed `carepop-web` Profile/Dashboard redirect loop.
-*   Identified that local `carepop-backend/src/server.ts` has a CORS setup.
+*   **CRITICAL FIX: User resolved the HTTP 500 error on `PATCH /api/users/profile` on `carepop-backend-staging`** by correcting the KMS configuration (ensuring `GCP_PROJECT_ID` environment variable name was correct).
+*   **UI/UX Enhancements on `carepop-web`:**
+    *   Fixed "Submit Profile" button on `/create-profile`.
+    *   Implemented searchable `Combobox` for address selection on `/create-profile`.
+    *   Dashboard now displays full address names (province, city, barangay).
+    *   Updated theme-wide hover/accent color for better brand consistency.
+*   Successfully debugged PSGC data filtering for barangays on `/create-profile`.
+*   Resolved `carepop-backend-staging` startup failures by fixing initially missing environment variable configurations.
+*   Narrowed down the frontend "Failed to fetch" issue to a specific HTTP 500 error on profile PATCH requests to the backend.
+*   Identified `EncryptionService.encrypt()` as the failure point via backend logs.
+*   Pinpointed the exact error message (`KMS configuration is incomplete. Cannot encrypt.`) and its origin in `EncryptionService`.
+*   **Crucially, identified the root cause: a mismatch between the expected environment variable name `GCP_PROJECT_ID` (in `config/config.ts`) and the likely actual name used in the Cloud Run service configuration for the KMS Project ID.**
 
 **Memory Bank File Status:**
-*   `projectbrief.md`, `productContext.md`, `systemPatterns.md`, `techContext.md`, `epics_and_tickets.md` reviewed and stable.
-*   `tracker.md`: Updated to reflect CORS blocker.
-*   `memorylog.md`: Updated with CORS issue diagnosis.
-*   `activeContext.md`: To be updated.
-*   `progress.md`: This document, updated.
+*   `memorylog.md`: To be updated with the backend fix confirmation.
+*   `activeContext.md`: Updated to reflect backend fix and shift focus to E2E testing.
+*   `progress.md`: This document, updated to reflect the unblocked status.
 
 ## Project Progress (CarePoP Platform)
 
@@ -83,13 +90,12 @@ The system is ready for comprehensive end-to-end testing of these web features i
 **Key Accomplishments Recently:**
 *   **Resolved critical redirect loop** on `carepop-web` by fixing key casing mismatch in `AuthContext.tsx`.
 *   Stabilized core auth, profile, and dashboard functionality on the web platform.
+*   **Significant UI/UX improvements** on `carepop-web` profile creation and dashboard pages (Combobox, address name display, submit button fix, hover color theming).
 
 **Current Blockers/Risks:**
-*   Address fields on `create-profile` are a temporary solution.
 *   Comprehensive testing pending.
 
 **Next Steps (based on `activeContext.md` - for next session):
 *   Full end-to-end testing of `carepop-web` auth, profile, and dashboard.
-*   Plan replacement of text address fields with dynamic dropdowns.
 
-**Overall Confidence:** High. The major blocker is resolved. The system is in a good state for thorough testing.
+**Overall Confidence:** High. Major blockers are resolved. Web UI and functionality have been significantly improved. The system is in a good state for thorough testing.

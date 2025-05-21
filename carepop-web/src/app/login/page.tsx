@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react'; 
 import GoogleIcon from '@/components/ui/GoogleIcon';
+import { useSearchParams } from 'next/navigation';
 
 export default function LoginPage() {
   const { signInWithEmail, isLoading, error, signInWithGoogle } = useAuth();
@@ -16,6 +17,18 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false); // State for password visibility
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const status = searchParams.get('status');
+    if (status === 'email_verification_success') {
+      setMessage('Email successfully verified! You can now log in.');
+    } else if (status === 'password_reset_success') {
+      setMessage('Password successfully reset! You can now log in with your new password.');
+    } else if (searchParams.get('error_description')) {
+      setMessage(searchParams.get('error_description') || 'An error occurred.')
+    }
+  }, [searchParams]);
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

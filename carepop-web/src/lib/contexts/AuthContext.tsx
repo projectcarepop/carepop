@@ -63,31 +63,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     console.log('[AuthContext] Main useEffect triggered. Pathname:', pathname);
 
-    // Handle deferred sign-out for just confirmed email
-    if (pathname === '/login' && sessionStorage.getItem('justConfirmedEmail') === 'true') {
-      sessionStorage.removeItem('justConfirmedEmail');
-      const performDelayedSignOut = async () => {
-        console.log('[AuthContext] Login page: justConfirmedEmail flag found. Checking session for sign out.');
-        setIsLoading(true); // Indicate activity
-        const { data: { session: activeSession } } = await supabase.auth.getSession(); // Re-check current session
-        if (activeSession) {
-          console.log('[AuthContext] Login page: Active session found with justConfirmedEmail flag. Signing out now.');
-          await supabase.auth.signOut();
-          // Explicitly clear state here too, to prevent UI flicker or race conditions
-          // although onAuthStateChange for SIGNED_OUT should also do this.
-          setUser(null);
-          setCurrentSession(null);
-          setProfile(null);
-          console.log('[AuthContext] Login page: States explicitly cleared after signOut call.');
-        } else {
-          console.log('[AuthContext] Login page: No active session found with justConfirmedEmail flag. Proceeding normally.');
-        }
-        setIsLoading(false); // Done with this specific handling
-      };
-      performDelayedSignOut();
-      // The function will continue, and onAuthStateChange will eventually handle the SIGNED_OUT event
-    }
-
     console.log('[AuthContext] useEffect for session/profile triggered. Pathname:', pathname);
     const getInitialSessionAndProfile = async () => {
       console.log('[AuthContext] getInitialSessionAndProfile: START, setting isLoading=true');
@@ -101,10 +76,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (session?.user) {
           console.log('[AuthContext] getInitialSessionAndProfile: Fetching profile for user:', session.user.id);
           currentProfile = await fetchProfile(session.user, session);
-          console.log('[AuthContext] getInitialSessionAndProfile: Profile fetched', currentProfile ? 'OK' : 'NULL/Error');
+          console.log('[AuthContext] getInitialSessionAndProfile: Profile fetched (currentProfile var):', currentProfile ? JSON.stringify(currentProfile, null, 2) : 'NULL/Error');
+          console.log('[AuthContext] getInitialSessionAndProfile: Context state profile BEFORE redirect check:', profile ? JSON.stringify(profile, null, 2) : 'NULL STATE');
         }
         
         if (session?.user && (!currentProfile || !currentProfile.firstName)) {
+          console.log(`[AuthContext] getInitialSessionAndProfile: Redirect check. currentProfile.firstName: ${currentProfile?.firstName}, Context profile.firstName: ${profile?.firstName}`);
           if (pathname !== '/create-profile' && pathname !== '/auth/callback') {
             console.log('[AuthContext] Initial load: User logged in, profile incomplete. Redirecting to /create-profile.');
             router.push('/create-profile');
@@ -139,14 +116,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             (_event === 'USER_UPDATED') && 
             currentUser.email_confirmed_at && 
             !previousUserEmailConfirmedAt && 
-            (!profile || !profile.firstName) 
+            (!profile || !profile.firstName)
         ) {
-          console.log('[AuthContext] onAuthStateChange: Email confirmed event detected. Setting flag and redirecting to login.');
-          sessionStorage.setItem('justConfirmedEmail', 'true');
-          // DO NOT signOut() here, DO NOT clear user/session/profile here directly
-          router.push('/login?status=email_confirmed'); 
-          setIsLoading(false); // Done with this event's special handling
-          return; // Exit early to prevent standard profile fetching/redirect logic for this specific event
+          console.log('[AuthContext] onAuthStateChange: Email confirmed event detected. Signing out and redirecting to login.');
+          await supabase.auth.signOut();
+          setUser(null);
+          setCurrentSession(null);
+          setProfile(null);
+          router.push('/login?status=email_verification_success'); 
+          setIsLoading(false);
+          return;
         }
 
         // Existing profile fetching logic

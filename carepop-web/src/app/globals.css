@@ -22,8 +22,8 @@
     --muted: 210 17% 98%; /* #F8F9FA */
     --muted-foreground: 208 7% 46%; /* #6C757D */
 
-    --accent: 197 71% 73%; /* #87CEEB */
-    --accent-foreground: 210 11% 15%; /* #212529 */
+    --accent: 349 90% 80%; /* Lighter pink for hover - was 197 71% 73% (#87CEEB) */
+    --accent-foreground: 210 11% 15%; /* #212529 - Should remain readable */
 
     --destructive: 348 83% 47%; /* #DC143C */
     --destructive-foreground: 0 0% 100%; /* #FFFFFF */
@@ -56,8 +56,8 @@
     --secondary-foreground: 0 0% 100%;
     --muted: 210 10% 25%;
     --muted-foreground: 210 5% 63%;
-    --accent: 197 71% 55%;           /* Adjusted accent for dark mode */
-    --accent-foreground: 0 0% 100%;
+    --accent: 349 80% 60%;           /* Pink for hover in dark - was 197 71% 55% */
+    --accent-foreground: 0 0% 100%; /* White text, should be fine on the pink */
     --destructive: 348 83% 60%;      /* Adjusted destructive for dark mode */
     --destructive-foreground: 0 0% 100%;
     --border: 210 10% 30%;

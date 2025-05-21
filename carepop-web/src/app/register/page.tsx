@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Mail, Lock } from 'lucide-react'; // Icons
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react'; // Icons
 import GoogleIcon from '@/components/ui/GoogleIcon'; // Added GoogleIcon import
 
 export default function RegisterPage() {
@@ -25,7 +25,7 @@ export default function RegisterPage() {
   const { signUpWithPassword, isLoading, error, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
@@ -34,11 +34,6 @@ export default function RegisterPage() {
     e.preventDefault();
     setMessage('');
     setModalMessage('');
-
-    if (password !== confirmPassword) {
-      setMessage('Passwords do not match.');
-      return;
-    }
 
     const { user, error: signUpError } = await signUpWithPassword(email, password);
 
@@ -50,7 +45,6 @@ export default function RegisterPage() {
       setShowSuccessModal(true);
       setEmail('');
       setPassword('');
-      setConfirmPassword('');
       setMessage('');
     }
   };
@@ -107,35 +101,29 @@ export default function RegisterPage() {
                 <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={6} // Supabase default minimum
-                  className="pl-10"
-                  disabled={isLoading || showSuccessModal} // Disable while loading or modal is shown
+                  className="pl-10 pr-10"
+                  disabled={isLoading || showSuccessModal}
                 />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  placeholder="••••••••"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  className="pl-10"
-                  disabled={isLoading || showSuccessModal} // Disable while loading or modal is shown
-                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground hover:text-primary"
+                  onClick={() => setShowPassword(!showPassword)}
+                  disabled={isLoading || showSuccessModal}
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </Button>
               </div>
             </div>
             {error && <p className="text-sm text-destructive">{error.message}</p>}
-            {message && <p className={`text-sm ${error || (password !== confirmPassword && message === 'Passwords do not match.') ? 'text-destructive' : 'text-primary'}`}>{message}</p>}
+            {message && <p className={`text-sm ${error ? 'text-destructive' : 'text-primary'}`}>{message}</p>}
             <Button type="submit" className="w-full" disabled={isLoading || showSuccessModal}>
               {isLoading ? 'Registering...' : 'Register'}
             </Button>

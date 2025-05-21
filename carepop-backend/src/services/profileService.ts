@@ -233,17 +233,77 @@ export const getUserProfileService = async (userId: string): Promise<Profile | n
     throw new Error('User ID is required to fetch profile.');
   }
 
-  const { data: profileData, error } = await supabaseServiceRole
+  let profileQuery = await supabaseServiceRole
     .from('profiles')
     .select('*')
     .eq('user_id', userId)
     .single();
 
+  if (profileQuery.error && profileQuery.error.code === 'PGRST116') {
+    logger.warn(`[ProfileService] Profile not found for user ${userId} on first attempt. Retrying after a short delay.`);
+    // Wait for a short period to allow for potential trigger delay
+    await new Promise(resolve => setTimeout(resolve, 750)); // 750ms delay
+
+    profileQuery = await supabaseServiceRole
+      .from('profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+  }
+  
+  const { data: profileData, error } = profileQuery;
+
   if (error) {
-    if (error.code === 'PGRST116') { // PostgREST error code for "Resource not found"
-      logger.warn(`[ProfileService] Profile not found for user ${userId}.`);
-      return null;
+    if (error.code === 'PGRST116') { 
+      logger.warn(`[ProfileService] Profile still not found for user ${userId} after retry. Checking auth.users.`);
+      // Check if the user exists in auth.users
+      const { data: authUser, error: authUserError } = await supabaseServiceRole.auth.admin.getUserById(userId);
+
+      if (authUserError) {
+        logger.error(`[ProfileService] Error fetching user from auth.users for id ${userId}:`, authUserError.message);
+        // If we can't even verify against auth.users, treat as if profile truly not found or user is invalid.
+        return null; 
+      }
+
+      if (authUser && authUser.user) {
+        logger.info(`[ProfileService] User ${userId} exists in auth.users. Returning a stub profile.`);
+        // Construct and return a default/stub profile
+        // Ensure this stub matches the `Profile` interface structure.
+        // Key fields like email might come from authUser.user.email
+        // Other fields specific to 'profiles' table but not in auth.users should be null/default.
+        const stubProfile: Profile = {
+          user_id: userId,
+          username: null,
+          first_name: null,
+          middle_initial: null,
+          last_name: null,
+          date_of_birth: null,
+          age: null,
+          civil_status: null,
+          religion: null,
+          occupation: null,
+          contact_no: null,
+          phone_number: authUser.user.phone || null,
+          street: null,
+          barangay_code: null,
+          city_municipality_code: null,
+          province_code: null,
+          philhealth_no: null,
+          avatar_url: authUser.user.user_metadata?.avatar_url || null,
+          gender_identity: null,
+          pronouns: null,
+          assigned_sex_at_birth: null,
+          granular_consents: { initial_consent_given: true }, // Example default
+          created_at: authUser.user.created_at, 
+          updated_at: authUser.user.updated_at || null,
+        };
+        return stubProfile; // Return the constructed stub
+      } else {
+        logger.warn(`[ProfileService] User ${userId} does NOT exist in auth.users. Profile truly not found.`);
+        return null; // User doesn't even exist in auth, so profile definitely not found
+      }
     }
+    // For other errors, log and re-throw
     logger.error(`[ProfileService] Supabase error fetching profile for user ${userId}:`, JSON.stringify(error, null, 2));
     throw new Error(`Database error: ${error.message} (Code: ${error.code})`);
   }

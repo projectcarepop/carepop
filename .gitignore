@@ -1,7 +1,8 @@
 node_modules
+.cursor/
 .cursor\rules
 .env.local
 *.env.local
 **/.env.local
-./memory-bank
-./context
+memory-bank/
+context/
