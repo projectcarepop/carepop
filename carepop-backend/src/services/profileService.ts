@@ -37,6 +37,8 @@ export const updateUserProfileService = async (
   profileData: UpdateProfileDto
 ): Promise<Profile | null> => {
   logger.info(`[ProfileService] updateUserProfileService called for userId: ${userId}`);
+  // Log the raw DTO received by the service
+  logger.debug(`[ProfileService] Raw profileData DTO for userId ${userId}:`, JSON.stringify(profileData, null, 2));
 
   if (!userId) {
     logger.error('[ProfileService] Error: User ID is required to update profile.');
@@ -138,6 +140,8 @@ export const updateUserProfileService = async (
     throw new Error('No fields provided for profile update.'); // Or return current profile
   }
 
+  // Log the 'updates' object just before sending to Supabase
+  logger.debug(`[ProfileService] Prepared 'updates' object for Supabase for userId ${userId}:`, JSON.stringify(updates, null, 2));
   logger.info(`[ProfileService] Attempting to update profile for user ${userId} with data:`, JSON.stringify(updates, null, 2));
 
   const { data: updatedProfileData, error } = await supabaseServiceRole

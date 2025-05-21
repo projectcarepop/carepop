@@ -105,7 +105,23 @@ export const handleUpdateUserProfile = async (req: AuthenticatedRequest, res: Re
         return;
     }
 
-    res.status(500).json({ message: 'An unexpected server error occurred while updating the profile.', details: error.message });
+    // Ensure details are always a string for JSON serialization
+    let errorDetails = 'No additional details available.';
+    if (error && typeof error.message === 'string') {
+      errorDetails = error.message;
+    } else if (error) {
+      // Attempt to stringify the error if its message isn't a direct string
+      try {
+        errorDetails = JSON.stringify(error);
+      } catch (stringifyError) {
+        errorDetails = 'Could not serialize error details.';
+      }
+    }
+
+    res.status(500).json({ 
+      message: 'An unexpected server error occurred while updating the profile.', 
+      details: errorDetails 
+    });
     return;
   }
 };
