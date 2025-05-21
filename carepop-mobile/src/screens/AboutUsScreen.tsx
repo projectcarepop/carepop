@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, Linking, TouchableOpacity } from 'react-native';
-import { theme } from '../components'; // Assuming theme is also exported from ../components/index.ts
-import { Ionicons } from '@expo/vector-icons'; // For icons
+import { theme } from '../components'; 
+import { Ionicons } from '@expo/vector-icons';
 import type { NavigationProp } from '@react-navigation/native';
 
 interface AboutUsScreenProps {

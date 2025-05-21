@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
-import { theme } from '../src/components'; // Adjusted path
+import { theme } from '../src/components'; 
 import type { NavigationProp } from '@react-navigation/native';
 
 interface BookingScreenProps {
