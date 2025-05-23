@@ -65,8 +65,8 @@ app.use((req: Request, res: Response) => {
 const PORT = config.port;
 app.listen(PORT, () => {
   logger.info(`Server is running on port ${PORT}`);
-  logger.info(`Environment: ${config.env}`);
-  // if (config.env === 'development' && typeof setupSwagger === 'function') {
+  logger.info(`Environment: ${config.nodeEnv}`);
+  // if (config.nodeEnv === 'development' && typeof setupSwagger === 'function') {
   //   logger.info(`Swagger UI available at http://localhost:${PORT}/api-docs`);
   // }
 });
