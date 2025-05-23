@@ -55,7 +55,7 @@ export const getAllClinics = async (req: Request, res: Response, next: NextFunct
   }
 };
 
-export const searchClinics = async (req: Request, res: Response, next: NextFunction) => {
+export const searchClinics = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const queryParams = searchClinicsQuerySchema.parse(req.query);
     logger.info('[searchClinics] Validated query params:', queryParams);
@@ -80,13 +80,14 @@ export const searchClinics = async (req: Request, res: Response, next: NextFunct
       logger.info(`[searchClinics] Found ${clinicIdsFromProximity.length} clinics from proximity search.`);
 
       if (clinicIdsFromProximity.length === 0) {
-        return res.status(200).json({ 
+        res.status(200).json({ 
           data: [], 
           totalCount: 0, 
           page: queryParams.page, 
           pageSize: queryParams.pageSize, 
           message: 'No clinics found matching proximity criteria.'
         });
+        return;
       }
     }
 
@@ -104,7 +105,8 @@ export const searchClinics = async (req: Request, res: Response, next: NextFunct
       if (clinicIdsFromProximity.length > 0) {
         query = query.in('id', clinicIdsFromProximity);
       } else {
-        return res.status(200).json({ data: [], totalCount: 0, page: queryParams.page, pageSize: queryParams.pageSize, message: 'No clinics found after proximity filter.' });
+        res.status(200).json({ data: [], totalCount: 0, page: queryParams.page, pageSize: queryParams.pageSize, message: 'No clinics found after proximity filter.' });
+        return;
       }
     }
 
@@ -151,7 +153,8 @@ export const searchClinics = async (req: Request, res: Response, next: NextFunct
   } catch (error) {
     if (error instanceof z.ZodError) {
       logger.warn('[searchClinics] Validation error:', error.issues);
-      return res.status(400).json({ message: 'Validation failed', errors: error.issues });
+      res.status(400).json({ message: 'Validation failed', errors: error.issues });
+      return;
     }
     logger.error('[searchClinics] Unhandled error in searchClinics:', error);
     if (!res.headersSent) {
