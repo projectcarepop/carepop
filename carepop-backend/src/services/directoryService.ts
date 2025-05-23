@@ -17,11 +17,6 @@ export const fetchAllActiveClinics = async () => {
       .select(`
         id,
         name,
-        address_street,
-        address_barangay,
-        address_city,
-        address_province,
-        address_postal_code,
         full_address,
         latitude,
         longitude,
