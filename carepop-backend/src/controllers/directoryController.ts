@@ -33,7 +33,7 @@ const getClinicByIdParamsSchema = z.object({
 
 // --- Controller Functions ---
 
-export const getAllClinics = async (req: Request, res: Response, next: NextFunction) => {
+export const getAllClinics = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     // TODO: Add pagination query params validation if needed (e.g., page, pageSize)
     // For now, fetches all active clinics without explicit pagination from controller
@@ -46,6 +46,7 @@ export const getAllClinics = async (req: Request, res: Response, next: NextFunct
       data: clinics || [], 
       // If pagination is added in service, include totalCount, page, pageSize here
     });
+    return;
 
   } catch (error) {
     logger.error('[getAllClinics] Unhandled error:', error);
@@ -163,7 +164,7 @@ export const searchClinics = async (req: Request, res: Response, next: NextFunct
   }
 };
 
-export const getClinicById = async (req: Request, res: Response, next: NextFunction) => {
+export const getClinicById = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { clinicId } = getClinicByIdParamsSchema.parse(req.params);
     logger.info(`[getClinicById] Clinic ID received: ${clinicId}`);
@@ -181,7 +182,8 @@ export const getClinicById = async (req: Request, res: Response, next: NextFunct
     if (error) {
       if (error.code === 'PGRST116') { 
         logger.warn(`[getClinicById] Clinic not found or not active: ${clinicId}`);
-        return res.status(404).json({ message: 'Clinic not found or not active' });
+        res.status(404).json({ message: 'Clinic not found or not active' });
+        return;
       }
       logger.error('[getClinicById] Supabase error:', error);
       throw error;
@@ -189,15 +191,18 @@ export const getClinicById = async (req: Request, res: Response, next: NextFunct
 
     if (!data) { 
       logger.warn(`[getClinicById] Clinic not found or not active (no data): ${clinicId}`);
-      return res.status(404).json({ message: 'Clinic not found or not active' });
+      res.status(404).json({ message: 'Clinic not found or not active' });
+      return;
     }
     // TODO: Transform data if necessary to match frontend Clinic type for services_offered, operating_hours
     res.status(200).json(data);
+    return;
 
   } catch (error) {
     if (error instanceof z.ZodError) {
       logger.warn('[getClinicById] Validation error:', error.issues);
-      return res.status(400).json({ message: 'Validation failed', errors: error.issues });
+      res.status(400).json({ message: 'Validation failed', errors: error.issues });
+      return;
     }
     logger.error('[getClinicById] Error:', error);
     if (!res.headersSent) {
@@ -208,4 +213,4 @@ export const getClinicById = async (req: Request, res: Response, next: NextFunct
 
 // Ensure existing Zod schemas are not accidentally removed by the edit
 searchClinicsQuerySchema;
-getClinicByIdParamsSchema; 
+getClinicByIdParamsSchema;
