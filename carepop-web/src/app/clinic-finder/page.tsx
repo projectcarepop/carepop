@@ -79,7 +79,7 @@ async function getClinics(): Promise<Clinic[]> {
     throw new Error("API base URL is not configured.");
   }
 
-  const response = await fetch(`${apiBaseUrl}/api/v1/clinics`, {
+  const response = await fetch(`${apiBaseUrl}/api/v1/directory/clinics`, {
     // cache: 'no-store', // Use this if you want to ensure fresh data on every request during development or for highly dynamic data.
     // next: { revalidate: 3600 } // Or use incremental static regeneration (ISR) - revalidate every hour.
   });
