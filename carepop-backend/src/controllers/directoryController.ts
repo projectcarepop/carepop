@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { supabase } from '../config/supabaseClient'; // Assuming this is your Supabase anon client
 import logger from '../utils/logger';
+import * as directoryService from '../services/directoryService'; // Import the service
 
 // --- Zod Schemas for Validation ---
 const searchClinicsQuerySchema = z.object({
@@ -31,6 +32,28 @@ const getClinicByIdParamsSchema = z.object({
 });
 
 // --- Controller Functions ---
+
+export const getAllClinics = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // TODO: Add pagination query params validation if needed (e.g., page, pageSize)
+    // For now, fetches all active clinics without explicit pagination from controller
+    logger.info('[getAllClinics] Request received to fetch all active clinics');
+    
+    const clinics = await directoryService.fetchAllActiveClinics();
+    
+    logger.info(`[getAllClinics] Successfully fetched ${clinics?.length || 0} clinics`);
+    res.status(200).json({ 
+      data: clinics || [], 
+      // If pagination is added in service, include totalCount, page, pageSize here
+    });
+
+  } catch (error) {
+    logger.error('[getAllClinics] Unhandled error:', error);
+    if (!res.headersSent) {
+        next(error); // Pass to global error handler
+    }
+  }
+};
 
 export const searchClinics = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -71,7 +94,7 @@ export const searchClinics = async (req: Request, res: Response, next: NextFunct
     let query = supabase
       .from('clinics')
       .select(
-        'id, name, full_address, latitude, longitude, contact_phone, services_offered, operating_hours, fpop_chapter_affiliation',
+        'id, name, full_address, latitude, longitude, contact_phone, services_offered, operating_hours, fpop_chapter_affiliation, is_active', // Added is_active for consistency with Clinic type
         { count: 'exact' } // For total count based on filters
       )
       .eq('is_active', true);
@@ -81,7 +104,6 @@ export const searchClinics = async (req: Request, res: Response, next: NextFunct
       if (clinicIdsFromProximity.length > 0) {
         query = query.in('id', clinicIdsFromProximity);
       } else {
-        // This case should be handled above, but as a safeguard:
         return res.status(200).json({ data: [], totalCount: 0, page: queryParams.page, pageSize: queryParams.pageSize, message: 'No clinics found after proximity filter.' });
       }
     }
@@ -89,6 +111,8 @@ export const searchClinics = async (req: Request, res: Response, next: NextFunct
     // Service filter
     if (queryParams.services && queryParams.services.length > 0) {
       logger.info('[searchClinics] Applying services filter:', queryParams.services);
+      // Assuming services_offered in DB is an array of service IDs or texts that can be directly filtered
+      // If services_offered is an array of JSON objects, this might need a different approach or a DB function
       query = query.overlaps('services_offered', queryParams.services);
     }
 
@@ -97,7 +121,6 @@ export const searchClinics = async (req: Request, res: Response, next: NextFunct
       const searchTerm = `%${queryParams.q.trim()}%`;
       logger.info(`[searchClinics] Applying keyword filter: ${searchTerm}`);
       query = query.or(`name.ilike.${searchTerm},full_address.ilike.${searchTerm}`);
-      // Consider adding other relevant text fields to the .or() condition if needed
     }
     
     // Pagination
@@ -107,10 +130,8 @@ export const searchClinics = async (req: Request, res: Response, next: NextFunct
     logger.info(`[searchClinics] Applying pagination: page=${page}, pageSize=${pageSize}, offset=${offset}`);
     query = query.range(offset, offset + pageSize - 1);
 
-    // Order by name for consistent results (optional)
     query = query.order('name', { ascending: true });
 
-    // Execute the main query
     logger.info('[searchClinics] Executing main Supabase query...');
     const { data: clinics, error: queryError, count } = await query;
 
@@ -133,7 +154,6 @@ export const searchClinics = async (req: Request, res: Response, next: NextFunct
       return res.status(400).json({ message: 'Validation failed', errors: error.issues });
     }
     logger.error('[searchClinics] Unhandled error in searchClinics:', error);
-    // Ensure that next is called for other errors to reach the global error handler
     if (!res.headersSent) {
         next(error);
     }
@@ -145,28 +165,30 @@ export const getClinicById = async (req: Request, res: Response, next: NextFunct
     const { clinicId } = getClinicByIdParamsSchema.parse(req.params);
     logger.info(`[getClinicById] Clinic ID received: ${clinicId}`);
 
+    // To match the Clinic type from the frontend, especially for services_offered and operating_hours,
+    // a more complex query or data transformation might be needed here instead of 'select("*")'.
+    // For now, keeping it simple, but this will likely need refinement.
     const { data, error } = await supabase
       .from('clinics')
-      .select('*') // Select all columns for detail view
+      .select('id, name, full_address, latitude, longitude, contact_phone, contact_email, operating_hours, services_offered, fpop_chapter_affiliation, is_active') 
       .eq('id', clinicId)
       .eq('is_active', true)
       .single();
 
     if (error) {
-      // Check if the error is due to no rows found, which .single() treats as an error
-      if (error.code === 'PGRST116') { // PostgREST code for "Fetched single row, but no rows returned"
+      if (error.code === 'PGRST116') { 
         logger.warn(`[getClinicById] Clinic not found or not active: ${clinicId}`);
         return res.status(404).json({ message: 'Clinic not found or not active' });
       }
       logger.error('[getClinicById] Supabase error:', error);
-      throw error; // Throw to be caught by the outer try-catch and handled by next(error)
+      throw error;
     }
 
-    if (!data) { // Should be redundant due to .single() error handling but good for safety
+    if (!data) { 
       logger.warn(`[getClinicById] Clinic not found or not active (no data): ${clinicId}`);
       return res.status(404).json({ message: 'Clinic not found or not active' });
     }
-
+    // TODO: Transform data if necessary to match frontend Clinic type for services_offered, operating_hours
     res.status(200).json(data);
 
   } catch (error) {
@@ -179,4 +201,8 @@ export const getClinicById = async (req: Request, res: Response, next: NextFunct
         next(error);
     }
   }
-}; 
+};
+
+// Ensure existing Zod schemas are not accidentally removed by the edit
+searchClinicsQuerySchema;
+getClinicByIdParamsSchema; 
