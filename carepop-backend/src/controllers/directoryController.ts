@@ -9,11 +9,18 @@ const searchClinicsQuerySchema = z.object({
   latitude: z.preprocess((val) => val ? Number(val) : undefined, z.number().optional()),
   longitude: z.preprocess((val) => val ? Number(val) : undefined, z.number().optional()),
   radiusKm: z.preprocess((val) => val ? Number(val) : undefined, z.number().positive().optional()),
-  services: z.preprocess((val) => {
-    if (typeof val === 'string' && val.trim() !== '') return [val.trim()];
-    if (Array.isArray(val)) return val.map(s => String(s).trim()).filter(s => s !== '');
-    return undefined;
-  }, z.array(z.string()).optional()),
+  serviceIds: z.preprocess(
+    (val) => {
+      if (typeof val === 'string') {
+        return val.split(',').map(id => id.trim()).filter(id => id && z.string().uuid().safeParse(id).success);
+      }
+      if (Array.isArray(val)) {
+        return val.map(id => String(id).trim()).filter(id => id && z.string().uuid().safeParse(id).success);
+      }
+      return undefined; // Changed from [] to undefined to align with .optional()
+    },
+    z.array(z.string().uuid({ message: "Invalid Service ID format in serviceIds array" })).optional()
+  ),
   q: z.string().trim().optional(),
   page: z.preprocess((val) => Number(val), z.number().min(1).default(1).optional()),
   pageSize: z.preprocess((val) => Number(val), z.number().min(1).max(50).default(10).optional()),
@@ -62,6 +69,7 @@ export const searchClinics = async (req: Request, res: Response, next: NextFunct
     logger.info('[searchClinics] Validated query params:', queryParams);
 
     let clinicIdsFromProximity: string[] | undefined = undefined;
+    let clinicIdsFromServiceFilter: string[] | undefined = undefined;
 
     // Step 1: Proximity search if lat, lon, and radius are provided
     if (queryParams.latitude !== undefined && queryParams.longitude !== undefined && queryParams.radiusKm !== undefined) {
@@ -70,7 +78,7 @@ export const searchClinics = async (req: Request, res: Response, next: NextFunct
         search_lat: queryParams.latitude,
         search_lon: queryParams.longitude,
         search_radius_meters: queryParams.radiusKm * 1000,
-      }).select('id'); // Assuming nearby_clinics can return just IDs
+      }).select('id');
 
       if (rpcError) {
         logger.error('[searchClinics] Supabase RPC nearby_clinics error:', rpcError);
@@ -91,32 +99,68 @@ export const searchClinics = async (req: Request, res: Response, next: NextFunct
         return;
       }
     }
+    
+    // Step 2: Service filter if serviceIds are provided
+    if (queryParams.serviceIds && queryParams.serviceIds.length > 0) {
+      logger.info('[searchClinics] Applying serviceIds filter:', queryParams.serviceIds);
+      const { data: serviceFilteredClinics, error: serviceFilterError } = await supabase
+        .from('clinic_services')
+        .select('clinic_id')
+        .in('service_id', queryParams.serviceIds)
+        .eq('is_offered', true);
 
-    // Step 2: Build the main query
-    let query = supabase
-      .from('clinics')
-      .select(
-        'id, name, full_address, latitude, longitude, contact_phone, services_offered, operating_hours, fpop_chapter_affiliation, is_active', // Added is_active for consistency with Clinic type
-        { count: 'exact' } // For total count based on filters
-      )
-      .eq('is_active', true);
+      if (serviceFilterError) {
+        logger.error('[searchClinics] Supabase clinic_services query error:', serviceFilterError);
+        throw serviceFilterError;
+      }
 
-    // Filter by IDs from proximity search if available
-    if (clinicIdsFromProximity !== undefined) {
-      if (clinicIdsFromProximity.length > 0) {
-        query = query.in('id', clinicIdsFromProximity);
-      } else {
-        res.status(200).json({ data: [], totalCount: 0, page: queryParams.page, pageSize: queryParams.pageSize, message: 'No clinics found after proximity filter.' });
+      clinicIdsFromServiceFilter = serviceFilteredClinics?.map((cs: { clinic_id: string }) => cs.clinic_id) || [];
+      // Deduplicate clinic IDs from service filter
+      clinicIdsFromServiceFilter = [...new Set(clinicIdsFromServiceFilter)];
+      logger.info(`[searchClinics] Found ${clinicIdsFromServiceFilter.length} unique clinic IDs from service filter.`);
+
+      if (clinicIdsFromServiceFilter.length === 0) {
+        res.status(200).json({ 
+          data: [], 
+          totalCount: 0, 
+          page: queryParams.page, 
+          pageSize: queryParams.pageSize, 
+          message: 'No clinics found matching service criteria.'
+        });
         return;
       }
     }
 
-    // Service filter
-    if (queryParams.services && queryParams.services.length > 0) {
-      logger.info('[searchClinics] Applying services filter:', queryParams.services);
-      // Assuming services_offered in DB is an array of service IDs or texts that can be directly filtered
-      // If services_offered is an array of JSON objects, this might need a different approach or a DB function
-      query = query.overlaps('services_offered', queryParams.services);
+    // Step 3: Build the main query, combining filters
+    let query = supabase
+      .from('clinics')
+      .select(
+        'id, name, full_address, latitude, longitude, contact_phone, services_offered, operating_hours, fpop_chapter_affiliation, is_active',
+        { count: 'exact' }
+      )
+      .eq('is_active', true);
+
+    // Combine IDs from proximity and service filters
+    let finalClinicIds: string[] | undefined = undefined;
+
+    if (clinicIdsFromProximity !== undefined && clinicIdsFromServiceFilter !== undefined) {
+      // Intersect IDs if both filters applied
+      finalClinicIds = clinicIdsFromProximity.filter(id => clinicIdsFromServiceFilter!.includes(id));
+    } else if (clinicIdsFromProximity !== undefined) {
+      finalClinicIds = clinicIdsFromProximity;
+    } else if (clinicIdsFromServiceFilter !== undefined) {
+      finalClinicIds = clinicIdsFromServiceFilter;
+    }
+    
+    // Apply combined ID filter if any ID filters were active
+    if (finalClinicIds !== undefined) {
+      if (finalClinicIds.length > 0) {
+        query = query.in('id', finalClinicIds);
+      } else {
+        // If intersection or a single filter resulted in no IDs, return empty
+        res.status(200).json({ data: [], totalCount: 0, page: queryParams.page, pageSize: queryParams.pageSize, message: 'No clinics found after applying all filters.' });
+        return;
+      }
     }
 
     // Keyword filter (ILKE for MVP)

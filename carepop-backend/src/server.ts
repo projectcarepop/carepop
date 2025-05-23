@@ -5,6 +5,9 @@ import { supabase, supabaseServiceRole } from './config/supabaseClient';
 import authRoutes from './routes/authRoutes';
 import profileRoutes from './routes/profileRoutes';
 import directoryRoutes from './routes/directoryRoutes';
+import serviceRoutes from './routes/serviceRoutes';
+import appointmentRoutes from './routes/appointmentRoutes';
+import { getConfig } from './config/config';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -59,6 +62,8 @@ app.use(express.json()); // Middleware to parse JSON bodies
 app.use('/api/auth', authRoutes); // Mount auth routes under /api/auth
 app.use('/api/users', profileRoutes); // Mount profile routes under /api/users
 app.use('/api/v1/directory', directoryRoutes); // Mount directory routes under /api/v1/directory
+app.use('/api/v1', serviceRoutes); // Add the service routes under /api/v1
+app.use('/api/v1/appointments', appointmentRoutes); // Added: Mount appointment routes
 
 // --- Basic Routes (Optional) ---
 app.get('/', (req: Request, res: Response) => {
