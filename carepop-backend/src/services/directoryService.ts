@@ -18,14 +18,23 @@ export const fetchAllActiveClinics = async () => {
         id,
         name,
         full_address,
+        street_address,
+        locality,
+        region,
+        postal_code,
+        country_code,
         latitude,
         longitude,
         contact_phone,
         contact_email,
-        operating_hours, 
-        services_offered, 
+        website_url,
+        operating_hours,
+        services_offered,
         fpop_chapter_affiliation,
-        is_active
+        additional_notes,
+        is_active,
+        created_at,
+        updated_at
       `)
       .eq('is_active', true)
       .order('name', { ascending: true }); // Optional: for consistent ordering

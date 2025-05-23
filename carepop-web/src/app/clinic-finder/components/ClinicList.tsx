@@ -7,9 +7,10 @@ import { AlertTriangle } from "lucide-react";
 
 interface ClinicListProps {
   clinics?: Clinic[]; // Use Clinic type
+  onViewDetails: (clinic: Clinic) => void; // Add this prop
 }
 
-export default function ClinicList({ clinics }: ClinicListProps) {
+export default function ClinicList({ clinics, onViewDetails }: ClinicListProps) {
   // Use passed-in clinics if provided. If not, or if it's empty, handle appropriately.
   const clinicsToDisplay = clinics ? clinics.filter(clinic => clinic.is_active) : [];
 
@@ -32,7 +33,7 @@ export default function ClinicList({ clinics }: ClinicListProps) {
           Otherwise, a single column list is also fine, especially on smaller main content areas. 
           Adjust lg:grid-cols-1 / xl:grid-cols-2 as needed based on final page layout. */}
       {clinicsToDisplay.map((clinic) => (
-        <ClinicCard key={clinic.id} clinic={clinic} />
+        <ClinicCard key={clinic.id} clinic={clinic} onViewDetails={onViewDetails} />
       ))}
     </div>
   );

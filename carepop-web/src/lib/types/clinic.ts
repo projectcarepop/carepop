@@ -21,32 +21,29 @@ export interface Clinic {
   id: string; // UUID from the database
   name: string;
   
-  // Address components (assuming these are separate fields in your DB)
-  address_street?: string | null;
-  address_barangay?: string | null;
-  address_city: string; // Or city/municipality
-  address_province: string;
-  address_postal_code?: string | null;
   full_address?: string | null; // Optional: if the backend provides a concatenated version
+  street_address?: string | null;
+  locality?: string | null; // e.g., City/Municipality, was address_city
+  region?: string | null; // e.g., NCR, was address_province
+  postal_code?: string | null; // was address_postal_code
+  country_code?: string | null;
 
   latitude: number;
   longitude: number;
   
   contact_phone?: string | null;
   contact_email?: string | null;
+  website_url?: string | null;
   
-  // Store as JSONB in DB, define a clear structure for it
-  // The API might return it as a structured object or a pre-formatted summary string
   operating_hours?: OperatingHours | string | null; 
                                         
-  services_offered?: Service[]; // Array of service objects offered by the clinic
+  services_offered?: string[]; // Changed from Service[]
   
   fpop_chapter_affiliation?: string | null;
+  additional_notes?: string | null;
   is_active: boolean;
+  created_at?: string | Date; // Or just string if not parsing
+  updated_at?: string | Date; // Or just string if not parsing
   
-  // Optional fields that might be added by the API (e.g., distance)
   distance_km?: number | null;
-
-  // Any other relevant fields from your \`clinics\` table
-  // e.g., website_url, social_media_links (JSONB?), specific_details_json (JSONB?)
 } 
