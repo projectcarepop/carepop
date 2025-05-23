@@ -102,7 +102,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
       console.log(`[AuthContext] onAuthStateChange: EVENT: ${_event}, setting isLoading=true. Session:`, session ? '(exists)' : '(null)');
       setIsLoading(true);
-      const previousUserEmailConfirmedAt = user?.email_confirmed_at; 
+      const previousUser = user; // Capture the entire previous user state
 
       try {
         const currentUser = session?.user ?? null;
@@ -110,19 +110,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setCurrentSession(session);
         console.log('[AuthContext] onAuthStateChange: User set to:', currentUser ? currentUser.id : 'null');
         
-        let currentProfile: Profile | null = null;
+        let currentProfile: Profile | null = null; // Keep this for profile fetching
 
+        // More specific check for email confirmation event
         if (currentUser && 
-            (_event === 'USER_UPDATED') && 
+            (_event === 'USER_UPDATED' || _event === 'SIGNED_IN') && // Could happen on SIGNED_IN after verify link too
             currentUser.email_confirmed_at && 
-            !previousUserEmailConfirmedAt && 
-            (!profile || !profile.firstName)
+            !previousUser?.email_confirmed_at && // Check if previous state was not confirmed
+            previousUser?.id === currentUser.id // Ensure it's the same user being updated
         ) {
-          console.log('[AuthContext] onAuthStateChange: Email confirmed event detected. Signing out and redirecting to login.');
+          console.log('[AuthContext] onAuthStateChange: Email confirmation transition detected. Signing out and redirecting to login for re-authentication.');
           await supabase.auth.signOut();
           setUser(null);
           setCurrentSession(null);
-          setProfile(null);
+          setProfile(null); // Clear profile as well
           router.push('/login?status=email_verification_success'); 
           setIsLoading(false);
           return;
@@ -345,10 +346,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const sendPasswordResetEmail = async (email: string) => {
     setIsLoading(true);
     setError(null);
+    console.log(`[AuthContext] sendPasswordResetEmail: Attempting to send reset email to: ${email}`);
     try {
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/update-password`,
+        redirectTo: `${window.location.origin}/auth/update-password`,
       });
+
       if (resetError) {
         console.error('Password Reset error:', resetError);
         setError(resetError);

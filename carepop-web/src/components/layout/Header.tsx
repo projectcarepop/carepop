@@ -39,6 +39,9 @@ export default function Header() {
           <Link href="/about" className="flex items-center text-sm font-medium text-secondary hover:text-primary px-3 py-2 rounded-md">
             About
           </Link>
+          <Link href="/contact" className="flex items-center text-sm font-medium text-secondary hover:text-primary px-3 py-2 rounded-md">
+            Contact Us
+          </Link>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center text-sm font-medium text-secondary hover:text-primary hover:bg-transparent px-3 py-2 rounded-md">
@@ -110,6 +113,9 @@ export default function Header() {
               </DropdownMenuItem>
               <DropdownMenuItem asChild className="hover:bg-transparent focus:bg-transparent hover:text-primary focus:text-primary font-medium">
                 <Link href="/about">About</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild className="hover:bg-transparent focus:bg-transparent hover:text-primary focus:text-primary font-medium">
+                <Link href="/contact">Contact Us</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild className="hover:bg-transparent focus:bg-transparent hover:text-primary focus:text-primary font-medium">
                 <Link href="/appointments">Appointments</Link>

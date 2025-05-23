@@ -1,35 +1,100 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
+import { useAuth } from '@/lib/contexts/AuthContext';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Loader2, AlertTriangle, CheckCircle } from 'lucide-react';
 
 const ForgotPasswordPage = () => {
+  const { sendPasswordResetEmail, isLoading: authIsLoading, error: authError } = useAuth();
+  const [email, setEmail] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formSuccess, setFormSuccess] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setFormError(null);
+    setFormSuccess(null);
+    setIsSubmitting(true);
+
+    if (!email) {
+      setFormError('Please enter your email address.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    const { error } = await sendPasswordResetEmail(email);
+
+    if (error) {
+      console.error("[ForgotPasswordPage] Error sending reset email:", error);
+      setFormError(error.message || 'Failed to send password reset email. Please try again.');
+    } else {
+      setFormSuccess('If an account exists for this email, a password reset link has been sent.');
+      setEmail(''); // Clear the input field on success
+    }
+    setIsSubmitting(false);
+  };
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <header className="mb-8 text-center">
-        <h1 className="text-4xl font-bold text-pink-600">Forgot Password</h1>
-      </header>
-      <main>
-        <section className="mb-8 p-6 bg-white shadow-lg rounded-lg max-w-md mx-auto">
-          <h2 className="text-2xl font-semibold text-gray-700 mb-4 text-center">Reset Your Password</h2>
-          <p className="text-gray-600 mb-6 text-center">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 dark:bg-slate-900 p-4">
+      <Card className="w-full max-w-md shadow-xl">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold text-center">Forgot Password</CardTitle>
+          <CardDescription className="text-center text-slate-600 dark:text-slate-400">
             Enter your email address below and we&apos;ll send you a link to reset your password.
-          </p>
-          <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
-              <label htmlFor="email-forgot" className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-              <input type="email" id="email-forgot" name="email" autoComplete="email" required 
-                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500 sm:text-sm" />
+              <Label htmlFor="email-forgot">Email Address</Label>
+              <Input 
+                type="email" 
+                id="email-forgot" 
+                name="email" 
+                autoComplete="email" 
+                required 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-1" 
+                disabled={isSubmitting || authIsLoading}
+              />
             </div>
+
+            {formError && (
+              <div className="text-red-600 dark:text-red-400 text-sm p-2 bg-red-100 dark:bg-red-900/20 rounded-md flex items-center">
+                <AlertTriangle className="h-4 w-4 mr-2 shrink-0" /> {formError}
+              </div>
+            )}
+            {authError && (
+              <div className="text-red-600 dark:text-red-400 text-sm p-2 bg-red-100 dark:bg-red-900/20 rounded-md flex items-center">
+                <AlertTriangle className="h-4 w-4 mr-2 shrink-0" /> {authError.message}
+              </div>
+            )}
+            {formSuccess && (
+              <div className="text-green-600 dark:text-green-400 text-sm p-2 bg-green-100 dark:bg-green-900/20 rounded-md flex items-center">
+                <CheckCircle className="h-4 w-4 mr-2 shrink-0" /> {formSuccess}
+              </div>
+            )}
+            
             <div>
-              <button type="submit" 
-                      className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-pink-600 hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500">
+              <Button 
+                type="submit" 
+                className="w-full" 
+                disabled={isSubmitting || authIsLoading || !!formSuccess}
+              >
+                {(isSubmitting || authIsLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Send Password Reset Link
-              </button>
+              </Button>
             </div>
           </form>
-        </section>
-      </main>
-      <footer className="mt-12 text-center text-gray-500">
+        </CardContent>
+      </Card>
+      <footer className="mt-12 text-center text-sm text-gray-500">
         <p>&copy; {new Date().getFullYear()} CarePop. All rights reserved.</p>
       </footer>
     </div>

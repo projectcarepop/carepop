@@ -367,7 +367,7 @@ export default function CreateProfileWizardPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        console.error("Profile update failed. Status:", response.status, "Result:", result);
+        console.error("Profile update failed. Status:", response.status, "Result (stringified):", JSON.stringify(result, null, 2));
         throw new Error(result.message || `Failed to update profile. Status: ${response.status}`);
       }
 
