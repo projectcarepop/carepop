@@ -156,4 +156,146 @@ export const bookAppointment = async (
     ...createdAppointment,
     // notes: responseNotes, // If notes were decrypted for response
   } as Appointment; // Cast to ensure all fields of Appointment are covered if select() was partial
+};
+
+/**
+ * Cancels an appointment.
+ *
+ * @param appointmentId - The ID of the appointment to cancel.
+ * @param cancelledBy - Who is initiating the cancellation ('user' or 'clinic').
+ * @param cancellationReason - The reason for cancellation.
+ * @param userId - The ID of the user making the request (for user cancellations or audit).
+ * @param userRoles - The roles of the user making the request (for clinic cancellations).
+ * @returns A promise that resolves to the updated Appointment object.
+ * @throws Error if validation or authorization fails, or if there's an issue updating the appointment.
+ */
+export const cancelAppointment = async (
+  appointmentId: string,
+  cancelledBy: 'user' | 'clinic',
+  cancellationReason: string,
+  userId: string,
+  userRoles: string[] = [] // Assuming roles are passed for clinic-side cancellation auth
+): Promise<Appointment> => {
+  logger.info(`[cancelAppointment] Attempting to cancel appointment ${appointmentId} by ${cancelledBy} (requester: ${userId})`, { reason: cancellationReason });
+
+  const { data: appointment, error: fetchError } = await supabase
+    .from('appointments')
+    .select('*')
+    .eq('id', appointmentId)
+    .single();
+
+  if (fetchError || !appointment) {
+    logger.warn(`[cancelAppointment] Appointment not found or query failed for id ${appointmentId}:`, fetchError);
+    throw new Error('Appointment not found.');
+  }
+
+  // Check if appointment can be cancelled
+  if (
+    appointment.status === AppointmentStatus.CANCELLED_USER ||
+    appointment.status === AppointmentStatus.CANCELLED_CLINIC ||
+    appointment.status === AppointmentStatus.COMPLETED
+  ) {
+    logger.warn(`[cancelAppointment] Appointment ${appointmentId} cannot be cancelled. Current status: ${appointment.status}`);
+    throw new Error(`Appointment cannot be cancelled, its status is: ${appointment.status}`);
+  }
+
+  let newStatus: AppointmentStatus;
+
+  if (cancelledBy === 'user') {
+    if (appointment.user_id !== userId) {
+      logger.error(`[cancelAppointment] User ${userId} not authorized to cancel appointment ${appointmentId} owned by ${appointment.user_id}.`);
+      throw new Error('You are not authorized to cancel this appointment.');
+    }
+    newStatus = AppointmentStatus.CANCELLED_USER;
+  } else if (cancelledBy === 'clinic') {
+    let isClinicAuthorized = false;
+    if (userRoles.includes('admin')) {
+      isClinicAuthorized = true;
+      logger.info(`[cancelAppointment] User ${userId} is an admin, authorizing clinic-side cancellation for appointment ${appointmentId}.`);
+    } else if (userRoles.includes('provider')) {
+      logger.info(`[cancelAppointment] User ${userId} has 'provider' role. Checking clinic association for appointment ${appointmentId} at clinic ${appointment.clinic_id}.`);
+      const { data: providerData, error: providerError } = await supabase
+        .from('providers')
+        .select('id')
+        .eq('user_id', userId)
+        .single();
+
+      if (providerError) {
+        logger.error(`[cancelAppointment] Error fetching provider record for user ${userId}:`, providerError);
+        // Do not throw here, let isClinicAuthorized remain false
+      }
+
+      if (providerData) {
+        const { data: facilityLink, error: facilityLinkError } = await supabase
+          .from('provider_facilities')
+          .select('facility_id')
+          .eq('provider_id', providerData.id)
+          .eq('facility_id', appointment.clinic_id) // facility_id is our clinic_id
+          .maybeSingle(); // Use maybeSingle as there might be no link
+
+        if (facilityLinkError) {
+          logger.error(`[cancelAppointment] Error checking provider-facility link for provider ${providerData.id} and clinic ${appointment.clinic_id}:`, facilityLinkError);
+          // Do not throw here
+        }
+        if (facilityLink) {
+          isClinicAuthorized = true;
+          logger.info(`[cancelAppointment] User ${userId} (provider ${providerData.id}) is linked to clinic ${appointment.clinic_id}. Authorizing cancellation.`);
+        } else {
+          logger.warn(`[cancelAppointment] User ${userId} (provider ${providerData.id}) is NOT linked to clinic ${appointment.clinic_id}.`);
+        }
+      } else {
+        logger.warn(`[cancelAppointment] No provider record found for user ${userId} with 'provider' role.`);
+      }
+    }
+
+    if (!isClinicAuthorized) {
+      logger.error(`[cancelAppointment] User ${userId} (roles: ${userRoles.join(',')}) not authorized for clinic-side cancellation of appointment ${appointmentId} at clinic ${appointment.clinic_id}.`);
+      throw new Error('You are not authorized to cancel this appointment on behalf of the clinic.');
+    }
+    newStatus = AppointmentStatus.CANCELLED_CLINIC;
+  } else {
+    // Should not happen due to Zod validation on request body, but as a safeguard:
+    logger.error(`[cancelAppointment] Invalid 'cancelledBy' value: ${cancelledBy}`);
+    throw new Error("Invalid cancellation party specified.");
+  }
+
+  let encryptedCancellationReason: string | null = cancellationReason;
+  if (cancellationReason) {
+    try {
+      const encryptionService = new EncryptionService();
+      encryptedCancellationReason = await encryptionService.encrypt(cancellationReason);
+      logger.info(`[cancelAppointment] Cancellation reason for appointment ${appointmentId} was encrypted.`);
+    } catch (encError) {
+      logger.error(`[cancelAppointment] Failed to encrypt cancellation reason for appointment ${appointmentId}:`, encError);
+      // Decide if to throw or proceed with unencrypted. For now, let's proceed but log error.
+      // For higher security, one might throw: throw new Error('Failed to process cancellation reason securely.');
+      // Or, ensure cancellationReason is nulled if encryption fails and encryption is mandatory.
+      // Current choice: log and proceed with potentially unencrypted reason if encryption fails.
+      // This is a trade-off. A better approach for mandatory encryption would be to throw.
+      // Let's change to throw, to enforce security.
+      throw new Error('Failed to process cancellation reason securely.');
+    }
+  }
+
+  const updateData = {
+    status: newStatus,
+    cancellation_reason: encryptedCancellationReason, // Use the (potentially) encrypted reason
+    updated_at: new Date().toISOString(), // Explicitly set updated_at
+  };
+
+  const { data: updatedAppointment, error: updateError } = await supabase
+    .from('appointments')
+    .update(updateData)
+    .eq('id', appointmentId)
+    .select()
+    .single();
+
+  if (updateError || !updatedAppointment) {
+    logger.error(`[cancelAppointment] Failed to update appointment ${appointmentId} in DB:`, updateError);
+    throw new Error(`Failed to cancel appointment: ${updateError?.message || 'Unknown error'}`);
+  }
+
+  logger.info(`[cancelAppointment] Successfully cancelled appointment ${updatedAppointment.id}. New status: ${newStatus}`);
+  
+  return updatedAppointment as Appointment;
 }; 

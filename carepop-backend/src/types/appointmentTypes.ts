@@ -39,4 +39,30 @@ export interface Appointment {
   created_at: string; // ISO date string
   updated_at: string; // ISO date string
   // Add any other relevant fields, e.g., duration_minutes if derived/stored
-} 
+}
+
+// Zod schema for the appointment cancellation request path parameters
+export const CancelAppointmentPathParamsSchema = z.object({
+  appointmentId: z.string().uuid({ message: "Invalid Appointment ID format" }),
+});
+
+// Enum for who initiated the cancellation
+export enum CancelledBy {
+  USER = 'user',
+  CLINIC = 'clinic',
+}
+
+// Zod schema for CancelledBy enum
+export const CancelledBySchema = z.nativeEnum(CancelledBy);
+
+// Zod schema for the appointment cancellation request body
+export const CancelAppointmentRequestBodySchema = z.object({
+  cancelledBy: CancelledBySchema,
+  cancellationReason: z.string().min(1, { message: "Cancellation reason is required" }).max(500, { message: "Cancellation reason must be 500 characters or less" }),
+});
+
+// TypeScript type for the appointment cancellation request body
+export type CancelAppointmentRequestBody = z.infer<typeof CancelAppointmentRequestBodySchema>;
+
+// TypeScript type for the appointment cancellation request path parameters
+export type CancelAppointmentPathParams = z.infer<typeof CancelAppointmentPathParamsSchema>; 
