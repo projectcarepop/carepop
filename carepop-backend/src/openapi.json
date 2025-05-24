@@ -81,6 +81,63 @@
             "nullable": true
           }
         }
+      },
+      "ServiceDetails": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "description": { "type": "string", "nullable": true }
+        },
+        "required": ["id", "name"]
+      },
+      "ClinicDetails": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "address_line1": { "type": "string", "nullable": true },
+          "city": { "type": "string", "nullable": true }
+        },
+        "required": ["id", "name"]
+      },
+      "ProviderDetails": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "full_name": { "type": "string" },
+          "specialty": { "type": "string", "nullable": true }
+        },
+        "required": ["id", "full_name"]
+      },
+      "UserAppointmentDetails": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "user_id": { "type": "string", "format": "uuid" },
+          "appointment_time": { "type": "string", "format": "date-time" },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "confirmed", "cancelled_user", "cancelled_clinic", "completed", "no_show"]
+          },
+          "notes": { "type": "string", "nullable": true },
+          "cancellation_reason": { "type": "string", "nullable": true },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" },
+          "service": { "$ref": "#/components/schemas/ServiceDetails" },
+          "clinic": { "$ref": "#/components/schemas/ClinicDetails" },
+          "provider": { "$ref": "#/components/schemas/ProviderDetails", "nullable": true }
+        },
+        "required": [
+          "id", 
+          "user_id", 
+          "appointment_time", 
+          "status", 
+          "created_at", 
+          "updated_at", 
+          "service", 
+          "clinic"
+        ]
       }
     }
   },

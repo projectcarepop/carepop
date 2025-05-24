@@ -1,5 +1,10 @@
 import express, { Router } from 'express';
-import { createAppointmentHandler, cancelAppointmentHandler } from '../controllers/appointmentController';
+import {
+  createAppointmentHandler,
+  cancelAppointmentHandler,
+  getUserFutureAppointmentsHandler,
+  getUserPastAppointmentsHandler
+} from '../controllers/appointmentController';
 import { authenticateToken } from '../middleware/authMiddleware';
 
 const router: Router = express.Router();
@@ -124,6 +129,92 @@ router.patch(
   '/:appointmentId/cancel',
   authenticateToken,
   cancelAppointmentHandler
+);
+
+/**
+ * @openapi
+ * /api/v1/appointments/me/future:
+ *   get:
+ *     summary: Get user's future appointments
+ *     description: >
+ *       Retrieves a list of the authenticated user's future appointments
+ *       (status PENDING or CONFIRMED, and appointment_time in the future).
+ *       Includes details of the service, clinic, and provider for each appointment.
+ *       Requires authentication (Bearer token).
+ *     tags:
+ *       - Appointments
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: A list of future appointments with details.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/UserAppointmentDetails'
+ *       401:
+ *         description: Authentication required.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Internal server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.get(
+  '/me/future', 
+  authenticateToken, 
+  getUserFutureAppointmentsHandler
+);
+
+/**
+ * @openapi
+ * /api/v1/appointments/me/past:
+ *   get:
+ *     summary: Get user's past appointments
+ *     description: >
+ *       Retrieves a list of the authenticated user's past appointments
+ *       (e.g., status COMPLETED, CANCELLED_USER, CANCELLED_CLINIC, NO_SHOW 
+ *       and appointment_time in the past).
+ *       Includes details of the service, clinic, and provider for each appointment.
+ *       Results are ordered by appointment_time descending.
+ *       Requires authentication (Bearer token).
+ *     tags:
+ *       - Appointments
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: A list of past appointments with details.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/UserAppointmentDetails'
+ *       401:
+ *         description: Authentication required.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Internal server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.get(
+  '/me/past',
+  authenticateToken,
+  getUserPastAppointmentsHandler
 );
 
 export default router; 

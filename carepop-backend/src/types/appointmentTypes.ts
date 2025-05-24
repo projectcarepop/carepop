@@ -65,4 +65,66 @@ export const CancelAppointmentRequestBodySchema = z.object({
 export type CancelAppointmentRequestBody = z.infer<typeof CancelAppointmentRequestBodySchema>;
 
 // TypeScript type for the appointment cancellation request path parameters
-export type CancelAppointmentPathParams = z.infer<typeof CancelAppointmentPathParamsSchema>; 
+export type CancelAppointmentPathParams = z.infer<typeof CancelAppointmentPathParamsSchema>;
+
+// --- Types for Fetching User Appointments with Details (APP-USER-1) ---
+
+// Basic details for a service (assuming these fields exist on a full Service type)
+export const ServiceDetailsSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  description: z.string().nullable().optional(), // Or make non-optional if always present
+  // Add other relevant service fields like category, duration_minutes if needed directly in the list
+});
+export type ServiceDetails = z.infer<typeof ServiceDetailsSchema>;
+
+// Basic details for a clinic (assuming these fields exist on a full Clinic type)
+export const ClinicDetailsSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  address_line1: z.string().nullable().optional(), // Example field
+  city: z.string().nullable().optional(),          // Example field
+  // Add other relevant clinic fields like phone_number, full_address if needed
+});
+export type ClinicDetails = z.infer<typeof ClinicDetailsSchema>;
+
+// Basic details for a provider (assuming these fields exist on a full Provider type)
+export const ProviderDetailsSchema = z.object({
+  id: z.string().uuid(),
+  full_name: z.string(), // Assuming a full_name field
+  specialty: z.string().nullable().optional(),
+  // Add other relevant provider fields like qualifications, avatar_url if needed
+});
+export type ProviderDetails = z.infer<typeof ProviderDetailsSchema>;
+
+// Enriched appointment details for user-facing lists/views
+export const UserAppointmentDetailsSchema = z.object({
+  // Core Appointment fields (consider if all are needed or a subset)
+  id: z.string().uuid(), 
+  user_id: z.string().uuid(),
+  appointment_time: z.string().datetime(),
+  status: AppointmentStatusSchema,
+  notes: z.string().nullable(), // Assuming notes might be decrypted for the user
+  cancellation_reason: z.string().nullable(),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+  
+  // Joined details
+  service: ServiceDetailsSchema,
+  clinic: ClinicDetailsSchema,
+  provider: ProviderDetailsSchema.nullable(), // Provider can be null on an appointment
+});
+export type UserAppointmentDetails = z.infer<typeof UserAppointmentDetailsSchema>;
+
+// Schema for the API response when fetching a list of user appointments
+export const GetUserAppointmentsResponseSchema = z.array(UserAppointmentDetailsSchema);
+export type GetUserAppointmentsResponse = z.infer<typeof GetUserAppointmentsResponseSchema>;
+
+// Potential Query Parameters for fetching appointments (e.g., for pagination, filtering by status - though APP-USER-1 is for future appointments)
+// For now, APP-USER-1 doesn't specify query params, but this is where they'd go.
+// export const GetUserAppointmentsQuerySchema = z.object({
+//   limit: z.number().int().positive().optional(),
+//   offset: z.number().int().nonnegative().optional(),
+//   status: AppointmentStatusSchema.optional(), // Could be used for past appointments later
+// });
+// export type GetUserAppointmentsQuery = z.infer<typeof GetUserAppointmentsQuerySchema>; 

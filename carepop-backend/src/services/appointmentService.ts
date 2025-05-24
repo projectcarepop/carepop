@@ -1,5 +1,11 @@
 import { supabase } from '../config/supabaseClient';
-import { BookAppointmentRequest, Appointment, AppointmentStatus } from '../types/appointmentTypes';
+import {
+  BookAppointmentRequest,
+  Appointment,
+  AppointmentStatus,
+  UserAppointmentDetails, // Added for APP-USER-1
+  // GetUserAppointmentsResponse, // This is an array type, not needed for service return type directly
+} from '../types/appointmentTypes';
 import { Service } from '../types/serviceTypes'; // For checking service.is_active
 // import { Clinic } from '../types/clinicTypes'; // If a specific Clinic type exists for validation
 import logger from '../utils/logger';
@@ -298,4 +304,166 @@ export const cancelAppointment = async (
   logger.info(`[cancelAppointment] Successfully cancelled appointment ${updatedAppointment.id}. New status: ${newStatus}`);
   
   return updatedAppointment as Appointment;
+};
+
+/**
+ * Fetches a user's future appointments with details about the service, clinic, and provider.
+ *
+ * @param userId - The ID of the user whose future appointments are to be fetched.
+ * @returns A promise that resolves to an array of UserAppointmentDetails.
+ * @throws Error if there's an issue querying the database.
+ */
+export const getUserFutureAppointments = async (
+  userId: string
+): Promise<UserAppointmentDetails[]> => {
+  logger.info(`[getUserFutureAppointments] Attempting to fetch future appointments for user ${userId}`);
+
+  const now = new Date().toISOString();
+
+  const query = supabase
+    .from('appointments')
+    .select(`
+      id,
+      user_id,
+      appointment_time,
+      status,
+      notes,
+      cancellation_reason,
+      created_at,
+      updated_at,
+      service:services!inner(id, name, description),
+      clinic:clinics!inner(id, name, address_line1, city),
+      provider:providers(id, full_name, specialty)
+    `)
+    .eq('user_id', userId)
+    .gt('appointment_time', now)
+    .in('status', [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED])
+    .order('appointment_time', { ascending: true });
+
+  const { data: appointmentsData, error: fetchError } = await query;
+
+  if (fetchError) {
+    logger.error(`[getUserFutureAppointments] Error fetching future appointments for user ${userId}:`, fetchError);
+    throw new Error('Failed to fetch future appointments.');
+  }
+
+  if (!appointmentsData) {
+    logger.info(`[getUserFutureAppointments] No future appointments found for user ${userId}.`);
+    return [];
+  }
+
+  // Post-process to decrypt notes
+  const encryptionService = new EncryptionService();
+  const detailedAppointments: UserAppointmentDetails[] = await Promise.all(
+    appointmentsData.map(async (appt: any) => { // Use 'any' for raw Supabase data before casting
+      let decryptedNotes: string | null = null;
+      if (appt.notes) {
+        try {
+          decryptedNotes = await encryptionService.decrypt(appt.notes);
+        } catch (decErr) {
+          logger.warn(`[getUserFutureAppointments] Failed to decrypt notes for appointment ${appt.id}, returning null for notes.`, decErr);
+          // Keep notes as null if decryption fails
+        }
+      }
+      return {
+        id: appt.id,
+        user_id: appt.user_id,
+        appointment_time: appt.appointment_time,
+        status: appt.status as AppointmentStatus,
+        notes: decryptedNotes,
+        cancellation_reason: appt.cancellation_reason,
+        created_at: appt.created_at,
+        updated_at: appt.updated_at,
+        service: appt.service as UserAppointmentDetails['service'],
+        clinic: appt.clinic as UserAppointmentDetails['clinic'],
+        provider: appt.provider as UserAppointmentDetails['provider'] | null,
+      } as UserAppointmentDetails; // Ensure the final object matches UserAppointmentDetails
+    })
+  );
+
+  logger.info(`[getUserFutureAppointments] Successfully fetched ${detailedAppointments.length} future appointments for user ${userId}`);
+  return detailedAppointments;
+};
+
+/**
+ * Fetches a user's past appointments with details about the service, clinic, and provider.
+ *
+ * @param userId - The ID of the user whose past appointments are to be fetched.
+ * @returns A promise that resolves to an array of UserAppointmentDetails.
+ * @throws Error if there's an issue querying the database.
+ */
+export const getUserPastAppointments = async (
+  userId: string
+): Promise<UserAppointmentDetails[]> => {
+  logger.info(`[getUserPastAppointments] Attempting to fetch past appointments for user ${userId}`);
+
+  const now = new Date().toISOString();
+
+  const query = supabase
+    .from('appointments')
+    .select(`
+      id,
+      user_id,
+      appointment_time,
+      status,
+      notes,
+      cancellation_reason,
+      created_at,
+      updated_at,
+      service:services!inner(id, name, description),
+      clinic:clinics!inner(id, name, address_line1, city),
+      provider:providers(id, full_name, specialty)
+    `)
+    .eq('user_id', userId)
+    .lte('appointment_time', now) // Less than or equal to now for past appointments
+    .in('status', [
+      AppointmentStatus.COMPLETED,
+      AppointmentStatus.CANCELLED_USER,
+      AppointmentStatus.CANCELLED_CLINIC,
+      AppointmentStatus.NO_SHOW
+    ])
+    .order('appointment_time', { ascending: false }); // Descending for past appointments
+
+  const { data: appointmentsData, error: fetchError } = await query;
+
+  if (fetchError) {
+    logger.error(`[getUserPastAppointments] Error fetching past appointments for user ${userId}:`, fetchError);
+    throw new Error('Failed to fetch past appointments.');
+  }
+
+  if (!appointmentsData) {
+    logger.info(`[getUserPastAppointments] No past appointments found for user ${userId}.`);
+    return [];
+  }
+
+  // Post-process to decrypt notes (same logic as for future appointments)
+  const encryptionService = new EncryptionService();
+  const detailedAppointments: UserAppointmentDetails[] = await Promise.all(
+    appointmentsData.map(async (appt: any) => {
+      let decryptedNotes: string | null = null;
+      if (appt.notes) {
+        try {
+          decryptedNotes = await encryptionService.decrypt(appt.notes);
+        } catch (decErr) {
+          logger.warn(`[getUserPastAppointments] Failed to decrypt notes for appointment ${appt.id}, returning null for notes.`, decErr);
+        }
+      }
+      return {
+        id: appt.id,
+        user_id: appt.user_id,
+        appointment_time: appt.appointment_time,
+        status: appt.status as AppointmentStatus,
+        notes: decryptedNotes,
+        cancellation_reason: appt.cancellation_reason,
+        created_at: appt.created_at,
+        updated_at: appt.updated_at,
+        service: appt.service as UserAppointmentDetails['service'],
+        clinic: appt.clinic as UserAppointmentDetails['clinic'],
+        provider: appt.provider as UserAppointmentDetails['provider'] | null,
+      } as UserAppointmentDetails;
+    })
+  );
+
+  logger.info(`[getUserPastAppointments] Successfully fetched ${detailedAppointments.length} past appointments for user ${userId}`);
+  return detailedAppointments;
 }; 
