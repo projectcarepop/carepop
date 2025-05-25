@@ -1,15 +1,22 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { Check, MapPin } from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Check, MapPin, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ServerCrash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from "@/components/ui/input";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 // Raw API response types (matching backend structure before frontend mapping)
 interface RawApiClinic {
@@ -55,7 +62,143 @@ interface ApiService {
   price?: number | null;
   duration?: string | null;
   requires_provider_assignment: boolean; // Added
+  categoryName?: string; // For frontend categorization
 }
+
+// Define categories and service name mappings
+// In a real app, this mapping might come from a config or be part of the service data itself
+const SERVICE_CATEGORIES_CONFIG = [
+  {
+    name: "Family Planning & Contraception",
+    serviceNames: [
+      "Family Planning Counseling",
+      "IUD Insertion",
+      "IUD Check-up",
+      "IUD Removal",
+    ],
+  },
+  {
+    name: "Maternal & Obstetric Care",
+    serviceNames: [
+      "Birthing Services",
+      "Pre-natal Consultation",
+      "Normal Delivery Assistance",
+      "Post-natal Check-up",
+      "Maternal Immunization - Hepa B",
+      "Maternal Immunization - Tetanus Toxoid",
+    ],
+  },
+  {
+    name: "Gynecology & Women's Health",
+    serviceNames: [
+      "Gynecology Consultation",
+      "Cervical Cauterization",
+      "Albothyl Concentrate Application",
+      "Gyne Cervical/Vaginal Douche",
+      "Pap Smear Reading/Test",
+      "Women Pelvic Examination",
+      "Women Breast Examination",
+      "Women Infertility Consultation/Management",
+      "Women UTI/RTI Management",
+      "Other Gynecological Cases",
+    ],
+  },
+  {
+    name: "Pediatrics & Child Health",
+    serviceNames: [
+      "Well-baby/Child Check-up",
+      "Child Immunization - Hepa B",
+      "Child Immunization - MMR",
+      "Child Immunization - Oral Polio",
+      "Child Immunization - Measles",
+      "Child Immunization - BCG",
+      "Child Immunization - Chickenpox",
+      "Child Immunization - Hib",
+      "Child Immunization - PentactHib",
+      "Child Immunization - Mumpa Measles Rubella",
+      "Child Immunization - URTI",
+      "Child Immunization - DPT",
+      "Sick Baby/Child Consultation",
+      "Vitamin A Supplementation",
+      "Nebulization",
+      "Ear Piercing",
+      "Circumcision",
+      "Other Medical Cases (Child Health)",
+    ],
+  },
+  {
+    name: "General Medicine & Consultations",
+    serviceNames: [
+      "Hypertension (HPN) Management",
+      "UTI Management",
+      "General Medicine Consultation",
+      "Minor Surgery",
+      "Ophthalmology Consultation",
+      "Blood Pressure Check-up (Non-resupply)",
+      "Blood Pressure Check-up (Resupply)",
+    ],
+  },
+  {
+    name: "Dental Care",
+    serviceNames: [
+      "Dental Restoration (Filling)",
+      "Dental Prophylaxis (Cleaning)",
+      "Tooth Extraction",
+    ],
+  },
+  {
+    name: "Men's Health",
+    serviceNames: [
+      "Men Infertility Consultation/Management",
+      "Men Impotency Management",
+      "Men Urological Screening",
+      // "Men STD Screening / VDRL", // Moved to Lab/Diagnostics to avoid duplication
+    ],
+  },
+  {
+    name: "Laboratory & Diagnostics",
+    serviceNames: [
+      "Pregnancy Test",
+      "Urinalysis",
+      "Fecalysis",
+      "Complete Blood Count (CBC)",
+      "Hemoglobin Test (HB/HGB)",
+      "Hematocrit Test (HCF)",
+      "Blood Chemistry Panel",
+      "Platelet Count",
+      "Fasting Blood Sugar (FBS)",
+      "Ultrasound",
+      "Pap Smear Reading/Test", // Appears here and in Gyno, keeping in Gyno as primary for now or we decide one
+      "Chest X-ray",
+      "Widals Test (Typhoid)",
+      "Biopsy Procedure/Reading",
+      "Abdominal X-ray",
+      "Electrocardiogram (ECG)",
+      "Thyroid Clearance Test",
+      "Gram Stain",
+      "Wet Smear/Mount",
+      "STD Screening / VDRL Test", // Primary category
+      "Men STD Screening / VDRL", // Will be caught by the above if name is same
+      "Hepatitis B Surface Antigen (HBsAg) Test",
+      "Sperm Analysis",
+      "White Blood Cell (WBC) Count",
+      "Clotting Time Test",
+      "Bleeding Time Test",
+      "Blood Uric Acid (BUA) Test",
+      "Other Laboratory Tests",
+    ],
+  },
+];
+
+// Helper to assign categoryName to a service
+const getCategoryForService = (serviceName: string): string => {
+  for (const category of SERVICE_CATEGORIES_CONFIG) {
+    if (category.serviceNames.includes(serviceName)) {
+      return category.name;
+    }
+  }
+  return "Other Services"; // Fallback category
+};
 
 interface ClinicServiceSelectionStepProps {
   selectedClinicId: string | null;
@@ -73,6 +216,11 @@ interface ClinicServiceSelectionStepProps {
   }) => void;
 }
 
+interface ServiceCategory {
+    name: string;
+    services: ApiService[];
+}
+
 const ClinicServiceSelectionStep: React.FC<ClinicServiceSelectionStepProps> = ({
   selectedClinicId,
   setSelectedClinicId,
@@ -87,6 +235,8 @@ const ClinicServiceSelectionStep: React.FC<ClinicServiceSelectionStepProps> = ({
   const [availableServices, setAvailableServices] = useState<ApiService[]>([]);
   const [isLoadingServices, setIsLoadingServices] = useState(false);
   const [serviceError, setServiceError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [openAccordionItems, setOpenAccordionItems] = useState<string[]>([]); // For controlled accordion state
 
   useEffect(() => {
     const fetchClinics = async () => {
@@ -97,7 +247,6 @@ const ClinicServiceSelectionStep: React.FC<ClinicServiceSelectionStepProps> = ({
         if (!baseUrl) {
           throw new Error('Backend API URL is not configured. Please set NEXT_PUBLIC_BACKEND_API_URL.');
         }
-        // Ensure no double slashes and add an explicit empty query string just in case
         const clinicsUrl = `${baseUrl.replace(/\/$/, '')}/api/v1/directory/clinics/search?`;
         const response = await fetch(clinicsUrl);
         if (!response.ok) {
@@ -131,7 +280,6 @@ const ClinicServiceSelectionStep: React.FC<ClinicServiceSelectionStepProps> = ({
           if (!baseUrl) {
             throw new Error('Backend API URL is not configured. Please set NEXT_PUBLIC_BACKEND_API_URL.');
           }
-          // Ensure no double slashes
           const servicesUrl = `${baseUrl.replace(/\/$/, '')}/api/v1/clinics/${selectedClinicId}/services`;
           const response = await fetch(servicesUrl);
           if (!response.ok) {
@@ -150,6 +298,7 @@ const ClinicServiceSelectionStep: React.FC<ClinicServiceSelectionStepProps> = ({
             requires_provider_assignment: service.requires_provider_assignment !== null && service.requires_provider_assignment !== undefined 
                                             ? service.requires_provider_assignment 
                                             : true, // Default to true if undefined/null from API (safer for booking flow)
+            categoryName: getCategoryForService(service.name)
           }));
           setAvailableServices(fetchedServices);
         } catch (error) {
@@ -161,15 +310,49 @@ const ClinicServiceSelectionStep: React.FC<ClinicServiceSelectionStepProps> = ({
       };
       fetchServices();
       setSelectedServiceId(null);
+      setOpenAccordionItems([]); // Close accordion items when clinic changes
     } else {
       setAvailableServices([]);
       setSelectedServiceId(null);
+      setOpenAccordionItems([]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClinicId]);
 
+  // Memoize categorized and filtered services
+  const categorizedAndFilteredServices = useMemo(() => {
+    const grouped: Record<string, ApiService[]> = {};
+
+    availableServices.forEach(service => {
+      if (!service.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+        return; // Skip if service name doesn't match search term
+      }
+      const category = service.categoryName || "Other Services";
+      if (!grouped[category]) {
+        grouped[category] = [];
+      }
+      grouped[category].push(service);
+    });
+
+    // Ensure consistent order of categories based on SERVICE_CATEGORIES_CONFIG
+    const result: ServiceCategory[] = SERVICE_CATEGORIES_CONFIG.map(configCategory => ({
+      name: configCategory.name,
+      services: grouped[configCategory.name] || [],
+    })); 
+
+    // Add "Other Services" if it has any services and isn't already in config
+    if (grouped["Other Services"] && grouped["Other Services"].length > 0 && !SERVICE_CATEGORIES_CONFIG.find(c => c.name === "Other Services")) {
+        result.push({
+            name: "Other Services",
+            services: grouped["Other Services"]
+        });
+    }
+    return result.filter(category => category.services.length > 0); // Only return categories with services after filtering
+  }, [availableServices, searchTerm]);
+
   const handleClinicSelect = (clinicId: string) => {
     setSelectedClinicId(clinicId);
+    setSearchTerm("");
   };
 
   const handleServiceSelect = (serviceId: string) => {
@@ -204,170 +387,199 @@ const ClinicServiceSelectionStep: React.FC<ClinicServiceSelectionStepProps> = ({
     }
   };
 
-  if (isLoadingClinics) {
+  if (isLoadingClinics && !clinicsList.length) { // Show card skeleton only on initial full load
     return (
-      <div className="space-y-8">
-        <div className="space-y-2">
-          <Skeleton className="h-6 w-1/2" />
-          <Skeleton className="h-4 w-3/4" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="p-4">
-              <Skeleton className="h-5 w-3/5 mb-2" />
-              <Skeleton className="h-3 w-full mb-1" />
-              <Skeleton className="h-3 w-2/5" />
-            </Card>
-          ))}
-        </div>
-      </div>
+      <Card className="p-6 w-full max-w-4xl mx-auto shadow-lg md:max-h-[80vh] overflow-hidden">
+        <CardContent className="flex flex-col md:flex-row gap-6 md:gap-8 p-0">
+          <div className="w-full md:w-1/3 space-y-2">
+            <Skeleton className="h-6 w-3/4 mb-1" />
+            <Skeleton className="h-4 w-full mb-4" />
+            <Skeleton className="h-16 w-full mb-2" />
+            <Skeleton className="h-16 w-full mb-2" />
+            <Skeleton className="h-16 w-full" />
+          </div>
+          <div className="w-full md:w-2/3 space-y-2">
+            <Skeleton className="h-6 w-3/4 mb-1" />
+            <Skeleton className="h-4 w-full mb-4" />
+            <Skeleton className="h-10 w-full mb-4" /> {/* Search bar skeleton */}
+            <Skeleton className="h-12 w-full mb-2" /> {/* Accordion item skeleton */}
+            <Skeleton className="h-12 w-full mb-2" />
+            <Skeleton className="h-12 w-full mb-2" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
-  if (clinicError) {
-    return (
-      <Alert variant="destructive">
-        <ServerCrash className="h-4 w-4" />
-        <AlertTitle>Error Fetching Clinics</AlertTitle>
-        <AlertDescription>{clinicError}</AlertDescription>
-      </Alert>
-    );
-  }
-  
+  // Main layout as a Card
   return (
-    <div className={cn('space-y-8')}> 
-      <div className="space-y-2">
-        <h3 className="text-xl font-semibold tracking-tight text-center sm:text-left">
-          Choose Your Clinic
-        </h3>
-        <p className="text-sm text-muted-foreground text-center sm:text-left">
-          Start by selecting a clinic for your appointment.
-        </p>
-      </div>
-
-      {clinicsList.length === 0 && !isLoadingClinics && (
-         <Alert>
-            <MapPin className="h-4 w-4" />
-            <AlertTitle>No Clinics Available</AlertTitle>
-            <AlertDescription>
-              There are currently no clinics available to book. Please check back later.
-            </AlertDescription>
-          </Alert>
-      )}
-
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {clinicsList.map((clinic) => (
-            <Card
-              key={clinic.id}
-              className={cn(
-                'cursor-pointer p-4 transition-all hover:shadow-lg hover:border-primary/80',
-                selectedClinicId === clinic.id && 'border-2 border-primary ring-2 ring-primary/30 bg-primary/5 dark:bg-primary/10'
-              )}
-              onClick={() => handleClinicSelect(clinic.id)}
-            >
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <h4 className="font-semibold text-base">{clinic.name}</h4>
-                  <div className="flex items-center text-xs text-muted-foreground">
-                    <MapPin className="mr-1.5 h-3.5 w-3.5 flex-shrink-0" />
-                    <span>{clinic.full_address}</span>
-                  </div>
-                </div>
-                {selectedClinicId === clinic.id && (
-                  <Check className="h-5 w-5 text-primary flex-shrink-0" />
-                )}
-              </div>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      {selectedClinicId && (
-        <div className="space-y-4 pt-4 border-t border-border">
-            <div className="space-y-2">
-                <h3 className="text-xl font-semibold tracking-tight text-center sm:text-left">
-                    Available Services at {clinicsList.find(c => c.id === selectedClinicId)?.name || 'Selected Clinic'}
-                </h3>
-                <p className="text-sm text-muted-foreground text-center sm:text-left">
-                    Choose the service you need.
-                </p>
-            </div>
-
-          {isLoadingServices && (
-            <div className="space-y-3 mt-2">
-                <div className="flex items-center space-x-3 rounded-md border border-input p-4">
-                    <Skeleton className="h-5 w-5 rounded-full" />
-                    <div className="flex-1 space-y-1">
-                        <Skeleton className="h-4 w-3/4" />
-                        <Skeleton className="h-3 w-1/2" />
-                    </div>
-                    <Skeleton className="h-4 w-1/4" />
-                </div>
-            </div>
-          )}
-
-          {serviceError && !isLoadingServices && (
-            <Alert variant="destructive" className="mt-2">
-              <ServerCrash className="h-4 w-4" />
-              <AlertTitle>Error Fetching Services</AlertTitle>
-              <AlertDescription>{serviceError}</AlertDescription>
+    <Card className="w-full max-w-5xl mx-auto shadow-xl flex flex-col overflow-hidden bg-white md:max-h-[600px] lg:max-h-[600px]"> 
+      <CardContent className="p-4 md:p-6 flex flex-col md:flex-row gap-4 md:gap-6 flex-grow overflow-hidden"> {/* Flex grow and overflow for internal scrolling */}
+        {/* Left Column: Clinic Selection */} 
+        <div className="w-full md:w-1/3 flex-shrink-0 overflow-y-auto p-1"> 
+          <h2 className="text-lg font-semibold text-gray-800 mb-1 sticky top-0 z-10 pb-2">1. Select Clinic</h2>
+          {/* <p className="text-xs text-gray-500 mb-3 sticky top-8 bg-white z-10 pb-2">Choose a clinic to see its services.</p> */}
+          
+          {clinicError && (
+             <Alert variant="destructive" className="mt-2">
+                <ServerCrash className="h-4 w-4" />
+                <AlertTitle>Clinic Error</AlertTitle>
+                <AlertDescription>{clinicError}</AlertDescription>
             </Alert>
           )}
-
-          {!isLoadingServices && !serviceError && availableServices.length === 0 && (
-            <Alert className="mt-2">
-                <MapPin className="h-4 w-4" /> 
-                <AlertTitle>No Services Available</AlertTitle>
-                <AlertDescription>
-                This clinic currently has no services available for online booking. Please select another clinic or check back later.
-                </AlertDescription>
-            </Alert>
+          {!isLoadingClinics && !clinicError && clinicsList.length === 0 && (
+            <p className="text-gray-500 text-sm mt-4">No clinics available.</p>
           )}
-
-          {!isLoadingServices && !serviceError && availableServices.length > 0 && (
+          {clinicsList.length > 0 && (
             <RadioGroup
-              value={selectedServiceId || ''}
-              onValueChange={handleServiceSelect}
-              className="space-y-3 mt-2"
+              value={selectedClinicId || ''}
+              onValueChange={handleClinicSelect}
+              className="space-y-1.5"
             >
-              {availableServices.map((service) => (
+              {clinicsList.map(clinic => (
                 <Label
-                  key={service.id}
-                  htmlFor={service.id} 
+                  key={clinic.id}
+                  htmlFor={`clinic-${clinic.id}`}
                   className={cn(
-                    'flex items-center space-x-3 rounded-md border border-input p-4 cursor-pointer transition-all hover:shadow-md hover:border-primary/70',
-                    selectedServiceId === service.id && 'border-2 border-primary ring-2 ring-primary/30 bg-primary/5 dark:bg-primary/10'
+                    "flex items-center justify-between p-2.5 border-2 rounded-md cursor-pointer hover:bg-gray-50 transition-colors bg-white shadow-sm text-xs",
+                    selectedClinicId === clinic.id && "bg-primary-50 border-primary ring-1 ring-primary"
                   )}
                 >
-                  <RadioGroupItem value={service.id} id={service.id} className="flex-shrink-0"/>
-                  <div className="flex flex-1 flex-col sm:flex-row sm:items-center sm:justify-between">
-                    <div className="mb-2 sm:mb-0">
-                      <p className="font-medium text-base">{service.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {service.duration || 'Duration not specified'}
-                      </p>
-                      {service.description && <p className="text-xs text-muted-foreground mt-1">{service.description}</p>}
+                  <div className="flex items-center">
+                    <MapPin className={cn("h-4 w-4 mr-2 shrink-0", selectedClinicId === clinic.id ? "text-primary-600" : "text-gray-400")} />
+                    <div className="flex-grow">
+                      <span className="font-medium text-gray-700 block leading-tight">{clinic.name}</span>
+                      <p className="text-gray-500 leading-tight">{clinic.full_address}</p>
                     </div>
-                    <p className="font-semibold text-sm sm:text-base text-primary sm:text-right">
-                        {service.price !== undefined && service.price !== null ? `₱${service.price.toFixed(2)}` : 'Price not available'}
-                    </p>
                   </div>
+                  <RadioGroupItem value={clinic.id} id={`clinic-${clinic.id}`} className="sr-only" />
+                  {selectedClinicId === clinic.id && <Check className="h-4 w-4 text-primary-600 shrink-0 ml-2" />}
                 </Label>
               ))}
             </RadioGroup>
           )}
         </div>
-      )}
 
-      {selectedClinicId && selectedServiceId && (
-        <div className="flex justify-end mt-8">
-          <Button onClick={handleProceed} size="lg">
-            Next: Choose Provider & Time
-          </Button>
+        {/* Right Column: Service Selection */} 
+        <div className="w-full md:w-2/3 flex flex-col"> {/* Removed h-full and overflow-hidden */} 
+          <div className="flex-shrink-0 sticky top-0 z-10 pt-0"> {/* Reverted p-1 here, kept pt-0 */}
+            <h2 className="text-lg font-semibold text-gray-800 mb-1">2. Select Service</h2>
+            <p className="text-xs text-gray-500 mb-2">
+              {selectedClinicId && clinicsList.find(c => c.id === selectedClinicId) ? `Services at ${clinicsList.find(c => c.id === selectedClinicId)?.name}` : 'Please select a clinic first'}
+            </p>
+            {selectedClinicId && (
+              <div className="relative mb-3 pl-1 pr-1">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input 
+                  type="text"
+                  placeholder="Search services..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8 text-sm h-9 w-full"
+                  disabled={isLoadingServices || !selectedClinicId}
+                />
+              </div>
+            )}
+          </div>
+          
+          {selectedClinicId && (
+            <div className="flex-grow overflow-y-auto pr-1 pb-2"> {/* Scrollable area for accordion */} 
+              {isLoadingServices && (
+                <div className="space-y-2 mt-1">
+                  {[1,2,3,4].map(i => (
+                      <div key={i} className="flex items-center space-x-2 rounded-md border p-2.5">
+                          <Skeleton className="h-3 w-4/5" />
+                      </div>
+                  ))}
+                </div>
+              )}
+              {serviceError && (
+                <Alert variant="destructive" className="mt-1 text-xs">
+                  <ServerCrash className="h-3 w-3" />
+                  <AlertTitle>Service Error</AlertTitle>
+                  <AlertDescription>{serviceError}</AlertDescription>
+                </Alert>
+              )}
+              {!isLoadingServices && !serviceError && categorizedAndFilteredServices.length === 0 && (
+                <p className="text-gray-500 text-xs mt-3 text-center py-5">
+                  {searchTerm ? `No services match "${searchTerm}".` : "No services available for this clinic."}
+                </p>
+              )}
+
+              {!isLoadingServices && !serviceError && categorizedAndFilteredServices.length > 0 && (
+                <RadioGroup
+                  value={selectedServiceId || ''}
+                  onValueChange={handleServiceSelect} 
+                  className="mt-0"
+                >
+                  <Accordion 
+                      type="multiple" 
+                      value={openAccordionItems}
+                      onValueChange={setOpenAccordionItems} 
+                      className="w-full"
+                  >
+                    {categorizedAndFilteredServices.map((category) => (
+                      category.services.length > 0 && (
+                        <AccordionItem value={category.name} key={category.name} className="border-b border-gray-100 last:border-b-0">
+                          <AccordionTrigger className="hover:no-underline text-xs font-medium text-gray-600 py-2 px-1 data-[state=open]:text-primary-600 data-[state=open]:font-semibold">
+                            {category.name} ({category.services.length})
+                          </AccordionTrigger>
+                          <AccordionContent className="pt-0 pb-0 pl-0.5 pr-0.5">
+                            <div className="space-y-1 py-1.5">
+                              {category.services.map((service) => (
+                                <Label
+                                  key={service.id}
+                                  htmlFor={`service-${service.id}`}
+                                  className={cn(
+                                    "flex items-start justify-between p-2 rounded-md cursor-pointer hover:bg-gray-100 transition-colors text-xs",
+                                    selectedServiceId === service.id && "bg-primary-50 border-primary ring-1 ring-primary",
+                                    "border border-transparent"
+                                  )}
+                                >
+                                  <div className="flex-grow">
+                                    <span className="font-normal text-gray-700 block leading-tight">{service.name}</span>
+                                    {service.price !== null && service.price !== undefined && (
+                                      <span className="text-gray-500 block mt-0.5">
+                                        Price: PHP {service.price.toFixed(2)}
+                                      </span>
+                                    )}
+                                    {service.duration && (
+                                      <span className="text-gray-400 block mt-0.5">
+                                        Duration: {service.duration}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <RadioGroupItem value={service.id} id={`service-${service.id}`} className="sr-only" />
+                                  {selectedServiceId === service.id && <Check className="h-4 w-4 text-primary shrink-0 ml-2 mt-0.5" />}
+                                </Label>
+                              ))}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      )
+                    ))}
+                  </Accordion>
+                </RadioGroup>
+              )}
+            </div>
+          )}
+          {!selectedClinicId && !isLoadingServices && (
+             <p className="text-gray-400 text-sm mt-4 text-center py-10 flex-grow flex items-center justify-center">Please select a clinic to view its services.</p>
+          )}
         </div>
-      )}
-    </div>
+      </CardContent>
+      <CardFooter className="p-4 md:p-6 border-t flex justify-end">
+        <Button
+          onClick={handleProceed}
+          disabled={!selectedClinicId || !selectedServiceId || isLoadingClinics || isLoadingServices}
+          size="lg"
+          className="shadow-md"
+        >
+          Next: Select Provider
+        </Button>
+      </CardFooter>
+    </Card>
   );
 };
 
