@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Dispatch, SetStateAction, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Check, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ServerCrash } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 // Raw API response types (matching backend structure before frontend mapping)
 interface RawApiClinic {
@@ -31,7 +32,7 @@ interface RawApiService {
   description?: string | null;
   category?: string | null;
   typical_duration_minutes?: number | null;
-  requires_provider_assignment?: boolean | null;
+  requires_provider_assignment: boolean; // Changed: now mandatory based on API spec for services
   additional_details?: Record<string, unknown> | null; // Changed from any
   is_active?: boolean; // From nested services object
   created_at?: string;
@@ -53,13 +54,23 @@ interface ApiService {
   description?: string | null;
   price?: number | null;
   duration?: string | null;
+  requires_provider_assignment: boolean; // Added
 }
 
 interface ClinicServiceSelectionStepProps {
   selectedClinicId: string | null;
-  setSelectedClinicId: Dispatch<SetStateAction<string | null>>;
+  setSelectedClinicId: (id: string | null) => void;
   selectedServiceId: string | null;
-  setSelectedServiceId: Dispatch<SetStateAction<string | null>>;
+  setSelectedServiceId: (id: string | null, serviceDetails?: { name: string; price?: number | null; duration?: string | null; requiresProviderAssignment: boolean }) => void;
+  onNext: (data: { 
+    clinicId: string; 
+    serviceId: string; 
+    clinicName: string; 
+    serviceName: string; 
+    price?: number | null; // Allow null
+    duration?: string | null; // Allow null
+    requiresProviderAssignment: boolean; // Added
+  }) => void;
 }
 
 const ClinicServiceSelectionStep: React.FC<ClinicServiceSelectionStepProps> = ({
@@ -67,6 +78,7 @@ const ClinicServiceSelectionStep: React.FC<ClinicServiceSelectionStepProps> = ({
   setSelectedClinicId,
   selectedServiceId,
   setSelectedServiceId,
+  onNext,
 }) => {
   const [clinicsList, setClinicsList] = useState<ApiClinic[]>([]);
   const [isLoadingClinics, setIsLoadingClinics] = useState(true);
@@ -135,6 +147,9 @@ const ClinicServiceSelectionStep: React.FC<ClinicServiceSelectionStepProps> = ({
             duration: service.typical_duration_minutes
               ? `${service.typical_duration_minutes} minutes`
               : 'Duration not specified',
+            requires_provider_assignment: service.requires_provider_assignment !== null && service.requires_provider_assignment !== undefined 
+                                            ? service.requires_provider_assignment 
+                                            : true, // Default to true if undefined/null from API (safer for booking flow)
           }));
           setAvailableServices(fetchedServices);
         } catch (error) {
@@ -158,7 +173,35 @@ const ClinicServiceSelectionStep: React.FC<ClinicServiceSelectionStepProps> = ({
   };
 
   const handleServiceSelect = (serviceId: string) => {
-    setSelectedServiceId(serviceId);
+    const serviceDetails = availableServices.find(s => s.id === serviceId);
+    if (serviceDetails) {
+        setSelectedServiceId(serviceId, {
+            name: serviceDetails.name,
+            price: serviceDetails.price,
+            duration: serviceDetails.duration,
+            requiresProviderAssignment: serviceDetails.requires_provider_assignment,
+        });
+    } else {
+        setSelectedServiceId(serviceId); // Fallback if details not found (should not happen)
+    }
+  };
+
+  const handleProceed = () => {
+    if (selectedClinicId && selectedServiceId) {
+      const clinic = clinicsList.find(c => c.id === selectedClinicId);
+      const service = availableServices.find(s => s.id === selectedServiceId);
+      if (clinic && service) {
+        onNext({
+          clinicId: selectedClinicId,
+          serviceId: selectedServiceId,
+          clinicName: clinic.name,
+          serviceName: service.name,
+          price: service.price,
+          duration: service.duration,
+          requiresProviderAssignment: service.requires_provider_assignment,
+        });
+      }
+    }
   };
 
   if (isLoadingClinics) {
@@ -314,6 +357,14 @@ const ClinicServiceSelectionStep: React.FC<ClinicServiceSelectionStepProps> = ({
               ))}
             </RadioGroup>
           )}
+        </div>
+      )}
+
+      {selectedClinicId && selectedServiceId && (
+        <div className="flex justify-end mt-8">
+          <Button onClick={handleProceed} size="lg">
+            Next: Choose Provider & Time
+          </Button>
         </div>
       )}
     </div>

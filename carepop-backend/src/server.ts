@@ -8,6 +8,7 @@ import directoryRoutes from './routes/directoryRoutes';
 import serviceRoutes from './routes/serviceRoutes';
 import appointmentRoutes from './routes/appointmentRoutes';
 import availabilityRoutes from './routes/availabilityRoutes';
+import providerRoutes from './routes/providerRoutes';
 import { getConfig } from './config/config';
 
 const app: Express = express();
@@ -44,6 +45,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', profileRoutes);
 app.use('/api/v1/directory', directoryRoutes);
 app.use('/api/v1', serviceRoutes);
+app.use('/api/v1', providerRoutes);
 app.use('/api/v1/appointments', appointmentRoutes);
 app.use('/api/v1', availabilityRoutes); // Added - Mounts under /api/v1, so full path will be /api/v1/providers/:providerId/availability
 
