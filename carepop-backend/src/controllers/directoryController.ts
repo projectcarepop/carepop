@@ -17,13 +17,19 @@ const searchClinicsQuerySchema = z.object({
       if (Array.isArray(val)) {
         return val.map(id => String(id).trim()).filter(id => id && z.string().uuid().safeParse(id).success);
       }
-      return undefined; // Changed from [] to undefined to align with .optional()
+      return undefined;
     },
     z.array(z.string().uuid({ message: "Invalid Service ID format in serviceIds array" })).optional()
   ),
   q: z.string().trim().optional(),
-  page: z.preprocess((val) => Number(val), z.number().min(1).default(1).optional()),
-  pageSize: z.preprocess((val) => Number(val), z.number().min(1).max(50).default(10).optional()),
+  page: z.preprocess(
+    (val) => (val === undefined || val === null || val === '' ? undefined : Number(val)), 
+    z.number().min(1).default(1).optional()
+  ),
+  pageSize: z.preprocess(
+    (val) => (val === undefined || val === null || val === '' ? undefined : Number(val)), 
+    z.number().min(1).max(50).default(10).optional()
+  ),
 }).refine(data => {
   const hasLat = data.latitude !== undefined;
   const hasLon = data.longitude !== undefined;
