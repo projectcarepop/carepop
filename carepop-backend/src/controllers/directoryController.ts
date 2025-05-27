@@ -57,6 +57,8 @@ export const getAllClinics = async (req: Request, res: Response, next: NextFunct
     
     logger.info(`[getAllClinics] Successfully fetched ${clinics?.length || 0} clinics`);
     res.status(200).json({ 
+      success: true,
+      message: clinics && clinics.length > 0 ? 'Clinics fetched successfully.' : 'No clinics found.',
       data: clinics || [], 
       // If pagination is added in service, include totalCount, page, pageSize here
     });
