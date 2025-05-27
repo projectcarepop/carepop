@@ -9,25 +9,28 @@ export interface ProviderProfile {
 }
 
 /**
- * Fetches active providers associated with a specific clinic, including their specialty and avatar.
+ * Fetches active providers associated with a specific clinic and optionally by a service,
+ * including their specialty and avatar.
  */
-export const fetchProvidersByClinic = async (clinicId: string): Promise<ProviderProfile[]> => {
-    // Querying provider_weekly_schedules and joining providers, then their profiles and specialties.
-    // This ensures we only get providers scheduled at the specified clinic.
-    const { data, error } = await supabase
+export const fetchProvidersByClinic = async (clinicId: string, serviceId?: string): Promise<ProviderProfile[]> => {
+    let query = supabase
         .from('provider_weekly_schedules')
         .select(`
             clinic_id,
-            providers:provider_id (
+            providers:provider_id!inner (
                 id,
-                first_name, 
-                last_name,  
+                first_name,
+                last_name,
                 is_active,
-                user_id, 
+                user_id,
                 provider_specialties (
                     specialties (
                         name
                     )
+                ),
+                provider_services!inner ( 
+                    service_id,
+                    is_active
                 )
             )
         `)
@@ -35,34 +38,47 @@ export const fetchProvidersByClinic = async (clinicId: string): Promise<Provider
         .eq('is_active', true) // Schedule entry is active
         .eq('providers.is_active', true); // Provider is active
 
+    if (serviceId) {
+        query = query
+            .eq('providers.provider_services.service_id', serviceId)
+            .eq('providers.provider_services.is_active', true); // Ensure the provider-service link is active
+    }
+
+    const { data, error } = await query;
+
     if (error) {
         console.error('Error fetching providers for clinic:', error.message);
-        throw new Error('Could not fetch providers for the clinic. ' + error.message); 
+        throw new Error('Could not fetch providers for the clinic. ' + error.message);
     }
 
     if (!data) {
         return [];
     }
 
-    // Transform the data to match ProviderProfile structure
     const transformedProviders = data.reduce((acc: ProviderProfile[], scheduleEntry: any) => {
         const providerData = scheduleEntry.providers;
         if (!providerData) return acc;
+
+        // If filtering by serviceId, ensure the provider actually offers the service from the filtered results
+        if (serviceId) {
+            const offersService = providerData.provider_services?.some((ps: any) => ps.service_id === serviceId && ps.is_active);
+            if (!offersService) {
+                return acc; // Skip if this provider (despite being scheduled) doesn't match the service criteria after all
+            }
+        }
 
         if (acc.find(p => p.id === providerData.id)) {
             return acc;
         }
 
         const specialty = providerData.provider_specialties?.[0]?.specialties?.name || null;
-        
-        // Set avatar_url to null by default as the join is removed
         const avatarUrl = null; 
 
         acc.push({
             id: providerData.id,
             first_name: providerData.first_name || 'N/A',
             last_name: providerData.last_name || 'N/A',
-            avatar_url: avatarUrl, // Will be null for now
+            avatar_url: avatarUrl,
             specialty_name: specialty,
         });
         return acc;

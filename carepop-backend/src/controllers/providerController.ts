@@ -31,9 +31,10 @@ export const listProvidersForClinic = async (req: Request, res: Response, next: 
   try {
     const validatedRequest = GetProvidersForClinicSchema.parse(req);
     const { clinicId } = validatedRequest.params;
-    // const { serviceId } = validatedRequest.query; // serviceId not used in query yet, but validated
+    const { serviceId } = validatedRequest.query; // Uncommented and will be used
 
-    const providers: RawProviderData[] = await providerService.fetchProvidersByClinic(clinicId);
+    // Pass serviceId to the service layer function
+    const providers: RawProviderData[] = await providerService.fetchProvidersByClinic(clinicId, serviceId);
 
     const providerDTOs: ProviderDTO[] = providers.map((p: RawProviderData) => ({
       id: p.id,
