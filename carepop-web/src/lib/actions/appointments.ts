@@ -3,10 +3,10 @@
 import { cookies } from 'next/headers';
 import { createServerClient, type CookieOptions } from '@supabase/ssr'; // Import createServerClient
 import { 
-  AppointmentStatus, 
-  ServiceDetails, 
-  ClinicDetails, 
-  ProviderDetails, 
+  // AppointmentStatus, // Removed as it's unused in this file now
+  // ServiceDetails, // Removed
+  // ClinicDetails, // Removed
+  // ProviderDetails, // Removed
   UserAppointmentDetails 
 } from '@/lib/types/appointmentTypes'; // Import types
 
@@ -32,7 +32,8 @@ async function getAuthToken(): Promise<string | null> {
             // Call cookies() directly inside the method
             const cookieStore = await cookies();
             cookieStore.set(name, value, options);
-          } catch (error) {
+          } catch {
+            // const cookieStore = cookies(); // Removed, error variable not needed
             // The `set` method was called from a Server Component.
             // This can be ignored if you have middleware refreshing
             // user sessions.
@@ -43,7 +44,8 @@ async function getAuthToken(): Promise<string | null> {
             // Call cookies() directly inside the method
             const cookieStore = await cookies();
             cookieStore.set(name, '', options); // Note: Supabase examples use set with empty string for remove
-          } catch (error) {
+          } catch {
+            // const cookieStore = cookies(); // Removed, error variable not needed
             // The `delete` method was called from a Server Component.
             // This can be ignored if you have middleware refreshing
             // user sessions.
@@ -166,5 +168,65 @@ export async function cancelAppointmentAction(
   } catch (error) {
     console.error('[cancelAppointmentAction] Fetching error:', error);
     return { success: false, message: error instanceof Error ? error.message : 'An unexpected error occurred.' };
+  }
+}
+
+export async function createAppointmentAction(formData: {
+  clinicId: string;
+  serviceId: string;
+  providerId: string | null;
+  appointmentDate: string; // e.g., "YYYY-MM-DD"
+  appointmentTime: string; // e.g., "HH:MM" (backend will handle combining and timezone)
+  notes?: string;
+  // Add service_details if needed by the backend, or if it's for display on confirmation
+  // For now, assuming backend primarily needs IDs and will fetch details
+}): Promise<{ success: boolean; message?: string; data?: UserAppointmentDetails }> { // Use UserAppointmentDetails if that's the expected response
+  const token = await getAuthToken();
+  if (!token) {
+    console.error('[createAppointmentAction] No auth token found.');
+    return { success: false, message: 'Authentication required to create appointment.' };
+  }
+
+  // The backend /api/v1/appointments endpoint expects a full ISO string for appointment_time
+  // It's crucial to handle timezones correctly. Assuming dates/times are in local user timezone.
+  // The backend should store in UTC.
+  const appointmentTimestamp = new Date(`${formData.appointmentDate}T${formData.appointmentTime}:00`).toISOString();
+  // Note: If times are already UTC, adjust accordingly.
+  // If selecting time slots, ensure they are correctly converted.
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/appointments`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        clinic_id: formData.clinicId,
+        service_id: formData.serviceId,
+        provider_id: formData.providerId, // Can be null if service allows it
+        appointment_time: appointmentTimestamp, // Full ISO string
+        notes: formData.notes,
+        status: 'confirmed', // Default status, adjust if backend has different logic (e.g., 'pending')
+        // patient_id will be extracted from the token by the backend
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: response.statusText }));
+      console.error(`[createAppointmentAction] API error ${response.status}:`, errorData);
+      return { success: false, message: errorData.message || `Failed to create appointment: ${response.statusText}` };
+    }
+    
+    const responseData = await response.json();
+    // Assuming the backend returns the created appointment, matching UserAppointmentDetails
+    return { success: true, data: responseData as UserAppointmentDetails };
+
+  } catch (error) {
+    console.error('[createAppointmentAction] Fetching error:', error);
+    return { 
+      success: false, 
+      message: error instanceof Error ? error.message : 'An unexpected error occurred while creating the appointment.' 
+    };
   }
 } 

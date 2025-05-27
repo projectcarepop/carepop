@@ -1,8 +1,18 @@
 import express, { Router, RequestHandler } from 'express';
 import * as providerController from '../controllers/providerController';
 import { authenticateToken } from '../middleware/authMiddleware'; // Assuming auth is needed
+import logger from '../utils/logger'; // Import logger
 
 const router: Router = express.Router();
+
+// Debug middleware to log when this route pattern is accessed
+router.use('/clinics/:clinicId/providers', (req, res, next) => {
+    console.log(`[ProviderRoutes] Route pattern /clinics/:clinicId/providers accessed.`);
+    console.log(`  Params: clinicId = ${req.params.clinicId}`);
+    console.log(`  Query: serviceId = ${req.query.serviceId}`);
+    logger.info(`[ProviderRoutes] Accessing /clinics/${req.params.clinicId}/providers with serviceId: ${req.query.serviceId}`);
+    next();
+});
 
 /**
  * @openapi

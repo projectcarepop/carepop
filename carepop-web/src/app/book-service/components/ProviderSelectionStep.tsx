@@ -9,16 +9,10 @@ import { Calendar, Star, User, Verified, AlertTriangle, Loader2 } from 'lucide-r
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { toast } from 'sonner';
-import { useAuth } from '@/lib/contexts/AuthContext';
+import { getProvidersAction, Provider as ApiProvider } from '@/lib/actions/providers';
 
-// Interface for the provider data fetched from the API
-interface ApiProvider {
-  id: string;
-  name: string; // Combination of first_name and last_name
-  specialty_name: string | null;
-  avatar_url: string | null;
-  // Mocked fields, as the current API does not return these
-  // In a real scenario, the API would provide these or they'd be derived.
+// Local interface for display purposes, extending the base ApiProvider
+interface DisplayProvider extends ApiProvider {
   rating?: number;
   reviewCount?: number;
   availability?: string;
@@ -29,85 +23,56 @@ interface ProviderSelectionStepProps {
   selectedService: { 
     id: string | null; 
     name: string | null; 
-    requires_provider_assignment: boolean | null; 
+    requiresProviderAssignment: boolean | null; 
   } | null;
-  onNext: (selectedProviderId: string | null) => void;
   onBack: () => void;
+  setSelectedProviderIdProp: (id: string | null, name?: string | null, specialty?: string | null, avatarUrl?: string | null) => void;
 }
 
 const ProviderSelectionStep: React.FC<ProviderSelectionStepProps> = ({
   selectedClinicId,
   selectedService,
-  onNext,
   onBack,
+  setSelectedProviderIdProp,
 }) => {
   const id = useId();
-  const [providers, setProviders] = useState<ApiProvider[]>([]);
-  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+  const [providers, setProviders] = useState<DisplayProvider[]>([]);
+  const [localSelectedProviderId, setLocalSelectedProviderId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const { session } = useAuth();
 
-  const canSkipProviderSelection = selectedService?.requires_provider_assignment === false;
+  const canSkipProviderSelection = selectedService?.requiresProviderAssignment === false;
 
   const fetchProviders = useCallback(async () => {
-    if (!selectedClinicId) return;
+    if (!selectedClinicId || !selectedService?.id) {
+        setError("Clinic ID or Service ID is missing to fetch providers.");
+        setProviders([]);
+        return;
+    }
     if (canSkipProviderSelection) {
-      setProviders([]); // No need to fetch if skippable
-      return;
-    }
-
-    if (!session?.access_token) {
-      setError('Authentication token not found. Please ensure you are logged in.');
-      setIsLoading(false);
-      toast.error('Authentication Error', { description: 'Session token is missing.' });
-      return;
-    }
-
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL; // Get the base URL
-    if (!backendUrl) {                                          // Check if it's defined
-      setError('Backend API URL is not configured.');
-      setIsLoading(false);
-      toast.error('Configuration Error', { description: 'Backend API URL is missing.' });
+      setProviders([]); 
       return;
     }
 
     setIsLoading(true);
     setError(null);
     try {
-      // Construct query parameters, serviceId is optional for this endpoint
-      const queryParams = new URLSearchParams();
-      if (selectedService?.id) {
-        queryParams.append('serviceId', selectedService.id);
-      }
+      const result = await getProvidersAction({ 
+          clinicId: selectedClinicId, 
+          serviceId: selectedService.id 
+      });
 
-      // Construct the full URL
-      const apiUrl = `${backendUrl.replace(/\/$/, '')}/api/v1/clinics/${selectedClinicId}/providers?${queryParams.toString()}`;
-      
-      console.log('[ProviderSelectionStep] Fetching providers from:', apiUrl); // Add this log
-
-      const response = await fetch(
-        apiUrl, // Use the full, absolute URL
-        {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Failed to fetch providers' }));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      if (result.success && result.data) {
+        const enhancedData: DisplayProvider[] = result.data.map((p, index) => ({
+          ...p,
+          rating: index % 2 === 0 ? 4.5 + (index * 0.1) % 0.5 : undefined,
+          reviewCount: index % 2 === 0 ? Math.floor(Math.random() * 100) + 20 : undefined,
+          availability: index % 3 === 0 ? 'Next available: Tomorrow' : (index % 3 === 1 ? 'Available today' : undefined),
+        }));
+        setProviders(enhancedData);
+      } else {
+        throw new Error(result.message || 'Failed to fetch providers');
       }
-      const data: ApiProvider[] = await response.json();
-      // Add mock rating/reviews/availability for UI demonstration as API doesn't provide them yet
-      const enhancedData = data.map((p, index) => ({
-        ...p,
-        rating: index % 2 === 0 ? 4.5 + (index * 0.1) % 0.5 : undefined,
-        reviewCount: index % 2 === 0 ? Math.floor(Math.random() * 100) + 20 : undefined,
-        availability: index % 3 === 0 ? 'Next available: Tomorrow' : (index % 3 === 1 ? 'Available today' : undefined),
-      }));
-      setProviders(enhancedData);
     } catch (e: unknown) {
       console.error('Error fetching providers:', e);
       let errorMessage = 'An unexpected error occurred.';
@@ -118,21 +83,32 @@ const ProviderSelectionStep: React.FC<ProviderSelectionStepProps> = ({
       toast.error('Error fetching providers', { description: errorMessage });
     }
     setIsLoading(false);
-  }, [selectedClinicId, selectedService, canSkipProviderSelection, session]);
+  }, [selectedClinicId, selectedService, canSkipProviderSelection]);
 
   useEffect(() => {
     fetchProviders();
   }, [fetchProviders]);
-
-  const handleNext = () => {
-    if (canSkipProviderSelection) {
-      onNext(null); // Pass null if provider selection is skipped
-    } else if (selectedProviderId) {
-      onNext(selectedProviderId);
+  
+  useEffect(() => {
+    if (localSelectedProviderId) {
+      const selectedProvider = providers.find(p => p.id === localSelectedProviderId);
+      if (selectedProvider) {
+        setSelectedProviderIdProp(
+          selectedProvider.id,
+          selectedProvider.name,
+          selectedProvider.specialty_name,
+          selectedProvider.avatar_url
+        );
+      } else {
+        setSelectedProviderIdProp(localSelectedProviderId, null, null, null);
+      }
     } else {
-      // This case should ideally be prevented by disabling the Next button
-      toast.warning('Please select a provider', { description: 'You must choose a provider to continue.'});
+      setSelectedProviderIdProp(null, null, null, null);
     }
+  }, [localSelectedProviderId, providers, setSelectedProviderIdProp]);
+
+  const handleSelection = (providerId: string) => {
+    setLocalSelectedProviderId(providerId);
   };
 
   if (!selectedClinicId || !selectedService?.id) {
@@ -145,7 +121,7 @@ const ProviderSelectionStep: React.FC<ProviderSelectionStepProps> = ({
         <p className="text-sm text-muted-foreground mt-1">
           Provider selection will be available once a clinic and service are chosen.
         </p>
-        <Button onClick={onBack} variant="outline" className="mt-6">Back to Service Selection</Button>
+        <Button onClick={onBack} variant="outline" className="mt-6">Back to Clinic/Service</Button>
       </div>
     );
   }
@@ -162,7 +138,6 @@ const ProviderSelectionStep: React.FC<ProviderSelectionStepProps> = ({
         </p>
         <div className="flex gap-3">
             <Button onClick={onBack} variant="outline">Back</Button>
-            <Button onClick={() => onNext(null)}>Continue to Next Step</Button>
         </div>
       </div>
     );
@@ -175,7 +150,7 @@ const ProviderSelectionStep: React.FC<ProviderSelectionStepProps> = ({
           Select Your Healthcare Provider
         </h3>
         <p className="text-sm text-muted-foreground text-center sm:text-left">
-          Choose from the available providers for &quot;{selectedService.name}&quot; at your selected clinic.
+          Choose from the available providers for &quot;{selectedService?.name || 'the selected service'}&quot; at your selected clinic.
         </p>
       </div>
 
@@ -212,8 +187,8 @@ const ProviderSelectionStep: React.FC<ProviderSelectionStepProps> = ({
 
       {!isLoading && !error && providers.length > 0 && (
         <RadioGroup
-          value={selectedProviderId || undefined}
-          onValueChange={setSelectedProviderId}
+          value={localSelectedProviderId || undefined} 
+          onValueChange={handleSelection} 
           className="grid grid-cols-1 md:grid-cols-2 gap-4"
         >
           {providers.map((provider) => (
@@ -222,13 +197,13 @@ const ProviderSelectionStep: React.FC<ProviderSelectionStepProps> = ({
               htmlFor={`${id}-${provider.id}`}
               className={cn(
                 'relative flex flex-col items-start gap-3 rounded-lg border border-input p-4 transition-all hover:shadow-lg hover:border-primary/70 cursor-pointer',
-                selectedProviderId === provider.id && 'border-2 border-primary ring-2 ring-primary/30 bg-primary/5 dark:bg-primary/10'
+                localSelectedProviderId === provider.id && 'border-2 border-primary ring-2 ring-primary/30 bg-primary/5 dark:bg-primary/10'
               )}
             >
               <RadioGroupItem
                 value={provider.id}
                 id={`${id}-${provider.id}`}
-                className="sr-only" // Hide the actual radio button, selection is via card click
+                className="sr-only" 
               />
               <div className="flex items-start gap-4 w-full">
                 <div className="relative h-16 w-16 rounded-full overflow-hidden shrink-0 border bg-muted flex items-center justify-center">
@@ -241,7 +216,6 @@ const ProviderSelectionStep: React.FC<ProviderSelectionStepProps> = ({
                         height={64}
                         className="object-cover peer"
                         onError={(e) => { 
-                          // Hide image and show fallback directly
                           e.currentTarget.style.display = 'none';
                           const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');
                           if (fallback) (fallback as HTMLElement).style.display = 'flex';
@@ -252,46 +226,25 @@ const ProviderSelectionStep: React.FC<ProviderSelectionStepProps> = ({
                       </div>
                     </>
                   ) : (
-                     <div className="h-full w-full flex items-center justify-center">
-                        <User className="h-8 w-8 text-muted-foreground" />
-                     </div>
+                    <div className="flex h-full w-full items-center justify-center">
+                      <User className="h-8 w-8 text-muted-foreground" />
+                    </div>
                   )}
                 </div>
-                <div className="grid grow gap-1">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-semibold text-base leading-tight">{provider.name}</h4>
-                    {selectedProviderId === provider.id && (
-                      <Verified className="h-5 w-5 text-primary flex-shrink-0" />
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground leading-tight">{provider.specialty_name || 'General Practice'}</p>
-                  
-                  {(provider.rating && provider.reviewCount) ? (
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                      <div className="flex items-center">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <Star
-                            key={i}
-                            className={cn(
-                              "h-3.5 w-3.5",
-                              i < provider.rating! 
-                                ? "fill-yellow-400 text-yellow-400"
-                                : "fill-muted text-muted-foreground/60"
-                            )}
-                          />
-                        ))}
-                      </div>
-                      <span className="ml-1">({provider.reviewCount} reviews)</span>
+                <div className="flex-grow">
+                  <h4 className="font-semibold text-md mb-0.5">{provider.name}</h4>
+                  <p className="text-sm text-muted-foreground">{provider.specialty_name || 'General Practice'}</p>
+                  {provider.rating && provider.reviewCount && (
+                    <div className="mt-1 flex items-center gap-1">
+                      <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                      <span className="text-xs font-medium">{provider.rating.toFixed(1)}</span>
+                      <span className="text-xs text-muted-foreground">({provider.reviewCount} reviews)</span>
                     </div>
-                  ) : (
-                    <div className="h-[18px] mt-1"></div> 
                   )}
-
                   {provider.availability && (
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1.5">
-                      <Calendar className="h-3.5 w-3.5" />
-                      <span>{provider.availability}</span>
-                    </div>
+                    <p className="text-xs text-primary mt-1 flex items-center">
+                      <Calendar className="h-3 w-3 mr-1" /> {provider.availability}
+                    </p>
                   )}
                 </div>
               </div>
@@ -299,17 +252,6 @@ const ProviderSelectionStep: React.FC<ProviderSelectionStepProps> = ({
           ))}
         </RadioGroup>
       )}
-
-      <div className="flex justify-between items-center pt-4">
-        <Button onClick={onBack} variant="outline">Back</Button>
-        <Button 
-            onClick={handleNext} 
-            disabled={isLoading || (!canSkipProviderSelection && !selectedProviderId && providers.length > 0)}
-        >
-            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Next
-        </Button>
-      </div>
     </div>
   );
 };

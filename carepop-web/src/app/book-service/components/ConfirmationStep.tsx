@@ -5,61 +5,39 @@ import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { CalendarDays, Clock, Stethoscope, Building, Briefcase, MessageSquareText, UserCircle } from 'lucide-react';
+import { CalendarDays, Clock, Stethoscope, Building, Briefcase, MessageSquareText, UserCircle, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
-// Assuming MOCK_CLINICS, MOCK_SERVICES, MOCK_PROVIDERS are available 
-// or passed down, or fetched via a context/hook for display purposes.
-// For this component, we'll re-define simplified versions for display logic.
+// Mock data and individual ID props are removed. Component will use bookingDetails.
 
-interface DisplayClinic {
+// Interface for serviceDetails passed within bookingDetails
+interface ServiceSubDetails {
   id: string;
   name: string;
-  address: string;
+  price?: number | null;
+  duration?: string | null;
+  requiresProviderAssignment: boolean;
 }
 
-interface DisplayService {
-  id: string;
-  name: string;
-  duration: string;
-  price: string;
+interface BookingDetails {
+  clinicId: string | null;
+  clinicName: string | null;
+  serviceId: string | null;
+  serviceName: string | null; // Direct from BookingForm
+  providerId: string | null;
+  providerName: string | null;
+  providerSpecialty: string | null;
+  providerAvatarUrl: string | null;
+  date: Date | undefined;
+  timeSlot: string | null;
+  notes?: string;
+  serviceDetails: ServiceSubDetails | null; // Contains price, duration, etc.
 }
-
-interface DisplayProvider {
-  id: string;
-  name: string;
-  specialty: string;
-  avatarUrl?: string;
-}
-
-// Simplified Mock Data for display lookup (ideally from a shared source or props)
-const MOCK_CLINICS_DISPLAY: DisplayClinic[] = [
-  { id: 'clinic-1', name: 'CarePoP Central Clinic', address: '123 Health St, Wellness City' },
-  { id: 'clinic-2', name: 'Northside Community Health', address: '456 Cure Ave, Remedy Town' },
-  { id: 'clinic-3', name: 'Eastwood Medical Hub', address: '789 Vitality Rd, Recovery Suburb' },
-];
-
-const MOCK_SERVICES_DISPLAY: DisplayService[] = [
-  { id: 'service-a1', name: 'General Consultation', duration: '30 mins', price: '₱500' },
-  { id: 'service-b2', name: 'Regular Check-up', duration: '45 mins', price: '₱750' },
-  { id: 'service-c3', name: 'Specialist Follow-up', duration: '60 mins', price: '₱1200' },
-  { id: 'service-d4', name: 'Minor Procedure', duration: '90 mins', price: '₱2500' },
-];
-
-const MOCK_PROVIDERS_DISPLAY: DisplayProvider[] = [
-  { id: 'provider-101', name: 'Dr. Angela Merkel', specialty: 'General Practitioner', avatarUrl: '/images/avatars/provider-female-1.jpg' },
-  { id: 'provider-102', name: 'Dr. Ben Carson', specialty: 'Pediatrician', avatarUrl: '/images/avatars/provider-male-1.jpg' },
-  { id: 'provider-103', name: 'Dr. Condoleezza Rice', specialty: 'Cardiologist', avatarUrl: '/images/avatars/provider-female-2.jpg' },
-  { id: 'provider-104', name: 'Dr. John Smith (No Reviews)', specialty: 'General Practitioner' },
-];
 
 interface ConfirmationStepProps {
-  selectedClinicId: string | null;
-  selectedServiceId: string | null;
-  selectedProviderId: string | null;
-  selectedDate: Date | undefined;
-  selectedTimeSlot: string | null;
-  appointmentNotes?: string;
+  bookingDetails: BookingDetails;
+  onEdit: (stepId: string) => void; // Callback to go back to an edit step
 }
 
 interface SummaryItemProps {
@@ -68,37 +46,58 @@ interface SummaryItemProps {
   value: React.ReactNode | string;
   className?: string;
   avatarUrl?: string;
+  onEdit?: () => void; // Optional edit callback for a specific item
+  editStepId?: string; // Step ID to navigate to for editing this item
 }
 
-const SummaryItem: React.FC<SummaryItemProps> = ({ icon: Icon, label, value, className, avatarUrl }) => (
+const SummaryItem: React.FC<SummaryItemProps> = ({ icon: Icon, label, value, className, avatarUrl, onEdit, editStepId }) => (
   <div className={cn("flex items-start space-x-3 py-3", className)}>
     {avatarUrl ? (
-      <img src={avatarUrl} alt={typeof value === 'string' ? value : label} className="h-10 w-10 rounded-full flex-shrink-0 mt-0.5" />
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={avatarUrl} alt={label} className="h-10 w-10 rounded-full flex-shrink-0 mt-0.5 object-cover" />
     ) : (
       <Icon className="h-5 w-5 text-primary mt-1 flex-shrink-0" />
     )}
     <div className="flex-grow">
       <p className="text-sm text-muted-foreground">{label}</p>
       <p className="text-md font-semibold text-foreground">
-        {value || <span className="italic text-sm font-normal text-muted-foreground/80">Not selected</span>}
+        {value || <span className="italic text-sm font-normal text-muted-foreground/80">Not specified</span>}
       </p>
     </div>
+    {onEdit && editStepId && (
+        <Button variant="ghost" size="sm" onClick={onEdit} className="ml-auto self-start p-1 h-auto">
+            <Pencil className="h-4 w-4 text-muted-foreground hover:text-primary"/>
+        </Button>
+    )}
   </div>
 );
 
 const ConfirmationStep: React.FC<ConfirmationStepProps> = ({
-  selectedClinicId,
-  selectedServiceId,
-  selectedProviderId,
-  selectedDate,
-  selectedTimeSlot,
-  appointmentNotes,
+  bookingDetails,
+  onEdit
 }) => {
-  const clinic = MOCK_CLINICS_DISPLAY.find(c => c.id === selectedClinicId);
-  const service = MOCK_SERVICES_DISPLAY.find(s => s.id === selectedServiceId);
-  const provider = MOCK_PROVIDERS_DISPLAY.find(p => p.id === selectedProviderId);
+  const { 
+    clinicName,
+    serviceName,
+    providerName,
+    providerSpecialty,
+    providerAvatarUrl,
+    date,
+    timeSlot,
+    notes,
+    serviceDetails
+  } = bookingDetails;
 
-  const formattedDate = selectedDate ? format(selectedDate, 'EEEE, MMMM d, yyyy') : null;
+  const formattedDate = date ? format(date, 'EEEE, MMMM d, yyyy') : null;
+  const formattedTime = timeSlot ? format(new Date(`1970-01-01T${timeSlot}`), 'h:mm a') : null;
+  
+  const serviceDisplayInfo = [
+    serviceName,
+    serviceDetails?.duration ? `(${serviceDetails.duration})` : null,
+    serviceDetails?.price !== undefined && serviceDetails?.price !== null ? 
+        `₱${serviceDetails.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
+        : null
+  ].filter(Boolean).join(' - ');
 
   return (
     <div className={cn('space-y-6')}>
@@ -125,35 +124,61 @@ const ConfirmationStep: React.FC<ConfirmationStepProps> = ({
             <SummaryItem 
               icon={Building} 
               label="Clinic" 
-              value={clinic ? `${clinic.name} - ${clinic.address}` : 'Clinic details missing'} 
+              value={clinicName || 'Clinic not selected'} 
+              onEdit={() => onEdit('clinicServiceSelection')}
+              editStepId="clinicServiceSelection"
             />
             <SummaryItem 
               icon={Briefcase} 
               label="Service" 
-              value={service ? `${service.name} (${service.duration} - ${service.price})` : 'Service details missing'} 
+              value={serviceDisplayInfo || 'Service not selected'} 
+              onEdit={() => onEdit('clinicServiceSelection')}
+              editStepId="clinicServiceSelection"
             />
-            <SummaryItem 
-              icon={Stethoscope} 
-              label="Provider" 
-              value={provider ? `${provider.name} (${provider.specialty})` : 'Provider details missing'}
-              avatarUrl={provider?.avatarUrl}
-            />
+            { (serviceDetails?.requiresProviderAssignment || providerName) && (
+                <SummaryItem 
+                  icon={Stethoscope} 
+                  label="Provider" 
+                  value={providerName ? `${providerName}${providerSpecialty ? ` (${providerSpecialty})` : ''}` : 'Any available provider'}
+                  avatarUrl={providerAvatarUrl || undefined}
+                  onEdit={() => onEdit('providerSelection')}
+                  editStepId="providerSelection"
+                />
+            )}
           </div>
           
           <Separator />
 
           <div className="p-6 space-y-1">
             <h4 className="text-sm font-medium text-muted-foreground pb-2">Date & Time</h4>
-            <SummaryItem icon={CalendarDays} label="Date" value={formattedDate} />
-            <SummaryItem icon={Clock} label="Time Slot" value={selectedTimeSlot} />
+            <SummaryItem 
+                icon={CalendarDays} 
+                label="Date" 
+                value={formattedDate} 
+                onEdit={() => onEdit('dateTimeSelection')}
+                editStepId="dateTimeSelection"
+            />
+            <SummaryItem 
+                icon={Clock} 
+                label="Time Slot" 
+                value={formattedTime} 
+                onEdit={() => onEdit('dateTimeSelection')}
+                editStepId="dateTimeSelection"
+            />
           </div>
 
-          {appointmentNotes && (
+          {(notes || notes === '') && (
             <>
               <Separator />
               <div className="p-6 space-y-1">
                 <h4 className="text-sm font-medium text-muted-foreground pb-2">Additional Information</h4>
-                <SummaryItem icon={MessageSquareText} label="Your Notes" value={appointmentNotes} />
+                <SummaryItem 
+                    icon={MessageSquareText} 
+                    label="Your Notes" 
+                    value={notes || <span className="italic text-sm font-normal text-muted-foreground/80">No notes provided</span>} 
+                    onEdit={() => onEdit('dateTimeSelection')}
+                    editStepId="dateTimeSelection"
+                />
               </div>
             </>
           )}
@@ -164,8 +189,7 @@ const ConfirmationStep: React.FC<ConfirmationStepProps> = ({
         <UserCircle className="h-4 w-4 !text-primary" /> 
         <AlertTitle className="font-semibold">Ready to Book?</AlertTitle>
         <AlertDescription className="text-sm">
-          If all details are correct, click the "Confirm Booking" button to finalize your appointment.
-          You will receive a confirmation email shortly after (mock functionality).
+          If all details are correct, click the &quot;Confirm Booking&quot; button to finalize your appointment.
         </AlertDescription>
       </Alert>
     </div>
