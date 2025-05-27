@@ -23,12 +23,8 @@ export const fetchProvidersByClinic = async (clinicId: string): Promise<Provider
                 first_name, 
                 last_name,  
                 is_active,
-                user_id,    
-                user_account:user_id ( 
-                    profile_details:profiles ( 
-                        avatar_url 
-                    )
-                ),
+                user_id, 
+                // Attempt to fetch avatar_url via user_id removed for now to isolate the relationship issue
                 provider_specialties (
                     specialties (
                         name
@@ -60,15 +56,14 @@ export const fetchProvidersByClinic = async (clinicId: string): Promise<Provider
 
         const specialty = providerData.provider_specialties?.[0]?.specialties?.name || null;
         
-        // Get first_name and last_name directly from providerData
-        // Get avatar_url from the nested structure, if available
-        const avatarUrl = providerData.user_account?.profile_details?.avatar_url || null;
+        // Set avatar_url to null by default as the join is removed
+        const avatarUrl = null; 
 
         acc.push({
             id: providerData.id,
             first_name: providerData.first_name || 'N/A',
             last_name: providerData.last_name || 'N/A',
-            avatar_url: avatarUrl,
+            avatar_url: avatarUrl, // Will be null for now
             specialty_name: specialty,
         });
         return acc;
