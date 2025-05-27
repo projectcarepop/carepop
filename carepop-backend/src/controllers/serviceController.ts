@@ -46,9 +46,11 @@ export const listServicesForClinic = async (req: Request, res: Response, next: N
 
     const services = await serviceService.getServicesForClinic(clinicId);
     
-    // Could add a check here if services array is empty and clinic itself doesn't exist, 
-    // then return 404, but for now, an empty array is acceptable if clinic exists but has no services offered.
-    res.status(200).json(services);
+    res.status(200).json({
+      success: true,
+      message: services.length > 0 ? 'Services fetched successfully.' : 'No services found for this clinic.',
+      data: services
+    });
   } catch (error) {
     if (error instanceof Error && error.name === 'ZodError') {
       return res.status(400).json({ message: 'Invalid clinic ID format', details: (error as any).errors });

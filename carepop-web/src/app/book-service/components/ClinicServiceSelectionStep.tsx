@@ -48,7 +48,7 @@ const ClinicServiceSelectionStep: React.FC = () => {
       dispatch({ type: 'SET_SERVICES_FOR_CLINIC_LOADING', payload: true });
       // API Call: GET /api/clinics/:clinicId/services (Backend Integration Guide - Section 1.2)
       // TODO: Replace with a proper API client or service call if available
-      fetch(`/api/clinics/${selectedClinic.id}/services`)
+      fetch(`/api/v1/clinics/${selectedClinic.id}/services`)
         .then(res => {
           if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
           return res.json();

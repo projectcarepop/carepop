@@ -37,4 +37,10 @@ export interface ClinicService extends Service {
   clinic_specific_price?: number | null; // From clinic_services table
   // Add other clinic-specific service details if needed from clinic_services table
   // For example, if clinic_services had its own is_offered_at_clinic boolean separate from service.is_active
+}
+
+// Added as per frontend's expectation for grouped services
+export interface ServiceCategory {
+  category: string;
+  services: Service[];
 } 
