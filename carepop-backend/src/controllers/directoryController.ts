@@ -47,6 +47,7 @@ const getClinicByIdParamsSchema = z.object({
 // --- Controller Functions ---
 
 export const getAllClinics = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  console.log('[directoryController.ts] getAllClinics controller function invoked');
   try {
     // TODO: Add pagination query params validation if needed (e.g., page, pageSize)
     // For now, fetches all active clinics without explicit pagination from controller

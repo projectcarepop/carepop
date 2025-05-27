@@ -1,256 +1,200 @@
 'use client';
 
-import * as React from 'react';
-import { Dispatch, SetStateAction, useEffect, useState, useCallback } from 'react';
-import { format } from 'date-fns';
-import { Calendar as CalendarIconLucide, Clock, MessageSquare, AlertTriangle, Loader2 } from 'lucide-react'; 
-import { cn } from '@/lib/utils';
+import React, { useEffect, useState } from 'react';
+import { useBookingContext } from '@/lib/contexts/BookingContext';
+import { AvailabilitySlot } from '@/lib/types/booking';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { Textarea } from '@/components/ui/textarea';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Card, CardContent } from '@/components/ui/card'; 
-import { getAvailabilityAction, AvailabilitySlot } from '@/lib/actions/availability'; // Import server action
-import { toast } from 'sonner';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Calendar } from "@/components/ui/calendar"; // Assuming Shadcn UI Calendar
+import { Loader2 } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, isSameDay, parseISO, getMonth, getYear } from 'date-fns';
 
-// Mock Data function getMockTimeSlots is removed as we'll use API data.
+const DateTimeSelectionStep: React.FC = () => {
+  const { state, dispatch } = useBookingContext();
+  const { 
+    selectedClinic,
+    selectedService,
+    selectedProvider,
+    selectedDate,
+    selectedTimeSlot,
+    availabilitySlots,
+    isLoading,
+    errors 
+  } = state;
 
-interface DateTimeSelectionStepProps {
-  selectedClinicId: string | null; // Added: Needed for API call
-  selectedServiceId: string | null; // Added: Needed for API call
-  selectedProviderId: string | null; 
-  selectedDate: Date | undefined;
-  setSelectedDate: Dispatch<SetStateAction<Date | undefined>>;
-  selectedTimeSlot: string | null;
-  setSelectedTimeSlot: Dispatch<SetStateAction<string | null>>;
-  appointmentNotes?: string;
-  setAppointmentNotes?: Dispatch<SetStateAction<string>>;
-  // Add selectedService.requiresProviderAssignment to better handle UI messaging
-  serviceRequiresProvider: boolean;
-}
-
-const DateTimeSelectionStep: React.FC<DateTimeSelectionStepProps> = ({
-  selectedClinicId,
-  selectedServiceId,
-  selectedProviderId,
-  selectedDate,
-  setSelectedDate,
-  selectedTimeSlot,
-  setSelectedTimeSlot,
-  appointmentNotes,
-  setAppointmentNotes,
-  serviceRequiresProvider,
-}) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0); 
-
-  const [availableTimeSlots, setAvailableTimeSlots] = useState<AvailabilitySlot[]>([]);
-  const [isLoadingSlots, setIsLoadingSlots] = useState<boolean>(false);
-  const [slotsError, setSlotsError] = useState<string | null>(null);
-
-  const fetchAvailability = useCallback(async () => {
-    if (!selectedDate || !selectedClinicId || !selectedServiceId) {
-      setAvailableTimeSlots([]);
-      return;
-    }
-    // If service requires a provider, but none is selected, don't fetch.
-    // BookingForm should ideally prevent reaching this state if provider is mandatory.
-    if (serviceRequiresProvider && !selectedProviderId) {
-        setSlotsError("Provider is required for this service, but none selected. Please go back.");
-        setAvailableTimeSlots([]);
-        return;
-    }
-
-    setIsLoadingSlots(true);
-    setSlotsError(null);
-    setAvailableTimeSlots([]); // Clear previous slots
-
-    try {
-      const formattedDate = format(selectedDate, 'yyyy-MM-dd');
-      const result = await getAvailabilityAction({
-        clinicId: selectedClinicId,
-        serviceId: selectedServiceId,
-        providerId: selectedProviderId, // Can be null if service does not require a provider
-        date: formattedDate,
-      });
-
-      if (result.success && result.data) {
-        setAvailableTimeSlots(result.data);
-      } else {
-        setSlotsError(result.message || 'Failed to load availability.');
-        toast.error('Could not load time slots', { description: result.message });
-      }
-    } catch (e: unknown) {
-      const errorMessage = e instanceof Error ? e.message : 'An unexpected error occurred.';
-      setSlotsError(errorMessage);
-      toast.error('Error fetching time slots', { description: errorMessage });
-    }
-    setIsLoadingSlots(false);
-  }, [selectedDate, selectedClinicId, selectedServiceId, selectedProviderId, serviceRequiresProvider]);
+  // Local state for the calendar month being viewed
+  const [currentMonth, setCurrentMonth] = useState<Date>(selectedDate || new Date());
 
   useEffect(() => {
-    if (selectedDate) { // Fetch only if a date is selected
-        fetchAvailability();
-    }
-    setSelectedTimeSlot(null); // Reset time slot when date or other dependencies change
-  }, [selectedDate, fetchAvailability, setSelectedTimeSlot]); // Added fetchAvailability to dependency array
+    if (selectedProvider && selectedClinic && selectedService) {
+      dispatch({ type: 'SET_AVAILABILITY_LOADING', payload: true });
+      
+      const startDate = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
+      const endDate = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
 
-  const handleDateSelect = (newDate: Date | undefined) => {
-    if (newDate) {
-      setSelectedDate(newDate);
-      // Time slots will be fetched by the useEffect above
+      const queryParams = new URLSearchParams({
+        clinicId: selectedClinic.id,
+        serviceId: selectedService.id,
+        startDate: startDate,
+        endDate: endDate
+      }).toString();
+
+      // API Call: GET /api/availability/provider/:providerId/slots (Backend Integration Guide - Section 3.1)
+      fetch(`/api/v1/availability/provider/${selectedProvider.id}/slots?${queryParams}`)
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+          return res.json();
+        })
+        .then(data => {
+          if (data.success) {
+            dispatch({ type: 'SET_AVAILABILITY_SUCCESS', payload: data.data as AvailabilitySlot[] });
+          } else {
+            dispatch({ type: 'SET_AVAILABILITY_ERROR', payload: data.message || 'Failed to fetch availability.' });
+          }
+        })
+        .catch((error) => {
+          console.error("Error fetching availability:", error);
+          dispatch({ type: 'SET_AVAILABILITY_ERROR', payload: error.message || 'An error occurred while fetching availability.' });
+        });
     } else {
-      setSelectedDate(undefined);
-      setAvailableTimeSlots([]); // Clear slots if date is cleared
+        dispatch({ type: 'SET_AVAILABILITY_SUCCESS', payload: [] });
+    }
+  }, [selectedProvider, selectedClinic, selectedService, currentMonth, dispatch]);
+
+  const handleDateSelect = (date: Date | undefined) => {
+    if (date) {
+      dispatch({ type: 'SELECT_DATE', payload: date });
+      // If month changes, useEffect will refetch. If same month, no auto-refetch unless currentMonth state is also managed by calendar.
+      if (getMonth(date) !== getMonth(currentMonth) || getYear(date) !== getYear(currentMonth)) {
+        setCurrentMonth(date);
+      }
     }
   };
 
-  const handleTimeSelect = (slot: AvailabilitySlot) => {
-    // Assuming slot.start_time is the value to store, e.g., "09:00:00"
-    setSelectedTimeSlot(slot.start_time);
+  const handleTimeSlotSelect = (slot: AvailabilitySlot) => {
+    dispatch({ type: 'SELECT_TIME_SLOT', payload: slot });
   };
 
-  const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setAppointmentNotes?.(e.target.value);
+  const goToNextStep = () => {
+    if (selectedDate && selectedTimeSlot) {
+      dispatch({ type: 'SET_CURRENT_STEP', payload: 4 });
+    }
   };
 
-  // UI Message if required IDs are missing for context
-  if (!selectedClinicId || !selectedServiceId) {
+  const goToPreviousStep = () => {
+    dispatch({ type: 'SET_CURRENT_STEP', payload: 2 });
+  };
+
+  const getSlotsForSelectedDate = () => {
+    if (!selectedDate) return [];
+    return availabilitySlots.filter(slot => 
+      isSameDay(parseISO(slot.startTime), selectedDate)
+    ).sort((a, b) => parseISO(a.startTime).getTime() - parseISO(b.startTime).getTime());
+  };
+
+  const dailySlots = getSlotsForSelectedDate();
+
+  // Highlight days with available slots
+  const highlightDays = availabilitySlots.map(slot => parseISO(slot.startTime));
+  const modifiers = { available: highlightDays };
+  const modifiersClassNames = {
+    available: 'bg-primary/20 text-primary-foreground rounded-full'
+  };
+
+  if (!selectedProvider || !selectedClinic || !selectedService) {
     return (
-      <div className="rounded-lg border-2 border-dashed border-muted-foreground/30 p-8 text-center min-h-[200px] flex flex-col justify-center items-center">
-        <Clock className="w-12 h-12 text-muted-foreground mb-4" />
-        <h3 className="text-lg font-semibold text-muted-foreground">
-          Please select clinic and service first.
-        </h3>
-        <p className="text-sm text-muted-foreground mt-1">
-          Date and time selection will be available after clinic and service are chosen.
-        </p>
-      </div>
-    );
-  }
-  // UI Message if service requires provider, but none is selected (redundant if BookingForm handles this)
-  if (serviceRequiresProvider && !selectedProviderId) {
-    return (
-      <div className="rounded-lg border-2 border-dashed border-muted-foreground/30 p-8 text-center min-h-[200px] flex flex-col justify-center items-center">
-        <Clock className="w-12 h-12 text-muted-foreground mb-4" />
-        <h3 className="text-lg font-semibold text-muted-foreground">
-          Please select a provider for this service.
-        </h3>
-        <p className="text-sm text-muted-foreground mt-1">
-          A provider is required before selecting date and time.
-        </p>
-      </div>
+        <Card className="w-full">
+            <CardHeader>
+                <CardTitle>Step 3: Select Date & Time</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <Alert variant="default">
+                    <AlertTitle>Missing Information</AlertTitle>
+                    <AlertDescription>
+                        Please go back and select a clinic, service, and provider first.
+                    </AlertDescription>
+                </Alert>
+            </CardContent>
+            <CardFooter className="flex justify-start">
+                <Button variant="outline" onClick={goToPreviousStep}>Back to Provider Selection</Button>
+            </CardFooter>
+        </Card>
     );
   }
 
   return (
-    <div className={cn('space-y-6')}>
-       <div className="space-y-2">
-        <h3 className="text-xl font-semibold tracking-tight text-center sm:text-left">
-          Schedule Your Appointment
-        </h3>
-        <p className="text-sm text-muted-foreground text-center sm:text-left">
-          Choose a suitable date and time, and add any notes for your provider.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 items-start">
-        <div className="space-y-3">
-            <div className="flex items-center text-base font-medium">
-                <CalendarIconLucide className="mr-2 h-5 w-5 text-primary" />
-                <span>Select Date</span>
-            </div>
-            <Card className="overflow-hidden">
-                <CardContent className="p-0">
-                    <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={handleDateSelect}
-                    disabled={[{ before: today }]}
-                    className="w-full"
-                    initialFocus
-                    />
-                </CardContent>
-            </Card>
-        </div>
-
-        <div className="space-y-3">
-            <div className="flex items-center text-base font-medium">
-                <Clock className="mr-2 h-5 w-5 text-primary" />
-                <span>Select Time Slot</span>
-            </div>
-            <Card className="h-[360px] flex flex-col">
-                <CardContent className="p-4 flex-grow flex flex-col">
-                    {!selectedDate && (
-                        <div className="flex-grow flex flex-col items-center justify-center text-center p-4">
-                            <CalendarIconLucide className="w-10 h-10 text-muted-foreground mb-3" />
-                            <p className="text-sm font-medium text-muted-foreground">Please select a date first.</p>
-                        </div>
-                    )}
-                    {selectedDate && isLoadingSlots && (
-                        <div className="flex-grow flex flex-col items-center justify-center">
-                            <Loader2 className="h-10 w-10 animate-spin text-primary mb-3" />
-                            <p className="text-sm text-muted-foreground">Loading time slots...</p>
-                        </div>
-                    )}
-                    {selectedDate && !isLoadingSlots && slotsError && (
-                        <div className="flex-grow flex flex-col items-center justify-center text-center p-4">
-                            <AlertTriangle className="w-10 h-10 text-destructive mb-3" />
-                            <p className="text-sm font-medium text-destructive">Error Loading Slots</p>
-                            <p className="text-xs text-destructive/80 mt-1">{slotsError}</p>
-                            <Button onClick={fetchAvailability} variant="destructive" size="sm" className="mt-3">Try Again</Button>
-                        </div>
-                    )}
-                    {selectedDate && !isLoadingSlots && !slotsError && availableTimeSlots.length > 0 && (
-                        <ScrollArea className="flex-grow pr-3 -mr-3">
-                            <div className="mb-3">
-                                <p className="text-sm font-medium text-center">
-                                Available on {format(selectedDate, "EEEE, MMMM d")}
-                                </p>
-                            </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                            {availableTimeSlots.map((slot) => (
-                                <Button
-                                key={slot.start_time}
-                                variant={selectedTimeSlot === slot.start_time ? 'default' : 'outline'}
-                                size="default"
-                                className="w-full h-11 text-sm"
-                                onClick={() => handleTimeSelect(slot)}
-                                // disabled={!slot.available} // Assuming all returned slots are available
-                                >
-                                {format(new Date(`1970-01-01T${slot.start_time}`), 'h:mm a')} {/* Format time for display */}
-                                </Button>
-                            ))}
-                            </div>
-                        </ScrollArea>
-                    )}
-                    {selectedDate && !isLoadingSlots && !slotsError && availableTimeSlots.length === 0 && (
-                        <div className="flex-grow flex flex-col items-center justify-center text-center p-4">
-                            <Clock className="w-10 h-10 text-muted-foreground mb-3" />
-                            <p className="text-sm font-medium text-muted-foreground">
-                                No time slots available for {format(selectedDate, "MMMM d, yyyy")}.
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">Please try another date.</p>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-        </div>
-      </div>
-
-        <div className="space-y-3 pt-4 border-t border-border">
-            <div className="flex items-center text-base font-medium">
-                <MessageSquare className="mr-2 h-5 w-5 text-primary" />
-                <span>Notes for Provider (Optional)</span>
-            </div>
-            <Textarea
-                placeholder="E.g., specific concerns, accessibility needs, or reason for visit if not covered by service selection."
-                className="min-h-[100px] text-sm"
-                value={appointmentNotes || ''}
-                onChange={handleNotesChange}
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle>Step 3: Select Date & Time</CardTitle>
+        <CardDescription>
+          Pick a date and time for your appointment with {selectedProvider.fullName} for {selectedService.name}.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Calendar View */}
+          <div className="flex flex-col items-center">
+            <h4 className="text-lg font-medium mb-2">Select a Date</h4>
+            <Calendar
+              mode="single"
+              selected={selectedDate || undefined}
+              onSelect={handleDateSelect}
+              month={currentMonth}
+              onMonthChange={setCurrentMonth} // Handles month navigation in calendar
+              disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() -1)) } // Disable past dates
+              className="rounded-md border shadow-sm p-3"
+              modifiers={modifiers}
+              modifiersClassNames={modifiersClassNames}
+              footer={
+                selectedDate && <p className="text-sm mt-2">You selected: {format(selectedDate, 'PPP')}.</p>
+              }
             />
+          </div>
+
+          {/* Time Slots View */}
+          <div className="space-y-4">
+            <h4 className="text-lg font-medium">Available Times on {selectedDate ? format(selectedDate, 'PPP') : 'selected date'}</h4>
+            {isLoading.availabilitySlots && <div className="flex items-center space-x-2"><Loader2 className="h-5 w-5 animate-spin" /> <span>Loading time slots...</span></div>}
+            {errors.availabilitySlots && <Alert variant="destructive"><AlertTitle>Error Loading Slots</AlertTitle><AlertDescription>{errors.availabilitySlots}</AlertDescription></Alert>}
+            
+            {!isLoading.availabilitySlots && !errors.availabilitySlots && !selectedDate && (
+              <Alert variant="default">
+                <AlertDescription>Please select a date from the calendar to see available time slots.</AlertDescription>
+              </Alert>
+            )}
+
+            {!isLoading.availabilitySlots && selectedDate && dailySlots.length === 0 && !errors.availabilitySlots && (
+              <Alert variant="default">
+                <AlertTitle>No Slots Available</AlertTitle>
+                <AlertDescription>There are no available time slots for {selectedProvider.fullName} on {format(selectedDate, 'PPP')}. Please try another date.</AlertDescription>
+              </Alert>
+            )}
+
+            {!isLoading.availabilitySlots && dailySlots.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-72 overflow-y-auto pr-2">
+                {dailySlots.map((slot) => (
+                  <Button 
+                    key={slot.slotId}
+                    variant={selectedTimeSlot?.slotId === slot.slotId ? "default" : "outline"}
+                    onClick={() => handleTimeSlotSelect(slot)}
+                    className="w-full py-3 text-sm focus:ring-2 focus:ring-primary"
+                  >
+                    {format(parseISO(slot.startTime), 'p')} - {format(parseISO(slot.endTime), 'p')}
+                  </Button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-    </div>
+      </CardContent>
+      <CardFooter className="flex justify-between border-t pt-6 mt-6">
+        <Button variant="outline" onClick={goToPreviousStep} disabled={isLoading.availabilitySlots}>Back</Button>
+        <Button onClick={goToNextStep} disabled={!selectedDate || !selectedTimeSlot || isLoading.availabilitySlots} size="lg">
+          Next: Confirm Booking
+        </Button>
+      </CardFooter>
+    </Card>
   );
 };
 

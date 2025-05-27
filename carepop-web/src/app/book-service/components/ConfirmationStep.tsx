@@ -1,198 +1,162 @@
 'use client';
 
-import * as React from 'react';
-import { format } from 'date-fns';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { CalendarDays, Clock, Stethoscope, Building, Briefcase, MessageSquareText, UserCircle, Pencil } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import React from 'react';
+import { useBookingContext } from '@/lib/contexts/BookingContext';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Textarea } from '@/components/ui/textarea';
+import { Loader2 } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
-// Mock data and individual ID props are removed. Component will use bookingDetails.
-
-// Interface for serviceDetails passed within bookingDetails
-interface ServiceSubDetails {
-  id: string;
-  name: string;
-  price?: number | null;
-  duration?: string | null;
-  requiresProviderAssignment: boolean;
-}
-
-interface BookingDetails {
-  clinicId: string | null;
-  clinicName: string | null;
-  serviceId: string | null;
-  serviceName: string | null; // Direct from BookingForm
-  providerId: string | null;
-  providerName: string | null;
-  providerSpecialty: string | null;
-  providerAvatarUrl: string | null;
-  date: Date | undefined;
-  timeSlot: string | null;
-  notes?: string;
-  serviceDetails: ServiceSubDetails | null; // Contains price, duration, etc.
-}
-
-interface ConfirmationStepProps {
-  bookingDetails: BookingDetails;
-  onEdit: (stepId: string) => void; // Callback to go back to an edit step
-}
-
-interface SummaryItemProps {
-  icon: React.ElementType;
-  label: string;
-  value: React.ReactNode | string;
-  className?: string;
-  avatarUrl?: string;
-  onEdit?: () => void; // Optional edit callback for a specific item
-  editStepId?: string; // Step ID to navigate to for editing this item
-}
-
-const SummaryItem: React.FC<SummaryItemProps> = ({ icon: Icon, label, value, className, avatarUrl, onEdit, editStepId }) => (
-  <div className={cn("flex items-start space-x-3 py-3", className)}>
-    {avatarUrl ? (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={avatarUrl} alt={label} className="h-10 w-10 rounded-full flex-shrink-0 mt-0.5 object-cover" />
-    ) : (
-      <Icon className="h-5 w-5 text-primary mt-1 flex-shrink-0" />
-    )}
-    <div className="flex-grow">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="text-md font-semibold text-foreground">
-        {value || <span className="italic text-sm font-normal text-muted-foreground/80">Not specified</span>}
-      </p>
-    </div>
-    {onEdit && editStepId && (
-        <Button variant="ghost" size="sm" onClick={onEdit} className="ml-auto self-start p-1 h-auto">
-            <Pencil className="h-4 w-4 text-muted-foreground hover:text-primary"/>
-        </Button>
-    )}
-  </div>
-);
-
-const ConfirmationStep: React.FC<ConfirmationStepProps> = ({
-  bookingDetails,
-  onEdit
-}) => {
+const ConfirmationStep: React.FC = () => {
+  const { state, dispatch } = useBookingContext();
   const { 
-    clinicName,
-    serviceName,
-    providerName,
-    providerSpecialty,
-    providerAvatarUrl,
-    date,
-    timeSlot,
-    notes,
-    serviceDetails
-  } = bookingDetails;
+    selectedClinic,
+    selectedService,
+    selectedProvider,
+    selectedDate,
+    selectedTimeSlot,
+    bookingNotes,
+    isLoading,
+    errors 
+  } = state;
 
-  const formattedDate = date ? format(date, 'EEEE, MMMM d, yyyy') : null;
-  const formattedTime = timeSlot ? format(new Date(`1970-01-01T${timeSlot}`), 'h:mm a') : null;
-  
-  const serviceDisplayInfo = [
-    serviceName,
-    serviceDetails?.duration ? `(${serviceDetails.duration})` : null,
-    serviceDetails?.price !== undefined && serviceDetails?.price !== null ? 
-        `₱${serviceDetails.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
-        : null
-  ].filter(Boolean).join(' - ');
+  const handleNotesChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    dispatch({ type: 'SET_BOOKING_NOTES', payload: event.target.value });
+  };
+
+  const handleSubmitBooking = async () => {
+    if (!selectedClinic || !selectedService || !selectedProvider || !selectedDate || !selectedTimeSlot) {
+      // This should ideally not happen if navigation is controlled properly
+      dispatch({ type: 'SET_BOOKING_SUBMISSION_ERROR', payload: 'Missing booking information. Please review previous steps.' });
+      return;
+    }
+
+    dispatch({ type: 'SET_BOOKING_SUBMISSION_LOADING', payload: true });
+
+    const supabase = createSupabaseBrowserClient();
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError || !sessionData.session) {
+      console.error("Error getting session or no session:", sessionError);
+      dispatch({ type: 'SET_BOOKING_SUBMISSION_ERROR', payload: 'Your session is invalid. Please log in again.' });
+      dispatch({ type: 'SET_BOOKING_SUBMISSION_LOADING', payload: false });
+      return;
+    }
+    const token = sessionData.session.access_token;
+
+    const bookingData = {
+      clinicId: selectedClinic.id,
+      serviceId: selectedService.id,
+      providerId: selectedProvider.id,
+      startTime: selectedTimeSlot.startTime, // Already in ISO format from backend
+      endTime: selectedTimeSlot.endTime,     // Already in ISO format from backend
+      notes: bookingNotes,
+    };
+
+    try {
+      // API Call: POST /api/appointments (Backend Integration Guide - Section 4.1)
+      const response = await fetch('/api/v1/appointments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(bookingData),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        dispatch({ type: 'SET_BOOKING_SUBMISSION_SUCCESS', payload: result.data });
+        dispatch({ type: 'SET_CURRENT_STEP', payload: 5 }); // Move to a success/summary step
+      } else {
+        dispatch({ type: 'SET_BOOKING_SUBMISSION_ERROR', payload: result.message || 'Failed to submit booking.' });
+      }
+    } catch (error) {
+      console.error("Error submitting booking:", error);
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';
+      dispatch({ type: 'SET_BOOKING_SUBMISSION_ERROR', payload: errorMessage });
+    }
+  };
+
+  const goToPreviousStep = () => {
+    dispatch({ type: 'SET_CURRENT_STEP', payload: 3 });
+  };
+
+  if (!selectedClinic || !selectedService || !selectedProvider || !selectedDate || !selectedTimeSlot) {
+    return (
+        <Card className="w-full">
+            <CardHeader>
+                <CardTitle>Step 4: Confirm Booking</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <Alert variant="default">
+                    <AlertTitle>Missing Information</AlertTitle>
+                    <AlertDescription>
+                        Please complete all previous steps before confirming your booking.
+                    </AlertDescription>
+                </Alert>
+            </CardContent>
+            <CardFooter className="flex justify-start">
+                <Button variant="outline" onClick={goToPreviousStep}>Back to Date & Time</Button>
+            </CardFooter>
+        </Card>
+    );
+  }
 
   return (
-    <div className={cn('space-y-6')}>
-      <div className="space-y-2 text-center">
-        <h3 className="text-2xl font-semibold tracking-tight">
-          Confirm Your Booking Details
-        </h3>
-        <p className="text-muted-foreground">
-          Please review your appointment details below before confirming.
-        </p>
-      </div>
-
-      <Card className="overflow-hidden shadow-lg">
-        <CardHeader className="bg-muted/30 pb-3 pt-4 px-6">
-          <CardTitle className="text-lg flex items-center">
-            <CalendarDays className="mr-2 h-5 w-5 text-primary"/>
-            Appointment Summary
-          </CardTitle>
-        </CardHeader>
-        <Separator />
-        <CardContent className="p-0">
-          <div className="px-6 pt-4 pb-6 space-y-1">
-            <h4 className="text-sm font-medium text-muted-foreground pb-2">Location & Service</h4>
-            <SummaryItem 
-              icon={Building} 
-              label="Clinic" 
-              value={clinicName || 'Clinic not selected'} 
-              onEdit={() => onEdit('clinicServiceSelection')}
-              editStepId="clinicServiceSelection"
-            />
-            <SummaryItem 
-              icon={Briefcase} 
-              label="Service" 
-              value={serviceDisplayInfo || 'Service not selected'} 
-              onEdit={() => onEdit('clinicServiceSelection')}
-              editStepId="clinicServiceSelection"
-            />
-            { (serviceDetails?.requiresProviderAssignment || providerName) && (
-                <SummaryItem 
-                  icon={Stethoscope} 
-                  label="Provider" 
-                  value={providerName ? `${providerName}${providerSpecialty ? ` (${providerSpecialty})` : ''}` : 'Any available provider'}
-                  avatarUrl={providerAvatarUrl || undefined}
-                  onEdit={() => onEdit('providerSelection')}
-                  editStepId="providerSelection"
-                />
-            )}
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle>Step 4: Confirm Your Booking</CardTitle>
+        <CardDescription>
+          Please review your appointment details below and confirm.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-3 rounded-md border p-4 shadow-sm">
+          <h4 className="text-lg font-medium text-primary">Appointment Summary</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            <div><strong>Clinic:</strong> {selectedClinic.name}</div>
+            <div><strong>Service:</strong> {selectedService.name}</div>
+            <div><strong>Provider:</strong> {selectedProvider.fullName}</div>
+            <div><strong>Date:</strong> {format(selectedDate, 'PPP')}</div>
+            <div><strong>Time:</strong> {format(parseISO(selectedTimeSlot.startTime), 'p')} - {format(parseISO(selectedTimeSlot.endTime), 'p')}</div>
+            {selectedService.typicalDurationMinutes && <div><strong>Duration:</strong> {selectedService.typicalDurationMinutes} minutes</div>}
           </div>
-          
-          <Separator />
+        </div>
 
-          <div className="p-6 space-y-1">
-            <h4 className="text-sm font-medium text-muted-foreground pb-2">Date & Time</h4>
-            <SummaryItem 
-                icon={CalendarDays} 
-                label="Date" 
-                value={formattedDate} 
-                onEdit={() => onEdit('dateTimeSelection')}
-                editStepId="dateTimeSelection"
-            />
-            <SummaryItem 
-                icon={Clock} 
-                label="Time Slot" 
-                value={formattedTime} 
-                onEdit={() => onEdit('dateTimeSelection')}
-                editStepId="dateTimeSelection"
-            />
-          </div>
+        <div className="space-y-2">
+          <label htmlFor="booking-notes" className="block text-sm font-medium text-gray-700">Additional Notes (Optional)</label>
+          <Textarea 
+            id="booking-notes"
+            placeholder="Any specific requests or information for the provider..."
+            value={bookingNotes}
+            onChange={handleNotesChange}
+            className="min-h-[100px]"
+            disabled={isLoading.bookingSubmission}
+          />
+        </div>
 
-          {(notes || notes === '') && (
-            <>
-              <Separator />
-              <div className="p-6 space-y-1">
-                <h4 className="text-sm font-medium text-muted-foreground pb-2">Additional Information</h4>
-                <SummaryItem 
-                    icon={MessageSquareText} 
-                    label="Your Notes" 
-                    value={notes || <span className="italic text-sm font-normal text-muted-foreground/80">No notes provided</span>} 
-                    onEdit={() => onEdit('dateTimeSelection')}
-                    editStepId="dateTimeSelection"
-                />
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+        {errors.bookingSubmission && (
+            <Alert variant="destructive">
+                <AlertTitle>Booking Failed</AlertTitle>
+                <AlertDescription>{errors.bookingSubmission}</AlertDescription>
+            </Alert>
+        )}
 
-      <Alert variant="default" className="bg-primary/5 border-primary/20 text-primary">
-        <UserCircle className="h-4 w-4 !text-primary" /> 
-        <AlertTitle className="font-semibold">Ready to Book?</AlertTitle>
-        <AlertDescription className="text-sm">
-          If all details are correct, click the &quot;Confirm Booking&quot; button to finalize your appointment.
-        </AlertDescription>
-      </Alert>
-    </div>
+      </CardContent>
+      <CardFooter className="flex justify-between border-t pt-6 mt-6">
+        <Button variant="outline" onClick={goToPreviousStep} disabled={isLoading.bookingSubmission}>Back</Button>
+        <Button onClick={handleSubmitBooking} disabled={isLoading.bookingSubmission} size="lg">
+          {isLoading.bookingSubmission ? (
+            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
+          ) : 'Confirm & Book Appointment'}
+        </Button>
+      </CardFooter>
+    </Card>
   );
 };
 

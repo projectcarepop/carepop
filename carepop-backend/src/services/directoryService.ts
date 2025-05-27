@@ -10,6 +10,7 @@ import logger from '../utils/logger';
  * to get service names and structure it like the frontend's Clinic.services_offered.
  */
 export const fetchAllActiveClinics = async () => {
+  console.log('[directoryService.ts] fetchAllActiveClinics service function invoked');
   logger.info('[fetchAllActiveClinics] Fetching all active clinics');
   try {
     const { data, error } = await supabase

@@ -5,6 +5,8 @@ import {
   getAllClinics
 } from '../controllers/directoryController'; // Assuming controller will be created here
 
+console.log('[directoryRoutes.ts] File loaded');
+
 const router: Router = express.Router();
 
 /**
@@ -27,7 +29,10 @@ const router: Router = express.Router();
  *       500:
  *         description: Internal server error
  */
-router.get('/clinics', getAllClinics as RequestHandler);
+router.get('/clinics', (req, res, next) => {
+  console.log('[directoryRoutes.ts] GET /clinics route hit');
+  (getAllClinics as RequestHandler)(req, res, next);
+});
 
 /**
  * @openapi
