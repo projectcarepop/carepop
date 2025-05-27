@@ -24,7 +24,6 @@ export const fetchProvidersByClinic = async (clinicId: string): Promise<Provider
                 last_name,  
                 is_active,
                 user_id, 
-                // Attempt to fetch avatar_url via user_id removed for now to isolate the relationship issue
                 provider_specialties (
                     specialties (
                         name
