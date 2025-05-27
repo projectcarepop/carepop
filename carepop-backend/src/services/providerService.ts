@@ -38,11 +38,14 @@ export const fetchProvidersByClinic = async (clinicId: string, serviceId?: strin
         .eq('is_active', true) // Schedule entry is active
         .eq('providers.is_active', true); // Provider is active
 
+    // TEMP: Comment out serviceId filtering to test base provider fetching for the clinic
+    /*
     if (serviceId) {
         query = query
             .eq('providers.provider_services.service_id', serviceId)
             .eq('providers.provider_services.is_active', true); // Ensure the provider-service link is active
     }
+    */
 
     const { data, error } = await query;
 
@@ -59,13 +62,15 @@ export const fetchProvidersByClinic = async (clinicId: string, serviceId?: strin
         const providerData = scheduleEntry.providers;
         if (!providerData) return acc;
 
-        // If filtering by serviceId, ensure the provider actually offers the service from the filtered results
+        // TEMP: Comment out JS-side service check
+        /*
         if (serviceId) {
             const offersService = providerData.provider_services?.some((ps: any) => ps.service_id === serviceId && ps.is_active);
             if (!offersService) {
                 return acc; // Skip if this provider (despite being scheduled) doesn't match the service criteria after all
             }
         }
+        */
 
         if (acc.find(p => p.id === providerData.id)) {
             return acc;
