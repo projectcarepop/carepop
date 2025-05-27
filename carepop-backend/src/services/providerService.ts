@@ -20,12 +20,13 @@ export const fetchProvidersByClinic = async (clinicId: string): Promise<Provider
             clinic_id,
             providers:provider_id (
                 id,
+                first_name, 
+                last_name,  
                 is_active,
+                user_id,    
                 user_account:user_id ( 
                     profile_details:profiles ( 
-                        first_name,
-                        last_name,
-                        avatar_url
+                        avatar_url 
                     )
                 ),
                 provider_specialties (
@@ -53,21 +54,21 @@ export const fetchProvidersByClinic = async (clinicId: string): Promise<Provider
         const providerData = scheduleEntry.providers;
         if (!providerData) return acc;
 
-        // Check if this provider has already been added to avoid duplicates from multiple schedules
         if (acc.find(p => p.id === providerData.id)) {
             return acc;
         }
 
         const specialty = providerData.provider_specialties?.[0]?.specialties?.name || null;
         
-        // Adjust to use the new nested structure for profile information
-        const profileInfo = providerData.user_account?.profile_details;
+        // Get first_name and last_name directly from providerData
+        // Get avatar_url from the nested structure, if available
+        const avatarUrl = providerData.user_account?.profile_details?.avatar_url || null;
 
         acc.push({
             id: providerData.id,
-            first_name: profileInfo?.first_name || 'N/A', // Provide fallback for names
-            last_name: profileInfo?.last_name || 'N/A',  // Provide fallback for names
-            avatar_url: profileInfo?.avatar_url || null,
+            first_name: providerData.first_name || 'N/A',
+            last_name: providerData.last_name || 'N/A',
+            avatar_url: avatarUrl,
             specialty_name: specialty,
         });
         return acc;
