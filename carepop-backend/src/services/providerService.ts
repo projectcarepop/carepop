@@ -24,7 +24,7 @@ export const fetchProvidersByClinic = async (clinicId: string): Promise<Provider
                 last_name,
                 is_active,
                 user_id, 
-                profiles:user_id (
+                profile:user_id (
                     avatar_url
                 ),
                 provider_specialties (
@@ -59,8 +59,8 @@ export const fetchProvidersByClinic = async (clinicId: string): Promise<Provider
 
         const specialty = providerData.provider_specialties?.[0]?.specialties?.name || null;
         
-        // profiles via user_id should be an object if a match is found, or null/undefined
-        const avatarUrl = providerData.profiles?.avatar_url || null;
+        // Adjust to use the new 'profile' alias from the query
+        const avatarUrl = providerData.profile?.avatar_url || null;
 
         acc.push({
             id: providerData.id,

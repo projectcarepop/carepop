@@ -1,3 +1,6 @@
+CREATE EXTENSION IF NOT EXISTS postgis WITH SCHEMA extensions;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
+
 -- Create public.specialties table first as it's a lookup table
 CREATE TABLE IF NOT EXISTS public.specialties (
     id UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),

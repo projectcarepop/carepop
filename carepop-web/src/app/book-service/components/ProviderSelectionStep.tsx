@@ -9,6 +9,7 @@ import { Calendar, Star, User, Verified, AlertTriangle, Loader2 } from 'lucide-r
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { toast } from 'sonner';
+import { useAuth } from '@/lib/contexts/AuthContext';
 
 // Interface for the provider data fetched from the API
 interface ApiProvider {
@@ -45,6 +46,7 @@ const ProviderSelectionStep: React.FC<ProviderSelectionStepProps> = ({
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const { session } = useAuth();
 
   const canSkipProviderSelection = selectedService?.requires_provider_assignment === false;
 
@@ -52,6 +54,21 @@ const ProviderSelectionStep: React.FC<ProviderSelectionStepProps> = ({
     if (!selectedClinicId) return;
     if (canSkipProviderSelection) {
       setProviders([]); // No need to fetch if skippable
+      return;
+    }
+
+    if (!session?.access_token) {
+      setError('Authentication token not found. Please ensure you are logged in.');
+      setIsLoading(false);
+      toast.error('Authentication Error', { description: 'Session token is missing.' });
+      return;
+    }
+
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL; // Get the base URL
+    if (!backendUrl) {                                          // Check if it's defined
+      setError('Backend API URL is not configured.');
+      setIsLoading(false);
+      toast.error('Configuration Error', { description: 'Backend API URL is missing.' });
       return;
     }
 
@@ -64,7 +81,20 @@ const ProviderSelectionStep: React.FC<ProviderSelectionStepProps> = ({
         queryParams.append('serviceId', selectedService.id);
       }
 
-      const response = await fetch(`/api/v1/clinics/${selectedClinicId}/providers?${queryParams.toString()}`);
+      // Construct the full URL
+      const apiUrl = `${backendUrl.replace(/\/$/, '')}/api/v1/clinics/${selectedClinicId}/providers?${queryParams.toString()}`;
+      
+      console.log('[ProviderSelectionStep] Fetching providers from:', apiUrl); // Add this log
+
+      const response = await fetch(
+        apiUrl, // Use the full, absolute URL
+        {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Failed to fetch providers' }));
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
@@ -88,7 +118,7 @@ const ProviderSelectionStep: React.FC<ProviderSelectionStepProps> = ({
       toast.error('Error fetching providers', { description: errorMessage });
     }
     setIsLoading(false);
-  }, [selectedClinicId, selectedService, canSkipProviderSelection]);
+  }, [selectedClinicId, selectedService, canSkipProviderSelection, session]);
 
   useEffect(() => {
     fetchProviders();
