@@ -20,12 +20,13 @@ export const fetchProvidersByClinic = async (clinicId: string): Promise<Provider
             clinic_id,
             providers:provider_id (
                 id,
-                first_name,
-                last_name,
                 is_active,
-                user_id, 
-                profile:user_id (
-                    avatar_url
+                user_account:user_id ( 
+                    profile_details:profiles ( 
+                        first_name,
+                        last_name,
+                        avatar_url
+                    )
                 ),
                 provider_specialties (
                     specialties (
@@ -59,14 +60,14 @@ export const fetchProvidersByClinic = async (clinicId: string): Promise<Provider
 
         const specialty = providerData.provider_specialties?.[0]?.specialties?.name || null;
         
-        // Adjust to use the new 'profile' alias from the query
-        const avatarUrl = providerData.profile?.avatar_url || null;
+        // Adjust to use the new nested structure for profile information
+        const profileInfo = providerData.user_account?.profile_details;
 
         acc.push({
             id: providerData.id,
-            first_name: providerData.first_name,
-            last_name: providerData.last_name,
-            avatar_url: avatarUrl,
+            first_name: profileInfo?.first_name || 'N/A', // Provide fallback for names
+            last_name: profileInfo?.last_name || 'N/A',  // Provide fallback for names
+            avatar_url: profileInfo?.avatar_url || null,
             specialty_name: specialty,
         });
         return acc;
