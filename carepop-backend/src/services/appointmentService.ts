@@ -47,10 +47,10 @@ export const bookAppointment = async (
     throw new Error('Selected clinic is not active.');
   }
 
-  // 2. Validate Service
+  // 2. Validate Service - Fetch typical_duration_minutes as well
   const { data: serviceData, error: serviceError } = await dbClient
     .from('services')
-    .select('id, is_active, name') // name for logging
+    .select('id, is_active, name, typical_duration_minutes') // Added typical_duration_minutes
     .eq('id', serviceId)
     .single();
   
@@ -61,6 +61,10 @@ export const bookAppointment = async (
   if (!serviceData.is_active) {
     logger.warn(`[bookAppointment] Service ${serviceData.name} (ID: ${serviceId}) is not active.`);
     throw new Error('Selected service is not active.');
+  }
+  if (serviceData.typical_duration_minutes == null) { // Check if duration is null
+    logger.warn(`[bookAppointment] Service ${serviceData.name} (ID: ${serviceId}) has no typical_duration_minutes defined.`);
+    throw new Error('Selected service does not have a duration defined.');
   }
 
   // 3. Validate Clinic offers the Service
@@ -111,7 +115,7 @@ export const bookAppointment = async (
     }
   }
 
-  // 6. Create Appointment record
+  // 6. Create Appointment record - Add duration_minutes
   const newAppointmentData = {
     user_id: userId,
     clinic_id: clinicId,
@@ -119,6 +123,7 @@ export const bookAppointment = async (
     provider_id: providerId || null,
     appointment_datetime: startTime,
     end_time: endTime,
+    duration_minutes: serviceData.typical_duration_minutes, // Added duration_minutes
     status: AppointmentStatus.PENDING,
     notes: encryptedNotes,
     // created_at and updated_at are typically handled by DB defaults
