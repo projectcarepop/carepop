@@ -14,6 +14,7 @@ import {
 import * as appointmentService from '../services/appointmentService';
 import logger from '../utils/logger';
 import { z } from 'zod';
+import { createSupabaseClientWithToken } from '../config/supabaseClient';
 
 // Extend Express Request type to include user from auth middleware
 interface AuthenticatedRequest extends Request {
@@ -28,21 +29,34 @@ interface AuthenticatedRequest extends Request {
  */
 export const createAppointmentHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    if (!req.user || !req.user.id) {
-      logger.warn('[createAppointmentHandler] User not authenticated or user ID missing.');
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ') || !req.user || !req.user.id) {
+      logger.warn('[createAppointmentHandler] User not authenticated, user ID missing, or token missing.');
       res.status(401).json({ message: 'Authentication required.' });
-      return; // Explicitly return void
+      return;
     }
     const userId = req.user.id;
+    const accessToken = authHeader.split(' ')[1];
+
+    if (!accessToken) { // Should be caught by the check above, but as an extra safeguard
+        logger.warn('[createAppointmentHandler] Access token is missing after Bearer split.');
+        res.status(401).json({ message: 'Malformed authentication token.'});
+        return;
+    }
+
+    const userSupabaseClient = createSupabaseClientWithToken(accessToken);
 
     const bookingRequest: BookAppointmentRequest = BookAppointmentRequestSchema.parse(req.body);
     logger.info(`[createAppointmentHandler] Validated booking request for user ${userId}:`, bookingRequest);
 
-    const newAppointment: Appointment = await appointmentService.bookAppointment(bookingRequest, userId);
+    const newAppointment: Appointment = await appointmentService.bookAppointment(
+      bookingRequest, 
+      userId,
+      userSupabaseClient
+    );
 
     logger.info(`[createAppointmentHandler] Appointment ${newAppointment.id} created successfully for user ${userId}.`);
     res.status(201).json(newAppointment);
-    // No explicit return here, implicitly void
 
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -69,13 +83,22 @@ export const createAppointmentHandler = async (req: AuthenticatedRequest, res: R
  */
 export const cancelAppointmentHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    if (!req.user || !req.user.id) {
-      logger.warn('[cancelAppointmentHandler] User not authenticated or user ID missing.');
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ') || !req.user || !req.user.id) {
+      logger.warn('[cancelAppointmentHandler] User not authenticated, user ID missing, or token missing.');
       res.status(401).json({ message: 'Authentication required.' });
       return;
     }
     const userId = req.user.id;
-    const userRoles = req.user.roles || []; // Get roles from token, default to empty array
+    const userRoles = req.user.roles || [];
+    const accessToken = authHeader.split(' ')[1];
+
+    if (!accessToken) {
+        logger.warn('[cancelAppointmentHandler] Access token is missing after Bearer split.');
+        res.status(401).json({ message: 'Malformed authentication token.'});
+        return;
+    }
+    const userSupabaseClient = createSupabaseClientWithToken(accessToken);
 
     const { appointmentId } = CancelAppointmentPathParamsSchema.parse(req.params);
     const requestBody: CancelAppointmentRequestBody = CancelAppointmentRequestBodySchema.parse(req.body);
@@ -87,7 +110,8 @@ export const cancelAppointmentHandler = async (req: AuthenticatedRequest, res: R
       requestBody.cancelledBy, // This is 'user' | 'clinic' from the enum
       requestBody.cancellationReason,
       userId,
-      userRoles
+      userRoles,
+      userSupabaseClient // Pass the client
     );
 
     logger.info(`[cancelAppointmentHandler] Appointment ${updatedAppointment.id} cancelled successfully by user ${userId}.`);
@@ -116,16 +140,25 @@ export const cancelAppointmentHandler = async (req: AuthenticatedRequest, res: R
  */
 export const getUserFutureAppointmentsHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    if (!req.user || !req.user.id) {
-      logger.warn('[getUserFutureAppointmentsHandler] User not authenticated or user ID missing.');
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ') || !req.user || !req.user.id) {
+      logger.warn('[getUserFutureAppointmentsHandler] User not authenticated, user ID missing, or token missing.');
       res.status(401).json({ message: 'Authentication required.' });
       return;
     }
     const userId = req.user.id;
+    const accessToken = authHeader.split(' ')[1];
+
+    if (!accessToken) {
+        logger.warn('[getUserFutureAppointmentsHandler] Access token is missing after Bearer split.');
+        res.status(401).json({ message: 'Malformed authentication token.'});
+        return;
+    }
+    const userSupabaseClient = createSupabaseClientWithToken(accessToken);
 
     logger.info(`[getUserFutureAppointmentsHandler] Fetching future appointments for user ${userId}`);
 
-    const futureAppointments: UserAppointmentDetails[] = await appointmentService.getUserFutureAppointments(userId);
+    const futureAppointments: UserAppointmentDetails[] = await appointmentService.getUserFutureAppointments(userId, userSupabaseClient);
 
     logger.info(`[getUserFutureAppointmentsHandler] Successfully fetched ${futureAppointments.length} future appointments for user ${userId}.`);
     res.status(200).json(futureAppointments);
@@ -151,16 +184,25 @@ export const getUserFutureAppointmentsHandler = async (req: AuthenticatedRequest
  */
 export const getUserPastAppointmentsHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    if (!req.user || !req.user.id) {
-      logger.warn('[getUserPastAppointmentsHandler] User not authenticated or user ID missing.');
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ') || !req.user || !req.user.id) {
+      logger.warn('[getUserPastAppointmentsHandler] User not authenticated, user ID missing, or token missing.');
       res.status(401).json({ message: 'Authentication required.' });
       return;
     }
     const userId = req.user.id;
+    const accessToken = authHeader.split(' ')[1];
+
+    if (!accessToken) {
+        logger.warn('[getUserPastAppointmentsHandler] Access token is missing after Bearer split.');
+        res.status(401).json({ message: 'Malformed authentication token.'});
+        return;
+    }
+    const userSupabaseClient = createSupabaseClientWithToken(accessToken);
 
     logger.info(`[getUserPastAppointmentsHandler] Fetching past appointments for user ${userId}`);
 
-    const pastAppointments: UserAppointmentDetails[] = await appointmentService.getUserPastAppointments(userId);
+    const pastAppointments: UserAppointmentDetails[] = await appointmentService.getUserPastAppointments(userId, userSupabaseClient);
 
     logger.info(`[getUserPastAppointmentsHandler] Successfully fetched ${pastAppointments.length} past appointments for user ${userId}.`);
     res.status(200).json(pastAppointments);

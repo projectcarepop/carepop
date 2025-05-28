@@ -2,6 +2,9 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import { SecretManagerServiceClient } from '@google-cloud/secret-manager';
 
+// Keep a reference to the initialized Supabase URL
+let initializedSupabaseUrl: string | null = null;
+
 // Function to fetch secrets from GCP Secret Manager
 async function getGcpSecret(secretName: string): Promise<string | null> {
   const projectId = process.env.GOOGLE_CLOUD_PROJECT;
@@ -73,6 +76,8 @@ async function initializeSupabase() {
       throw new Error('Supabase Service Role Key is missing. Ensure configuration is correct (GCP Secret Manager or .env).');
   }
 
+  initializedSupabaseUrl = supabaseUrl; // Store for use in createSupabaseClientWithToken
+
   // Create the standard anon client instance
   supabaseAnonClient = createClient(supabaseUrl, supabaseAnonKey);
   console.log('Supabase anon client initialized successfully.');
@@ -91,3 +96,21 @@ initializeSupabase().catch(error => {
 
 // Export both initialized clients
 export { supabaseAnonClient as supabase, supabaseServiceRoleClient as supabaseServiceRole }; 
+
+// Export a function to create a new client instance scoped with a user's JWT
+export const createSupabaseClientWithToken = (accessToken: string): SupabaseClient => {
+  if (!initializedSupabaseUrl) { // Check if the URL was initialized
+    throw new Error('Supabase URL has not been initialized. Cannot create user-scoped client.');
+  }
+  // It's important to use the supabaseAnonKey here for the initial client creation.
+  // The user's permissions are then applied via the Authorization header.
+  return createClient(initializedSupabaseUrl, process.env.SUPABASE_ANON_KEY!, { 
+    global: {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+    // Optional: autoRefreshToken, persistSession, detectSessionInUrl can be configured if needed
+    // For server-side, typically you manage the token lifecycle.
+  });
+}; 

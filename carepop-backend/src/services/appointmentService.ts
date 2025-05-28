@@ -1,4 +1,5 @@
 import { supabase } from '../config/supabaseClient';
+import { SupabaseClient } from '@supabase/supabase-js';
 import {
   BookAppointmentRequest,
   Appointment,
@@ -17,19 +18,21 @@ import EncryptionService from './encryptionService'; // Corrected: Default impor
  * 
  * @param bookingRequest - The appointment booking request details.
  * @param userId - The ID of the user booking the appointment.
+ * @param dbClient - The Supabase client to use for database operations.
  * @returns A promise that resolves to the created Appointment object.
  * @throws Error if validation fails or if there's an issue creating the appointment.
  */
 export const bookAppointment = async (
   bookingRequest: BookAppointmentRequest,
-  userId: string
+  userId: string,
+  dbClient: SupabaseClient
 ): Promise<Appointment> => {
   logger.info(`[bookAppointment] Attempting to book appointment for user ${userId}`, bookingRequest);
 
   const { clinicId, serviceId, providerId, startTime, endTime, notes } = bookingRequest;
 
   // 1. Validate Clinic
-  const { data: clinicData, error: clinicError } = await supabase
+  const { data: clinicData, error: clinicError } = await dbClient
     .from('clinics')
     .select('id, is_active')
     .eq('id', clinicId)
@@ -45,7 +48,7 @@ export const bookAppointment = async (
   }
 
   // 2. Validate Service
-  const { data: serviceData, error: serviceError } = await supabase
+  const { data: serviceData, error: serviceError } = await dbClient
     .from('services')
     .select('id, is_active, name') // name for logging
     .eq('id', serviceId)
@@ -61,7 +64,7 @@ export const bookAppointment = async (
   }
 
   // 3. Validate Clinic offers the Service
-  const { data: clinicServiceData, error: clinicServiceError } = await supabase
+  const { data: clinicServiceData, error: clinicServiceError } = await dbClient
     .from('clinic_services')
     .select('clinic_id, service_id, is_offered')
     .eq('clinic_id', clinicId)
@@ -79,7 +82,7 @@ export const bookAppointment = async (
 
   // 4. Validate Provider (if provided) - Basic existence check for MVP
   if (providerId) {
-    const { data: providerData, error: providerError } = await supabase
+    const { data: providerData, error: providerError } = await dbClient
       .from('providers') // Assuming a 'providers' table exists
       .select('id, is_active') // Assuming providers have an is_active status
       .eq('id', providerId)
@@ -125,7 +128,7 @@ export const bookAppointment = async (
   // Log the data just before inserting
   logger.info(`[bookAppointment] Attempting insert with userId: ${userId} for appointment data:`, newAppointmentData);
 
-  const { data: createdAppointment, error: creationError } = await supabase
+  const { data: createdAppointment, error: creationError } = await dbClient
     .from('appointments')
     .insert(newAppointmentData)
     .select()
@@ -174,11 +177,12 @@ export const cancelAppointment = async (
   cancelledBy: 'user' | 'clinic',
   cancellationReason: string,
   userId: string,
-  userRoles: string[] = [] // Assuming roles are passed for clinic-side cancellation auth
+  userRoles: string[] = [], // Assuming roles are passed for clinic-side cancellation auth
+  dbClient: SupabaseClient
 ): Promise<Appointment> => {
   logger.info(`[cancelAppointment] Attempting to cancel appointment ${appointmentId} by ${cancelledBy} (requester: ${userId})`, { reason: cancellationReason });
 
-  const { data: appointment, error: fetchError } = await supabase
+  const { data: appointment, error: fetchError } = await dbClient
     .from('appointments')
     .select('*')
     .eq('id', appointmentId)
@@ -214,7 +218,7 @@ export const cancelAppointment = async (
       logger.info(`[cancelAppointment] User ${userId} is an admin, authorizing clinic-side cancellation for appointment ${appointmentId}.`);
     } else if (userRoles.includes('provider')) {
       logger.info(`[cancelAppointment] User ${userId} has 'provider' role. Checking clinic association for appointment ${appointmentId} at clinic ${appointment.clinic_id}.`);
-      const { data: providerData, error: providerError } = await supabase
+      const { data: providerData, error: providerError } = await dbClient
         .from('providers')
         .select('id')
         .eq('user_id', userId)
@@ -226,7 +230,7 @@ export const cancelAppointment = async (
       }
 
       if (providerData) {
-        const { data: facilityLink, error: facilityLinkError } = await supabase
+        const { data: facilityLink, error: facilityLinkError } = await dbClient
           .from('provider_facilities')
           .select('facility_id')
           .eq('provider_id', providerData.id)
@@ -283,7 +287,7 @@ export const cancelAppointment = async (
     updated_at: new Date().toISOString(), // Explicitly set updated_at
   };
 
-  const { data: updatedAppointment, error: updateError } = await supabase
+  const { data: updatedAppointment, error: updateError } = await dbClient
     .from('appointments')
     .update(updateData)
     .eq('id', appointmentId)
@@ -308,13 +312,14 @@ export const cancelAppointment = async (
  * @throws Error if there's an issue querying the database.
  */
 export const getUserFutureAppointments = async (
-  userId: string
+  userId: string,
+  dbClient: SupabaseClient
 ): Promise<UserAppointmentDetails[]> => {
   logger.info(`[getUserFutureAppointments] Attempting to fetch future appointments for user ${userId}`);
 
   const now = new Date().toISOString();
 
-  const query = supabase
+  const query = dbClient
     .from('appointments')
     .select(`
       id,
@@ -387,13 +392,14 @@ export const getUserFutureAppointments = async (
  * @throws Error if there's an issue querying the database.
  */
 export const getUserPastAppointments = async (
-  userId: string
+  userId: string,
+  dbClient: SupabaseClient
 ): Promise<UserAppointmentDetails[]> => {
   logger.info(`[getUserPastAppointments] Attempting to fetch past appointments for user ${userId}`);
 
   const now = new Date().toISOString();
 
-  const query = supabase
+  const query = dbClient
     .from('appointments')
     .select(`
       id,
