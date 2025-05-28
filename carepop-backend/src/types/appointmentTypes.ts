@@ -33,7 +33,7 @@ export interface Appointment {
   clinic_id: string; // UUID, FK to clinics
   service_id: string; // UUID, FK to services
   provider_id: string | null; // UUID, FK to providers (nullable)
-  appointment_time: string; // ISO date string
+  start_time: string; // Changed from appointment_time to match assumed DB column
   status: AppointmentStatus;
   notes: string | null; // Potentially encrypted
   cancellation_reason: string | null;
@@ -103,7 +103,7 @@ export const UserAppointmentDetailsSchema = z.object({
   // Core Appointment fields (consider if all are needed or a subset)
   id: z.string().uuid(), 
   user_id: z.string().uuid(),
-  appointment_time: z.string().datetime(),
+  start_time: z.string().datetime(), // Changed from appointment_time
   status: AppointmentStatusSchema,
   notes: z.string().nullable(), // Assuming notes might be decrypted for the user
   cancellation_reason: z.string().nullable(),
