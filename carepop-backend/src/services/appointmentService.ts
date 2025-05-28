@@ -326,7 +326,7 @@ export const getUserFutureAppointments = async (
     .select(`
       id,
       user_id,
-      appointment_time,
+      start_time,
       status,
       notes,
       cancellation_reason,
@@ -337,9 +337,9 @@ export const getUserFutureAppointments = async (
       provider:providers(id, full_name, specialty)
     `)
     .eq('user_id', userId)
-    .gt('appointment_time', now)
+    .gt('start_time', now)
     .in('status', [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED])
-    .order('appointment_time', { ascending: true });
+    .order('start_time', { ascending: true });
 
   const { data: appointmentsData, error: fetchError } = await query;
 
@@ -369,7 +369,7 @@ export const getUserFutureAppointments = async (
       return {
         id: appt.id,
         user_id: appt.user_id,
-        appointment_time: appt.appointment_time,
+        start_time: appt.start_time,
         status: appt.status as AppointmentStatus,
         notes: decryptedNotes,
         cancellation_reason: appt.cancellation_reason,
@@ -405,7 +405,7 @@ export const getUserPastAppointments = async (
     .select(`
       id,
       user_id,
-      appointment_time,
+      start_time,
       status,
       notes,
       cancellation_reason,
@@ -416,14 +416,14 @@ export const getUserPastAppointments = async (
       provider:providers(id, full_name, specialty)
     `)
     .eq('user_id', userId)
-    .lte('appointment_time', now) // Less than or equal to now for past appointments
+    .lte('start_time', now)
     .in('status', [
       AppointmentStatus.COMPLETED,
       AppointmentStatus.CANCELLED_USER,
       AppointmentStatus.CANCELLED_CLINIC,
       AppointmentStatus.NO_SHOW
     ])
-    .order('appointment_time', { ascending: false }); // Descending for past appointments
+    .order('start_time', { ascending: false });
 
   const { data: appointmentsData, error: fetchError } = await query;
 
@@ -452,7 +452,7 @@ export const getUserPastAppointments = async (
       return {
         id: appt.id,
         user_id: appt.user_id,
-        appointment_time: appt.appointment_time,
+        start_time: appt.start_time,
         status: appt.status as AppointmentStatus,
         notes: decryptedNotes,
         cancellation_reason: appt.cancellation_reason,
