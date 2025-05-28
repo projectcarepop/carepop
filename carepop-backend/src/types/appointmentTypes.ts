@@ -15,10 +15,10 @@ export type BookAppointmentRequest = z.infer<typeof BookAppointmentRequestSchema
 
 // Enum for appointment status (align with DB schema if it uses an enum)
 export enum AppointmentStatus {
-  PENDING = 'pending',
+  PENDING = 'pending_confirmation',
   CONFIRMED = 'confirmed',
-  CANCELLED_USER = 'cancelled_user',
-  CANCELLED_CLINIC = 'cancelled_clinic',
+  CANCELLED_USER = 'cancelled_by_user',
+  CANCELLED_CLINIC = 'cancelled_by_clinic',
   COMPLETED = 'completed',
   NO_SHOW = 'no_show'
 }
