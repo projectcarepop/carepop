@@ -29,7 +29,7 @@ export const bookAppointment = async (
 ): Promise<Appointment> => {
   logger.info(`[bookAppointment] Attempting to book appointment for user ${userId}`, bookingRequest);
 
-  const { clinicId, serviceId, providerId, startTime, endTime, notes } = bookingRequest;
+  const { clinicId, serviceId, providerId, startTime, notes } = bookingRequest;
 
   // 1. Validate Clinic
   const { data: clinicData, error: clinicError } = await dbClient
@@ -47,10 +47,10 @@ export const bookAppointment = async (
     throw new Error('Selected clinic is not active.');
   }
 
-  // 2. Validate Service - Fetch typical_duration_minutes as well
+  // 2. Validate Service - Fetch typical_duration_minutes
   const { data: serviceData, error: serviceError } = await dbClient
     .from('services')
-    .select('id, is_active, name, typical_duration_minutes') // Added typical_duration_minutes
+    .select('id, is_active, name, typical_duration_minutes')
     .eq('id', serviceId)
     .single();
   
@@ -62,10 +62,14 @@ export const bookAppointment = async (
     logger.warn(`[bookAppointment] Service ${serviceData.name} (ID: ${serviceId}) is not active.`);
     throw new Error('Selected service is not active.');
   }
-  if (serviceData.typical_duration_minutes == null) { // Check if duration is null
-    logger.warn(`[bookAppointment] Service ${serviceData.name} (ID: ${serviceId}) has no typical_duration_minutes defined.`);
-    throw new Error('Selected service does not have a duration defined.');
+  if (serviceData.typical_duration_minutes == null || typeof serviceData.typical_duration_minutes !== 'number') {
+    logger.warn(`[bookAppointment] Service ${serviceData.name} (ID: ${serviceId}) has invalid or missing typical_duration_minutes.`);
+    throw new Error('Selected service has an invalid or undefined duration.');
   }
+
+  // Calculate endTime on the server
+  const startTimeObj = new Date(startTime); // startTime from request is expected to be ISO string
+  const calculatedEndTime = new Date(startTimeObj.getTime() + serviceData.typical_duration_minutes * 60000);
 
   // 3. Validate Clinic offers the Service
   const { data: clinicServiceData, error: clinicServiceError } = await dbClient
@@ -115,15 +119,15 @@ export const bookAppointment = async (
     }
   }
 
-  // 6. Create Appointment record - Add duration_minutes
+  // 6. Create Appointment record - Use server-calculated endTime
   const newAppointmentData = {
     user_id: userId,
     clinic_id: clinicId,
     service_id: serviceId,
     provider_id: providerId || null,
-    appointment_datetime: startTime,
-    end_time: endTime,
-    duration_minutes: serviceData.typical_duration_minutes, // Added duration_minutes
+    appointment_datetime: startTime, // This is client provided startTime
+    end_time: calculatedEndTime.toISOString(), // Use server-calculated endTime
+    duration_minutes: serviceData.typical_duration_minutes,
     status: AppointmentStatus.PENDING,
     notes: encryptedNotes,
     // created_at and updated_at are typically handled by DB defaults
