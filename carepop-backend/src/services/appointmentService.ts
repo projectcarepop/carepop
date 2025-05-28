@@ -26,7 +26,7 @@ export const bookAppointment = async (
 ): Promise<Appointment> => {
   logger.info(`[bookAppointment] Attempting to book appointment for user ${userId}`, bookingRequest);
 
-  const { clinicId, serviceId, providerId, appointment_time, notes } = bookingRequest;
+  const { clinicId, serviceId, providerId, startTime, endTime, notes } = bookingRequest;
 
   // 1. Validate Clinic
   const { data: clinicData, error: clinicError } = await supabase
@@ -125,7 +125,8 @@ export const bookAppointment = async (
     clinic_id: clinicId,
     service_id: serviceId,
     provider_id: providerId || null,
-    appointment_time: appointment_time,
+    start_time: startTime,
+    end_time: endTime,
     status: AppointmentStatus.PENDING,
     notes: encryptedNotes,
     // created_at and updated_at will be set by DB
