@@ -100,16 +100,6 @@ export const bookAppointment = async (
   let encryptedNotes: string | null = null;
   if (notes) {
     try {
-      // EncryptionService is a class, so we need to instantiate it to use its methods.
-      // Or, if its methods are static, we call them directly on the class.
-      // Based on the provided encryptionService.ts, it's a class that should be instantiated.
-      // However, typical service patterns might offer a singleton instance or static methods.
-      // For now, assuming it needs instantiation or that methods are static.
-      // Let's assume the methods encrypt/decrypt are static for simplicity as per memorylog entries for SEC-E-2.
-      // If they are instance methods, an instance would need to be created/retrieved.
-      // Re-checking systemPatterns.md for SEC-E-2 for usage patterns if available.
-      // systemPatterns.md implies instance usage: `encryptionService.encrypt(data)`
-      // So, we need an instance.
       const encryptionService = new EncryptionService();
       encryptedNotes = await encryptionService.encrypt(notes);
     } catch (encError) {
@@ -131,6 +121,9 @@ export const bookAppointment = async (
     notes: encryptedNotes,
     // created_at and updated_at will be set by DB
   };
+
+  // Log the data just before inserting
+  logger.info(`[bookAppointment] Attempting insert with userId: ${userId} for appointment data:`, newAppointmentData);
 
   const { data: createdAppointment, error: creationError } = await supabase
     .from('appointments')
