@@ -41,16 +41,46 @@ const DateTimeSelectionStep: React.FC = () => {
       }).toString();
 
       // API Call: GET /api/availability/provider/:providerId/slots (Backend Integration Guide - Section 3.1)
-      fetch(`/api/v1/availability/provider/${selectedProvider.id}/slots?${queryParams}`)
+      fetch(`/api/v1/availability/provider/${selectedProvider.id}/slots?${queryParams}&_cb=${new Date().getTime()}`)
         .then(res => {
           if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
           return res.json();
         })
         .then(data => {
-          if (data.success) {
-            dispatch({ type: 'SET_AVAILABILITY_SUCCESS', payload: data.data as AvailabilitySlot[] });
+          // Assuming the actual API response structure is { success: boolean, data: YourGroupedArrayType[] } or similar
+          // If 'data' itself is the array of grouped day slots, then use data.reduce directly.
+          // For this example, let's assume the grouped array is in data.data as per previous discussions.
+          if (data && typeof data.success === 'boolean') { // Check if data is the wrapper object
+            if (data.success && Array.isArray(data.data)) {
+              const flatSlots: AvailabilitySlot[] = data.data.reduce((acc: AvailabilitySlot[], dayGroup: { date: string, slots: Array<{startTime: string, endTime: string, slotId?: string}> }) => {
+                dayGroup.slots.forEach(slot => {
+                  acc.push({
+                    ...slot,
+                    slotId: slot.slotId || slot.startTime // Ensure slotId is present
+                  });
+                });
+                return acc;
+              }, []);
+              dispatch({ type: 'SET_AVAILABILITY_SUCCESS', payload: flatSlots });
+            } else if (!data.success) {
+              dispatch({ type: 'SET_AVAILABILITY_ERROR', payload: data.message || 'Failed to fetch availability (API error).' });
+            }
+          } else if (Array.isArray(data)) { 
+            // Fallback if 'data' is the array of grouped day slots directly (no {success: ..., data: ...} wrapper)
+             const flatSlots: AvailabilitySlot[] = data.reduce((acc: AvailabilitySlot[], dayGroup: { date: string, slots: Array<{startTime: string, endTime: string, slotId?: string}> }) => {
+                dayGroup.slots.forEach(slot => {
+                  acc.push({
+                    ...slot,
+                    slotId: slot.slotId || slot.startTime
+                  });
+                });
+                return acc;
+              }, []);
+              dispatch({ type: 'SET_AVAILABILITY_SUCCESS', payload: flatSlots });
           } else {
-            dispatch({ type: 'SET_AVAILABILITY_ERROR', payload: data.message || 'Failed to fetch availability.' });
+            // Unexpected response structure
+            console.error("Unexpected API response structure:", data);
+            dispatch({ type: 'SET_AVAILABILITY_ERROR', payload: 'Received malformed data from server.' });
           }
         })
         .catch((error) => {

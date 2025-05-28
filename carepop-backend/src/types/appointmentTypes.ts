@@ -5,7 +5,8 @@ export const BookAppointmentRequestSchema = z.object({
   clinicId: z.string().uuid({ message: "Invalid Clinic ID format" }),
   serviceId: z.string().uuid({ message: "Invalid Service ID format" }),
   providerId: z.string().uuid({ message: "Invalid Provider ID format" }).optional(),
-  appointment_time: z.string().datetime({ message: "Invalid appointment time format, expected ISO 8601" }), // ISO 8601 format
+  startTime: z.string().datetime({ message: "Invalid start time format, expected ISO 8601" }), // Changed from appointment_time
+  endTime: z.string().datetime({ message: "Invalid end time format, expected ISO 8601" }),   // Added endTime
   notes: z.string().max(1000, { message: "Notes must be 1000 characters or less" }).optional(),
 });
 
