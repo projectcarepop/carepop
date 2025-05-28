@@ -34,11 +34,10 @@ const ProviderSelectionStep: React.FC = () => {
       // API Call: GET /api/v1/providers (Backend Integration Guide - Section 2.1)
       // Query Parameters: clinicId, serviceId
       const queryParams = new URLSearchParams({
-        clinicId: selectedClinic.id,
         serviceId: selectedService.id,
       }).toString();
       
-      fetch(`/api/v1/providers?${queryParams}`)
+      fetch(`/api/v1/clinics/${selectedClinic.id}/providers?${queryParams}`)
         .then(res => {
           if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
           return res.json();
