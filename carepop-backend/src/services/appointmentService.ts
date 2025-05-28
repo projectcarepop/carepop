@@ -112,20 +112,18 @@ export const bookAppointment = async (
   }
 
   // 6. Create Appointment record
-  // For MVP, status is 'pending'. No complex availability check.
   const newAppointmentData = {
     user_id: userId,
     clinic_id: clinicId,
     service_id: serviceId,
     provider_id: providerId || null,
-    start_time: startTime,
+    appointment_datetime: startTime,
     end_time: endTime,
     status: AppointmentStatus.PENDING,
     notes: encryptedNotes,
-    // created_at and updated_at will be set by DB
+    // created_at and updated_at are typically handled by DB defaults
   };
 
-  // Log the data just before inserting
   logger.info(`[bookAppointment] Attempting insert with userId: ${userId} for appointment data:`, newAppointmentData);
 
   const { data: createdAppointment, error: creationError } = await dbClient
@@ -136,6 +134,10 @@ export const bookAppointment = async (
 
   if (creationError || !createdAppointment) {
     logger.error('[bookAppointment] Failed to create appointment in DB:', creationError);
+    // Check if the error message indicates a problem with 'end_time' as well
+    if (creationError?.message.includes('end_time')) {
+        logger.error('[bookAppointment] Potential issue with end_time column. Check schema.');
+    }
     throw new Error(`Failed to book appointment: ${creationError?.message || 'Unknown error'}`);
   }
 
