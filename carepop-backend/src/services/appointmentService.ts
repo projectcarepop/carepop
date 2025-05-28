@@ -125,7 +125,7 @@ export const bookAppointment = async (
     clinic_id: clinicId,
     service_id: serviceId,
     provider_id: providerId || null,
-    start_time: startTime,
+    appointment_time: startTime,
     end_time: endTime,
     status: AppointmentStatus.PENDING,
     notes: encryptedNotes,
