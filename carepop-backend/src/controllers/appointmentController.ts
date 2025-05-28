@@ -56,12 +56,12 @@ export const createAppointmentHandler = async (req: AuthenticatedRequest, res: R
     );
 
     logger.info(`[createAppointmentHandler] Appointment ${newAppointment.id} created successfully for user ${userId}.`);
-    res.status(201).json(newAppointment);
+    res.status(201).json({ success: true, data: newAppointment, message: 'Appointment created successfully.' });
 
   } catch (error) {
     if (error instanceof z.ZodError) {
       logger.warn('[createAppointmentHandler] Validation error:', error.issues);
-      res.status(400).json({ message: 'Invalid request body', details: error.issues });
+      res.status(400).json({ success: false, message: 'Invalid request body', details: error.issues });
       return; // Explicitly return void
     }
     if (error instanceof Error) {
@@ -69,12 +69,14 @@ export const createAppointmentHandler = async (req: AuthenticatedRequest, res: R
         // These are treated as client errors (e.g., bad request based on business logic)
         // Log them as info/warn as they are expected application flow errors for invalid inputs.
         logger.warn(`[createAppointmentHandler] Error booking appointment for user ${req.user?.id || 'unknown'}: ${error.message}`);
-        res.status(400).json({ message: error.message }); 
+        res.status(400).json({ success: false, message: error.message }); 
         return; // Explicitly return void
     }
     // Fallback for unexpected errors
     logger.error('[createAppointmentHandler] Unexpected error:', error);
-    next(error); // Passes control, implicitly void for this path's promise
+    // For generic server errors, send a generic message
+    res.status(500).json({ success: false, message: 'An unexpected server error occurred.' });
+    // next(error); // Avoid passing to generic error handler if we send a response
   }
 };
 
@@ -86,7 +88,7 @@ export const cancelAppointmentHandler = async (req: AuthenticatedRequest, res: R
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ') || !req.user || !req.user.id) {
       logger.warn('[cancelAppointmentHandler] User not authenticated, user ID missing, or token missing.');
-      res.status(401).json({ message: 'Authentication required.' });
+      res.status(401).json({ success: false, message: 'Authentication required.' });
       return;
     }
     const userId = req.user.id;
@@ -115,23 +117,24 @@ export const cancelAppointmentHandler = async (req: AuthenticatedRequest, res: R
     );
 
     logger.info(`[cancelAppointmentHandler] Appointment ${updatedAppointment.id} cancelled successfully by user ${userId}.`);
-    res.status(200).json(updatedAppointment);
+    res.status(200).json({ success: true, data: updatedAppointment, message: 'Appointment cancelled successfully.' });
 
   } catch (error) {
     if (error instanceof z.ZodError) {
       logger.warn('[cancelAppointmentHandler] Validation error:', error.issues);
-      res.status(400).json({ message: 'Invalid request parameters or body', details: error.issues });
+      res.status(400).json({ success: false, message: 'Invalid request parameters or body', details: error.issues });
       return;
     }
     if (error instanceof Error) {
       // Errors from appointmentService (e.g., appointment not found, not authorized)
       logger.warn(`[cancelAppointmentHandler] Error cancelling appointment for user ${req.user?.id || 'unknown'}: ${error.message}`);
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ success: false, message: error.message });
       return;
     }
     // Fallback for unexpected errors
     logger.error('[cancelAppointmentHandler] Unexpected error:', error);
-    next(error);
+    res.status(500).json({ success: false, message: 'An unexpected server error occurred.' });
+    // next(error);
   }
 };
 
@@ -143,7 +146,7 @@ export const getUserFutureAppointmentsHandler = async (req: AuthenticatedRequest
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ') || !req.user || !req.user.id) {
       logger.warn('[getUserFutureAppointmentsHandler] User not authenticated, user ID missing, or token missing.');
-      res.status(401).json({ message: 'Authentication required.' });
+      res.status(401).json({ success: false, message: 'Authentication required.' });
       return;
     }
     const userId = req.user.id;
@@ -161,7 +164,7 @@ export const getUserFutureAppointmentsHandler = async (req: AuthenticatedRequest
     const futureAppointments: UserAppointmentDetails[] = await appointmentService.getUserFutureAppointments(userId, userSupabaseClient);
 
     logger.info(`[getUserFutureAppointmentsHandler] Successfully fetched ${futureAppointments.length} future appointments for user ${userId}.`);
-    res.status(200).json(futureAppointments);
+    res.status(200).json({ success: true, data: futureAppointments, message: 'Future appointments fetched successfully.' });
 
   } catch (error) {
     // Errors from appointmentService are already logged there.
@@ -170,12 +173,13 @@ export const getUserFutureAppointmentsHandler = async (req: AuthenticatedRequest
         logger.warn(`[getUserFutureAppointmentsHandler] Error fetching future appointments for user ${req.user?.id || 'unknown'}: ${error.message}`);
         // Typically, service layer errors like "Failed to fetch..." should translate to a 500 for the client,
         // unless it's a specifically handled client-side error (which isn't the case here).
-        res.status(500).json({ message: 'Failed to retrieve future appointments.' }); 
+        res.status(500).json({ success: false, message: 'Failed to retrieve future appointments.' }); 
         return;
     }
     // Fallback for unexpected non-Error objects thrown
     logger.error('[getUserFutureAppointmentsHandler] Unexpected error object:', error);
-    next(error); // Passes control to the generic error handler
+    res.status(500).json({ success: false, message: 'An unexpected server error occurred while fetching future appointments.' });
+    // next(error); // Passes control to the generic error handler
   }
 };
 
@@ -187,7 +191,7 @@ export const getUserPastAppointmentsHandler = async (req: AuthenticatedRequest, 
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ') || !req.user || !req.user.id) {
       logger.warn('[getUserPastAppointmentsHandler] User not authenticated, user ID missing, or token missing.');
-      res.status(401).json({ message: 'Authentication required.' });
+      res.status(401).json({ success: false, message: 'Authentication required.' });
       return;
     }
     const userId = req.user.id;
@@ -205,15 +209,16 @@ export const getUserPastAppointmentsHandler = async (req: AuthenticatedRequest, 
     const pastAppointments: UserAppointmentDetails[] = await appointmentService.getUserPastAppointments(userId, userSupabaseClient);
 
     logger.info(`[getUserPastAppointmentsHandler] Successfully fetched ${pastAppointments.length} past appointments for user ${userId}.`);
-    res.status(200).json(pastAppointments);
+    res.status(200).json({ success: true, data: pastAppointments, message: 'Past appointments fetched successfully.' });
 
   } catch (error) {
     if (error instanceof Error) {
         logger.warn(`[getUserPastAppointmentsHandler] Error fetching past appointments for user ${req.user?.id || 'unknown'}: ${error.message}`);
-        res.status(500).json({ message: 'Failed to retrieve past appointments.' }); 
+        res.status(500).json({ success: false, message: 'Failed to retrieve past appointments.' });
         return;
     }
     logger.error('[getUserPastAppointmentsHandler] Unexpected error object:', error);
-    next(error);
+    res.status(500).json({ success: false, message: 'An unexpected server error occurred while fetching past appointments.' });
+    // next(error);
   }
 }; 
