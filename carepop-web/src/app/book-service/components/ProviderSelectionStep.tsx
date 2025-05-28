@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, UserCircle } from 'lucide-react';
 import Image from 'next/image';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 const ProviderSelectionStep: React.FC = () => {
   const { state, dispatch } = useBookingContext();
@@ -37,22 +38,42 @@ const ProviderSelectionStep: React.FC = () => {
         serviceId: selectedService.id,
       }).toString();
       
-      fetch(`/api/v1/clinics/${selectedClinic.id}/providers?${queryParams}`)
-        .then(res => {
-          if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-          return res.json();
-        })
-        .then(data => {
-          if (data.success) {
-            dispatch({ type: 'SET_PROVIDERS_SUCCESS', payload: data.data as Provider[] });
-          } else {
-            dispatch({ type: 'SET_PROVIDERS_ERROR', payload: data.message || 'Failed to fetch providers.' });
+      // Fetch with Auth
+      const supabase = createSupabaseBrowserClient();
+      supabase.auth.getSession().then(({ data: sessionData, error: sessionError }) => {
+        if (sessionError || !sessionData.session) {
+          console.error("Error getting session or no session for provider fetch:", sessionError);
+          dispatch({ type: 'SET_PROVIDERS_ERROR', payload: 'Your session is invalid. Please log in again.' });
+          dispatch({ type: 'SET_PROVIDERS_LOADING', payload: false });
+          return;
+        }
+        const token = sessionData.session.access_token;
+
+        fetch(`/api/v1/clinics/${selectedClinic.id}/providers?${queryParams}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
           }
         })
-        .catch((error) => {
-          console.error("Error fetching providers:", error);
-          dispatch({ type: 'SET_PROVIDERS_ERROR', payload: error.message || 'An error occurred while fetching providers.' });
-        });
+          .then(res => {
+            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+            return res.json();
+          })
+          .then(data => {
+            if (data.success) {
+              dispatch({ type: 'SET_PROVIDERS_SUCCESS', payload: data.data as Provider[] });
+            } else {
+              dispatch({ type: 'SET_PROVIDERS_ERROR', payload: data.message || 'Failed to fetch providers.' });
+            }
+          })
+          .catch((error) => {
+            console.error("Error fetching providers:", error);
+            dispatch({ type: 'SET_PROVIDERS_ERROR', payload: error.message || 'An error occurred while fetching providers.' });
+          })
+          .finally(() => {
+            // Ensure loading is set to false in context if not handled by success/error dispatches specifically for this scenario
+            // However, current SET_PROVIDERS_SUCCESS/ERROR actions already set loading to false.
+          });
+      });
     } else {
         // Clear providers if clinic or service is not selected
         dispatch({ type: 'SET_PROVIDERS_SUCCESS', payload: [] });

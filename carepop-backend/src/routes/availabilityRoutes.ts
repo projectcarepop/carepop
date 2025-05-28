@@ -78,6 +78,6 @@ const router: Router = express.Router();
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/providers/:providerId/availability', getProviderAvailabilityHandler as express.RequestHandler);
+router.get('/provider/:providerId/slots', getProviderAvailabilityHandler as express.RequestHandler);
 
 export default router; 
