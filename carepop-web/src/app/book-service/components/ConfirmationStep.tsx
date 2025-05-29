@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Info, CheckSquare } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
@@ -88,19 +88,20 @@ const ConfirmationStep: React.FC = () => {
 
   if (!selectedClinic || !selectedService || !selectedProvider || !selectedDate || !selectedTimeSlot) {
     return (
-        <Card className="w-full">
+        <Card className="w-full shadow-xl">
             <CardHeader>
-                <CardTitle>Step 4: Confirm Booking</CardTitle>
+                <CardTitle className="text-2xl font-bold">Step 4: Confirm Booking</CardTitle>
             </CardHeader>
             <CardContent>
-                <Alert variant="default">
-                    <AlertTitle>Missing Information</AlertTitle>
+                <Alert variant="default" className="border-primary/50">
+                    <Info className="h-5 w-5 mr-2 text-primary"/>
+                    <AlertTitle className="font-semibold text-primary">Missing Information</AlertTitle>
                     <AlertDescription>
                         Please complete all previous steps before confirming your booking.
                     </AlertDescription>
                 </Alert>
             </CardContent>
-            <CardFooter className="flex justify-start">
+            <CardFooter className="flex justify-start border-t pt-6 mt-6">
                 <Button variant="outline" onClick={goToPreviousStep}>Back to Date & Time</Button>
             </CardFooter>
         </Card>
@@ -108,40 +109,63 @@ const ConfirmationStep: React.FC = () => {
   }
 
   return (
-    <Card className="w-full">
+    <Card className="w-full shadow-xl">
       <CardHeader>
-        <CardTitle>Step 4: Confirm Your Booking</CardTitle>
-        <CardDescription>
+        <CardTitle className="text-2xl font-bold flex items-center">
+            <CheckSquare className="mr-3 h-8 w-8 text-primary"/> Step 4: Confirm Your Booking
+        </CardTitle>
+        <CardDescription className="text-md pl-11">
           Please review your appointment details below and confirm.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="space-y-3 rounded-md border p-4 shadow-sm">
-          <h4 className="text-lg font-medium text-primary">Appointment Summary</h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <div><strong>Clinic:</strong> {selectedClinic.name}</div>
-            <div><strong>Service:</strong> {selectedService.name}</div>
-            <div><strong>Provider:</strong> {selectedProvider.fullName}</div>
-            <div><strong>Date:</strong> {format(selectedDate, 'PPP')}</div>
-            <div><strong>Time:</strong> {format(parseISO(selectedTimeSlot.startTime), 'p')} - {format(parseISO(selectedTimeSlot.endTime), 'p')}</div>
-            {selectedService.typicalDurationMinutes && <div><strong>Duration:</strong> {selectedService.typicalDurationMinutes} minutes</div>}
+      <CardContent className="space-y-6 pt-2">
+        <div className="space-y-3 rounded-lg border-2 border-primary/30 p-5 shadow-md bg-gradient-to-br from-primary/5 via-background to-background">
+          <h4 className="text-xl font-semibold text-primary mb-3">Appointment Summary</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+            <div className="flex flex-col space-y-0.5">
+              <span className="text-xs text-muted-foreground">Clinic:</span>
+              <strong className="text-md">{selectedClinic.name}</strong>
+            </div>
+            <div className="flex flex-col space-y-0.5">
+              <span className="text-xs text-muted-foreground">Service:</span>
+              <strong className="text-md">{selectedService.name}</strong>
+            </div>
+            <div className="flex flex-col space-y-0.5">
+              <span className="text-xs text-muted-foreground">Provider:</span>
+              <strong className="text-md">{selectedProvider.fullName}</strong>
+            </div>
+            <div className="flex flex-col space-y-0.5">
+              <span className="text-xs text-muted-foreground">Date:</span>
+              <strong className="text-md">{format(selectedDate, 'PPP')}</strong>
+            </div>
+            <div className="flex flex-col space-y-0.5 md:col-span-2">
+              <span className="text-xs text-muted-foreground">Time:</span>
+              <strong className="text-md">{format(parseISO(selectedTimeSlot.startTime), 'p')} - {format(parseISO(selectedTimeSlot.endTime), 'p')}</strong>
+            </div>
+            {selectedService.typicalDurationMinutes && 
+              <div className="flex flex-col space-y-0.5">
+                <span className="text-xs text-muted-foreground">Duration:</span>
+                <strong className="text-md">{selectedService.typicalDurationMinutes} minutes</strong>
+              </div>
+            }
           </div>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 pt-4">
           <label htmlFor="booking-notes" className="block text-sm font-medium text-gray-700">Additional Notes (Optional)</label>
           <Textarea 
             id="booking-notes"
             placeholder="Any specific requests or information for the provider..."
             value={bookingNotes}
             onChange={handleNotesChange}
-            className="min-h-[100px]"
+            className="min-h-[100px] focus:ring-primary focus:border-primary rounded-md shadow-sm"
             disabled={isLoading.bookingSubmission}
           />
         </div>
 
         {errors.bookingSubmission && (
-            <Alert variant="destructive">
+            <Alert variant="destructive" className="mt-4">
+                <Info className="h-5 w-5 mr-2"/>
                 <AlertTitle>Booking Failed</AlertTitle>
                 <AlertDescription>{errors.bookingSubmission}</AlertDescription>
             </Alert>

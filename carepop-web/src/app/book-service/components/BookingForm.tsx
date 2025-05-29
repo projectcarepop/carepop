@@ -36,6 +36,17 @@ interface BaseStepProps {
   setAppointmentNotes?: Dispatch<SetStateAction<string>>; // Add notes setter
 }
 
+// Define the shape of the data object passed from ClinicServiceSelectionStep
+interface ClinicServiceSelectionData {
+  clinicId: string;
+  serviceId: string;
+  clinicName: string;
+  serviceName: string;
+  price?: number | null;
+  duration?: string | null;
+  requiresProviderAssignment: boolean;
+}
+
 // Define specific props for each step component that might include callbacks
 // ClinicServiceSelectionStepProps is defined in its own file and includes its specific onNext
 
@@ -43,21 +54,25 @@ const steps = [
   {
     id: 'clinicServiceSelection',
     name: 'Select Clinic & Service',
+    description: 'Find your preferred clinic and the service you need.',
     component: ClinicServiceSelectionStep,
   },
   {
     id: 'providerSelection',
     name: 'Select Provider',
+    description: 'Choose an available healthcare provider or skip if not needed.',
     component: ProviderSelectionStep, // Add component here
   },
   {
     id: 'dateTimeSelection',
     name: 'Select Date & Time',
+    description: 'Pick a suitable date and time for your appointment.',
     component: DateTimeSelectionStep, // Add component here
   },
   {
     id: 'confirmation',
     name: 'Confirm Booking',
+    description: 'Review and confirm your appointment details.',
     component: ConfirmationStep, // Add component here
   },
 ];
@@ -140,7 +155,7 @@ export default function BookingForm() {
 
   const CurrentStepComponent = steps[currentStep].component;
 
-  const handleNext = (data?: any) => { // Allow data to be passed from steps
+  const handleNext = (data?: ClinicServiceSelectionData) => { // Use the specific interface
     setFormMessage(null); // Clear messages on step change
     if (steps[currentStep].id === 'clinicServiceSelection' && data) {
         // Data from ClinicServiceSelectionStep includes: 
@@ -244,7 +259,7 @@ export default function BookingForm() {
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let stepSpecificProps: any = { ...baseProps }; // Base props are passed to all steps
+  const stepSpecificProps: any = { ...baseProps }; // Base props are passed to all steps
 
   if (steps[currentStep].id === 'clinicServiceSelection') {
     stepSpecificProps.onNext = handleNext; 
@@ -290,7 +305,10 @@ export default function BookingForm() {
 
   return (
     <div>
-      <BookingProgressIndicator steps={steps.map(s => ({ id: s.id, name: s.name }))} currentStepIndex={currentStep} />
+      <BookingProgressIndicator 
+        steps={steps.map(s => ({ id: s.id, name: s.name, description: s.description }))} 
+        currentStepIndex={currentStep}
+      />
 
       {/* Form-level Messages */} 
       {formMessage && (

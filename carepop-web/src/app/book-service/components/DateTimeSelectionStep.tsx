@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Calendar } from "@/components/ui/calendar"; // Assuming Shadcn UI Calendar
-import { Loader2 } from 'lucide-react';
+import { Loader2, CalendarDays, Clock, Info } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, isSameDay, parseISO, getMonth, getYear } from 'date-fns';
+import { ScrollArea } from "@/components/ui/scroll-area"; // Added ScrollArea import
 
 const DateTimeSelectionStep: React.FC = () => {
   const { state, dispatch } = useBookingContext();
@@ -134,13 +135,14 @@ const DateTimeSelectionStep: React.FC = () => {
 
   if (!selectedProvider || !selectedClinic || !selectedService) {
     return (
-        <Card className="w-full">
+        <Card className="w-full shadow-xl">
             <CardHeader>
-                <CardTitle>Step 3: Select Date & Time</CardTitle>
+                <CardTitle className="text-2xl font-bold">Step 3: Select Date & Time</CardTitle>
             </CardHeader>
             <CardContent>
-                <Alert variant="default">
-                    <AlertTitle>Missing Information</AlertTitle>
+                <Alert variant="default" className="border-primary/50">
+                    <Info className="h-5 w-5 mr-2 text-primary"/>
+                    <AlertTitle className="font-semibold text-primary">Missing Information</AlertTitle>
                     <AlertDescription>
                         Please go back and select a clinic, service, and provider first.
                     </AlertDescription>
@@ -154,67 +156,98 @@ const DateTimeSelectionStep: React.FC = () => {
   }
 
   return (
-    <Card className="w-full">
+    <Card className="w-full shadow-xl">
       <CardHeader>
-        <CardTitle>Step 3: Select Date & Time</CardTitle>
-        <CardDescription>
+        <CardTitle className="text-2xl font-bold">Step 3: Select Date & Time</CardTitle>
+        <CardDescription className="text-md">
           Pick a date and time for your appointment with {selectedProvider.fullName} for {selectedService.name}.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Calendar View */}
-          <div className="flex flex-col items-center">
-            <h4 className="text-lg font-medium mb-2">Select a Date</h4>
-            <Calendar
-              mode="single"
-              selected={selectedDate || undefined}
-              onSelect={handleDateSelect}
-              month={currentMonth}
-              onMonthChange={setCurrentMonth} // Handles month navigation in calendar
-              disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() -1)) } // Disable past dates
-              className="rounded-md border shadow-sm p-3"
-              modifiers={modifiers}
-              modifiersClassNames={modifiersClassNames}
-              footer={
-                selectedDate && <p className="text-sm mt-2">You selected: {format(selectedDate, 'PPP')}.</p>
-              }
-            />
+      <CardContent className="flex flex-col"> 
+        {/* Calendar View - Simplified container, added border-b */}
+        <div className="flex flex-col items-center p-4 border-b border-border">
+          <h4 className="flex items-center text-lg font-semibold text-gray-800 mb-3">
+            <CalendarDays className="mr-2 h-6 w-6 text-primary" />
+            Select a Date
+          </h4>
+          <Calendar
+            mode="single"
+            selected={selectedDate || undefined}
+            onSelect={handleDateSelect}
+            month={currentMonth}
+            onMonthChange={setCurrentMonth}
+            disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() -1)) }
+            className="w-full max-w-md" 
+            modifiers={modifiers}
+            modifiersClassNames={modifiersClassNames}
+          />
+        </div>
+
+        {/* Time Slots View - Simplified container */}
+        <div className="flex flex-col p-4">
+          <div className="flex items-center text-lg font-semibold text-gray-800 mb-2">
+            <Clock className="mr-2 h-6 w-6 text-primary" />
+            Available Times 
+            {selectedDate && <span className="text-primary ml-1.5">{format(selectedDate, 'EEEE, MMM d')}</span>}
           </div>
+          
+          <div className="relative flex-1 min-h-[250px]"> {/* Ensured min-height for scroll area content */}
+            <ScrollArea className="absolute inset-0 pr-2"> {/* Added pr-2 to prevent scrollbar overlap */}
+              {isLoading.availabilitySlots && (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" /> 
+                </div>
+              )}
+              {errors.availabilitySlots && (
+                <div className="flex items-center justify-center h-full">
+                  <Alert variant="destructive" className="m-4">
+                    <Info className="h-5 w-5 mr-2"/>
+                    <AlertTitle>Error Loading Slots</AlertTitle>
+                    <AlertDescription>{errors.availabilitySlots}</AlertDescription>
+                  </Alert>
+                </div>
+              )}
+              
+              {!isLoading.availabilitySlots && !errors.availabilitySlots && !selectedDate && (
+                <div className="flex items-center justify-center h-full">
+                  <Alert variant="default" className="border-blue-400/50 m-4">
+                    <Info className="h-5 w-5 mr-2 text-blue-500"/>
+                    <AlertTitle className="font-semibold text-blue-600">Select a Date</AlertTitle>
+                    <AlertDescription>
+                      Please pick a date from the calendar to see available time slots.
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              )}
 
-          {/* Time Slots View */}
-          <div className="space-y-4">
-            <h4 className="text-lg font-medium">Available Times on {selectedDate ? format(selectedDate, 'PPP') : 'selected date'}</h4>
-            {isLoading.availabilitySlots && <div className="flex items-center space-x-2"><Loader2 className="h-5 w-5 animate-spin" /> <span>Loading time slots...</span></div>}
-            {errors.availabilitySlots && <Alert variant="destructive"><AlertTitle>Error Loading Slots</AlertTitle><AlertDescription>{errors.availabilitySlots}</AlertDescription></Alert>}
-            
-            {!isLoading.availabilitySlots && !errors.availabilitySlots && !selectedDate && (
-              <Alert variant="default">
-                <AlertDescription>Please select a date from the calendar to see available time slots.</AlertDescription>
-              </Alert>
-            )}
+              {!isLoading.availabilitySlots && !errors.availabilitySlots && selectedDate && dailySlots.length === 0 && (
+                <div className="flex items-center justify-center h-full">
+                  <Alert variant="default" className="border-orange-400/50 m-4">
+                    <Info className="h-5 w-5 mr-2 text-orange-500"/>
+                    <AlertTitle className="font-semibold text-orange-600">No Slots Available</AlertTitle>
+                    <AlertDescription>
+                      There are no time slots available for {format(selectedDate, 'PPP')}. Please try another date.
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              )}
 
-            {!isLoading.availabilitySlots && selectedDate && dailySlots.length === 0 && !errors.availabilitySlots && (
-              <Alert variant="default">
-                <AlertTitle>No Slots Available</AlertTitle>
-                <AlertDescription>There are no available time slots for {selectedProvider.fullName} on {format(selectedDate, 'PPP')}. Please try another date.</AlertDescription>
-              </Alert>
-            )}
-
-            {!isLoading.availabilitySlots && dailySlots.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-72 overflow-y-auto pr-2">
-                {dailySlots.map((slot) => (
-                  <Button 
-                    key={slot.slotId}
-                    variant={selectedTimeSlot?.slotId === slot.slotId ? "default" : "outline"}
-                    onClick={() => handleTimeSlotSelect(slot)}
-                    className="w-full py-3 text-sm focus:ring-2 focus:ring-primary"
-                  >
-                    {format(parseISO(slot.startTime), 'p')} - {format(parseISO(slot.endTime), 'p')}
-                  </Button>
-                ))}
-              </div>
-            )}
+              {!isLoading.availabilitySlots && !errors.availabilitySlots && selectedDate && dailySlots.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {dailySlots.map((slot) => (
+                    <Button
+                      key={slot.slotId}
+                      variant={selectedTimeSlot?.slotId === slot.slotId ? "default" : "outline"}
+                      onClick={() => handleTimeSlotSelect(slot)}
+                      className="w-full"
+                      disabled={isLoading.availabilitySlots} 
+                    >
+                      {format(parseISO(slot.startTime), 'p')}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
           </div>
         </div>
       </CardContent>

@@ -7,23 +7,31 @@ import ProviderSelectionStep from './components/ProviderSelectionStep';
 import DateTimeSelectionStep from './components/DateTimeSelectionStep';
 import ConfirmationStep from './components/ConfirmationStep';
 import BookingSuccessStep from './components/BookingSuccessStep';
+import BookingProgressIndicator from './components/BookingProgressIndicator';
 
-// Placeholder for the actual Stepper component from Shadcn/ui or custom
-const Stepper = ({ currentStep, totalSteps }: { currentStep: number; totalSteps: number }) => {
-  return (
-    <div className="mb-8 w-full">
-      <p className="text-center text-sm text-gray-600">
-        Step {currentStep} of {totalSteps}
-      </p>
-      <div className="mt-2 flex w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-        <div 
-          className="h-full bg-primary transition-all duration-300 ease-in-out"
-          style={{ width: `${(currentStep / totalSteps) * 100}%` }}
-        />
-      </div>
-    </div>
-  );
-};
+// Define the steps array (similar to BookingForm.tsx)
+const bookingFlowSteps = [
+  {
+    id: 'clinicServiceSelection',
+    name: 'Clinic & Service',
+    description: 'Find your clinic and service.',
+  },
+  {
+    id: 'providerSelection',
+    name: 'Provider',
+    description: 'Choose a provider.',
+  },
+  {
+    id: 'dateTimeSelection',
+    name: 'Date & Time',
+    description: 'Pick a date and time.',
+  },
+  {
+    id: 'confirmation',
+    name: 'Confirm',
+    description: 'Review your booking.',
+  },
+];
 
 const BookingFlowManager: React.FC = () => {
   const { state } = useBookingContext();
@@ -49,7 +57,7 @@ const BookingFlowManager: React.FC = () => {
     }
   };
 
-  const TOTAL_BOOKING_STEPS = 4; 
+  const TOTAL_BOOKING_STEPS = bookingFlowSteps.length; // Use the length of the new array
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
@@ -58,9 +66,12 @@ const BookingFlowManager: React.FC = () => {
         Follow the steps below to schedule your appointment.
       </p>
       
-      {/* Hide stepper on success page (step 5) */}
-      {currentStep <= TOTAL_BOOKING_STEPS && (
-        <Stepper currentStep={currentStep} totalSteps={TOTAL_BOOKING_STEPS} />
+      {/* Use BookingProgressIndicator if not on success page (currentStep 5) */}
+      {currentStep <= TOTAL_BOOKING_STEPS && currentStep !== 0 && currentStep !== 5 && (
+        <BookingProgressIndicator 
+          steps={bookingFlowSteps} 
+          currentStepIndex={currentStep -1} // Adjust index because steps array is 0-indexed
+        />
       )}
       
       <div className="p-0 sm:p-6 bg-white sm:shadow-xl sm:rounded-lg">

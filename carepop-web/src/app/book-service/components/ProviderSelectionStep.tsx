@@ -6,9 +6,10 @@ import { Provider } from '@/lib/types/booking';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, UserCircle } from 'lucide-react';
+import { Loader2, UserCircle, ShieldCheck, ShieldAlert, Info } from 'lucide-react';
 import Image from 'next/image';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { cn } from '@/lib/utils';
 
 const ProviderSelectionStep: React.FC = () => {
   const { state, dispatch } = useBookingContext();
@@ -96,13 +97,14 @@ const ProviderSelectionStep: React.FC = () => {
 
   if (!selectedClinic || !selectedService) {
     return (
-        <Card className="w-full">
+        <Card className="w-full shadow-xl">
             <CardHeader>
-                <CardTitle>Step 2: Select Provider</CardTitle>
+                <CardTitle  className="text-2xl font-bold">Step 2: Select Provider</CardTitle>
             </CardHeader>
             <CardContent>
-                <Alert variant="default">
-                    <AlertTitle>Missing Information</AlertTitle>
+                <Alert variant="default" className="border-primary/50">
+                    <Info className="h-5 w-5 mr-2 text-primary"/>
+                    <AlertTitle className="font-semibold text-primary">Missing Information</AlertTitle>
                     <AlertDescription>
                         Please go back to Step 1 and select a clinic and a service first.
                     </AlertDescription>
@@ -116,20 +118,21 @@ const ProviderSelectionStep: React.FC = () => {
   }
 
   return (
-    <Card className="w-full">
+    <Card className="w-full shadow-xl">
       <CardHeader>
-        <CardTitle>Step 2: Select Provider</CardTitle>
-        <CardDescription>
+        <CardTitle className="text-2xl font-bold">Step 2: Select Provider</CardTitle>
+        <CardDescription className="text-md">
           Choose a provider for {selectedService.name} at {selectedClinic.name}.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {isLoading.providersForService && <div className="flex items-center space-x-2"><Loader2 className="h-5 w-5 animate-spin" /> <span>Loading available providers...</span></div>}
-        {errors.providersForService && <Alert variant="destructive"><AlertTitle>Error Loading Providers</AlertTitle><AlertDescription>{errors.providersForService}</AlertDescription></Alert>}
+      <CardContent className="space-y-6">
+        {isLoading.providersForService && <div className="flex items-center space-x-2 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /> <span>Loading available providers...</span></div>}
+        {errors.providersForService && <Alert variant="destructive" className="mt-2"><AlertTitle className="flex items-center"><Info className="h-5 w-5 mr-2"/>Error Loading Providers</AlertTitle><AlertDescription>{errors.providersForService}</AlertDescription></Alert>}
         
         {!isLoading.providersForService && providersForService.length === 0 && !errors.providersForService && (
-          <Alert>
-            <AlertTitle>No Providers Available</AlertTitle>
+          <Alert variant="default" className="border-orange-400/50">
+            <Info className="h-5 w-5 mr-2 text-orange-500"/>
+            <AlertTitle className="font-semibold text-orange-600">No Providers Available</AlertTitle>
             <AlertDescription>
               There are currently no providers available for the selected service at this clinic. Please try a different service or clinic.
             </AlertDescription>
@@ -137,31 +140,69 @@ const ProviderSelectionStep: React.FC = () => {
         )}
 
         {!isLoading.providersForService && providersForService.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="flex flex-col gap-2">
             {providersForService.map((provider) => (
-              <Button 
+              <Card 
                 key={provider.id} 
-                variant={selectedProvider?.id === provider.id ? "default" : "outline"} 
-                className="h-auto p-4 flex flex-col items-center justify-center text-center space-y-2 border rounded-lg transition-all duration-150 ease-in-out focus:ring-2 focus:ring-primary"
                 onClick={() => handleProviderSelect(provider)}
-              >
-                {provider.photoUrl ? (
-                  <Image 
-                    src={provider.photoUrl} 
-                    alt={provider.fullName} 
-                    width={80} 
-                    height={80} 
-                    className="rounded-full object-cover w-20 h-20 mb-2"
-                  />
-                ) : (
-                  <UserCircle className="w-20 h-20 text-gray-400 mb-2" />
+                className={cn(
+                  "cursor-pointer transition-all duration-150 ease-in-out hover:shadow-md focus-within:ring-1 focus-within:ring-primary focus-within:ring-offset-1 text-center group",
+                  selectedProvider?.id === provider.id ? "ring-1 ring-primary shadow-md border-primary" : "border-border bg-card"
                 )}
-                <p className="font-semibold text-md">{provider.fullName}</p>
-                <p className="text-xs text-muted-foreground">{provider.specialty}</p>
-                <p className={`text-xs ${provider.acceptingNewPatients ? 'text-green-600' : 'text-red-600'}`}>
-                  {provider.acceptingNewPatients ? 'Accepting new patients' : 'Not accepting new patients'}
-                </p>
-              </Button>
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' || e.key === ' ' ? handleProviderSelect(provider) : null}
+              >
+                <CardContent className="flex flex-row items-center pt-1 space-x-3">
+                  <div className="relative">
+                    {provider.photoUrl ? (
+                      <Image 
+                        src={provider.photoUrl} 
+                        alt={provider.fullName} 
+                        width={48}
+                        height={48}
+                        className="rounded-full object-cover w-12 h-12 border-2 border-muted group-hover:border-primary/30 transition-colors"
+                      />
+                    ) : (
+                      <UserCircle className={cn(
+                        "w-12 h-12 text-gray-300 group-hover:text-primary/70 transition-colors",
+                        selectedProvider?.id === provider.id ? "text-primary/90" : ""
+                       )} />
+                    )}
+                  </div>
+                  <div className="flex-1 flex flex-col text-left">
+                    <p className={cn(
+                       "font-semibold text-sm leading-tight",
+                       selectedProvider?.id === provider.id ? "text-primary" : "text-card-foreground"
+                      )}>
+                      {provider.fullName}
+                    </p>
+                    <p className={cn(
+                      "text-xs font-inter",
+                      selectedProvider?.id === provider.id ? "text-primary/80" : "text-muted-foreground"
+                    )}>
+                      {provider.specialty || 'General Provider'}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end space-y-1">
+                    <div className={cn(
+                      "flex items-center text-xs px-2 py-1 rounded-full font-medium whitespace-nowrap", 
+                      provider.acceptingNewPatients ? 
+                        (selectedProvider?.id === provider.id ? "bg-primary/15 text-primary" : "bg-green-100 text-green-700 group-hover:bg-green-200/70") :
+                        (selectedProvider?.id === provider.id ? "bg-destructive/10 text-destructive" : "bg-red-100 text-red-700 group-hover:bg-red-200/70"),
+                      "transition-colors duration-150"
+                    )}>
+                      {provider.acceptingNewPatients ? 
+                        <ShieldCheck className="h-3.5 w-3.5 mr-1.5 shrink-0" /> : 
+                        <ShieldAlert className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+                      }
+                      {provider.acceptingNewPatients ? 'Accepting New Patients' : 'Not Accepting Patients'}
+                    </div>
+                    <Button variant="outline" size="sm" className={cn(selectedProvider?.id === provider.id ? "border-primary/50 text-primary hover:bg-primary/5 hover:text-primary" : "")}>
+                      Detail
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         )}

@@ -2,7 +2,13 @@
 export interface Clinic {
   id: string;
   name: string;
-  address: string;
+  address: string; // Full address for display
+  imageUrl?: string; // Optional URL for a clinic image or logo
+  contactPhone?: string; // Optional contact phone number
+  operatingHours?: string; // Optional, could be a string or a structured object (e.g., JSON string)
+  // Add other relevant clinic details as needed, e.g.:
+  // servicesSummary?: string[]; // A brief list of key services
+  // distance?: string; // If calculated and relevant for display
 }
 
 // Corresponds to data from: Backend Integration Guide - Section 1.2
@@ -83,7 +89,7 @@ export interface BookingConfirmationData {
   clinicName: string;
   serviceName: string;
   providerName: string;
-  startTime: string;
+  appointment_datetime: string;
 }
 
 export type BookingAction =
