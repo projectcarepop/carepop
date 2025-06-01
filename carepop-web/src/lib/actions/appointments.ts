@@ -89,7 +89,9 @@ export async function getFutureAppointments(): Promise<UserAppointmentDetails[]>
       console.error(`[getFutureAppointments] API error ${response.status}:`, errorData);
       throw new Error(`Failed to fetch future appointments: ${errorData.message || response.statusText}`);
     }
-    return await response.json() as UserAppointmentDetails[];
+    const data = await response.json();
+    console.log("[getFutureAppointments] Raw data from API:", JSON.stringify(data, null, 2)); // Log the raw data
+    return data.data as UserAppointmentDetails[];
   } catch (error) {
     console.error('[getFutureAppointments] Fetching error:', error);
     if (error instanceof Error) {
@@ -122,7 +124,9 @@ export async function getPastAppointments(): Promise<UserAppointmentDetails[]> {
       console.error(`[getPastAppointments] API error ${response.status}:`, errorData);
       throw new Error(`Failed to fetch past appointments: ${errorData.message || response.statusText}`);
     }
-    return await response.json() as UserAppointmentDetails[];
+    const data = await response.json();
+    console.log("[getPastAppointments] Raw data from API:", JSON.stringify(data, null, 2)); // Log the raw data
+    return data.data as UserAppointmentDetails[];
   } catch (error) {
     console.error('[getPastAppointments] Fetching error:', error);
      if (error instanceof Error) {

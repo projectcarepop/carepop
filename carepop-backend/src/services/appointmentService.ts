@@ -358,12 +358,7 @@ export const getUserFutureAppointments = async (
       user_id,
       appointment_datetime,
       status,
-      notes:notes_user,
-      created_at,
-      updated_at,
-      service:services!inner(id, name, description),
-      clinic:clinics!inner(id, name, street_address, locality),
-      provider:providers!inner(id, full_name, provider_specialties!inner(specialties!inner(id, name)))
+      notes:notes_user
     `)
     .eq('user_id', userId)
     .gt('appointment_datetime', now)
@@ -401,11 +396,12 @@ export const getUserFutureAppointments = async (
         start_time: appt.appointment_datetime,
         status: appt.status as AppointmentStatus,
         notes: decryptedNotes,
-        created_at: appt.created_at,
-        updated_at: appt.updated_at,
-        service: appt.service as UserAppointmentDetails['service'],
-        clinic: appt.clinic as UserAppointmentDetails['clinic'],
-        provider: appt.provider as UserAppointmentDetails['provider'] | null,
+        cancellation_reason: null, // Added to satisfy type
+        created_at: 'N/A', // Placeholder for removed field
+        updated_at: 'N/A', // Placeholder for removed field
+        service: { id: 'N/A', name: 'N/A', description: 'N/A' }, // Placeholder
+        clinic: { id: 'N/A', name: 'N/A', address_line1: 'N/A', city: 'N/A' }, // Placeholder, added missing fields
+        provider: null, // Placeholder
       } as UserAppointmentDetails; // Ensure the final object matches UserAppointmentDetails
     })
   );
@@ -436,12 +432,7 @@ export const getUserPastAppointments = async (
       user_id,
       appointment_datetime,
       status,
-      notes:notes_user,
-      created_at,
-      updated_at,
-      service:services!inner(id, name, description),
-      clinic:clinics!inner(id, name, street_address, locality),
-      provider:providers!inner(id, full_name, provider_specialties!inner(specialties!inner(id, name)))
+      notes:notes_user
     `)
     .eq('user_id', userId)
     .lte('appointment_datetime', now)
@@ -483,11 +474,12 @@ export const getUserPastAppointments = async (
         start_time: appt.appointment_datetime,
         status: appt.status as AppointmentStatus,
         notes: decryptedNotes,
-        created_at: appt.created_at,
-        updated_at: appt.updated_at,
-        service: appt.service as UserAppointmentDetails['service'],
-        clinic: appt.clinic as UserAppointmentDetails['clinic'],
-        provider: appt.provider as UserAppointmentDetails['provider'] | null,
+        cancellation_reason: null, // Added to satisfy type
+        created_at: 'N/A', // Placeholder for removed field
+        updated_at: 'N/A', // Placeholder for removed field
+        service: { id: 'N/A', name: 'N/A' , description: 'N/A'}, // Placeholder
+        clinic: { id: 'N/A', name: 'N/A', address_line1: 'N/A', city: 'N/A' }, // Placeholder, added missing fields
+        provider: null, // Placeholder
       } as UserAppointmentDetails;
     })
   );
