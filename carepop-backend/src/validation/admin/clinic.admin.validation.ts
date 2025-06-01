@@ -39,4 +39,20 @@ export type UpdateClinicInput = z.infer<typeof updateClinicSchema>;
 export const clinicIdParamSchema = z.object({
   clinicId: z.string().uuid("Invalid clinic ID format")
 });
-export type ClinicIdParam = z.infer<typeof clinicIdParamSchema>; 
+export type ClinicIdParam = z.infer<typeof clinicIdParamSchema>;
+
+// Schema for validating listClinics query parameters
+export const listClinicsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(10), // Max 100 items per page
+  isActive: z.preprocess((val) => {
+    if (val === 'true') return true;
+    if (val === 'false') return false;
+    return undefined; // Or keep as is if not 'true' or 'false', letting Zod handle non-boolean if needed
+  }, z.boolean().optional()),
+  sortBy: z.string().optional().default('name'), // Default sort by name
+  sortOrder: z.enum(['asc', 'desc']).optional().default('asc'), // Default sort order ascending
+  searchByName: z.string().optional(), // Example for a future search filter
+});
+
+export type ListClinicsQueryInput = z.infer<typeof listClinicsQuerySchema>; 

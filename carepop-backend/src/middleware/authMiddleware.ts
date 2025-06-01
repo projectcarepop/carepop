@@ -6,6 +6,7 @@ export interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     email?: string; // Optional: if you want to pass email
+    role?: string | string[]; // Add role to the interface
     // Add other user properties from JWT if needed, e.g., role
   };
 }
@@ -43,7 +44,8 @@ export const authenticateToken = async (req: AuthenticatedRequest, res: Response
     req.user = { 
       id: user.id,
       email: user.email, // Include email if available and needed by downstream handlers
-      // role: user.role // If you have roles in your JWT app_metadata, you might extract it here
+      // Attempt to extract role from app_metadata. Handle both string and array cases.
+      role: user.app_metadata?.role || (Array.isArray(user.app_metadata?.roles) ? user.app_metadata.roles : undefined)
     }; 
     
     next(); // Proceed to the next middleware or route handler
