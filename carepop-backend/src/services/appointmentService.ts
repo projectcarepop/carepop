@@ -12,6 +12,17 @@ import { Service } from '../types/serviceTypes'; // For checking service.is_acti
 import logger from '../utils/logger';
 import EncryptionService from './encryptionService'; // Corrected: Default import
 
+// Define a type for the enhanced response, similar to frontend's BookingConfirmationData
+interface EnrichedAppointmentConfirmation {
+  appointmentId: string;
+  status: string;
+  clinicName: string;
+  serviceName: string;
+  providerName: string | null; // Provider can be optional
+  appointment_datetime: string;
+  // Add any other fields from 'Appointment' if needed by success step, like notes (decrypted if necessary)
+}
+
 /**
  * Books an appointment after performing necessary validations.
  * MVP: Does not perform complex availability/slot checking.
@@ -26,15 +37,17 @@ export const bookAppointment = async (
   bookingRequest: BookAppointmentRequest,
   userId: string,
   dbClient: SupabaseClient
-): Promise<Appointment> => {
+): Promise<EnrichedAppointmentConfirmation> => { // Changed return type
   logger.info(`[bookAppointment] Attempting to book appointment for user ${userId}`, bookingRequest);
 
+  // Correctly destructure startTime from BookAppointmentRequest
+  // endTime from request is available but backend recalculates it based on duration.
   const { clinicId, serviceId, providerId, startTime, notes } = bookingRequest;
 
-  // 1. Validate Clinic
+  // 1. Validate Clinic & get name
   const { data: clinicData, error: clinicError } = await dbClient
     .from('clinics')
-    .select('id, is_active')
+    .select('id, name, is_active') // Ensure name is selected
     .eq('id', clinicId)
     .single();
 
@@ -47,10 +60,10 @@ export const bookAppointment = async (
     throw new Error('Selected clinic is not active.');
   }
 
-  // 2. Validate Service - Fetch typical_duration_minutes
+  // 2. Validate Service - Fetch name & typical_duration_minutes
   const { data: serviceData, error: serviceError } = await dbClient
     .from('services')
-    .select('id, is_active, name, typical_duration_minutes')
+    .select('id, name, is_active, typical_duration_minutes') // Ensure name is selected
     .eq('id', serviceId)
     .single();
   
@@ -67,8 +80,8 @@ export const bookAppointment = async (
     throw new Error('Selected service has an invalid or undefined duration.');
   }
 
-  // Calculate endTime on the server
-  const startTimeObj = new Date(startTime); // startTime from request is expected to be ISO string
+  // Calculate endTime on the server using startTime from the request
+  const startTimeObj = new Date(startTime); 
   const calculatedEndTime = new Date(startTimeObj.getTime() + serviceData.typical_duration_minutes * 60000);
 
   // 3. Validate Clinic offers the Service
@@ -88,11 +101,12 @@ export const bookAppointment = async (
     throw new Error('Selected clinic does not offer this service at the moment.');
   }
 
-  // 4. Validate Provider (if provided) - Basic existence check for MVP
+  // 4. Validate Provider (if provided) & get name
+  let providerName: string | null = null; 
   if (providerId) {
     const { data: providerData, error: providerError } = await dbClient
-      .from('providers') // Assuming a 'providers' table exists
-      .select('id, is_active') // Assuming providers have an is_active status
+      .from('providers') 
+      .select('id, full_name, is_active') // Ensure full_name is selected
       .eq('id', providerId)
       .single();
     
@@ -100,78 +114,22 @@ export const bookAppointment = async (
       logger.warn(`[bookAppointment] Provider validation failed for providerId ${providerId}:`, providerError);
       throw new Error('Provider not found or query failed.');
     }
-    // Add is_active check for provider if applicable, e.g.:
-    // if (!providerData.is_active) {
-    //   logger.warn(`[bookAppointment] Provider ${providerId} is not active.`);
-    //   throw new Error('Selected provider is not active.');
-    // }
+    // Assuming is_active check for provider would be here if implemented
+    // if (!providerData.is_active) { ... }
+    providerName = providerData.full_name;
   }
 
-  // NEW STEP 5: Re-check slot availability (as per API_Submit_Booking_Implementation_Guide.md)
-  // This is crucial for preventing double bookings.
-  if (providerId) { // Conflict check is primarily relevant if a specific provider is chosen.
+  // 5. Re-check slot availability (Simplified conflict check)
+  if (providerId) { 
     logger.info(`[bookAppointment] Re-checking slot availability for provider ${providerId} at clinic ${clinicId} for time ${startTimeObj.toISOString()} to ${calculatedEndTime.toISOString()}`);
     const { data: conflictingAppointments, error: conflictError } = await dbClient
       .from('appointments')
-      .select('id')
+      .select('id') 
       .eq('provider_id', providerId)
       .eq('clinic_id', clinicId)
-      // Check for appointments that overlap with the new appointment's time range
-      // An existing appointment conflicts if:
-      // Its start_time is before the new appointment's end_time AND
-      // Its end_time (appointment_datetime + duration_minutes) is after the new appointment's start_time.
-      // Since 'end_time' is not stored directly, we use appointment_datetime and duration_minutes for existing appointments.
-      // For simplicity, we'll check if an existing appointment's start_time falls within the new slot, 
-      // or if the new slot's start_time falls within an existing appointment.
-      // A more robust check involves comparing intervals properly.
-      // Simplified check: existing.startTime < new.endTime AND existing.endTime > new.startTime
-      // We don't have existing.endTime directly, so we need to construct it or use a range overlap function if Supabase/Postgres supports it well.
-      // Let's use the logic from the guide for now:
-      // lt('start_time', calculatedEndTime.toISOString()) // Existing appt starts before new one ends
-      // gt('end_time', startTimeObj.toISOString())   // Existing appt ends after new one starts
-      // Since 'end_time' is not a column, we cannot use it in the query directly.
-      // We must filter on `appointment_datetime` and `duration_minutes` of existing appointments.
-      // This can be complex with direct Supabase queries. An RPC might be better.
-      // For now, a simpler check: find appointments for this provider/clinic where *their* start time
-      // is not too far from the requested start time, and then filter in code if necessary.
-      // OR, let's try a time range overlap. Postgres supports range types and overlap operators (&&).
-      // Supabase JS client might not directly expose this for .lt/.gt in an easy way for two columns.
-
-      // Simpler conflict check:
-      // Find any appointment for this provider/clinic that STARTS during the proposed new slot
-      // OR ENDS during the proposed new slot
-      // OR ENCOMPASSES the proposed new slot.
-      // This means:
-      // (existing.start_time >= new.start_time AND existing.start_time < new.end_time) OR
-      // (existing.end_time > new.start_time AND existing.end_time <= new.end_time) OR
-      // (existing.start_time < new.start_time AND existing.end_time > new.end_time)
-      // This is still hard without a stored end_time.
-
-      // Guide's query adapted:
-      // It assumed an 'end_time' column. We need to adapt.
-      // Let's find appointments that START within a window that could overlap.
-      // An appointment conflicts if:
-      //   `existing.appointment_datetime` < `calculatedEndTime` (new appointment's end)
-      //   AND
-      //   `existing.appointment_datetime + make_interval(mins => existing.duration_minutes)` > `startTimeObj` (new appointment's start)
-      .lt('appointment_datetime', calculatedEndTime.toISOString())
-      // The part below is tricky: existing_end_time > new_start_time
-      // .gt('appointment_datetime' + 'make_interval(secs := duration_minutes * 60)', startTimeObj.toISOString()) // This syntax is illustrative, not direct Supabase JS
-      // The above won't work directly. We might need to fetch more and filter, or use an RPC.
-      // For an MVP conflict check focusing on start times for now (less robust):
-      // This finds appointments starting strictly between the new slot's start and end.
-      // And also appointments that start AT THE SAME TIME.
-      // .gte('appointment_datetime', startTimeObj.toISOString()) 
-      // .lt('appointment_datetime', calculatedEndTime.toISOString())
-      // A slightly more robust check for start times that could overlap:
-      // Fetch appointments that start before the new one ends, and whose (calculated) end is after the new one starts.
-      // This often requires an RPC for proper transactional safety and complex range overlap.
-
-      // Using the guide's logic directly is problematic without an end_time column.
-      // Alternative: Query for appointments that start before the new one would end,
-      // and then in application code, calculate their end times and check for overlap.
-      .lt('appointment_datetime', calculatedEndTime.toISOString()) // Existing starts before new one ends
-      .in('status', [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED]); // Only check active appointments
+      .lt('appointment_datetime', calculatedEndTime.toISOString()) 
+      .gte('appointment_datetime', startTimeObj.toISOString()) // Check if any existing appointment starts AT or AFTER new one starts but before new one ends.
+      .in('status', [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED]); 
 
     if (conflictError) {
       logger.error(`[bookAppointment] Supabase error checking for conflicting appointments for provider ${providerId}:`, conflictError.message);
@@ -179,141 +137,60 @@ export const bookAppointment = async (
     }
 
     if (conflictingAppointments && conflictingAppointments.length > 0) {
-      // Further filter in code because direct SQL for interval overlap without stored end_time is hard here
-      const newStartTimeMs = startTimeObj.getTime();
-      const newEndTimeMs = calculatedEndTime.getTime();
-
-      for (const existingAppt of conflictingAppointments) {
-        // We need to fetch duration_minutes for these existing appointments if not already selected
-        // Assuming 'id' and 'appointment_datetime' and 'duration_minutes' are selected
-        // For this to work, the select above needs to include duration_minutes
-        // Let's adjust the select:
-        // .select('id, appointment_datetime, duration_minutes')
-        // If the select was just 'id', this loop won't work.
-
-        // To implement the guide's spirit, we need to check:
-        // existingAppt.appointment_datetime < newEndTime  AND existingAppt.end_time > newStartTime
-        // We need to calculate existingAppt.end_time
-        // This requires fetching duration_minutes for each potentially conflicting appointment.
-        // The original conflict check query needs to select `appointment_datetime` and `duration_minutes`.
-        
-        // Let's assume the conflict query is adjusted:
-        // const { data: conflictingAppointments, error: conflictError } = await dbClient
-        //   .from('appointments')
-        //   .select('id, appointment_datetime, duration_minutes') // Ensure duration_minutes is fetched
-        //   .eq('provider_id', providerId)
-        //   .eq('clinic_id', clinicId)
-        //   .lt('appointment_datetime', calculatedEndTime.toISOString()) 
-        //   .in('status', [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED]);
-        
-        // If the above select is updated, then:
-        // const existingApptStartTime = new Date(existingAppt.appointment_datetime).getTime();
-        // const existingApptEndTime = existingApptStartTime + existingAppt.duration_minutes * 60000;
-        // if (existingApptStartTime < newEndTimeMs && existingApptEndTime > newStartTimeMs) {
-        //   logger.warn(`[bookAppointment] Attempted double booking for provider ${providerId}. New: ${startTimeObj.toISOString()}-${calculatedEndTime.toISOString()}. Existing: ${new Date(existingApptStartTime).toISOString()}-${new Date(existingApptEndTime).toISOString()}`);
-        //   throw new Error('Slot not available or conflicts with an existing booking.');
-        // }
-      }
-      // If we reach here, the initial coarse filter didn't find a definite overlap that the simplified query could detect without calculating end times.
-      // A more robust solution involves an RPC or a more complex query.
-      // For now, if the guide's exact query structure cannot be replicated due to schema,
-      // we might have to accept a less perfect conflict detection or enhance it later with an RPC.
-      // Given the current schema and Supabase JS client limitations for complex date arithmetic in queries:
-      // The guide's query:
-      // .lt('start_time', endTimeObj.toISOString()) // This is appointment_datetime < new_endTime
-      // .gt('end_time', startTimeObj.toISOString()) // This is existing_calculated_end_time > new_startTime
-      // This is the problematic part.
-
-      // Let's simplify the conflict check for now:
-      // If any appointment for the provider/clinic starts *exactly* at the same time.
-      const { data: exactStartTimeConflicts, error: exactConflictError } = await dbClient
-        .from('appointments')
-        .select('id', { count: 'exact' })
-        .eq('provider_id', providerId)
-        .eq('clinic_id', clinicId)
-        .eq('appointment_datetime', startTimeObj.toISOString())
-        .in('status', [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED]);
-
-      if (exactConflictError) {
-        logger.error(`[bookAppointment] Supabase error checking for exact start time conflicts for provider ${providerId}:`, exactConflictError.message);
-        throw new Error('Database error: Could not verify slot availability (exact check).');
-      }
-
-      if (exactStartTimeConflicts && exactStartTimeConflicts.length > 0) {
-         // The guide had `conflictingAppointments && conflictingAppointments.length > 0`
-         // If the count query is used, it would be `exactStartTimeConflicts.count > 0`
-         // Let's assume the select returns an array, and if its length > 0, there's a conflict.
-        logger.warn(`[bookAppointment] Attempted double booking (exact start time match) for provider ${providerId} at ${startTimeObj.toISOString()}.`);
-        throw new Error('Slot not available: An appointment already exists at this exact start time.');
-      }
-      logger.info(`[bookAppointment] Slot availability check passed for provider ${providerId} (exact start time). More comprehensive overlap check is recommended via RPC.`);
+      logger.warn(`[bookAppointment] Potential slot conflict detected for provider ${providerId} at ${startTimeObj.toISOString()}. Conflicting appointment count: ${conflictingAppointments.length}`);
+      throw new Error('The selected time slot is no longer available. Please try a different slot.');
     }
   }
 
-  // 5. Encrypt notes if provided
+  // 6. Encrypt Notes (if any)
   let encryptedNotes: string | null = null;
   if (notes) {
     try {
-      const encryptionService = new EncryptionService();
+      const encryptionService = new EncryptionService(); // Instantiate the service
       encryptedNotes = await encryptionService.encrypt(notes);
+      logger.info('[bookAppointment] Booking notes encrypted.');
     } catch (encError) {
-      logger.error('[bookAppointment] Failed to encrypt notes:', encError);
-      throw new Error('Failed to process appointment notes securely.');
+      logger.error('[bookAppointment] Failed to encrypt booking notes:', encError);
+      throw new Error('Failed to process booking notes securely.');
     }
   }
 
-  // 6. Create Appointment record - Use server-calculated endTime
-  const newAppointmentData = {
+  // 7. Create Appointment Record
+  const appointmentDataToInsert = {
     user_id: userId,
     clinic_id: clinicId,
     service_id: serviceId,
-    provider_id: providerId || null,
-    appointment_datetime: startTime, // This is client provided startTime
-    // end_time: calculatedEndTime.toISOString(), // REMOVED: Column does not exist in DB
+    provider_id: providerId, 
+    appointment_datetime: startTimeObj.toISOString(), // Store the validated and processed startTime
+    status: AppointmentStatus.PENDING, 
+    notes: encryptedNotes,
     duration_minutes: serviceData.typical_duration_minutes,
-    status: AppointmentStatus.PENDING,
-    notes_user: encryptedNotes, // CHANGED: Map to notes_user
-    // notes_clinic will be null by default or handled by clinic staff later
-    // created_at and updated_at are typically handled by DB defaults
   };
 
-  logger.info(`[bookAppointment] Attempting insert with userId: ${userId} for appointment data:`, newAppointmentData);
-
-  const { data: createdAppointment, error: creationError } = await dbClient
+  const { data: newAppointment, error: insertError } = await dbClient
     .from('appointments')
-    .insert(newAppointmentData)
+    .insert(appointmentDataToInsert)
     .select()
     .single();
 
-  if (creationError || !createdAppointment) {
-    logger.error('[bookAppointment] Failed to create appointment in DB:', creationError);
-    // Check if the error message indicates a problem with 'end_time' as well
-    if (creationError?.message.includes('end_time')) {
-        logger.error('[bookAppointment] Potential issue with end_time column. Check schema.');
-    }
-    throw new Error(`Failed to book appointment: ${creationError?.message || 'Unknown error'}`);
+  if (insertError || !newAppointment) {
+    logger.error('[bookAppointment] Error creating appointment in database:', insertError);
+    throw new Error('Failed to create appointment in database.');
   }
 
-  logger.info(`[bookAppointment] Successfully booked appointment ${createdAppointment.id} for user ${userId}`);
+  logger.info(`[bookAppointment] Appointment ${newAppointment.id} booked successfully for user ${userId}.`);
   
-  // Decrypt notes for the response if they were encrypted, only if necessary for immediate response.
-  // Otherwise, client can request and decrypt later if needed via a dedicated endpoint.
-  // For now, returning with encrypted notes or null.
-  // If decryption is needed here for the response:
-  // let responseNotes = createdAppointment.notes;
-  // if (createdAppointment.notes && encryptedNotes) { // only if it was just encrypted by this request
-  //   try {
-  //     responseNotes = await EncryptionService.decrypt(createdAppointment.notes);
-  //   } catch (decErr) {
-  //     logger.warn('[bookAppointment] Failed to decrypt notes for response, returning encrypted version.', decErr);
-  //     // Keep responseNotes as encrypted in this case or null it out if preferred not to send encrypted
-  //   }
-  // }
+  // Construct the enriched response
+  const enrichedResponse: EnrichedAppointmentConfirmation = {
+    appointmentId: newAppointment.id,
+    status: newAppointment.status,
+    clinicName: clinicData.name, 
+    serviceName: serviceData.name, 
+    providerName: providerName, 
+    appointment_datetime: newAppointment.appointment_datetime,
+  };
 
-  return {
-    ...createdAppointment,
-    // notes: responseNotes, // If notes were decrypted for response
-  } as Appointment; // Cast to ensure all fields of Appointment are covered if select() was partial
+  return enrichedResponse;
 };
 
 /**
