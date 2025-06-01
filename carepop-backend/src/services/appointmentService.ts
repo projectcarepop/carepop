@@ -364,7 +364,7 @@ export const getUserFutureAppointments = async (
       updated_at,
       service:services!inner(id, name, description),
       clinic:clinics!inner(id, name, street_address, locality),
-      provider:providers(id, full_name, specialty)
+      provider:providers!inner(id, full_name, provider_specialties!inner(specialties!inner(id, name)))
     `)
     .eq('user_id', userId)
     .gt('start_time', now)
@@ -444,7 +444,7 @@ export const getUserPastAppointments = async (
       updated_at,
       service:services!inner(id, name, description),
       clinic:clinics!inner(id, name, street_address, locality),
-      provider:providers(id, full_name, specialty)
+      provider:providers!inner(id, full_name, provider_specialties!inner(specialties!inner(id, name)))
     `)
     .eq('user_id', userId)
     .lte('start_time', now)
