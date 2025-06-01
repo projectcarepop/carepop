@@ -10,7 +10,7 @@ import {
   UserAppointmentDetails 
 } from '@/lib/types/appointmentTypes'; // Import types
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1` : 'http://localhost:8080/api/v1';
 
 // Type definitions are now in ../types/appointmentTypes.ts
 
