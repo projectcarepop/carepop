@@ -356,10 +356,9 @@ export const getUserFutureAppointments = async (
     .select(`
       id,
       user_id,
-      start_time,
+      appointment_datetime,
       status,
-      notes,
-      cancellation_reason,
+      notes:notes_user,
       created_at,
       updated_at,
       service:services!inner(id, name, description),
@@ -367,9 +366,9 @@ export const getUserFutureAppointments = async (
       provider:providers!inner(id, full_name, provider_specialties!inner(specialties!inner(id, name)))
     `)
     .eq('user_id', userId)
-    .gt('start_time', now)
+    .gt('appointment_datetime', now)
     .in('status', [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED])
-    .order('start_time', { ascending: true });
+    .order('appointment_datetime', { ascending: true });
 
   const { data: appointmentsData, error: fetchError } = await query;
 
@@ -399,10 +398,9 @@ export const getUserFutureAppointments = async (
       return {
         id: appt.id,
         user_id: appt.user_id,
-        start_time: appt.start_time,
+        start_time: appt.appointment_datetime,
         status: appt.status as AppointmentStatus,
         notes: decryptedNotes,
-        cancellation_reason: appt.cancellation_reason,
         created_at: appt.created_at,
         updated_at: appt.updated_at,
         service: appt.service as UserAppointmentDetails['service'],
@@ -436,10 +434,9 @@ export const getUserPastAppointments = async (
     .select(`
       id,
       user_id,
-      start_time,
+      appointment_datetime,
       status,
-      notes,
-      cancellation_reason,
+      notes:notes_user,
       created_at,
       updated_at,
       service:services!inner(id, name, description),
@@ -447,14 +444,14 @@ export const getUserPastAppointments = async (
       provider:providers!inner(id, full_name, provider_specialties!inner(specialties!inner(id, name)))
     `)
     .eq('user_id', userId)
-    .lte('start_time', now)
+    .lte('appointment_datetime', now)
     .in('status', [
       AppointmentStatus.COMPLETED,
       AppointmentStatus.CANCELLED_USER,
       AppointmentStatus.CANCELLED_CLINIC,
       AppointmentStatus.NO_SHOW
     ])
-    .order('start_time', { ascending: false });
+    .order('appointment_datetime', { ascending: false });
 
   const { data: appointmentsData, error: fetchError } = await query;
 
@@ -483,10 +480,9 @@ export const getUserPastAppointments = async (
       return {
         id: appt.id,
         user_id: appt.user_id,
-        start_time: appt.start_time,
+        start_time: appt.appointment_datetime,
         status: appt.status as AppointmentStatus,
         notes: decryptedNotes,
-        cancellation_reason: appt.cancellation_reason,
         created_at: appt.created_at,
         updated_at: appt.updated_at,
         service: appt.service as UserAppointmentDetails['service'],
