@@ -24,6 +24,17 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
+// Define a type for the expected enriched response from the service
+// This should align with EnrichedAppointmentConfirmation in appointmentService.ts
+interface EnrichedAppointmentResponseData {
+  appointmentId: string;
+  status: string;
+  clinicName: string;
+  serviceName: string;
+  providerName: string | null;
+  appointment_datetime: string;
+}
+
 /**
  * Handles the request to book a new appointment.
  */
@@ -49,14 +60,16 @@ export const createAppointmentHandler = async (req: AuthenticatedRequest, res: R
     const bookingRequest: BookAppointmentRequest = BookAppointmentRequestSchema.parse(req.body);
     logger.info(`[createAppointmentHandler] Validated booking request for user ${userId}:`, bookingRequest);
 
-    const newAppointment: Appointment = await appointmentService.bookAppointment(
+    // Expect the enriched data structure from the service
+    const newAppointmentDetails: EnrichedAppointmentResponseData = await appointmentService.bookAppointment(
       bookingRequest, 
       userId,
       userSupabaseClient
     );
 
-    logger.info(`[createAppointmentHandler] Appointment ${newAppointment.id} created successfully for user ${userId}.`);
-    res.status(201).json({ success: true, data: newAppointment, message: 'Appointment created successfully.' });
+    logger.info(`[createAppointmentHandler] Appointment ${newAppointmentDetails.appointmentId} created successfully for user ${userId}.`);
+    // Send the enriched data back to the client
+    res.status(201).json({ success: true, data: newAppointmentDetails, message: 'Appointment created successfully.' });
 
   } catch (error) {
     if (error instanceof z.ZodError) {
