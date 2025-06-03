@@ -94,6 +94,10 @@ export function ProviderForm({ initialData, onSubmitSuccess }: ProviderFormProps
         if (!initialData?.id) {
           throw new Error("Provider ID is missing for editing.");
         }
+
+        console.log('[ProviderForm] Submitting PUT request to:', `/api/v1/admin/providers/${initialData.id}`);
+        console.log('[ProviderForm] Payload:', JSON.stringify(payload, null, 2));
+
         response = await fetch(`/api/v1/admin/providers/${initialData.id}`, {
           method: "PUT",
           headers: {
