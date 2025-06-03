@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useAuth, Profile } from '@/lib/contexts/AuthContext';
@@ -37,7 +37,8 @@ interface ProfileWithRole extends Profile {
   role?: string;
 }
 
-export default function ClinicDetailsPage({ params }: { params: { id: string } }) {
+export default function ClinicDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params);
   const { user, profile: authProfile, isLoading: authLoading, session } = useAuth();
   const profile = authProfile as ProfileWithRole | null;
   
@@ -52,7 +53,7 @@ export default function ClinicDetailsPage({ params }: { params: { id: string } }
       if (!session?.access_token) return;
       
       try {
-        const response = await fetch(`/api/v1/admin/clinics/${params.id}`, {
+        const response = await fetch(`/api/v1/admin/clinics/${resolvedParams.id}`, {
           headers: {
             'Authorization': `Bearer ${session.access_token}`
           }
@@ -75,13 +76,13 @@ export default function ClinicDetailsPage({ params }: { params: { id: string } }
     if (!authLoading && session) {
       fetchClinicDetails();
     }
-  }, [params.id, session, authLoading]);
+  }, [resolvedParams.id, session, authLoading]);
 
   const handleDeleteClinic = async () => {
     if (!session?.access_token) return;
     
     try {
-      const response = await fetch(`/api/v1/admin/clinics/${params.id}`, {
+      const response = await fetch(`/api/v1/admin/clinics/${resolvedParams.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${session.access_token}`

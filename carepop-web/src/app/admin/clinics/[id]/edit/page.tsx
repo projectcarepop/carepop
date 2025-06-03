@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -30,7 +30,8 @@ interface ProfileWithRole extends Profile {
   role?: string;
 }
 
-export default function EditClinicPage({ params }: { params: { id: string } }) {
+export default function EditClinicPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params);
   const { user, profile: authProfile, isLoading: authLoading, session } = useAuth();
   const profile = authProfile as ProfileWithRole | null;
   const router = useRouter();
@@ -60,7 +61,7 @@ export default function EditClinicPage({ params }: { params: { id: string } }) {
       if (!session?.access_token) return;
       
       try {
-        const response = await fetch(`/api/v1/admin/clinics/${params.id}`, {
+        const response = await fetch(`/api/v1/admin/clinics/${resolvedParams.id}`, {
           headers: {
             'Authorization': `Bearer ${session.access_token}`
           }
@@ -102,7 +103,7 @@ export default function EditClinicPage({ params }: { params: { id: string } }) {
     if (!authLoading && session) {
       fetchClinicDetails();
     }
-  }, [params.id, session, authLoading]);
+  }, [resolvedParams.id, session, authLoading]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -156,7 +157,7 @@ export default function EditClinicPage({ params }: { params: { id: string } }) {
     }
 
     try {
-      const response = await fetch(`/api/v1/admin/clinics/${params.id}`, {
+      const response = await fetch(`/api/v1/admin/clinics/${resolvedParams.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -171,7 +172,7 @@ export default function EditClinicPage({ params }: { params: { id: string } }) {
       }
 
       // Redirect to the clinic details page on success
-      router.push(`/admin/clinics/${params.id}`);
+      router.push(`/admin/clinics/${resolvedParams.id}`);
 
     } catch (err: unknown) {
       console.error('Error updating clinic:', err);
@@ -283,7 +284,7 @@ export default function EditClinicPage({ params }: { params: { id: string } }) {
           
           </CardContent>
           <CardFooter className="flex justify-between space-x-2 pt-6">
-            <Link href={`/admin/clinics/${params.id}`}>
+            <Link href={`/admin/clinics/${resolvedParams.id}`}>
               <Button variant="outline" type="button">Cancel</Button>
             </Link>
             <Button type="submit" disabled={isSaving || authLoading}>

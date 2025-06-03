@@ -92,24 +92,32 @@ export class AdminClinicController {
   }
 
   async getClinicById(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    console.log(`[AdminClinicController] getClinicById CALLED for ID: ${req.params.clinicId}, Timestamp: ${new Date().toISOString()}`);
     try {
       // 1. Validate clinicId from URL params
       const { clinicId } = clinicIdParamSchema.parse(req.params);
+      console.log(`[AdminClinicController] Validated clinicId: ${clinicId}`);
 
       // 2. Call the service
+      console.log(`[AdminClinicController] Calling clinicService.getClinicById for ID: ${clinicId}`);
       const clinic = await this.clinicService.getClinicById(clinicId);
+      console.log(`[AdminClinicController] clinicService.getClinicById returned:`, clinic);
 
       // 3. Handle response
       if (!clinic) {
+        console.log(`[AdminClinicController] Clinic with ID ${clinicId} not found. Responding 404.`);
         res.status(StatusCodes.NOT_FOUND).json({ message: `Clinic with ID ${clinicId} not found.` });
         return;
       }
 
+      console.log(`[AdminClinicController] Clinic with ID ${clinicId} found. Responding 200.`);
       res.status(StatusCodes.OK).json({
         message: 'Clinic retrieved successfully',
         data: clinic,
       });
     } catch (error) {
+      console.error(`[AdminClinicController] ERROR in getClinicById for ID: ${req.params.clinicId}:`, error);
+      // Ensure the error is actually passed to the global error handler
       next(error);
     }
   }
