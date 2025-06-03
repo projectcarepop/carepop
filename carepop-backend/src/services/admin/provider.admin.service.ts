@@ -58,7 +58,7 @@ export class AdminProviderService {
   }
 
   async listProviders(queryParams: ListProvidersQuery): Promise<ListProvidersResult> {
-    const {
+    let {
       page = 1,
       limit = 10,
       sortBy = 'created_at',
@@ -68,6 +68,14 @@ export class AdminProviderService {
     } = queryParams;
 
     const offset = (page - 1) * limit;
+
+    let dbSortBy = sortBy;
+    if (sortBy === 'createdAt') {
+      dbSortBy = 'created_at';
+    }
+    if (sortBy === 'updatedAt') {
+      dbSortBy = 'updated_at';
+    }
 
     let query = supabaseServiceRole
       .from(this.tableName)
@@ -82,7 +90,7 @@ export class AdminProviderService {
       query = query.eq('is_active', isActive);
     }
 
-    query = query.order(sortBy, { ascending: sortOrder === 'asc' })
+    query = query.order(dbSortBy, { ascending: sortOrder === 'asc' })
                  .range(offset, offset + limit - 1);
 
     const { data, error, count }: PostgrestResponse<Provider> = await query;
