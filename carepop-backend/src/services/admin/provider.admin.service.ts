@@ -1,4 +1,4 @@
-import { supabase } from '../../config/supabaseClient'; // Assuming service_role client
+import { supabaseServiceRole } from '../../config/supabaseClient'; // Use service_role client
 import { AppError } from '../../utils/errors';
 import { CreateProviderBody, UpdateProviderBody, ListProvidersQuery } from '../../validation/admin/provider.admin.validation';
 import { PostgrestResponse, PostgrestSingleResponse } from '@supabase/supabase-js';
@@ -38,7 +38,7 @@ export class AdminProviderService {
     // or if userId, if provided, is valid and not already linked to another provider.
     // Also, if providerData.services is present, handle associating services.
 
-    const { data, error }: PostgrestSingleResponse<Provider> = await supabase
+    const { data, error }: PostgrestSingleResponse<Provider> = await supabaseServiceRole
       .from(this.tableName)
       .insert(providerData as any) // Cast to any if CreateProviderBody doesn't exactly match table
       .select()
@@ -69,7 +69,7 @@ export class AdminProviderService {
 
     const offset = (page - 1) * limit;
 
-    let query = supabase
+    let query = supabaseServiceRole
       .from(this.tableName)
       .select('*', { count: 'exact' });
 
@@ -104,7 +104,7 @@ export class AdminProviderService {
   }
 
   async getProviderById(providerId: string): Promise<Provider | null> {
-    const { data, error }: PostgrestSingleResponse<Provider> = await supabase
+    const { data, error }: PostgrestSingleResponse<Provider> = await supabaseServiceRole
       .from(this.tableName)
       .select('*')
       .eq('id', providerId)
@@ -123,7 +123,7 @@ export class AdminProviderService {
   async updateProvider(providerId: string, providerData: UpdateProviderBody): Promise<Provider | null> {
     // Handle service associations if providerData.services is present and changed
 
-    const { data, error }: PostgrestSingleResponse<Provider> = await supabase
+    const { data, error }: PostgrestSingleResponse<Provider> = await supabaseServiceRole
       .from(this.tableName)
       .update(providerData as any) // Cast if UpdateProviderBody doesn't exactly match table
       .eq('id', providerId)
@@ -152,7 +152,7 @@ export class AdminProviderService {
     // Also, consider what to do with associations (e.g., clinic_providers).
     // Supabase table relations with ON DELETE CASCADE/SET NULL can handle this at DB level.
 
-    const { error, count } = await supabase
+    const { error, count } = await supabaseServiceRole
       .from(this.tableName)
       .delete({ count: 'exact' }) // Request count of deleted rows
       .eq('id', providerId);
