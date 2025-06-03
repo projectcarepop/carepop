@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { supabase } from '../config/supabaseClient'; // Adjust path if necessary
+import { supabase, supabaseServiceRole } from '../config/supabaseClient'; // Adjust path if necessary
 
 // Extend Express Request type to include 'user'
 export interface AuthenticatedRequest extends Request {
@@ -35,25 +35,23 @@ export const authenticateToken = async (req: AuthenticatedRequest, res: Response
       return;
     }
 
-    // Fetch user role from public.user_roles table
+    // Fetch user role from public.user_roles table using service_role client
     let userRole: string | undefined = undefined;
     try {
-      const { data: roleData, error: roleError } = await supabase
+      const { data: roleData, error: roleError } = await supabaseServiceRole 
         .from('user_roles')
         .select('role')
         .eq('user_id', authUser.id)
         .single();
 
       if (roleError && roleError.code !== 'PGRST116') { // PGRST116 means no row was found
-        console.error('[AuthMiddleware] Error fetching user role:', roleError.message);
-        // Decide if this is a critical error. For now, proceed without role if not found or error.
+        console.error('[AuthMiddleware] Error fetching user role using service client:', roleError.message);
       }
       if (roleData) {
         userRole = roleData.role;
       }
     } catch (dbError: any) {
-      console.error('[AuthMiddleware] Database error fetching role:', dbError.message);
-      // Proceed without role in case of unexpected db error
+      console.error('[AuthMiddleware] Database error fetching role using service client:', dbError.message);
     }
 
     // Attach user information to the request object
