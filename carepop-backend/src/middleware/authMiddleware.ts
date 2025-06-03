@@ -21,33 +21,49 @@ export const authenticateToken = async (req: AuthenticatedRequest, res: Response
   }
 
   try {
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
 
-    if (error) {
-      console.warn('[AuthMiddleware] Error validating token with Supabase:', error.message);
-      // Distinguish between different types of errors if needed
-      // e.g., 'invalid_token', 'expired_token'
-      // For now, a general 403 for any token validation issue.
-      res.status(403).json({ message: 'Invalid or expired token.', details: error.message });
+    if (authError) {
+      console.warn('[AuthMiddleware] Error validating token with Supabase:', authError.message);
+      res.status(403).json({ message: 'Invalid or expired token.', details: authError.message });
       return;
     }
 
-    if (!user) {
-      // This case should ideally not be reached if Supabase returns an error for no user,
-      // but as a safeguard:
+    if (!authUser) {
       console.warn('[AuthMiddleware] Token valid, but no user object returned from Supabase.');
       res.status(403).json({ message: 'Authentication failed: No user found for token.' });
       return;
     }
 
+    // Fetch user role from public.user_roles table
+    let userRole: string | undefined = undefined;
+    try {
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', authUser.id)
+        .single();
+
+      if (roleError && roleError.code !== 'PGRST116') { // PGRST116 means no row was found
+        console.error('[AuthMiddleware] Error fetching user role:', roleError.message);
+        // Decide if this is a critical error. For now, proceed without role if not found or error.
+      }
+      if (roleData) {
+        userRole = roleData.role;
+      }
+    } catch (dbError: any) {
+      console.error('[AuthMiddleware] Database error fetching role:', dbError.message);
+      // Proceed without role in case of unexpected db error
+    }
+
     // Attach user information to the request object
     req.user = { 
-      id: user.id,
-      email: user.email, // Include email if available and needed by downstream handlers
-      // Attempt to extract role from app_metadata. Handle both string and array cases.
-      role: user.app_metadata?.role || (Array.isArray(user.app_metadata?.roles) ? user.app_metadata.roles : undefined)
+      id: authUser.id,
+      email: authUser.email,
+      role: userRole // Use role from user_roles table
     }; 
     
+    console.log(`[AuthMiddleware] User ${authUser.id} authenticated. Role: ${userRole || 'N/A'}`);
     next(); // Proceed to the next middleware or route handler
 
   } catch (err: any) {
