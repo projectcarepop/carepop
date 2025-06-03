@@ -103,14 +103,6 @@ export class AdminClinicController {
       const clinic = await this.clinicService.getClinicById(clinicId);
       console.log(`[AdminClinicController] clinicService.getClinicById returned:`, clinic);
 
-      // !!!!! TEMPORARY TEST START !!!!!
-      if (clinic) {
-        console.log(`[AdminClinicController] TEMP TEST: Clinic found, attempting to send simplified response.`);
-        res.status(StatusCodes.OK).json({ message: "Test successful", clinicName: clinic.name, clinicId: clinic.id });
-        return; // Exit early after sending test response
-      }
-      // !!!!! TEMPORARY TEST END !!!!!
-
       // 3. Handle response
       if (!clinic) {
         console.log(`[AdminClinicController] Clinic with ID ${clinicId} not found. Responding 404.`);
@@ -118,11 +110,24 @@ export class AdminClinicController {
         return;
       }
 
-      console.log(`[AdminClinicController] Clinic with ID ${clinicId} found. Responding 200.`);
-      res.status(StatusCodes.OK).json({
-        message: 'Clinic retrieved successfully',
-        data: clinic,
-      });
+      try {
+        // Attempt to stringify the clinic data to catch serialization errors
+        const stringifiedClinic = JSON.stringify(clinic); // Or more granularly: JSON.stringify(clinic.operating_hours), JSON.stringify(clinic.services_offered) etc.
+        console.log(`[AdminClinicController] Successfully stringified clinic data for ID: ${clinicId}. Length: ${stringifiedClinic.length}`);
+        
+        console.log(`[AdminClinicController] Clinic with ID ${clinicId} found. Responding 200.`);
+        // Send the original clinic object, not necessarily the stringified one here,
+        // as res.json will stringify it again. The test above is just to catch errors.
+        res.status(StatusCodes.OK).json({
+          message: 'Clinic retrieved successfully',
+          data: clinic, 
+        });
+      } catch (stringifyError) {
+        console.error(`[AdminClinicController] ERROR stringifying clinic data for ID: ${clinicId}:`, stringifyError);
+        // If stringification fails, we can't send the clinic data. Send a generic error.
+        // It's important to pass this to next so the global error handler can deal with it.
+        next(stringifyError); // Let the global error handler deal with it
+      }
     } catch (error) {
       console.error(`[AdminClinicController] ERROR in getClinicById for ID: ${req.params.clinicId}:`, error);
       // Ensure the error is actually passed to the global error handler
