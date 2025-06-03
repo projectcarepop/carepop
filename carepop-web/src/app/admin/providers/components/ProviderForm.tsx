@@ -48,13 +48,14 @@ interface ProviderFormProps {
 }
 
 // Interface for the data structure being sent to the backend PUT request
-interface ProviderUpdatePayload {
-  first_name: string;
-  last_name: string;
-  email: string;
-  contact_number?: string | null;
-  is_active: boolean;
-  // Add other DB fields here if they become updatable through the form
+// This should match the backend's Zod schema (updateProviderBodySchema) which expects camelCase
+interface ProviderUpdateRequestPayload {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phoneNumber?: string | null;
+  isActive?: boolean;
+  // userId?: string | null; // If you plan to update this
 }
 
 export function ProviderForm({ initialData, onSubmitSuccess }: ProviderFormProps) {
@@ -81,12 +82,13 @@ export function ProviderForm({ initialData, onSubmitSuccess }: ProviderFormProps
       }
       const token = sessionData.session.access_token;
 
-      const payload: ProviderUpdatePayload = {
-        first_name: data.firstName,
-        last_name: data.lastName,
+      // Construct payload with camelCase keys to match backend Zod schema
+      const payload: ProviderUpdateRequestPayload = {
+        firstName: data.firstName,
+        lastName: data.lastName,
         email: data.email,
-        contact_number: data.phoneNumber,
-        is_active: data.isActive,
+        phoneNumber: data.phoneNumber, // Use camelCase for the key
+        isActive: data.isActive,
       };
       
       let response;

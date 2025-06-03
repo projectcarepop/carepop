@@ -34,26 +34,43 @@ export class AdminProviderService {
   private tableName = 'providers'; // Or your actual table name
 
   async createProvider(providerData: CreateProviderBody): Promise<Provider> {
-    // In a real scenario, you might want to check if email is unique
-    // or if userId, if provided, is valid and not already linked to another provider.
-    // Also, if providerData.services is present, handle associating services.
+    console.log("[AdminProviderService.createProvider] Incoming providerData:", JSON.stringify(providerData, null, 2));
+    // Note: createProviderBodySchema expects camelCase from the route validation
+    // We need to transform to snake_case for Supabase insertion if not already handled by Supabase client
+    const dbCreateData: { [key: string]: any } = {};
+    if (providerData.userId !== undefined) dbCreateData.user_id = providerData.userId;
+    if (providerData.firstName !== undefined) dbCreateData.first_name = providerData.firstName;
+    if (providerData.lastName !== undefined) dbCreateData.last_name = providerData.lastName;
+    if (providerData.email !== undefined) dbCreateData.email = providerData.email;
+    if (providerData.phoneNumber !== undefined) dbCreateData.contact_number = providerData.phoneNumber;
+    // if (providerData.specialization !== undefined) dbCreateData.specialization = providerData.specialization; // Field removed
+    // if (providerData.licenseNumber !== undefined) dbCreateData.license_number = providerData.licenseNumber; // Field removed
+    // if (providerData.credentials !== undefined) dbCreateData.credentials = providerData.credentials; // Field removed
+    // if (providerData.bio !== undefined) dbCreateData.bio = providerData.bio; // Field removed
+    if (providerData.isActive !== undefined) dbCreateData.is_active = providerData.isActive;
+    // Ensure default for isActive if not provided, matching schema
+    else if (providerData.isActive === undefined) dbCreateData.is_active = true; 
+
+    console.log("[AdminProviderService.createProvider] Transformed dbCreateData for Supabase:", JSON.stringify(dbCreateData, null, 2));
 
     const { data, error }: PostgrestSingleResponse<Provider> = await supabaseServiceRole
       .from(this.tableName)
-      .insert(providerData as any) // Cast to any if CreateProviderBody doesn't exactly match table
+      .insert(dbCreateData) // Use transformed snake_case data
       .select()
       .single();
 
     if (error) {
-      if (error.code === '23505') { // Unique constraint violation (e.g., email)
-        throw new AppError(`Provider with this email already exists: ${providerData.email}`, 409);
+      console.error("[AdminProviderService.createProvider] Supabase error:", JSON.stringify(error, null, 2));
+      if (error.code === '23505') {
+        throw new AppError(`Provider with this email already exists: ${dbCreateData.email}`, 409);
       }
-      // Consider other specific error codes for Supabase
       throw new AppError(`Error creating provider: ${error.message}`, 500, error.details);
     }
     if (!data) {
+        console.error("[AdminProviderService.createProvider] No data returned from Supabase after insert.");
         throw new AppError('Provider could not be created, no data returned.', 500);
     }
+    console.log("[AdminProviderService.createProvider] Supabase success. Returned data:", JSON.stringify(data, null, 2));
     return data;
   }
 
@@ -82,8 +99,7 @@ export class AdminProviderService {
       .select('*', { count: 'exact' });
 
     if (searchTerm) {
-      // Assuming search term applies to first name, last name, email or specialization
-      query = query.or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,specialization.ilike.%${searchTerm}%`);
+      query = query.or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
     }
 
     if (typeof isActive === 'boolean') {
@@ -112,6 +128,7 @@ export class AdminProviderService {
   }
 
   async getProviderById(providerId: string): Promise<Provider | null> {
+    console.log(`[AdminProviderService.getProviderById] Called with providerId: ${providerId}`);
     const { data, error }: PostgrestSingleResponse<Provider> = await supabaseServiceRole
       .from(this.tableName)
       .select('*')
@@ -119,76 +136,68 @@ export class AdminProviderService {
       .single();
 
     if (error) {
-      if (error.code === 'PGRST116') { // "Actual row count" != "expected row count (1)"
-        // This means 0 rows were found for .single()
+      console.error(`[AdminProviderService.getProviderById] Supabase error:`, JSON.stringify(error, null, 2));
+      if (error.code === 'PGRST116') {
+        console.warn(`[AdminProviderService.getProviderById] Provider with ID ${providerId} not found.`);
         return null;
       }
       throw new AppError(`Error fetching provider: ${error.message}`, 500, error.details);
     }
+    console.log(`[AdminProviderService.getProviderById] Supabase success. Returned data:`, data ? JSON.stringify(data, null, 2) : 'null');
     return data;
   }
 
   async updateProvider(providerId: string, providerData: UpdateProviderBody): Promise<Provider | null> {
     console.log(`[AdminProviderService.updateProvider] Called with providerId: ${providerId}`);
-    console.log(`[AdminProviderService.updateProvider] Incoming providerData (camelCase):`, JSON.stringify(providerData, null, 2));
+    console.log(`[AdminProviderService.updateProvider] Incoming providerData (camelCase from Zod validation):`, JSON.stringify(providerData, null, 2));
 
     const dbData: { [key: string]: any } = {};
-    // For testing, let's ONLY try to update first_name if it's provided
-    if (providerData.firstName !== undefined) {
-        dbData.first_name = providerData.firstName;
-    } else {
-        console.log("[AdminProviderService.updateProvider] Test: firstName was not in providerData. Skipping update for this test.");
-        return this.getProviderById(providerId); // Or handle as appropriate
-    }
-    // Keep other transformations commented out for this test
-    // if (providerData.lastName !== undefined) dbData.last_name = providerData.lastName;
-    // if (providerData.email !== undefined) dbData.email = providerData.email;
-    // if (providerData.phoneNumber !== undefined) dbData.contact_number = providerData.phoneNumber;
-    // if (providerData.isActive !== undefined) dbData.is_active = providerData.isActive;
-    // if (providerData.userId !== undefined) dbData.user_id = providerData.userId;
+    // Transform camelCase from providerData (validated request body) to snake_case for Supabase
+    if (providerData.firstName !== undefined) dbData.first_name = providerData.firstName;
+    if (providerData.lastName !== undefined) dbData.last_name = providerData.lastName;
+    if (providerData.email !== undefined) dbData.email = providerData.email; // email key is the same
+    if (providerData.phoneNumber !== undefined) dbData.contact_number = providerData.phoneNumber; // Map phoneNumber to contact_number
+    if (providerData.isActive !== undefined) dbData.is_active = providerData.isActive;
+    if (providerData.userId !== undefined) dbData.user_id = providerData.userId; // If userId is updatable from form
 
-    console.log(`[AdminProviderService.updateProvider] TEST: Simplified dbData for Supabase (only first_name):`, JSON.stringify(dbData, null, 2));
+    console.log(`[AdminProviderService.updateProvider] Transformed dbData (snake_case) for Supabase update:`, JSON.stringify(dbData, null, 2));
 
     if (Object.keys(dbData).length === 0) {
-      console.log("[AdminProviderService.updateProvider] TEST: No fields to update (first_name missing). Fetching current data.");
-      return this.getProviderById(providerId);
+      console.warn("[AdminProviderService.updateProvider] No fields to update after transformation. Provider data might be identical or no valid fields were provided.");
+      // Fetch and return current data as no update is being performed.
+      // This ensures the frontend gets a valid Provider object back if it expects one.
+      return this.getProviderById(providerId); 
     }
 
-    // TEST: Perform update without an immediate .select().single() to isolate the update operation
-    const { error, count } = await supabaseServiceRole
+    const { data, error }: PostgrestSingleResponse<Provider> = await supabaseServiceRole
       .from(this.tableName)
-      .update(dbData)
+      .update(dbData) // Use the transformed snake_case data
       .eq('id', providerId)
-      .select(); // Keep .select() to get count, but we won't use .single() here for the test
-      // .single(); // Removed .single() for this test
+      .select() // Select the updated row
+      .single();   // Expect a single row back
 
     if (error) {
-      console.error(`[AdminProviderService.updateProvider] TEST: Supabase error on update:`, JSON.stringify(error, null, 2));
-      // ... (existing specific error handling for PGRST116, 23505) ...
-      if (error.code === 'PGRST116') { 
-        console.warn(`[AdminProviderService.updateProvider] Provider with ID ${providerId} not found for update.`);
+      console.error(`[AdminProviderService.updateProvider] Supabase error on update:`, JSON.stringify(error, null, 2));
+      if (error.code === 'PGRST116') { // Row not found by .eq or .single()
+        console.warn(`[AdminProviderService.updateProvider] Provider with ID ${providerId} not found for update, or RLS prevented update/select.`);
         return null;
       }
-      if (error.code === '23505') { 
-        console.warn(`[AdminProviderService.updateProvider] Unique constraint violation.`);
-        throw new AppError(`Unique constraint violation during update.`, 409);
+      if (error.code === '23505') { // Unique constraint violation
+        console.warn(`[AdminProviderService.updateProvider] Unique constraint violation during update (e.g., email).`);
+        // Attempt to determine which field caused it, if possible, or use a generic message.
+        // For email specifically: if (providerData.email && error.message.includes('email')) ...
+        throw new AppError(`A provider with similar details (e.g., email) already exists.`, 409);
       }
       throw new AppError(`Error updating provider: ${error.message}`, 500, error.details);
     }
-
-    console.log(`[AdminProviderService.updateProvider] TEST: Supabase update operation completed. Error object:`, error); // Should be null if no error
-    console.log(`[AdminProviderService.updateProvider] TEST: Supabase update operation count of matched rows:`, count); // What is count?
-
-    // After the update, explicitly fetch the provider to see the actual current state from DB
-    // This bypasses any potential issues with what .select().single() might return immediately after update.
-    const updatedProvider = await this.getProviderById(providerId);
-    if (updatedProvider) {
-        console.log("[AdminProviderService.updateProvider] TEST: Data fetched by getProviderById AFTER update operation:", JSON.stringify(updatedProvider, null, 2));
-    } else {
-        console.log("[AdminProviderService.updateProvider] TEST: getProviderById returned null AFTER update operation.");
-    }
     
-    return updatedProvider;
+    if (!data) {
+        console.warn(`[AdminProviderService.updateProvider] No data returned from Supabase after update for provider ID ${providerId}, though no explicit error. This can happen if RLS prevented the SELECT or if the row was not found by .single() after update.`);
+        return null; 
+    }
+
+    console.log(`[AdminProviderService.updateProvider] Supabase success. Returned data after update:`, JSON.stringify(data, null, 2));
+    return data;
   }
 
   async deleteProvider(providerId: string): Promise<boolean> {
@@ -197,16 +206,17 @@ export class AdminProviderService {
     // If soft delete: use .update({ is_active: false })
     // Also, consider what to do with associations (e.g., clinic_providers).
     // Supabase table relations with ON DELETE CASCADE/SET NULL can handle this at DB level.
-
+    console.log(`[AdminProviderService.deleteProvider] Called with providerId: ${providerId}`);
     const { error, count } = await supabaseServiceRole
       .from(this.tableName)
-      .delete({ count: 'exact' }) // Request count of deleted rows
+      .delete({ count: 'exact' })
       .eq('id', providerId);
 
     if (error) {
+      console.error(`[AdminProviderService.deleteProvider] Supabase error:`, JSON.stringify(error, null, 2));
       throw new AppError(`Error deleting provider: ${error.message}`, 500, error.details);
     }
-
+    console.log(`[AdminProviderService.deleteProvider] Supabase success. Delete count: ${count}`);
     return count !== null && count > 0; // Successfully deleted if count is 1 or more
   }
 
