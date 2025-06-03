@@ -103,6 +103,14 @@ export class AdminClinicController {
       const clinic = await this.clinicService.getClinicById(clinicId);
       console.log(`[AdminClinicController] clinicService.getClinicById returned:`, clinic);
 
+      // !!!!! TEMPORARY TEST START !!!!!
+      if (clinic) {
+        console.log(`[AdminClinicController] TEMP TEST: Clinic found, attempting to send simplified response.`);
+        res.status(StatusCodes.OK).json({ message: "Test successful", clinicName: clinic.name, clinicId: clinic.id });
+        return; // Exit early after sending test response
+      }
+      // !!!!! TEMPORARY TEST END !!!!!
+
       // 3. Handle response
       if (!clinic) {
         console.log(`[AdminClinicController] Clinic with ID ${clinicId} not found. Responding 404.`);
