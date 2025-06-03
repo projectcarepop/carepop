@@ -23,13 +23,19 @@ export class AdminClinicController {
     // ... bind other methods like getClinicById, listClinics, updateClinic, deleteClinic later
   }
 
-  async createClinic(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async createClinic(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       // 1. Validate request body
       const validatedBody = createClinicSchema.parse(req.body);
+      const creatorUserId = req.user?.id;
+
+      if (!creatorUserId) {
+        res.status(StatusCodes.UNAUTHORIZED).json({ message: 'User ID not found in token.' });
+        return;
+      }
 
       // 2. Call the service
-      const newClinic = await this.clinicService.createClinic(validatedBody);
+      const newClinic = await this.clinicService.createClinic(validatedBody, creatorUserId);
 
       // 3. Send response
       res.status(StatusCodes.CREATED).json({
@@ -114,9 +120,15 @@ export class AdminClinicController {
       const { clinicId } = clinicIdParamSchema.parse(req.params);
       // 2. Validate request body for updates
       const validatedBody = updateClinicSchema.parse(req.body);
+      const updatorUserId = req.user?.id;
+
+      if (!updatorUserId) {
+        res.status(StatusCodes.UNAUTHORIZED).json({ message: 'User ID not found in token.' });
+        return;
+      }
 
       // 3. Call the service
-      const updatedClinic = await this.clinicService.updateClinic(clinicId, validatedBody);
+      const updatedClinic = await this.clinicService.updateClinic(clinicId, validatedBody, updatorUserId);
 
       // 4. Handle response
       if (!updatedClinic) {
