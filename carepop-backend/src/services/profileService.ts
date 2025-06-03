@@ -229,7 +229,7 @@ export const updateUserProfileService = async (
  * @returns The profile object with sensitive fields decrypted, or null if not found.
  * @throws Error if userId is not provided or if Supabase encounters an error.
  */
-export const getUserProfileService = async (userId: string): Promise<Profile | null> => {
+export const getUserProfileService = async (userId: string): Promise<Profile & { role?: string } | null> => {
   logger.info(`[ProfileService] getUserProfileService called for userId: ${userId}`);
 
   if (!userId) {
@@ -237,142 +237,94 @@ export const getUserProfileService = async (userId: string): Promise<Profile | n
     throw new Error('User ID is required to fetch profile.');
   }
 
-  let profileQuery = await supabaseServiceRole
+  // Fetch main profile data
+  const { data: profileData, error: profileError } = await supabaseServiceRole
     .from('profiles')
     .select('*')
     .eq('user_id', userId)
     .single();
 
-  if (profileQuery.error && profileQuery.error.code === 'PGRST116') {
-    logger.warn(`[ProfileService] Profile not found for user ${userId} on first attempt. Retrying after a short delay.`);
-    // Wait for a short period to allow for potential trigger delay
-    await new Promise(resolve => setTimeout(resolve, 750)); // 750ms delay
+  if (profileError && profileError.code !== 'PGRST116') { // PGRST116 (no rows) is handled later if needed
+    logger.error(`[ProfileService] Supabase error fetching profile for user ${userId}:`, JSON.stringify(profileError, null, 2));
+    throw new Error(`Database error fetching profile: ${profileError.message} (Code: ${profileError.code})`);
+  }
 
-    profileQuery = await supabaseServiceRole
-      .from('profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
+  // Fetch user role
+  const { data: userRoleData, error: roleError } = await supabaseServiceRole
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', userId)
+    .single();
+
+  if (roleError && roleError.code !== 'PGRST116') { // PGRST116 means no role found, which might be acceptable
+    logger.error(`[ProfileService] Supabase error fetching role for user ${userId}:`, JSON.stringify(roleError, null, 2));
+    // Depending on requirements, you might want to throw an error or proceed without a role
+    // For now, we'll log and proceed, the role will be undefined.
   }
   
-  const { data: profileData, error } = profileQuery;
-
-  if (error) {
-    if (error.code === 'PGRST116') { 
-      logger.warn(`[ProfileService] Profile still not found for user ${userId} after retry. Checking auth.users.`);
-      // Check if the user exists in auth.users
-      const { data: authUser, error: authUserError } = await supabaseServiceRole.auth.admin.getUserById(userId);
-
-      if (authUserError) {
-        logger.error(`[ProfileService] Error fetching user from auth.users for id ${userId}:`, authUserError.message);
-        // If we can't even verify against auth.users, treat as if profile truly not found or user is invalid.
-        return null; 
-      }
-
-      if (authUser && authUser.user) {
-        logger.info(`[ProfileService] User ${userId} exists in auth.users. Returning a stub profile.`);
-        // Construct and return a default/stub profile
-        // Ensure this stub matches the `Profile` interface structure.
-        // Key fields like email might come from authUser.user.email
-        // Other fields specific to 'profiles' table but not in auth.users should be null/default.
-        const stubProfile: Profile = {
-          user_id: userId,
-          username: null,
-          first_name: null,
-          middle_initial: null,
-          last_name: null,
-          date_of_birth: null,
-          age: null,
-          civil_status: null,
-          religion: null,
-          occupation: null,
-          contact_no: null,
-          phone_number: authUser.user.phone || null,
-          street: null,
-          barangay_code: null,
-          city_municipality_code: null,
-          province_code: null,
-          philhealth_no: null,
-          avatar_url: authUser.user.user_metadata?.avatar_url || null,
-          gender_identity: null,
-          pronouns: null,
-          assigned_sex_at_birth: null,
-          granular_consents: { initial_consent_given: true }, // Example default
-          created_at: authUser.user.created_at, 
-          updated_at: authUser.user.updated_at || null,
-        };
-        return stubProfile; // Return the constructed stub
-      } else {
-        logger.warn(`[ProfileService] User ${userId} does NOT exist in auth.users. Profile truly not found.`);
-        return null; // User doesn't even exist in auth, so profile definitely not found
-      }
-    }
-    // For other errors, log and re-throw
-    logger.error(`[ProfileService] Supabase error fetching profile for user ${userId}:`, JSON.stringify(error, null, 2));
-    throw new Error(`Database error: ${error.message} (Code: ${error.code})`);
-  }
+  const role = userRoleData?.role;
 
   if (!profileData) {
-    logger.warn(`[ProfileService] No profile data returned for user ${userId}, though no explicit error from Supabase.`);
-    return null; 
+    // This handles the case where PGRST116 occurred for profileData or it was just null
+    // If role was also not found, that's fine. If profile doesn't exist, return null.
+    logger.warn(`[ProfileService] Profile not found for user ${userId}.`);
+    return null;
   }
 
-  logger.info(`[ProfileService] Profile fetched successfully for user ${userId}. Decrypting sensitive fields.`);
+  logger.info(`[ProfileService] Profile fetched successfully for user ${userId}. Role: ${role || 'N/A'}. Decrypting sensitive fields.`);
 
   // Decrypt sensitive fields before returning the profile
-  // Ensure we are working with a mutable copy
-  const fullyProcessedProfile = { ...profileData } as Profile;
+  const fullyProcessedProfile = { ...profileData } as Profile; // Cast to ensure type from DB
 
   if (fullyProcessedProfile.date_of_birth) {
     try {
       fullyProcessedProfile.date_of_birth = await encryptionService.decrypt(fullyProcessedProfile.date_of_birth);
     } catch (decryptionError) {
-      logger.error(`[ProfileService] Failed to decrypt date_of_birth for user ${userId} during fetch:`, decryptionError);
-      // Handle: return as is (encrypted), nullify, or throw? For now, logging and returning as is.
+      logger.error(`[ProfileService] Failed to decrypt date_of_birth for user ${userId}:`, decryptionError);
     }
   }
   if (fullyProcessedProfile.philhealth_no) {
     try {
       fullyProcessedProfile.philhealth_no = await encryptionService.decrypt(fullyProcessedProfile.philhealth_no);
     } catch (decryptionError) {
-      logger.error(`[ProfileService] Failed to decrypt philhealth_no for user ${userId} during fetch:`, decryptionError);
+      logger.error(`[ProfileService] Failed to decrypt philhealth_no for user ${userId}:`, decryptionError);
     }
   }
   if (fullyProcessedProfile.contact_no) {
     try {
       fullyProcessedProfile.contact_no = await encryptionService.decrypt(fullyProcessedProfile.contact_no);
     } catch (decryptionError) {
-      logger.error(`[ProfileService] Failed to decrypt contact_no for user ${userId} during fetch:`, decryptionError);
+      logger.error(`[ProfileService] Failed to decrypt contact_no for user ${userId}:`, decryptionError);
     }
   }
   if (fullyProcessedProfile.street) {
     try {
       fullyProcessedProfile.street = await encryptionService.decrypt(fullyProcessedProfile.street);
     } catch (decryptionError) {
-      logger.error(`[ProfileService] Failed to decrypt street for user ${userId} during fetch:`, decryptionError);
+      logger.error(`[ProfileService] Failed to decrypt street for user ${userId}:`, decryptionError);
     }
   }
   if (fullyProcessedProfile.gender_identity) {
     try {
       fullyProcessedProfile.gender_identity = await encryptionService.decrypt(fullyProcessedProfile.gender_identity);
     } catch (decryptionError) {
-      logger.error(`[ProfileService] Failed to decrypt gender_identity for user ${userId} during fetch:`, decryptionError);
+      logger.error(`[ProfileService] Failed to decrypt gender_identity for user ${userId}:`, decryptionError);
     }
   }
   if (fullyProcessedProfile.pronouns) {
     try {
       fullyProcessedProfile.pronouns = await encryptionService.decrypt(fullyProcessedProfile.pronouns);
     } catch (decryptionError) {
-      logger.error(`[ProfileService] Failed to decrypt pronouns for user ${userId} during fetch:`, decryptionError);
+      logger.error(`[ProfileService] Failed to decrypt pronouns for user ${userId}:`, decryptionError);
     }
   }
   if (fullyProcessedProfile.assigned_sex_at_birth) { 
     try {
       fullyProcessedProfile.assigned_sex_at_birth = await encryptionService.decrypt(fullyProcessedProfile.assigned_sex_at_birth);
     } catch (decryptionError) {
-      logger.error(`[ProfileService] Failed to decrypt assigned_sex_at_birth for user ${userId} during fetch:`, decryptionError);
+      logger.error(`[ProfileService] Failed to decrypt assigned_sex_at_birth for user ${userId}:`, decryptionError);
     }
   }
 
-  return fullyProcessedProfile;
+  return { ...fullyProcessedProfile, role }; // Combine profile with role
 }; 

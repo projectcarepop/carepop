@@ -9,6 +9,7 @@ export interface Profile {
   user_id: string; // Matches Supabase auth.users.id
   username?: string; // Optional, standard field
   avatar_url?: string; // Optional, standard field
+  role?: string; // <--- ADDED ROLE FIELD
 
   // Fields aligned with carepop-mobile/screens/CreateProfileScreen.tsx payload
   firstName?: string;
@@ -219,6 +220,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         user_id: rawProfileData.user_id,
         username: rawProfileData.username,
         avatar_url: rawProfileData.avatar_url,
+        role: rawProfileData.role,
         firstName: rawProfileData.first_name,
         middleInitial: rawProfileData.middle_initial,
         lastName: rawProfileData.last_name,

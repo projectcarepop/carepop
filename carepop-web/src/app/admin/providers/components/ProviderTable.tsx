@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/table';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 export interface Provider {
   id: string;
@@ -146,14 +147,31 @@ export function ProviderTable() {
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
   
+  const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
+
   React.useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch('/api/v1/admin/providers'); 
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+        if (sessionError || !sessionData.session) {
+          throw new Error(sessionError?.message || 'User not authenticated.');
+        }
+
+        const token = sessionData.session.access_token;
+
+        const response = await fetch('/api/v1/admin/providers', {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+        }); 
         if (!response.ok) {
-          throw new Error(`Failed to fetch providers: ${response.statusText}`);
+          if (response.status === 401) throw new Error('Unauthorized: Access token might be invalid or expired.');
+          if (response.status === 403) throw new Error('Forbidden: You do not have permission to access this resource.');
+          throw new Error(`Failed to fetch providers: ${response.statusText} (Status: ${response.status})`);
         }
         const result = await response.json();
         setData(result.data || []);
@@ -168,7 +186,7 @@ export function ProviderTable() {
       setIsLoading(false);
     };
     fetchData();
-  }, [sorting, columnFilters]);
+  }, [sorting, columnFilters, supabase]);
 
   const table = useReactTable({
     data,
@@ -194,7 +212,13 @@ export function ProviderTable() {
   }
 
   if (error) {
-    return <div className="text-red-500">Error: {error}</div>;
+    if (error.toLowerCase().includes('unauthorized') || error.toLowerCase().includes('not authenticated')) {
+        return <div className="text-red-500">Error: Authentication failed. Please ensure you are logged in as an admin.</div>;
+    }
+    if (error.toLowerCase().includes('forbidden')) {
+        return <div className="text-red-500">Error: Access Denied. You do not have the necessary permissions.</div>;
+    }
+    return <div className="text-red-500">Error fetching providers: {error}</div>;
   }
 
   return (
