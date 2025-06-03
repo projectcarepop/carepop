@@ -4,11 +4,11 @@ import { authenticateToken } from '../../middleware/authMiddleware';
 import { isAdmin } from '../../middleware/role.middleware';
 import { validateRequest } from '../../middleware/validateRequest';
 import {
-  createProviderSchema,
-  updateProviderSchema,
+  createProviderBodySchema,
+  updateProviderBodySchema,
   listProvidersSchema,
   providerIdSchema,
-} from '../../validation/admin/provider.admin.validation'; // Assuming validation schemas will be created
+} from '../../validation/admin/provider.admin.validation';
 
 const router = Router();
 const adminProviderController = new AdminProviderController();
@@ -46,7 +46,7 @@ router.post(
   '/',
   authenticateToken,
   isAdmin,
-  validateRequest(createProviderSchema),
+  validateRequest({ body: createProviderBodySchema }),
   adminProviderController.createProvider
 );
 
@@ -114,7 +114,7 @@ router.get(
   '/',
   authenticateToken,
   isAdmin,
-  validateRequest(listProvidersSchema),
+  validateRequest({ query: listProvidersSchema.shape.query }),
   adminProviderController.listProviders
 );
 
@@ -155,7 +155,7 @@ router.get(
   '/:providerId',
   authenticateToken,
   isAdmin,
-  validateRequest(providerIdSchema),
+  validateRequest({ params: providerIdSchema.shape.params }),
   adminProviderController.getProviderById
 );
 
@@ -202,7 +202,10 @@ router.put(
   '/:providerId',
   authenticateToken,
   isAdmin,
-  validateRequest(updateProviderSchema), // providerId validation is part of this schema or path validation
+  validateRequest({
+    body: updateProviderBodySchema,
+    params: providerIdSchema.shape.params 
+  }),
   adminProviderController.updateProvider
 );
 
@@ -239,7 +242,7 @@ router.delete(
   '/:providerId',
   authenticateToken,
   isAdmin,
-  validateRequest(providerIdSchema),
+  validateRequest({ params: providerIdSchema.shape.params }),
   adminProviderController.deleteProvider
 );
 
