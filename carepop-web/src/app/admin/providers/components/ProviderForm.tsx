@@ -15,7 +15,9 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
+// import { Textarea } from "@/components/ui/textarea"; // REMOVED Textarea import
+import React, { useMemo } from 'react';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 // import { toast } from "@/components/ui/use-toast"; // Assuming you have toasts
 
 // Define the Zod schema based on backend validation
@@ -25,23 +27,38 @@ const providerFormSchema = z.object({
   lastName: z.string().min(1, { message: "Last name is required." }),
   email: z.string().email({ message: "Invalid email address." }),
   phoneNumber: z.string().optional().nullable(),
-  specialization: z.string().optional().nullable(),
-  licenseNumber: z.string().optional().nullable(),
-  credentials: z.string().optional().nullable(), // e.g., MD, RN, PhD
-  bio: z.string().optional().nullable(),
-  isActive: z.boolean(), // Made non-optional, default handled by react-hook-form's defaultValues
-  // userId: z.string().uuid().optional().nullable(), // For linking to auth.users if needed
+  isActive: z.boolean(),
 });
 
 // Export ProviderFormValues type
 export type ProviderFormValues = z.infer<typeof providerFormSchema>;
 
 interface ProviderFormProps {
-  initialData?: Partial<ProviderFormValues> & { id?: string; isActive?: boolean }; // id is present if editing
+  initialData?: Partial<ProviderFormValues> & { 
+    id?: string; 
+    isActive?: boolean;
+    // These can remain in the prop type for now, as the page might still fetch them
+    // but the form itself won't use or display them.
+    specialization?: string | null; 
+    licenseNumber?: string | null;  
+    credentials?: string | null;    
+    bio?: string | null;            
+  };
   onSubmitSuccess?: () => void;
 }
 
+// Interface for the data structure being sent to the backend PUT request
+interface ProviderUpdatePayload {
+  first_name: string;
+  last_name: string;
+  email: string;
+  contact_number?: string | null;
+  is_active: boolean;
+  // Add other DB fields here if they become updatable through the form
+}
+
 export function ProviderForm({ initialData, onSubmitSuccess }: ProviderFormProps) {
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const form = useForm<ProviderFormValues>({
     resolver: zodResolver(providerFormSchema),
     defaultValues: {
@@ -49,59 +66,77 @@ export function ProviderForm({ initialData, onSubmitSuccess }: ProviderFormProps
       lastName: initialData?.lastName || "",
       email: initialData?.email || "",
       phoneNumber: initialData?.phoneNumber || null,
-      specialization: initialData?.specialization || null,
-      licenseNumber: initialData?.licenseNumber || null,
-      credentials: initialData?.credentials || null,
-      bio: initialData?.bio || null,
-      isActive: initialData?.isActive === undefined ? true : initialData.isActive, // Explicitly handle default for isActive
+      isActive: initialData?.isActive === undefined ? true : initialData.isActive,
     },
   });
 
   const isEditing = !!initialData?.id;
 
   async function onSubmit(data: ProviderFormValues) {
-    // TODO: Implement API call
-    // try {
-    //   let response;
-    //   if (isEditing) {
-    //     response = await fetch(`/api/v1/admin/providers/${initialData.id}`, {
-    //       method: "PUT",
-    //       headers: { "Content-Type": "application/json" },
-    //       body: JSON.stringify(data),
-    //     });
-    //   } else {
-    //     response = await fetch("/api/v1/admin/providers", {
-    //       method: "POST",
-    //       headers: { "Content-Type": "application/json" },
-    //       body: JSON.stringify(data),
-    //     });
-    //   }
+    form.clearErrors();
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) {
+        throw new Error(sessionError?.message || 'User not authenticated. Please log in.');
+      }
+      const token = sessionData.session.access_token;
 
-    //   if (!response.ok) {
-    //     const errorData = await response.json();
-    //     throw new Error(errorData.message || "Something went wrong");
-    //   }
+      const payload: ProviderUpdatePayload = {
+        first_name: data.firstName,
+        last_name: data.lastName,
+        email: data.email,
+        contact_number: data.phoneNumber,
+        is_active: data.isActive,
+      };
+      
+      let response;
+      if (isEditing) {
+        if (!initialData?.id) {
+          throw new Error("Provider ID is missing for editing.");
+        }
+        response = await fetch(`/api/v1/admin/providers/${initialData.id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload), 
+        });
+      } else {
+        console.log("Create mode not fully implemented in this step. Payload:", payload);
+        if (onSubmitSuccess) {
+          onSubmitSuccess();
+        }
+        return;
+      }
 
-    //   toast({
-    //     title: isEditing ? "Provider updated" : "Provider created",
-    //     description: isEditing
-    //       ? "The provider details have been successfully updated."
-    //       : "The new provider has been successfully created.",
-    //   });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: `Request failed with status ${response.status}` }));
+        if (errorData.errors && Array.isArray(errorData.errors)) {
+            errorData.errors.forEach((err: { path?: (string | number)[], message: string }) => {
+                if (err.path && err.path.length > 0) {
+                    form.setError(err.path.join('.') as keyof ProviderFormValues, { type: 'manual', message: err.message });
+                } else if (err.message) {
+                    form.setError("root.serverError", { type: 'manual', message: err.message });
+                }
+            });
+        }
+        throw new Error(errorData.message || "Something went wrong while saving the provider.");
+      }
+
+      console.log(isEditing ? "Provider updated successfully" : "Provider creation placeholder success");
+      if (onSubmitSuccess) {
+        onSubmitSuccess();
+      }
       
-    //   if (onSubmitSuccess) {
-    //     onSubmitSuccess();
-    //   }
-      
-    // } catch (error: any) {
-    //   toast({
-    //     variant: "destructive",
-    //     title: "Error",
-    //     description: error.message || "Failed to save provider.",
-    //   });
-    // }
-    console.log("Form submitted", data);
-    if (onSubmitSuccess) onSubmitSuccess(); // Placeholder
+    } catch (error: unknown) {
+        let errorMessage = "An unexpected error occurred.";
+        if (error instanceof Error) {
+            errorMessage = error.message;
+        }
+        console.error("Submit error:", errorMessage);
+        form.setError("root.submit", { type: "manual", message: errorMessage });
+    }
   }
 
   return (
@@ -160,68 +195,7 @@ export function ProviderForm({ initialData, onSubmitSuccess }: ProviderFormProps
               </FormItem>
             )}
           />
-          <FormField
-            control={form.control}
-            name="specialization"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Specialization (Optional)</FormLabel>
-                <FormControl>
-                  <Input placeholder="e.g., Family Medicine, Pediatrics" {...field} value={field.value ?? ''} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="licenseNumber"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>License Number (Optional)</FormLabel>
-                <FormControl>
-                  <Input placeholder="Enter license number" {...field} value={field.value ?? ''} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="credentials"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Credentials (Optional)</FormLabel>
-                <FormControl>
-                  <Input placeholder="e.g., MD, RN, PhD" {...field} value={field.value ?? ''} />
-                </FormControl>
-                <FormDescription>
-                  Comma-separated list of credentials.
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
         </div>
-
-        <FormField
-          control={form.control}
-          name="bio"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Bio (Optional)</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="Enter a short bio for the provider..."
-                  className="resize-none"
-                  {...field}
-                  value={field.value ?? ''}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
 
         <Controller
           control={form.control}

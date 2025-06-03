@@ -50,6 +50,22 @@ export interface Provider {
   updatedAt: string;
 }
 
+// Define an interface for the raw backend data structure (snake_case)
+interface BackendProviderData {
+  id: string;
+  user_id?: string | null;
+  first_name: string;
+  last_name: string;
+  contact_email: string; // Assuming email comes as contact_email from backend based on common patterns
+  email?: string; // Keep if backend might send 'email' too
+  specialization?: string | null;
+  license_number?: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  // Add any other fields that come from the backend in snake_case
+}
+
 export const columns: ColumnDef<Provider>[] = [
   {
     accessorKey: 'firstName',
@@ -174,7 +190,19 @@ export function ProviderTable() {
           throw new Error(`Failed to fetch providers: ${response.statusText} (Status: ${response.status})`);
         }
         const result = await response.json();
-        setData(result.data || []);
+        // Transform snake_case to camelCase for specified fields
+        const transformedData = (result.data || []).map((provider: BackendProviderData) => ({
+          ...provider, // Spread first to carry over fields like id, specialization, etc.
+          firstName: provider.first_name,
+          lastName: provider.last_name,
+          email: provider.contact_email || provider.email, // Use contact_email or fallback to email
+          isActive: provider.is_active,
+          createdAt: provider.created_at,
+          updatedAt: provider.updated_at,
+          licenseNumber: provider.license_number,
+          // user_id is not in Provider interface, so it will be omitted unless added to Provider
+        }));
+        setData(transformedData);
       } catch (e: unknown) {
         if (e instanceof Error) {
             setError(e.message);

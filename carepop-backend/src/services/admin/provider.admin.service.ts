@@ -129,27 +129,52 @@ export class AdminProviderService {
   }
 
   async updateProvider(providerId: string, providerData: UpdateProviderBody): Promise<Provider | null> {
-    // Handle service associations if providerData.services is present and changed
+    console.log(`[AdminProviderService.updateProvider] Called with providerId: ${providerId}`);
+    console.log(`[AdminProviderService.updateProvider] Incoming providerData (camelCase):`, JSON.stringify(providerData, null, 2));
+
+    const dbData: { [key: string]: any } = {};
+    if (providerData.firstName !== undefined) dbData.first_name = providerData.firstName;
+    if (providerData.lastName !== undefined) dbData.last_name = providerData.lastName;
+    if (providerData.email !== undefined) dbData.email = providerData.email;
+    if (providerData.phoneNumber !== undefined) dbData.contact_number = providerData.phoneNumber;
+    if (providerData.isActive !== undefined) dbData.is_active = providerData.isActive;
+    if (providerData.userId !== undefined) dbData.user_id = providerData.userId;
+
+    console.log(`[AdminProviderService.updateProvider] Transformed dbData (snake_case) for Supabase:`, JSON.stringify(dbData, null, 2));
+
+    if (Object.keys(dbData).length === 0) {
+      console.log("[AdminProviderService.updateProvider] No valid fields to update after transformation. Fetching current data.");
+      return this.getProviderById(providerId);
+    }
 
     const { data, error }: PostgrestSingleResponse<Provider> = await supabaseServiceRole
       .from(this.tableName)
-      .update(providerData as any) // Cast if UpdateProviderBody doesn't exactly match table
+      .update(dbData)
       .eq('id', providerId)
       .select()
       .single();
 
     if (error) {
-      if (error.code === 'PGRST116') { 
-        return null; // Provider not found
+      console.error(`[AdminProviderService.updateProvider] Supabase error:`, JSON.stringify(error, null, 2));
+      if (error.code === 'PGRST116') {
+        console.warn(`[AdminProviderService.updateProvider] Provider with ID ${providerId} not found for update.`);
+        return null;
       }
-      if (error.code === '23505') { // Unique constraint violation (e.g., email)
+      if (error.code === '23505') {
+        console.warn(`[AdminProviderService.updateProvider] Unique constraint violation for email.`);
         throw new AppError(`Provider with this email already exists.`, 409);
       }
       throw new AppError(`Error updating provider: ${error.message}`, 500, error.details);
     }
-     if (!data && !error) { // Edge case: update matched 0 rows but no error (e.g. RLS or wrong ID)
-      return null;
+    
+    if (!data) { // This condition might be hit if RLS prevents select, or if .single() expects one row but gets zero after an update that RLS filters out from select.
+        console.warn(`[AdminProviderService.updateProvider] No data returned from Supabase after update for provider ID ${providerId}, though no explicit error was thrown. Possible RLS issue or provider not found by select after update.`);
+        // Depending on desired behavior, you might return null or fetch the current state to see if it changed.
+        // Returning null if no data is selected back might be correct if the update truly didn't apply or if the record became inaccessible.
+        return null; 
     }
+
+    console.log(`[AdminProviderService.updateProvider] Supabase success. Returned data:`, JSON.stringify(data, null, 2));
     return data;
   }
 

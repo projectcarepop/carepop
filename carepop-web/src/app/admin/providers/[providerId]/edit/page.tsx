@@ -4,71 +4,108 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ProviderForm, ProviderFormValues } from '../../components/ProviderForm'; // Adjusted import path
-import { useRouter } from 'next/navigation';
-import React, { useEffect, useState } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import React, { useEffect, useState, useMemo } from 'react';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'; // Ensure this is imported
 // import { toast } from '@/components/ui/use-toast'; // Assuming toast setup
 
-interface EditProviderPageProps {
-  params: {
-    providerId: string;
-  };
-}
+// Define the type for initialData, including the optional id
+// This should match or be compatible with ProviderFormProps['initialData']
+type InitialProviderData = Partial<ProviderFormValues> & { id?: string; isActive?: boolean };
 
-// Mock fetch function - replace with actual API call
-async function fetchProviderById(id: string): Promise<ProviderFormValues | null> {
-  console.log(`Fetching provider with ID: ${id}`);
-  // Replace with: const response = await fetch(`/api/v1/admin/providers/${id}`);
-  // if (!response.ok) return null;
-  // const data = await response.json();
-  // return data.data; // Assuming API returns { data: ProviderDetails }
-  await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
-  if (id === "error") return null; // Simulate not found
+// Updated fetch function to make a real API call
+async function fetchProviderById(id: string, token: string): Promise<InitialProviderData | null> {
+  console.log(`Fetching provider with ID: ${id} using token.`);
+  const response = await fetch(`/api/v1/admin/providers/${id}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      console.error(`Provider with ID ${id} not found.`);
+      return null;
+    }
+    const errorData = await response.json().catch(() => ({ message: response.statusText }));
+    throw new Error(`Failed to fetch provider ${id}: ${errorData.message || response.statusText} (Status: ${response.status})`);
+  }
+
+  const result = await response.json();
+  const providerData = result.data; // Assuming API returns { data: ProviderDetails }
+
+  if (!providerData) {
+    console.error(`No data found for provider with ID ${id} in API response.`);
+    return null;
+  }
+
+  // Transform snake_case from backend to camelCase for frontend
   return {
-    id,
-    firstName: "Jane",
-    lastName: "Doe",
-    email: "jane.doe@example.com",
-    phoneNumber: "123-456-7890",
-    specialization: "Pediatrics",
-    licenseNumber: "LIC12345",
-    credentials: "MD, FAAP",
-    bio: "Experienced pediatrician with over 10 years of practice.",
-    isActive: true,
+    id: providerData.id,
+    firstName: providerData.first_name,
+    lastName: providerData.last_name,
+    email: providerData.contact_email || providerData.email, // Prefer contact_email
+    phoneNumber: providerData.phone_number,
+    specialization: providerData.specialization,
+    licenseNumber: providerData.license_number,
+    credentials: providerData.credentials,
+    bio: providerData.bio,
+    isActive: providerData.is_active,
+    // Note: created_at and updated_at are not part of ProviderFormValues or InitialProviderData currently
+    // If they are needed by the form or display, add them to InitialProviderData
   };
 }
 
-export default function EditProviderPage({ params }: EditProviderPageProps) {
-  const { providerId } = params;
+export default function EditProviderPage(/*{ params }: EditProviderPageProps*/) {
+  const paramsHook = useParams(); // Use the hook
+  const providerId = paramsHook.providerId as string; // Get providerId, assert as string
+
   const router = useRouter();
-  const [initialData, setInitialData] = useState<ProviderFormValues | null | undefined>(undefined); // undefined for loading, null for not found
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []); // Initialize Supabase client
+
+  const [initialData, setInitialData] = useState<InitialProviderData | null | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (providerId) {
-      setIsLoading(true);
-      setError(null);
-      fetchProviderById(providerId)
-        .then(data => {
+      const loadProvider = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+          const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+          if (sessionError || !sessionData.session) {
+            throw new Error(sessionError?.message || 'User not authenticated. Redirecting to login...');
+          }
+          const token = sessionData.session.access_token;
+
+          const data = await fetchProviderById(providerId, token);
           if (data) {
             setInitialData(data);
           } else {
             setInitialData(null); // Mark as not found
             setError(`Provider with ID ${providerId} not found.`);
-            // Optionally redirect or show a specific not found component
-            // router.push('/admin/providers'); // Or a 404 page
           }
-        })
-        .catch(err => {
+        } catch (err: unknown) {
           console.error("Failed to fetch provider:", err);
-          setError("Failed to load provider data.");
+          let errorMessage = "Failed to load provider data.";
+          if (err instanceof Error) {
+            errorMessage = err.message;
+          } else if (typeof err === 'string') {
+            errorMessage = err;
+          }
+          setError(errorMessage);
           setInitialData(null);
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
+          if (errorMessage.includes('User not authenticated')) {
+            // router.push('/login'); // Optionally redirect to login
+          }
+        }
+        setIsLoading(false);
+      };
+      loadProvider();
     }
-  }, [providerId, router]);
+  }, [providerId, router, supabase]);
 
   const handleSuccess = () => {
     console.log('Provider updated successfully, redirecting...');

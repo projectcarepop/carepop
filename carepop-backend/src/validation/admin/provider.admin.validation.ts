@@ -6,10 +6,6 @@ export const createProviderBodySchema = z.object({
   lastName: z.string().min(1, 'Last name is required'),
   email: z.string().email('Invalid email address'),
   phoneNumber: z.string().optional().nullable(),
-  specialization: z.string().optional().nullable(),
-  licenseNumber: z.string().optional().nullable(),
-  credentials: z.string().optional().nullable(), // e.g., MD, RN, PhD
-  bio: z.string().optional().nullable(),
   isActive: z.boolean().optional().default(true),
   // services: z.array(z.string().uuid()).optional(), // Array of service IDs to associate
 });
@@ -20,10 +16,6 @@ export const updateProviderBodySchema = z.object({
   lastName: z.string().min(1, 'Last name is required').optional(),
   email: z.string().email('Invalid email address').optional(),
   phoneNumber: z.string().optional().nullable(),
-  specialization: z.string().optional().nullable(),
-  licenseNumber: z.string().optional().nullable(),
-  credentials: z.string().optional().nullable(),
-  bio: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
   // services: z.array(z.string().uuid()).optional(),
 });
@@ -32,7 +24,7 @@ export const listProvidersSchema = z.object({
   query: z.object({
     page: z.coerce.number().int().positive().optional().default(1),
     limit: z.coerce.number().int().positive().optional().default(10),
-    sortBy: z.enum(['lastName', 'firstName', 'specialization', 'createdAt', 'updatedAt']).optional().default('createdAt'),
+    sortBy: z.enum(['lastName', 'firstName', 'createdAt', 'updatedAt']).optional().default('createdAt'),
     sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
     searchTerm: z.string().optional(),
     isActive: z.preprocess((val) => {
