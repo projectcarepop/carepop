@@ -73,7 +73,7 @@ export default function ClinicsListingPage() {
         }
         
         const data = await response.json();
-        setClinics(data);
+        setClinics(Array.isArray(data.data) ? data.data : []);
       } catch (err: unknown) {
         console.error('Error fetching clinics:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch clinics');
