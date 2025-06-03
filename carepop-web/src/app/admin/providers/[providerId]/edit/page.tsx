@@ -9,9 +9,17 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'; // Ensure this is imported
 // import { toast } from '@/components/ui/use-toast'; // Assuming toast setup
 
-// Define the type for initialData, including the optional id
-// This should match or be compatible with ProviderFormProps['initialData']
-type InitialProviderData = Partial<ProviderFormValues> & { id?: string; isActive?: boolean };
+// Define the type for initialData, including the optional id and other fields
+// that might be fetched, even if not all are used by ProviderFormValues directly.
+// This should align with ProviderFormProps['initialData']
+type InitialProviderData = Partial<ProviderFormValues> & { 
+  id?: string; 
+  isActive?: boolean; 
+  specialization?: string | null; // Add this
+  licenseNumber?: string | null;  // Add this
+  credentials?: string | null;    // Add this
+  bio?: string | null;            // Add this
+};
 
 // Updated fetch function to make a real API call
 async function fetchProviderById(id: string, token: string): Promise<InitialProviderData | null> {
@@ -108,8 +116,9 @@ export default function EditProviderPage(/*{ params }: EditProviderPageProps*/) 
   }, [providerId, router, supabase]);
 
   const handleSuccess = () => {
-    console.log('Provider updated successfully, redirecting...');
+    console.log('Provider updated successfully, refreshing data and redirecting...');
     // toast({ title: "Provider Updated", description: "The provider details have been successfully updated." });
+    router.refresh(); // Add this to invalidate client-side cache and re-fetch server data for next route
     router.push('/admin/providers');
   };
 

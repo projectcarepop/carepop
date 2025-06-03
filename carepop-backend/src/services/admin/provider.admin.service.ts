@@ -133,49 +133,62 @@ export class AdminProviderService {
     console.log(`[AdminProviderService.updateProvider] Incoming providerData (camelCase):`, JSON.stringify(providerData, null, 2));
 
     const dbData: { [key: string]: any } = {};
-    if (providerData.firstName !== undefined) dbData.first_name = providerData.firstName;
-    if (providerData.lastName !== undefined) dbData.last_name = providerData.lastName;
-    if (providerData.email !== undefined) dbData.email = providerData.email;
-    if (providerData.phoneNumber !== undefined) dbData.contact_number = providerData.phoneNumber;
-    if (providerData.isActive !== undefined) dbData.is_active = providerData.isActive;
-    if (providerData.userId !== undefined) dbData.user_id = providerData.userId;
+    // For testing, let's ONLY try to update first_name if it's provided
+    if (providerData.firstName !== undefined) {
+        dbData.first_name = providerData.firstName;
+    } else {
+        console.log("[AdminProviderService.updateProvider] Test: firstName was not in providerData. Skipping update for this test.");
+        return this.getProviderById(providerId); // Or handle as appropriate
+    }
+    // Keep other transformations commented out for this test
+    // if (providerData.lastName !== undefined) dbData.last_name = providerData.lastName;
+    // if (providerData.email !== undefined) dbData.email = providerData.email;
+    // if (providerData.phoneNumber !== undefined) dbData.contact_number = providerData.phoneNumber;
+    // if (providerData.isActive !== undefined) dbData.is_active = providerData.isActive;
+    // if (providerData.userId !== undefined) dbData.user_id = providerData.userId;
 
-    console.log(`[AdminProviderService.updateProvider] Transformed dbData (snake_case) for Supabase:`, JSON.stringify(dbData, null, 2));
+    console.log(`[AdminProviderService.updateProvider] TEST: Simplified dbData for Supabase (only first_name):`, JSON.stringify(dbData, null, 2));
 
     if (Object.keys(dbData).length === 0) {
-      console.log("[AdminProviderService.updateProvider] No valid fields to update after transformation. Fetching current data.");
+      console.log("[AdminProviderService.updateProvider] TEST: No fields to update (first_name missing). Fetching current data.");
       return this.getProviderById(providerId);
     }
 
-    const { data, error }: PostgrestSingleResponse<Provider> = await supabaseServiceRole
+    // TEST: Perform update without an immediate .select().single() to isolate the update operation
+    const { error, count } = await supabaseServiceRole
       .from(this.tableName)
       .update(dbData)
       .eq('id', providerId)
-      .select()
-      .single();
+      .select(); // Keep .select() to get count, but we won't use .single() here for the test
+      // .single(); // Removed .single() for this test
 
     if (error) {
-      console.error(`[AdminProviderService.updateProvider] Supabase error:`, JSON.stringify(error, null, 2));
-      if (error.code === 'PGRST116') {
+      console.error(`[AdminProviderService.updateProvider] TEST: Supabase error on update:`, JSON.stringify(error, null, 2));
+      // ... (existing specific error handling for PGRST116, 23505) ...
+      if (error.code === 'PGRST116') { 
         console.warn(`[AdminProviderService.updateProvider] Provider with ID ${providerId} not found for update.`);
         return null;
       }
-      if (error.code === '23505') {
-        console.warn(`[AdminProviderService.updateProvider] Unique constraint violation for email.`);
-        throw new AppError(`Provider with this email already exists.`, 409);
+      if (error.code === '23505') { 
+        console.warn(`[AdminProviderService.updateProvider] Unique constraint violation.`);
+        throw new AppError(`Unique constraint violation during update.`, 409);
       }
       throw new AppError(`Error updating provider: ${error.message}`, 500, error.details);
     }
-    
-    if (!data) { // This condition might be hit if RLS prevents select, or if .single() expects one row but gets zero after an update that RLS filters out from select.
-        console.warn(`[AdminProviderService.updateProvider] No data returned from Supabase after update for provider ID ${providerId}, though no explicit error was thrown. Possible RLS issue or provider not found by select after update.`);
-        // Depending on desired behavior, you might return null or fetch the current state to see if it changed.
-        // Returning null if no data is selected back might be correct if the update truly didn't apply or if the record became inaccessible.
-        return null; 
-    }
 
-    console.log(`[AdminProviderService.updateProvider] Supabase success. Returned data:`, JSON.stringify(data, null, 2));
-    return data;
+    console.log(`[AdminProviderService.updateProvider] TEST: Supabase update operation completed. Error object:`, error); // Should be null if no error
+    console.log(`[AdminProviderService.updateProvider] TEST: Supabase update operation count of matched rows:`, count); // What is count?
+
+    // After the update, explicitly fetch the provider to see the actual current state from DB
+    // This bypasses any potential issues with what .select().single() might return immediately after update.
+    const updatedProvider = await this.getProviderById(providerId);
+    if (updatedProvider) {
+        console.log("[AdminProviderService.updateProvider] TEST: Data fetched by getProviderById AFTER update operation:", JSON.stringify(updatedProvider, null, 2));
+    } else {
+        console.log("[AdminProviderService.updateProvider] TEST: getProviderById returned null AFTER update operation.");
+    }
+    
+    return updatedProvider;
   }
 
   async deleteProvider(providerId: string): Promise<boolean> {
