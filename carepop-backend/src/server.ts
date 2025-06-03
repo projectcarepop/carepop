@@ -10,6 +10,7 @@ import appointmentRoutes from './routes/appointmentRoutes';
 import availabilityRoutes from './routes/availabilityRoutes';
 import providerRoutes from './routes/providerRoutes';
 import adminClinicRoutes from './routes/admin/clinic.admin.routes';
+import adminProviderRoutes from './routes/admin/provider.admin.routes';
 import { getConfig } from './config/config';
 
 const app: Express = express();
@@ -48,6 +49,7 @@ app.use('/api/v1/directory', directoryRoutes);
 app.use('/api/v1', serviceRoutes);
 app.use('/api/v1', providerRoutes);
 app.use('/api/v1/admin/clinics', adminClinicRoutes);
+app.use('/api/v1/admin/providers', adminProviderRoutes);
 app.use('/api/v1/appointments', appointmentRoutes);
 app.use('/api/v1/availability', availabilityRoutes);
 

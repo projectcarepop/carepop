@@ -1,0 +1,346 @@
+'use client';
+
+import * as React from 'react';
+import {
+  ColumnDef,
+  ColumnFiltersState,
+  SortingState,
+  VisibilityState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from '@tanstack/react-table';
+import { ArrowUpDown, ChevronDown, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import Link from 'next/link';
+import { Badge } from '@/components/ui/badge';
+
+export interface Provider {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  specialization?: string | null;
+  licenseNumber?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const columns: ColumnDef<Provider>[] = [
+  {
+    accessorKey: 'firstName',
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+      >
+        First Name
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => <div>{row.getValue('firstName')}</div>,
+  },
+  {
+    accessorKey: 'lastName',
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+      >
+        Last Name
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => <div>{row.getValue('lastName')}</div>,
+  },
+  {
+    accessorKey: 'email',
+    header: 'Email',
+    cell: ({ row }) => <div>{row.getValue('email')}</div>,
+  },
+  {
+    accessorKey: 'specialization',
+    header: 'Specialization',
+    cell: ({ row }) => <div>{row.getValue('specialization') || 'N/A'}</div>,
+  },
+  {
+    accessorKey: 'isActive',
+    header: 'Status',
+    cell: ({ row }) => (
+      <Badge variant={row.getValue('isActive') ? 'default' : 'secondary'}>
+        {row.getValue('isActive') ? 'Active' : 'Inactive'}
+      </Badge>
+    ),
+    filterFn: (row, id, value) => {
+      if (Array.isArray(value)) {
+        return value.includes(row.getValue(id)?.toString() || '');
+      }
+      return (row.getValue(id)?.toString() || '') === value;
+    },
+  },
+  {
+    id: 'actions',
+    enableHiding: false,
+    cell: ({ row }) => {
+      const provider = row.original;
+      return (
+        <>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem asChild>
+                 <Link href={`/admin/providers/${provider.id}/edit`} className="flex items-center">
+                    <Edit className="mr-2 h-4 w-4" /> Edit
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                className="text-red-600 hover:!text-red-700 flex items-center cursor-pointer"
+              >
+                <Trash2 className="mr-2 h-4 w-4" /> Delete (TODO)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </>
+      );
+    },
+  },
+];
+
+export function ProviderTable() {
+  const [data, setData] = React.useState<Provider[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = React.useState({});
+  
+  React.useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await fetch('/api/v1/admin/providers'); 
+        if (!response.ok) {
+          throw new Error(`Failed to fetch providers: ${response.statusText}`);
+        }
+        const result = await response.json();
+        setData(result.data || []);
+      } catch (e: unknown) {
+        if (e instanceof Error) {
+            setError(e.message);
+        } else {
+            setError('An unknown error occurred');
+        }
+        setData([]);
+      }
+      setIsLoading(false);
+    };
+    fetchData();
+  }, [sorting, columnFilters]);
+
+  const table = useReactTable({
+    data,
+    columns,
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    state: {
+      sorting,
+      columnFilters,
+      columnVisibility,
+      rowSelection,
+    },
+  });
+
+  if (isLoading) {
+    return <div>Loading providers...</div>;
+  }
+
+  if (error) {
+    return <div className="text-red-500">Error: {error}</div>;
+  }
+
+  return (
+    <div className="w-full">
+      <div className="flex items-center py-4 gap-2">
+        <Input
+          placeholder="Filter by name/specialization..."
+          value={(table.getColumn('firstName')?.getFilterValue() as string) ?? ''}
+          onChange={(event) => {
+            table.getColumn('firstName')?.setFilterValue(event.target.value);
+          }}
+          className="max-w-sm"
+        />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="ml-auto">
+              Status <ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuCheckboxItem
+                key="all-status"
+                checked={!table.getColumn('isActive')?.getFilterValue()}
+                onCheckedChange={() => table.getColumn('isActive')?.setFilterValue(undefined)}
+            >
+                All Statuses
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+                key="active-status"
+                checked={table.getColumn('isActive')?.getFilterValue() === 'true'}
+                onCheckedChange={() => table.getColumn('isActive')?.setFilterValue('true')}
+            >
+                Active
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+                key="inactive-status"
+                checked={table.getColumn('isActive')?.getFilterValue() === 'false'}
+                onCheckedChange={() => table.getColumn('isActive')?.setFilterValue('false')}
+            >
+                Inactive
+            </DropdownMenuCheckboxItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="ml-auto">
+              Columns <ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {table
+              .getAllColumns()
+              .filter((column) => column.getCanHide())
+              .map((column) => {
+                return (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    className="capitalize"
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) =>
+                      column.toggleVisibility(!!value)
+                    }
+                  >
+                    {column.id.replace(/_/g, ' ')}
+                  </DropdownMenuCheckboxItem>
+                );
+              })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  return (
+                    <TableHead key={header.id}>
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </TableHead>
+                  );
+                })}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && 'selected'}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  No results.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      <div className="flex items-center justify-end space-x-2 py-4">
+        <div className="flex-1 text-sm text-muted-foreground">
+          Page {table.getState().pagination?.pageIndex !== undefined ? table.getState().pagination.pageIndex + 1 : 1} of{" "}
+          {table.getPageCount() > 0 ? table.getPageCount() : 1} 
+          (Total: {table.getFilteredRowModel().rows.length} rows)
+        </div>
+        <div className="space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+} 
