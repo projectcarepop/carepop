@@ -19,7 +19,7 @@ interface UpdateClinicDto {
   longitude?: number | null;
   contact_phone?: string | null;
   contact_email?: string | null;
-  website?: string | null;
+  website_url?: string | null;
   operating_hours?: string | null;
   is_active: boolean;
   fpop_chapter_id?: string | null;
@@ -43,7 +43,7 @@ export default function EditClinicPage({ params }: { params: Promise<{ id: strin
     longitude: null,
     contact_phone: null,
     contact_email: null,
-    website: null,
+    website_url: null,
     operating_hours: null,
     is_active: true,
     fpop_chapter_id: null,
@@ -101,6 +101,17 @@ export default function EditClinicPage({ params }: { params: Promise<{ id: strin
         }
         console.log('EditClinicPage: Actual clinic data to use for form:', clinicData);
 
+        // Prepare operating_hours for the textarea
+        let operatingHoursForForm: string | null = null;
+        if (clinicData.operating_hours) {
+          if (typeof clinicData.operating_hours === 'object') {
+            operatingHoursForForm = JSON.stringify(clinicData.operating_hours, null, 2);
+          } else {
+            // If it's already a string (e.g. from previous incorrect save or if API returns it as string)
+            operatingHoursForForm = clinicData.operating_hours;
+          }
+        }
+
         const newFormData = {
           name: clinicData.name || '',
           full_address: clinicData.full_address || '',
@@ -108,8 +119,8 @@ export default function EditClinicPage({ params }: { params: Promise<{ id: strin
           longitude: clinicData.longitude,
           contact_phone: clinicData.contact_phone || null,
           contact_email: clinicData.contact_email || null,
-          website: clinicData.website_url || null, // Use website_url from backend data
-          operating_hours: clinicData.operating_hours || null,
+          website_url: clinicData.website_url || null,
+          operating_hours: operatingHoursForForm, // Use the processed string
           is_active: clinicData.is_active === undefined ? true : clinicData.is_active,
           fpop_chapter_id: clinicData.fpop_chapter_id || null,
           notes: clinicData.notes || null,
@@ -258,8 +269,8 @@ export default function EditClinicPage({ params }: { params: Promise<{ id: strin
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="website">Website</Label>
-              <Input id="website" name="website" type="url" value={formData.website ?? ''} onChange={handleChange} placeholder="e.g., https://clinic.com" />
+              <Label htmlFor="website_url">Website</Label>
+              <Input id="website_url" name="website_url" type="url" value={formData.website_url ?? ''} onChange={handleChange} placeholder="e.g., https://clinic.com" />
             </div>
 
             <div className="space-y-2">
@@ -272,9 +283,19 @@ export default function EditClinicPage({ params }: { params: Promise<{ id: strin
                 placeholder='e.g., Mon-Fri: 9am-5pm; Sat: 10am-2pm (Call to confirm)'
                 rows={4}
               />
-              <p className="text-xs text-muted-foreground">
-                Enter operating hours as a descriptive string. Example: {`Mon-Fri: 9am-5pm; Sat: 10am-2pm (Call to confirm)`}
-              </p>
+              <div className="text-xs text-muted-foreground">
+                Enter operating hours as a descriptive string OR a valid JSON string.
+                Example of JSON structure:
+                <pre className="mt-1 p-2 bg-gray-100 rounded text-xs dark:bg-gray-800 whitespace-pre-wrap">
+{`{
+  "monday": { "open": "09:00", "close": "17:00", "notes": "By appointment" },
+  "tuesday": { "open": "09:00", "close": "17:00" },
+  "wednesday": { "open": "09:00", "close": "12:00" },
+  "saturday": { "open": "10:00", "close": "14:00", "notes": "Walk-ins welcome" }
+  // Add other days as needed. Times in HH:MM format. Day keys in lowercase.
+}`}
+                </pre>
+              </div>
             </div>
             
             <div className="space-y-2">
