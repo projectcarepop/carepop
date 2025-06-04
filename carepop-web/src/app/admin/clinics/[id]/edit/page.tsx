@@ -20,7 +20,7 @@ interface UpdateClinicDto {
   contact_phone?: string | null;
   contact_email?: string | null;
   website?: string | null;
-  operating_hours?: Record<string, string> | string | null;
+  operating_hours?: Record<string, { open: string; close: string; notes?: string }> | null;
   is_active: boolean;
   fpop_chapter_id?: string | null;
   notes?: string | null;
@@ -81,14 +81,14 @@ export default function EditClinicPage({ params }: { params: Promise<{ id: strin
         console.log('EditClinicPage: Fetch response status:', response.status);
 
         if (!response.ok) {
-          let errorPayload: any = { message: `HTTP error! status: ${response.status}` };
+          let errorPayload: Record<string, unknown> | { message?: string } = { message: `HTTP error! status: ${response.status}` };
           try {
             errorPayload = await response.json();
             console.error('EditClinicPage: Error response payload:', errorPayload);
-          } catch (e) {
+          } catch {
             console.error('EditClinicPage: Could not parse error response as JSON.');
           }
-          throw new Error(errorPayload.message || `HTTP error! status: ${response.status}`);
+          throw new Error((errorPayload as {message?: string}).message || `HTTP error! status: ${response.status}`);
         }
         
         const responseBody = await response.json(); 
@@ -172,13 +172,13 @@ export default function EditClinicPage({ params }: { params: Promise<{ id: strin
       return;
     }
 
-    let parsedOperatingHours: Record<string, string> | null = null;
+    let parsedOperatingHours: Record<string, { open: string; close: string; notes?: string }> | null = null;
     if (operatingHoursString.trim() !== '') {
       try {
         parsedOperatingHours = JSON.parse(operatingHoursString);
       } catch (jsonError) {
         console.error("Error parsing operating hours JSON:", jsonError);
-        setError(`Operating hours must be a valid JSON object (e.g., {\"Mon\": \"9am-5pm\"}) or empty. Error: ${jsonError instanceof Error ? jsonError.message : 'Invalid JSON'}`);
+        setError(`Operating hours must be a valid JSON object (e.g., { "Mon-Fri": { "open": "09:00", "close": "17:00" } }) or empty. Error: ${jsonError instanceof Error ? jsonError.message : 'Invalid JSON'}`);
         setIsSaving(false);
         return;
       }
@@ -295,11 +295,11 @@ export default function EditClinicPage({ params }: { params: Promise<{ id: strin
                 name="operating_hours" 
                 value={operatingHoursString} 
                 onChange={handleOperatingHoursChange} 
-                placeholder='e.g., {&#92;"Mon\": \"9am-5pm\", \"Tue\": \"9am-5pm\", \"Wed\": \"Closed\"}' 
+                placeholder='e.g., { "Mon-Fri": { "open": "09:00", "close": "17:00" }, "Sat": { "open": "10:00", "close": "14:00", "notes": "By appointment" } }'
                 rows={4}
               />
               <p className="text-xs text-muted-foreground">
-                Enter as a valid JSON object. Example: {`{"Mon": "9am-5pm", "Tue-Fri": "9am-6pm", "Sat": "10am-2pm", "Sun": "Closed"}`}
+                Enter as a valid JSON object. Example: {`{ "Mon-Fri": { "open": "09:00", "close": "17:00" }, "Sat": { "open": "10:00", "close": "14:00", "notes": "By appointment" } }`}
               </p>
             </div>
             
