@@ -22,7 +22,7 @@ export const createClinicSchema = z.object({
   longitude: z.number().min(-180).max(180).optional(),
   contact_phone: z.string().optional(),
   contact_email: z.string().email("Invalid email address").optional(),
-  website_url: z.string().url("Invalid URL").optional(),
+  website_url: z.string().url("Invalid URL").optional().nullable(),
   operating_hours: operatingHoursSchema.optional(), // JSONB in DB
   services_offered: z.array(z.string()).optional(), // TEXT[] in DB
   fpop_chapter_affiliation: z.string().optional(),
