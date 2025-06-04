@@ -58,8 +58,19 @@ export default function EditClinicPage({ params }: { params: Promise<{ id: strin
   // Fetch the clinic data to pre-populate the form
   useEffect(() => {
     const fetchClinicDetails = async () => {
-      if (!session?.access_token) return;
-      
+      if (!session?.access_token) {
+        console.log('EditClinicPage: No session or access token, aborting fetch.');
+        return;
+      }
+      if (!resolvedParams.id) {
+        console.log('EditClinicPage: No clinic ID in params, aborting fetch.');
+        return;
+      }
+
+      console.log(`EditClinicPage: Attempting to fetch clinic details for ID: ${resolvedParams.id}`);
+      setIsLoading(true);
+      setError(null);
+
       try {
         const response = await fetch(`/api/v1/admin/clinics/${resolvedParams.id}`, {
           headers: {
@@ -67,41 +78,70 @@ export default function EditClinicPage({ params }: { params: Promise<{ id: strin
           }
         });
         
+        console.log('EditClinicPage: Fetch response status:', response.status);
+
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          let errorPayload: any = { message: `HTTP error! status: ${response.status}` };
+          try {
+            errorPayload = await response.json();
+            console.error('EditClinicPage: Error response payload:', errorPayload);
+          } catch (e) {
+            console.error('EditClinicPage: Could not parse error response as JSON.');
+          }
+          throw new Error(errorPayload.message || `HTTP error! status: ${response.status}`);
         }
         
-        const data = await response.json();
-        
-        // Format the data for the form
-        setFormData({
-          name: data.name,
-          full_address: data.full_address,
-          latitude: data.latitude,
-          longitude: data.longitude,
-          contact_phone: data.contact_phone,
-          contact_email: data.contact_email,
-          website: data.website,
-          operating_hours: data.operating_hours,
-          is_active: data.is_active,
-          fpop_chapter_id: data.fpop_chapter_id,
-          notes: data.notes,
-        });
-        
-        // Set operating hours string if it exists
-        if (data.operating_hours) {
-          setOperatingHoursString(JSON.stringify(data.operating_hours, null, 2));
+        const responseBody = await response.json(); 
+        console.log('EditClinicPage: Fetched response body:', responseBody);
+
+        const clinicData = responseBody.data; // Access the nested data object
+
+        if (!clinicData) {
+          console.error('EditClinicPage: Clinic data not found in response body.data');
+          throw new Error('Clinic data not found in response.');
         }
+        console.log('EditClinicPage: Actual clinic data to use for form:', clinicData);
+
+        const newFormData = {
+          name: clinicData.name || '',
+          full_address: clinicData.full_address || '',
+          latitude: clinicData.latitude,
+          longitude: clinicData.longitude,
+          contact_phone: clinicData.contact_phone || null,
+          contact_email: clinicData.contact_email || null,
+          website: clinicData.website_url || null, // Use website_url from backend data
+          operating_hours: clinicData.operating_hours || null,
+          is_active: clinicData.is_active === undefined ? true : clinicData.is_active,
+          fpop_chapter_id: clinicData.fpop_chapter_id || null,
+          notes: clinicData.notes || null,
+        };
+        setFormData(newFormData);
+        console.log('EditClinicPage: formData state after setting:', newFormData);
+        
+        if (clinicData.operating_hours && typeof clinicData.operating_hours === 'object') {
+          const ohString = JSON.stringify(clinicData.operating_hours, null, 2);
+          setOperatingHoursString(ohString);
+          console.log('EditClinicPage: operatingHoursString set to:', ohString);
+        } else {
+          setOperatingHoursString('');
+          console.log('EditClinicPage: operatingHoursString set to empty string.');
+        }
+        console.log('EditClinicPage: Successfully set form data.');
+
       } catch (err: unknown) {
-        console.error('Error fetching clinic details:', err);
+        console.error('EditClinicPage: Error in fetchClinicDetails catch block:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch clinic details');
       } finally {
         setIsLoading(false);
+        console.log('EditClinicPage: fetchClinicDetails finished, isLoading set to false.');
       }
     };
     
-    if (!authLoading && session) {
+    if (!authLoading && session && resolvedParams.id) {
+      console.log('EditClinicPage: Auth loaded, session and ID present. Calling fetchClinicDetails.');
       fetchClinicDetails();
+    } else {
+      console.log('EditClinicPage: Conditions not met for calling fetchClinicDetails.', { authLoading, sessionExists: !!session, idExists: !!resolvedParams.id });
     }
   }, [resolvedParams.id, session, authLoading]);
 

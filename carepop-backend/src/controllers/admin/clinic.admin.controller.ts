@@ -136,32 +136,46 @@ export class AdminClinicController {
   }
 
   async updateClinic(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    const { clinicId: rawClinicId } = req.params;
+    console.log(`[AdminClinicController] updateClinic CALLED for ID: ${rawClinicId}, Timestamp: ${new Date().toISOString()}`);
+    console.log(`[AdminClinicController] Request body:`, req.body);
+
     try {
       // 1. Validate clinicId from URL params
       const { clinicId } = clinicIdParamSchema.parse(req.params);
+      console.log(`[AdminClinicController] Validated clinicId: ${clinicId}`);
+      
       // 2. Validate request body for updates
       const validatedBody = updateClinicSchema.parse(req.body);
-      const updatorUserId = req.user?.id;
+      console.log(`[AdminClinicController] Validated request body:`, validatedBody);
 
+      const updatorUserId = req.user?.id;
       if (!updatorUserId) {
+        console.error('[AdminClinicController] User ID not found in token for update operation.');
         res.status(StatusCodes.UNAUTHORIZED).json({ message: 'User ID not found in token.' });
         return;
       }
+      console.log(`[AdminClinicController] Updator User ID: ${updatorUserId}`);
 
       // 3. Call the service
+      console.log(`[AdminClinicController] Calling clinicService.updateClinic for ID: ${clinicId}`);
       const updatedClinic = await this.clinicService.updateClinic(clinicId, validatedBody, updatorUserId);
+      console.log(`[AdminClinicController] clinicService.updateClinic returned:`, updatedClinic);
 
       // 4. Handle response
       if (!updatedClinic) {
+        console.log(`[AdminClinicController] Clinic with ID ${clinicId} not found or update failed (service returned null/undefined). Responding 404.`);
         res.status(StatusCodes.NOT_FOUND).json({ message: `Clinic with ID ${clinicId} not found or update failed.` });
         return;
       }
 
+      console.log(`[AdminClinicController] Clinic with ID ${clinicId} updated successfully. Responding 200.`);
       res.status(StatusCodes.OK).json({
         message: `Clinic with ID ${clinicId} updated successfully`,
         data: updatedClinic,
       });
     } catch (error) {
+      console.error(`[AdminClinicController] ERROR in updateClinic for ID: ${rawClinicId}:`, error);
       next(error);
     }
   }

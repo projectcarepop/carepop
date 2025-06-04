@@ -122,22 +122,46 @@ export class AdminClinicService {
   }
 
   async updateClinic(clinicId: string, clinicData: UpdateClinicInput, updatorUserId: string): Promise<Clinic | null> {
-    const { data, error } = await supabaseServiceRole // DIAGNOSTIC: Use imported client directly
-      .from('clinics')
-      .update({ ...clinicData, updated_by: updatorUserId, updated_at: new Date().toISOString() })
-      .eq('id', clinicId)
-      .select('*')
-      .single();
+    console.log(`[AdminClinicService] updateClinic CALLED for ID: ${clinicId}, Timestamp: ${new Date().toISOString()}`);
+    console.log(`[AdminClinicService] Received clinicData for update:`, clinicData);
+    console.log(`[AdminClinicService] Updator User ID: ${updatorUserId}`);
 
-    if (error) {
-      if (error.code === 'PGRST116') {
-        console.warn(`Clinic with ID ${clinicId} not found for update.`);
-        return null; 
+    try {
+      const { data, error } = await this.supabase
+        .from('clinics')
+        .update({ 
+          ...clinicData, 
+          updated_by: updatorUserId,
+          updated_at: new Date().toISOString(), 
+        })
+        .eq('id', clinicId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error(`[AdminClinicService] Supabase error updating clinic ID ${clinicId}:`, error);
+        // Consider if specific error codes should lead to different handling or logging
+        // For example, if error.code === 'PGRST116' (resource not found), it's a 404 scenario
+        if (error.code === 'PGRST116') { // Not found
+          return null;
+        }
+        throw error; // Re-throw other Supabase errors to be caught by controller
       }
-      console.error(`Error updating clinic ID ${clinicId} in Supabase:`, error);
-      throw new Error(`Could not update clinic ${clinicId}: ${error.message}`);
+
+      if (!data) {
+        console.log(`[AdminClinicService] No data returned from Supabase after update for clinic ID ${clinicId} (implies not found or no change?).`);
+        // This case might also indicate the clinic was not found if .single() is used and returns null without an error
+        return null;
+      }
+      
+      console.log(`[AdminClinicService] Clinic ID ${clinicId} updated successfully in Supabase. Returned data:`, data);
+      return data as Clinic;
+    } catch (error) {
+      console.error(`[AdminClinicService] Exception in updateClinic for ID ${clinicId}:`, error);
+      // Re-throw the error to be handled by the controller and global error handler
+      // Avoid returning null here if it's an unexpected exception, let it propagate
+      throw error;
     }
-    return data;
   }
 
   async deleteClinic(clinicId: string): Promise<{ success: boolean; message?: string }> {
