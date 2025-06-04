@@ -1,13 +1,32 @@
 import { z } from 'zod';
 
-// Helper for operating hours if you want a specific structure, e.g., for each day
-const operatingHoursSchema = z.record(
-  z.string(), // Day of week e.g., "monday", "tuesday"
-  z.object({
-    open: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Invalid time format, HH:MM expected"), // HH:MM format
-    close: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Invalid time format, HH:MM expected"),
-    notes: z.string().optional()
-  }).optional()
+// Definition for a single day's schedule object
+const dayScheduleObjectDefinition = z.object({
+  open: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Invalid time format, HH:MM expected"),
+  close: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Invalid time format, HH:MM expected"),
+  notes: z.string().optional()
+});
+
+// Schema for an individual day's schedule, handles stringified JSON for the day's schedule
+const individualDayScheduleSchema = z.preprocess((val) => {
+  if (typeof val === 'string') {
+    try {
+      const parsed = JSON.parse(val);
+      // Ensure parsed is an object before returning, otherwise let next schema fail it
+      if (typeof parsed === 'object' && parsed !== null) return parsed;
+      return val; 
+    } catch (e) { 
+      // If JSON.parse fails, return original string to let next schema fail it
+      return val; 
+    }
+  }
+  return val;
+}, dayScheduleObjectDefinition);
+
+// Schema for the group of operating hours (map of day strings to schedules)
+const operatingHoursGroupSchema = z.record(
+  z.string(), // Day of week key e.g., "monday", "tuesday"
+  individualDayScheduleSchema.optional() // Each day's schedule is optional and preprocessed
 );
 
 export const createClinicSchema = z.object({
@@ -23,12 +42,12 @@ export const createClinicSchema = z.object({
   contact_phone: z.string().optional(),
   contact_email: z.string().email("Invalid email address").optional(),
   website_url: z.string().url("Invalid URL").optional().nullable(),
-  operating_hours: z.preprocess((val) => {
+  operating_hours: z.preprocess((val) => { // Outer preprocess for the whole operating_hours field
     if (val === null || val === undefined) return val; // Pass through null or undefined
     if (typeof val === 'string') {
       try {
         const parsed = JSON.parse(val);
-        // Ensure the parsed value is an object, not a primitive if JSON string was e.g. '"string_literal"'
+        // Ensure the parsed value is an object, not a primitive
         if (typeof parsed === 'object' && parsed !== null) {
           return parsed;
         }
@@ -40,7 +59,7 @@ export const createClinicSchema = z.object({
     }
     // If it's already an object (or anything else not a string), pass it through
     return val;
-  }, operatingHoursSchema).optional().nullable(), // JSONB in DB
+  }, operatingHoursGroupSchema).optional().nullable(), // JSONB in DB
   services_offered: z.array(z.string()).optional(), // TEXT[] in DB
   fpop_chapter_affiliation: z.string().optional(),
   additional_notes: z.string().optional(),
