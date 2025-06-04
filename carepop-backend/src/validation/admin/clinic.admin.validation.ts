@@ -23,7 +23,24 @@ export const createClinicSchema = z.object({
   contact_phone: z.string().optional(),
   contact_email: z.string().email("Invalid email address").optional(),
   website_url: z.string().url("Invalid URL").optional().nullable(),
-  operating_hours: operatingHoursSchema.optional().nullable(), // JSONB in DB
+  operating_hours: z.preprocess((val) => {
+    if (val === null || val === undefined) return val; // Pass through null or undefined
+    if (typeof val === 'string') {
+      try {
+        const parsed = JSON.parse(val);
+        // Ensure the parsed value is an object, not a primitive if JSON string was e.g. '"string_literal"'
+        if (typeof parsed === 'object' && parsed !== null) {
+          return parsed;
+        }
+        return val; // Return original string if parsed value is not an object, to let Zod handle it
+      } catch (e) {
+        // If JSON.parse fails, return the original string to let Zod validation fail as expected
+        return val;
+      }
+    }
+    // If it's already an object (or anything else not a string), pass it through
+    return val;
+  }, operatingHoursSchema).optional().nullable(), // JSONB in DB
   services_offered: z.array(z.string()).optional(), // TEXT[] in DB
   fpop_chapter_affiliation: z.string().optional(),
   additional_notes: z.string().optional(),
