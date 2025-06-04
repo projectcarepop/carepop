@@ -161,7 +161,7 @@ export class AdminClinicController {
 
       // 3. Call the service
       console.log(`[AdminClinicController] Calling clinicService.updateClinic for ID: ${clinicId}`);
-      const updatedClinic = await this.clinicService.updateClinic(clinicId, validatedBody, updatorUserId);
+      const updatedClinic = await this.clinicService.updateClinic(clinicId, validatedBody, updatorUserId!);
       console.log(`[AdminClinicController] clinicService.updateClinic returned:`, updatedClinic);
 
       // 4. Handle response
