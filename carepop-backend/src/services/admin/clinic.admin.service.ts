@@ -2,7 +2,9 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '../../types/supabase.types'; // Assuming this will be the correct path after type generation
 import { CreateClinicInput, UpdateClinicInput }
   from '../../validation/admin/clinic.admin.validation';
-import { supabaseServiceRole } from '../../config/supabaseClient'; // Corrected import
+// Comment out direct import if we plan to inject it, or keep for fallback/type
+// import { supabaseServiceRole } from '../../config/supabaseClient'; 
+import logger from '../../utils/logger'; // Assuming you have a logger utility
 
 // Local interface representing a Clinic. 
 // Ideally, after types are correctly generated and stable,
@@ -51,10 +53,24 @@ export interface ListClinicsOptions {
 export class AdminClinicService {
   private supabase: SupabaseClient<Database>;
 
-  constructor() {
-    // IMPORTANT: This service uses service_role key.
-    // Ensure calling code (controller/middleware) has ALREADY VERIFIED ADMIN ROLE.
-    this.supabase = supabaseServiceRole; // Correctly assign the imported client
+  constructor(supabaseInstance?: SupabaseClient<Database>) {
+    if (supabaseInstance) {
+      this.supabase = supabaseInstance;
+      logger.info('AdminClinicService initialized with injected Supabase client.');
+    } else {
+      // Fallback or error if direct injection is the primary strategy
+      // This path should ideally not be taken if injection works.
+      logger.error('AdminClinicService: Supabase client was NOT injected! Attempting to use imported one (this might fail).');
+      // Re-enable direct import if this fallback is desired and tested carefully
+      // This line WILL cause issues if supabaseServiceRole is undefined at import time.
+      // this.supabase = supabaseServiceRole 
+      throw new Error('AdminClinicService constructor: Supabase client instance is required.');
+    }
+
+    if (!this.supabase || typeof this.supabase.from !== 'function') {
+        logger.error('AdminClinicService: Injected Supabase client is invalid or missing .from method.', { supabase: this.supabase });
+        throw new Error('AdminClinicService: Injected Supabase client is invalid.');
+    }
   }
 
   async listClinics(options: ListClinicsOptions = {}): Promise<Clinic[]> {
@@ -88,7 +104,7 @@ export class AdminClinicService {
     const { data, error } = await query;
 
     if (error) {
-      console.error('Error listing clinics in Supabase:', error);
+      logger.error('Error listing clinics in Supabase (AdminClinicService):', error);
       throw new Error(`Could not list clinics: ${error.message}`);
     }
     // After regenerating types, if Clinic is Database['public']['Tables']['clinics']['Row'], this cast might not be needed
@@ -113,7 +129,7 @@ export class AdminClinicService {
     const { error, count } = await query;
 
     if (error) {
-      console.error('Error counting clinics in Supabase:', error);
+      logger.error('Error counting clinics in Supabase (AdminClinicService):', error);
       throw new Error(`Could not count clinics: ${error.message}`);
     }
     return count || 0;
@@ -128,7 +144,7 @@ export class AdminClinicService {
 
     if (error) {
       if (error.code !== 'PGRST116') { 
-        console.error(`Error fetching clinic by ID (${clinicId}) from Supabase:`, error);
+        logger.error(`Error fetching clinic by ID (${clinicId}) from Supabase (AdminClinicService):`, error);
         throw new Error(`Could not fetch clinic by ID ${clinicId}: ${error.message}`);
       }
     }
@@ -150,14 +166,14 @@ export class AdminClinicService {
       .single(); 
 
     if (error || !data) {
-      console.error('Error creating clinic in Supabase:', error);
+      logger.error('Error creating clinic in Supabase (AdminClinicService):', error);
       throw new Error(`Could not create clinic: ${error?.message || 'No data returned'}`);
     }
     return data as Clinic;
   }
 
   async updateClinic(clinicId: string, clinicData: UpdateClinicInput /* updatorUserId: string - Removed */): Promise<Clinic | null> {
-    console.log(`[AdminClinicService] updateClinic CALLED for ID: ${clinicId}`);
+    logger.info(`[AdminClinicService] updateClinic CALLED for ID: ${clinicId}`);
 
     // Payload should only contain fields present in ClinicUpdatePayload (derived from DB schema)
     const payload: ClinicUpdatePayload = {
@@ -175,7 +191,7 @@ export class AdminClinicService {
         .single();
 
       if (error) {
-        console.error(`[AdminClinicService] Supabase error updating clinic ID ${clinicId}:`, error);
+        logger.error(`[AdminClinicService] Supabase error updating clinic ID ${clinicId}:`, error);
         // Consider if specific error codes should lead to different handling or logging
         // For example, if error.code === 'PGRST116' (resource not found), it's a 404 scenario
         if (error.code === 'PGRST116') { // Not found
@@ -185,15 +201,15 @@ export class AdminClinicService {
       }
 
       if (!data) {
-        console.log(`[AdminClinicService] No data returned from Supabase after update for clinic ID ${clinicId} (implies not found or no change?).`);
+        logger.warn(`[AdminClinicService] No data returned from Supabase after update for clinic ID ${clinicId}.`);
         // This case might also indicate the clinic was not found if .single() is used and returns null without an error
         return null;
       }
       
-      console.log(`[AdminClinicService] Clinic ID ${clinicId} updated successfully.`);
+      logger.info(`[AdminClinicService] Clinic ID ${clinicId} updated successfully.`);
       return data as Clinic;
     } catch (error) {
-      console.error(`[AdminClinicService] Exception in updateClinic for ID ${clinicId}:`, error);
+      logger.error(`[AdminClinicService] Exception in updateClinic for ID ${clinicId}:`, error);
       // Re-throw the error to be handled by the controller and global error handler
       // Avoid returning null here if it's an unexpected exception, let it propagate
       throw error;
@@ -212,7 +228,7 @@ export class AdminClinicService {
       .eq('id', clinicId);
 
     if (error) {
-      console.error(`Error deleting clinic ID ${clinicId} from Supabase:`, error);
+      logger.error(`Error deleting clinic ID ${clinicId} from Supabase (AdminClinicService):`, error);
       throw new Error(`Could not delete clinic ${clinicId}: ${error.message}`);
     }
 

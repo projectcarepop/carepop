@@ -8,12 +8,14 @@ import {
 } from '../../validation/admin/clinic.admin.validation';
 import { StatusCodes } from 'http-status-codes';
 import { AuthenticatedRequest } from '../../middleware/authMiddleware';
+import { supabaseServiceRole } from '../../config/supabaseClient'; // Import the service role client
 
 export class AdminClinicController {
   private clinicService: AdminClinicService;
 
   constructor() {
-    this.clinicService = new AdminClinicService();
+    // Pass the imported supabaseServiceRole client to the service constructor
+    this.clinicService = new AdminClinicService(supabaseServiceRole);
     // Bind methods to ensure 'this' context is correct when they are used as route handlers
     this.createClinic = this.createClinic.bind(this);
     this.listClinics = this.listClinics.bind(this);
