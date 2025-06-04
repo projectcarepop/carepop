@@ -20,7 +20,7 @@ interface UpdateClinicDto {
   contact_phone?: string | null;
   contact_email?: string | null;
   website?: string | null;
-  operating_hours?: Record<string, { open: string; close: string; notes?: string }> | null;
+  operating_hours?: string | null;
   is_active: boolean;
   fpop_chapter_id?: string | null;
   notes?: string | null;
@@ -53,7 +53,6 @@ export default function EditClinicPage({ params }: { params: Promise<{ id: strin
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [operatingHoursString, setOperatingHoursString] = useState('');
 
   // Fetch the clinic data to pre-populate the form
   useEffect(() => {
@@ -118,14 +117,6 @@ export default function EditClinicPage({ params }: { params: Promise<{ id: strin
         setFormData(newFormData);
         console.log('EditClinicPage: formData state after setting:', newFormData);
         
-        if (clinicData.operating_hours && typeof clinicData.operating_hours === 'object') {
-          const ohString = JSON.stringify(clinicData.operating_hours, null, 2);
-          setOperatingHoursString(ohString);
-          console.log('EditClinicPage: operatingHoursString set to:', ohString);
-        } else {
-          setOperatingHoursString('');
-          console.log('EditClinicPage: operatingHoursString set to empty string.');
-        }
         console.log('EditClinicPage: Successfully set form data.');
 
       } catch (err: unknown) {
@@ -155,10 +146,6 @@ export default function EditClinicPage({ params }: { params: Promise<{ id: strin
       setFormData(prev => ({ ...prev, [name]: value === '' ? null : value }));
     }
   };
-  
-  const handleOperatingHoursChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setOperatingHoursString(e.target.value);
-  };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -172,21 +159,8 @@ export default function EditClinicPage({ params }: { params: Promise<{ id: strin
       return;
     }
 
-    let parsedOperatingHours: Record<string, { open: string; close: string; notes?: string }> | null = null;
-    if (operatingHoursString.trim() !== '') {
-      try {
-        parsedOperatingHours = JSON.parse(operatingHoursString);
-      } catch (jsonError) {
-        console.error("Error parsing operating hours JSON:", jsonError);
-        setError(`Operating hours must be a valid JSON object (e.g., { "Mon-Fri": { "open": "09:00", "close": "17:00" } }) or empty. Error: ${jsonError instanceof Error ? jsonError.message : 'Invalid JSON'}`);
-        setIsSaving(false);
-        return;
-      }
-    }
-
     const payload: UpdateClinicDto = {
       ...formData,
-      operating_hours: parsedOperatingHours,
     };
     
     // Basic client-side validation
@@ -289,17 +263,17 @@ export default function EditClinicPage({ params }: { params: Promise<{ id: strin
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="operating_hours">Operating Hours (JSON format)</Label>
+              <Label htmlFor="operating_hours">Operating Hours</Label>
               <Textarea 
                 id="operating_hours" 
                 name="operating_hours" 
-                value={operatingHoursString} 
-                onChange={handleOperatingHoursChange} 
-                placeholder='e.g., { "Mon-Fri": { "open": "09:00", "close": "17:00" }, "Sat": { "open": "10:00", "close": "14:00", "notes": "By appointment" } }'
+                value={formData.operating_hours ?? ''}
+                onChange={handleChange}
+                placeholder='e.g., Mon-Fri: 9am-5pm; Sat: 10am-2pm (Call to confirm)'
                 rows={4}
               />
               <p className="text-xs text-muted-foreground">
-                Enter as a valid JSON object. Example: {`{ "Mon-Fri": { "open": "09:00", "close": "17:00" }, "Sat": { "open": "10:00", "close": "14:00", "notes": "By appointment" } }`}
+                Enter operating hours as a descriptive string. Example: {`Mon-Fri: 9am-5pm; Sat: 10am-2pm (Call to confirm)`}
               </p>
             </div>
             
