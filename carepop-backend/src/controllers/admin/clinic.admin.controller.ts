@@ -141,8 +141,6 @@ export class AdminClinicController {
     console.log(`[AdminClinicController] Request body:`, req.body);
 
     try {
-      throw new Error('CUSTOM TEST ERROR - BEFORE VALIDATION'); // Temporary line for testing
-
       // 1. Validate clinicId from URL params
       const { clinicId } = clinicIdParamSchema.parse(req.params);
       console.log(`[AdminClinicController] Validated clinicId: ${clinicId}`);

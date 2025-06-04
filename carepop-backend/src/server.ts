@@ -12,6 +12,7 @@ import providerRoutes from './routes/providerRoutes';
 import adminClinicRoutes from './routes/admin/clinic.admin.routes';
 import adminProviderRoutes from './routes/admin/provider.admin.routes';
 import { getConfig } from './config/config';
+import { ZodError } from 'zod';
 
 const app: Express = express();
 const config = getConfig();
@@ -55,11 +56,30 @@ app.use('/api/v1/availability', availabilityRoutes);
 
 // --- Centralized Error Handling ---
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  logger.error(`Unhandled Error: ${err.message}`, { error: err, stack: err.stack });
-  if (res.headersSent) {
-    return next(err);
+  if (err instanceof ZodError) {
+    logger.error('Zod Validation Error:', {
+      message: err.message,
+      errors: err.errors,
+      originalError: err,
+      stack: err.stack
+    });
+    if (res.headersSent) {
+      return next(err);
+    }
+    return res.status(400).json({
+      message: 'Validation failed',
+      errors: err.flatten().fieldErrors
+    });
+  } else {
+    logger.error(`Unhandled Error: ${err.message}`, {
+      error: err,
+      stack: err.stack,
+    });
+    if (res.headersSent) {
+      return next(err);
+    }
+    res.status(500).json({ message: 'Internal Server Error', error: err.message });
   }
-  res.status(500).json({ message: 'Internal Server Error', error: err.message });
 });
 
 // --- 404 Handler ---
