@@ -88,14 +88,21 @@ async function initializeSupabase() {
 
 }
 
-// Initialize Supabase async and handle potential errors
-initializeSupabase().catch(error => {
+// Store the promise of initialization
+const supabaseInitializationPromise = initializeSupabase().catch(error => {
   console.error("Failed to initialize Supabase clients:", error);
-  process.exit(1); // Exit if Supabase cannot be initialized
+  // Instead of process.exit here, let the main app decide or rethrow
+  // process.exit(1);
+  throw error; // Rethrow to be caught by the main server startup
 });
 
-// Export both initialized clients
-export { supabaseAnonClient as supabase, supabaseServiceRoleClient as supabaseServiceRole }; 
+// Export the promise and the clients
+// The clients might be undefined until the promise resolves.
+export {
+  supabaseInitializationPromise,
+  supabaseAnonClient as supabase,
+  supabaseServiceRoleClient as supabaseServiceRole
+};
 
 // Export a function to create a new client instance scoped with a user's JWT
 export const createSupabaseClientWithToken = (accessToken: string): SupabaseClient => {

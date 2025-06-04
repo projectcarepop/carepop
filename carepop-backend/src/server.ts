@@ -1,7 +1,7 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import logger from './utils/logger';
-import { supabase, supabaseServiceRole } from './config/supabaseClient';
+import { supabaseInitializationPromise, supabase, supabaseServiceRole } from './config/supabaseClient';
 import authRoutes from './routes/authRoutes';
 import profileRoutes from './routes/profileRoutes';
 import directoryRoutes from './routes/directoryRoutes';
@@ -87,14 +87,26 @@ app.use((req: Request, res: Response) => {
   res.status(404).json({ message: 'Resource not found' });
 });
 
-// --- Start Server ---
-const PORT = config.port;
-app.listen(PORT, () => {
-  logger.info(`Server is running on port ${PORT}`);
-  logger.info(`Environment: ${config.nodeEnv}`);
-  // if (config.nodeEnv === 'development' && typeof setupSwagger === 'function') {
-  //   logger.info(`Swagger UI available at http://localhost:${PORT}/api-docs`);
-  // }
-});
+// --- Start Server Async ---
+async function startServer() {
+  try {
+    await supabaseInitializationPromise; // Wait for Supabase to be ready
+    logger.info('Supabase clients initialized successfully by server.');
+
+    const PORT = config.port;
+    app.listen(PORT, () => {
+      logger.info(`Server is running on port ${PORT}`);
+      logger.info(`Environment: ${config.nodeEnv}`);
+      // if (config.nodeEnv === 'development' && typeof setupSwagger === 'function') {
+      //   logger.info(`Swagger UI available at http://localhost:${PORT}/api-docs`);
+      // }
+    });
+  } catch (error) {
+    logger.error('Failed to start server due to an initialization error (e.g., Supabase):', error);
+    process.exit(1); // Exit if server can't start
+  }
+}
+
+startServer(); // Call the async function to start the server
 
 export default app; 
