@@ -4,9 +4,10 @@ import { CreateClinicInput, UpdateClinicInput }
   from '../../validation/admin/clinic.admin.validation';
 import { supabaseServiceRole } from '../../config/supabaseClient'; // Corrected import
 
-// Explicitly type the Clinic based on generated Supabase schema
-// For actual use, prefer: type Clinic = Database['public']['Tables']['clinics']['Row'];
-// The interface below is a local fallback. After regenerating types, ensure it aligns or use the Row type.
+// Local interface representing a Clinic. 
+// Ideally, after types are correctly generated and stable,
+// you might use: type Clinic = Database['public']['Tables']['clinics']['Row'];
+// Ensure this local interface matches the fields selected and returned by your service methods.
 interface Clinic {
   id: string;
   name: string;
@@ -25,14 +26,14 @@ interface Clinic {
   services_offered?: string[] | null;
   fpop_chapter_affiliation?: string | null;
   additional_notes?: string | null;
-  is_active: boolean | null; // Adjusted to boolean | null to match typical Supabase Row type for nullable booleans
+  is_active: boolean | null; 
   created_at: string; 
   updated_at: string; 
-  created_by?: string | null; // Assuming these will be in the Row type after generation
-  updated_by?: string | null; // Assuming these will be in the Row type after generation
+  // Removed created_by and updated_by as they are not in the DB schema
 }
 
 // Type for the payload used in insert operations, derived from generated types
+// After regenerating supabase.types.ts, this will reflect the actual schema.
 type ClinicInsertPayload = Database['public']['Tables']['clinics']['Insert'];
 // Type for the payload used in update operations, derived from generated types
 type ClinicUpdatePayload = Database['public']['Tables']['clinics']['Update'];
@@ -134,12 +135,12 @@ export class AdminClinicService {
     return data as Clinic | null; 
   }
 
-  async createClinic(clinicData: CreateClinicInput, creatorUserId: string): Promise<Clinic> {
+  async createClinic(clinicData: CreateClinicInput /* creatorUserId: string - Removed */): Promise<Clinic> {
+    // Payload should only contain fields present in ClinicInsertPayload (derived from DB schema)
     const payload: ClinicInsertPayload = {
       ...clinicData, // Spread validated input data
-      created_by: creatorUserId,
-      updated_by: creatorUserId, // Set updated_by as well on creation
-      // created_at and updated_at are typically handled by DB default or trigger
+      // created_by and updated_by are removed as they are not in the schema
+      // created_at and updated_at are typically handled by DB default (TIMESTAMPTZ NOW())
     };
 
     const { data, error } = await this.supabase
@@ -152,18 +153,17 @@ export class AdminClinicService {
       console.error('Error creating clinic in Supabase:', error);
       throw new Error(`Could not create clinic: ${error?.message || 'No data returned'}`);
     }
-    return data as Clinic; // Cast to Clinic, ensure Clinic type is compatible with Row type
+    return data as Clinic;
   }
 
-  async updateClinic(clinicId: string, clinicData: UpdateClinicInput, updatorUserId: string): Promise<Clinic | null> {
-    console.log(`[AdminClinicService] updateClinic CALLED for ID: ${clinicId}, Timestamp: ${new Date().toISOString()}`);
-    console.log(`[AdminClinicService] Received clinicData for update:`, clinicData);
-    console.log(`[AdminClinicService] Updator User ID: ${updatorUserId}`);
+  async updateClinic(clinicId: string, clinicData: UpdateClinicInput /* updatorUserId: string - Removed */): Promise<Clinic | null> {
+    console.log(`[AdminClinicService] updateClinic CALLED for ID: ${clinicId}`);
 
+    // Payload should only contain fields present in ClinicUpdatePayload (derived from DB schema)
     const payload: ClinicUpdatePayload = {
       ...clinicData, // Spread validated input data
-      updated_by: updatorUserId,
-      updated_at: new Date().toISOString(), // Explicitly set updated_at
+      // updated_by is removed as it's not in the schema
+      updated_at: new Date().toISOString(), // Explicitly set updated_at, assuming this is desired behavior
     };
     
     try {
@@ -190,7 +190,7 @@ export class AdminClinicService {
         return null;
       }
       
-      console.log(`[AdminClinicService] Clinic ID ${clinicId} updated successfully in Supabase. Returned data:`, data);
+      console.log(`[AdminClinicService] Clinic ID ${clinicId} updated successfully.`);
       return data as Clinic;
     } catch (error) {
       console.error(`[AdminClinicService] Exception in updateClinic for ID ${clinicId}:`, error);
