@@ -4,12 +4,38 @@ import { CreateClinicInput, UpdateClinicInput }
   from '../../validation/admin/clinic.admin.validation';
 import { supabaseServiceRole } from '../../config/supabaseClient'; // Corrected import
 
-// Define Clinic type based on your Supabase schema if not already globally available
-// This is a placeholder; adjust according to your actual generated types.
-// type Clinic = Database['public']['Tables']['clinics']['Row'];
-// Assuming Clinic type is already defined or you're using `any` for now.
-// For stronger typing, ensure your Supabase types are generated and imported correctly.
-interface Clinic extends Record<string, any> { id: string; name: string; is_active?: boolean }
+// Explicitly type the Clinic based on generated Supabase schema
+// For actual use, prefer: type Clinic = Database['public']['Tables']['clinics']['Row'];
+// The interface below is a local fallback. After regenerating types, ensure it aligns or use the Row type.
+interface Clinic {
+  id: string;
+  name: string;
+  full_address?: string | null;
+  street_address?: string | null;
+  locality?: string | null;
+  region?: string | null;
+  postal_code?: string | null;
+  country_code?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
+  website_url?: string | null;
+  operating_hours?: string | null;
+  services_offered?: string[] | null;
+  fpop_chapter_affiliation?: string | null;
+  additional_notes?: string | null;
+  is_active: boolean | null; // Adjusted to boolean | null to match typical Supabase Row type for nullable booleans
+  created_at: string; 
+  updated_at: string; 
+  created_by?: string | null; // Assuming these will be in the Row type after generation
+  updated_by?: string | null; // Assuming these will be in the Row type after generation
+}
+
+// Type for the payload used in insert operations, derived from generated types
+type ClinicInsertPayload = Database['public']['Tables']['clinics']['Insert'];
+// Type for the payload used in update operations, derived from generated types
+type ClinicUpdatePayload = Database['public']['Tables']['clinics']['Update'];
 
 // Define an interface for the listClinics options for clarity
 export interface ListClinicsOptions {
@@ -33,7 +59,7 @@ export class AdminClinicService {
   async listClinics(options: ListClinicsOptions = {}): Promise<Clinic[]> {
     const { page = 1, limit = 10, isActive, sortBy = 'name', sortOrder = 'asc', searchByName } = options;
 
-    let query = supabaseServiceRole // DIAGNOSTIC: Use imported client directly
+    let query = this.supabase
       .from('clinics')
       .select('*');
 
@@ -64,13 +90,14 @@ export class AdminClinicService {
       console.error('Error listing clinics in Supabase:', error);
       throw new Error(`Could not list clinics: ${error.message}`);
     }
-
-    return data || [];
+    // After regenerating types, if Clinic is Database['public']['Tables']['clinics']['Row'], this cast might not be needed
+    // or might need adjustment if the local Clinic interface diverges significantly.
+    return (data as Clinic[]) || [];
   }
 
   async countClinics(options: Pick<ListClinicsOptions, 'isActive' | 'searchByName' /* add other filter options here */> = {}): Promise<number> {
     const { isActive, searchByName } = options;
-    let query = supabaseServiceRole // DIAGNOSTIC: Use imported client directly
+    let query = this.supabase
       .from('clinics')
       .select('id', { count: 'exact', head: true }); // Only need the count
 
@@ -92,7 +119,7 @@ export class AdminClinicService {
   }
 
   async getClinicById(clinicId: string): Promise<Clinic | null> {
-    const { data, error } = await supabaseServiceRole // DIAGNOSTIC: Use imported client directly
+    const { data, error } = await this.supabase
       .from('clinics')
       .select('*') // Select all columns
       .eq('id', clinicId)
@@ -104,13 +131,20 @@ export class AdminClinicService {
         throw new Error(`Could not fetch clinic by ID ${clinicId}: ${error.message}`);
       }
     }
-    return data; 
+    return data as Clinic | null; 
   }
 
   async createClinic(clinicData: CreateClinicInput, creatorUserId: string): Promise<Clinic> {
-    const { data, error } = await supabaseServiceRole // DIAGNOSTIC: Use imported client directly
+    const payload: ClinicInsertPayload = {
+      ...clinicData, // Spread validated input data
+      created_by: creatorUserId,
+      updated_by: creatorUserId, // Set updated_by as well on creation
+      // created_at and updated_at are typically handled by DB default or trigger
+    };
+
+    const { data, error } = await this.supabase
       .from('clinics')
-      .insert({ ...clinicData, created_by: creatorUserId, updated_by: creatorUserId })
+      .insert(payload)
       .select('*')
       .single(); 
 
@@ -118,7 +152,7 @@ export class AdminClinicService {
       console.error('Error creating clinic in Supabase:', error);
       throw new Error(`Could not create clinic: ${error?.message || 'No data returned'}`);
     }
-    return data;
+    return data as Clinic; // Cast to Clinic, ensure Clinic type is compatible with Row type
   }
 
   async updateClinic(clinicId: string, clinicData: UpdateClinicInput, updatorUserId: string): Promise<Clinic | null> {
@@ -126,14 +160,16 @@ export class AdminClinicService {
     console.log(`[AdminClinicService] Received clinicData for update:`, clinicData);
     console.log(`[AdminClinicService] Updator User ID: ${updatorUserId}`);
 
+    const payload: ClinicUpdatePayload = {
+      ...clinicData, // Spread validated input data
+      updated_by: updatorUserId,
+      updated_at: new Date().toISOString(), // Explicitly set updated_at
+    };
+    
     try {
       const { data, error } = await this.supabase
         .from('clinics')
-        .update({ 
-          ...clinicData, 
-          updated_by: updatorUserId,
-          updated_at: new Date().toISOString(), 
-        })
+        .update(payload)
         .eq('id', clinicId)
         .select()
         .single();
@@ -170,7 +206,7 @@ export class AdminClinicService {
       return { success: false, message: `Clinic with ID ${clinicId} not found.` };
     }
 
-    const { error, count } = await supabaseServiceRole // DIAGNOSTIC: Use imported client directly
+    const { error, count } = await this.supabase
       .from('clinics')
       .delete({ count: 'exact' })
       .eq('id', clinicId);

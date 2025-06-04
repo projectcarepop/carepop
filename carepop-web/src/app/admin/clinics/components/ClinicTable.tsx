@@ -101,9 +101,14 @@ export const columns: ColumnDef<Clinic>[] = [
     cell: ({ row }) => <div>{row.getValue('name')}</div>,
   },
   {
-    accessorKey: 'city',
-    header: 'City',
-    cell: ({ row }) => <div>{row.getValue('city') || 'N/A'}</div>,
+    accessorKey: 'locality',
+    header: 'City / Locality',
+    cell: ({ row }) => <div>{row.getValue('locality') || 'N/A'}</div>,
+  },
+  {
+    accessorKey: 'region',
+    header: 'Region',
+    cell: ({ row }) => <div>{row.getValue('region') || 'N/A'}</div>,
   },
   {
     accessorKey: 'contactPhone',
