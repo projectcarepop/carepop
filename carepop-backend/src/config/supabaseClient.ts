@@ -86,6 +86,13 @@ async function initializeSupabase() {
   supabaseServiceRoleClient = createClient(supabaseUrl, supabaseServiceKey);
   console.log('Supabase service role client initialized successfully.');
 
+  // Explicit check for service role client
+  if (!supabaseServiceRoleClient) {
+    throw new Error('Failed to create supabaseServiceRoleClient: createClient returned null or undefined.');
+  }
+  if (typeof supabaseServiceRoleClient.from !== 'function') {
+    throw new Error('Failed to create supabaseServiceRoleClient: instance does not have a .from method.');
+  }
 }
 
 // Store the promise of initialization
