@@ -1,21 +1,47 @@
 'use server';
 
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { Clinic, BackendClinicData } from '@/app/admin/clinics/components/ClinicTable'; // Re-using the types
+import { Clinic, BackendClinicData } from '@/app/admin/clinics/components/ClinicTable';
+import { Database } from '../types/supabase';
 
 export async function getClinicsForAdmin(): Promise<Clinic[]> {
   const cookieStore = await cookies();
 
-  const authTokenCookie = cookieStore.getAll().find((cookie: { name: string; value: string }) => 
-    cookie.name.startsWith('sb-') && cookie.name.endsWith('-auth-token')
+  const supabase = createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          try {
+            cookieStore.set({ name, value, ...options });
+          } catch (e) {
+            // The `set` method was called from a Server Component.
+          }
+        },
+        remove(name: string, options: CookieOptions) {
+          try {
+            cookieStore.set({ name, value: '', ...options });
+          } catch (e) {
+            // The `delete` method was called from a Server Component.
+          }
+        },
+      },
+    }
   );
+  
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-  const token = authTokenCookie?.value;
-
-  if (!token) {
-    throw new Error('User not authenticated.');
+  if (sessionError || !session) {
+    throw new Error(sessionError?.message || 'User not authenticated.');
   }
 
+  const token = session.access_token;
+  
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
   if (!apiBaseUrl) {
     throw new Error('API base URL is not configured.');
