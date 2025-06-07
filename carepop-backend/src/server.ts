@@ -84,6 +84,11 @@ async function startServer() {
     app.use('/api/v1/admin/providers', adminProviderRoutes);
     logger.info('Admin Provider routes mounted.');
     
+    // Appointments (Admin)
+    const appointmentAdminRoutes = (await import('./routes/admin/appointment.admin.routes')).default;
+    app.use('/api/v1/admin/appointments', appointmentAdminRoutes);
+    logger.info('Admin Appointment routes mounted.');
+
     // Dashboard (Most general admin route, mounted last)
     const { AdminDashboardController } = await import('./controllers/admin/dashboard.admin.controller');
     const { AdminDashboardService } = await import('./services/admin/dashboard.admin.service');

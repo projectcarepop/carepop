@@ -109,11 +109,17 @@ export function ProviderForm({ initialData, onSubmitSuccess }: ProviderFormProps
           body: JSON.stringify(payload), 
         });
       } else {
-        console.log("Create mode not fully implemented in this step. Payload:", payload);
-        if (onSubmitSuccess) {
-          onSubmitSuccess();
-        }
-        return;
+        console.log('[ProviderForm] Submitting POST request to:', `/api/v1/admin/providers`);
+        console.log('[ProviderForm] Payload:', JSON.stringify(payload, null, 2));
+        
+        response = await fetch(`/api/v1/admin/providers`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        });
       }
 
       if (!response.ok) {
@@ -130,7 +136,7 @@ export function ProviderForm({ initialData, onSubmitSuccess }: ProviderFormProps
         throw new Error(errorData.message || "Something went wrong while saving the provider.");
       }
 
-      console.log(isEditing ? "Provider updated successfully" : "Provider creation placeholder success");
+      console.log(isEditing ? "Provider updated successfully" : "Provider created successfully");
       if (onSubmitSuccess) {
         onSubmitSuccess();
       }

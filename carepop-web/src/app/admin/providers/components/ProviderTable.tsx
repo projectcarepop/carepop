@@ -37,6 +37,16 @@ import {
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export interface Provider {
   id: string;
@@ -65,6 +75,41 @@ interface BackendProviderData {
   updated_at: string;
   // Add any other fields that come from the backend in snake_case
 }
+
+const DeleteProviderDialog = ({
+  provider,
+  isOpen,
+  onClose,
+  onConfirm,
+  isDeleting,
+}: {
+  provider: Provider | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  isDeleting: boolean;
+}) => {
+  if (!provider) return null;
+
+  return (
+    <AlertDialog open={isOpen} onOpenChange={onClose}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This action cannot be undone. This will permanently delete the provider &quot;{provider.firstName} {provider.lastName}&quot;.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={onClose} disabled={isDeleting}>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm} disabled={isDeleting}>
+            {isDeleting ? 'Deleting...' : 'Continue'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+};
 
 export const columns: ColumnDef<Provider>[] = [
   {
@@ -121,8 +166,10 @@ export const columns: ColumnDef<Provider>[] = [
   {
     id: 'actions',
     enableHiding: false,
-    cell: ({ row }) => {
+    cell: ({ row, table }) => {
       const provider = row.original;
+      const { openDeleteDialog } = table.options.meta as { openDeleteDialog: (provider: Provider) => void };
+
       return (
         <>
           <DropdownMenu>
@@ -142,8 +189,12 @@ export const columns: ColumnDef<Provider>[] = [
               <DropdownMenuSeparator />
               <DropdownMenuItem 
                 className="text-red-600 hover:!text-red-700 flex items-center cursor-pointer"
+                onClick={(e) => {
+                  e.preventDefault();
+                  openDeleteDialog(provider);
+                }}
               >
-                <Trash2 className="mr-2 h-4 w-4" /> Delete (TODO)
+                <Trash2 className="mr-2 h-4 w-4" /> Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -167,83 +218,129 @@ export function ProviderTable() {
   
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
 
-  React.useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      setError(null);
+  // State for delete dialog
+  const [providerToDelete, setProviderToDelete] = React.useState<Provider | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
+  const [isDeleting, setIsDeleting] = React.useState(false);
 
-      // Maps frontend camelCase sort IDs to backend snake_case column names
-      const sortColumnMap: { [key: string]: string } = {
-        firstName: 'first_name',
-        lastName: 'last_name',
-        email: 'email',
-        createdAt: 'created_at',
-      };
+  const fetchData = React.useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
 
-      try {
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-
-        if (sessionError || !sessionData.session) {
-          throw new Error(sessionError?.message || 'User not authenticated.');
-        }
-
-        const token = sessionData.session.access_token;
-
-        // Build query params from table state
-        const params = new URLSearchParams();
-        if (sorting.length > 0) {
-          const sort = sorting[0];
-          const backendSortKey = sortColumnMap[sort.id] || 'created_at';
-          params.append('sortBy', backendSortKey);
-          params.append('sortOrder', sort.desc ? 'desc' : 'asc');
-        } else {
-          // Default sort if none is selected
-          params.append('sortBy', 'created_at');
-          params.append('sortOrder', 'desc');
-        }
-
-        const queryString = params.toString();
-        const apiUrl = `/api/v1/admin/providers${queryString ? `?${queryString}` : ''}`;
-        
-        console.log(`[ProviderTable] Fetching data from: ${apiUrl}`);
-
-        const response = await fetch(apiUrl, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-        }); 
-        if (!response.ok) {
-          if (response.status === 401) throw new Error('Unauthorized: Access token might be invalid or expired.');
-          if (response.status === 403) throw new Error('Forbidden: You do not have permission to access this resource.');
-          throw new Error(`Failed to fetch providers: ${response.statusText} (Status: ${response.status})`);
-        }
-        const result = await response.json();
-        // Transform snake_case to camelCase for specified fields
-        const transformedData = (result.data || []).map((provider: BackendProviderData) => ({
-          ...provider, // Spread first to carry over fields like id, specialization, etc.
-          firstName: provider.first_name,
-          lastName: provider.last_name,
-          email: provider.contact_email || provider.email, // Use contact_email or fallback to email
-          isActive: provider.is_active,
-          createdAt: provider.created_at,
-          updatedAt: provider.updated_at,
-          licenseNumber: provider.license_number,
-          // user_id is not in Provider interface, so it will be omitted unless added to Provider
-        }));
-        setData(transformedData);
-      } catch (e: unknown) {
-        if (e instanceof Error) {
-            setError(e.message);
-        } else {
-            setError('An unknown error occurred');
-        }
-        setData([]);
-      }
-      setIsLoading(false);
+    // Maps frontend camelCase sort IDs to backend snake_case column names
+    const sortColumnMap: { [key: string]: string } = {
+      firstName: 'first_name',
+      lastName: 'last_name',
+      email: 'email',
+      createdAt: 'created_at',
     };
-    fetchData();
+
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !sessionData.session) {
+        throw new Error(sessionError?.message || 'User not authenticated.');
+      }
+
+      const token = sessionData.session.access_token;
+
+      // Build query params from table state
+      const params = new URLSearchParams();
+      if (sorting.length > 0) {
+        const sort = sorting[0];
+        const backendSortKey = sortColumnMap[sort.id] || 'created_at';
+        params.append('sortBy', backendSortKey);
+        params.append('sortOrder', sort.desc ? 'desc' : 'asc');
+      } else {
+        // Default sort if none is selected
+        params.append('sortBy', 'created_at');
+        params.append('sortOrder', 'desc');
+      }
+
+      const queryString = params.toString();
+      const apiUrl = `/api/v1/admin/providers${queryString ? `?${queryString}` : ''}`;
+      
+      console.log(`[ProviderTable] Fetching data from: ${apiUrl}`);
+
+      const response = await fetch(apiUrl, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      }); 
+      if (!response.ok) {
+        if (response.status === 401) throw new Error('Unauthorized: Access token might be invalid or expired.');
+        if (response.status === 403) throw new Error('Forbidden: You do not have permission to access this resource.');
+        throw new Error(`Failed to fetch providers: ${response.statusText} (Status: ${response.status})`);
+      }
+      const result = await response.json();
+      // Transform snake_case to camelCase for specified fields
+      const transformedData = (result.data || []).map((provider: BackendProviderData) => ({
+        ...provider, // Spread first to carry over fields like id, specialization, etc.
+        firstName: provider.first_name,
+        lastName: provider.last_name,
+        email: provider.contact_email || provider.email, // Use contact_email or fallback to email
+        isActive: provider.is_active,
+        createdAt: provider.created_at,
+        updatedAt: provider.updated_at,
+        licenseNumber: provider.license_number,
+        // user_id is not in Provider interface, so it will be omitted unless added to Provider
+      }));
+      setData(transformedData);
+    } catch (e: unknown) {
+      if (e instanceof Error) {
+          setError(e.message);
+      } else {
+          setError('An unknown error occurred');
+      }
+      setData([]);
+    }
+    setIsLoading(false);
   }, [sorting, columnFilters, supabase]);
+
+  React.useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const openDeleteDialog = (provider: Provider) => {
+    setProviderToDelete(provider);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const closeDeleteDialog = () => {
+    setProviderToDelete(null);
+    setIsDeleteDialogOpen(false);
+  };
+
+  const handleDeleteProvider = async () => {
+    if (!providerToDelete) return;
+    setIsDeleting(true);
+
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) throw new Error('User not authenticated.');
+
+      const response = await fetch(`/api/v1/admin/providers/${providerToDelete.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${sessionData.session.access_token}` },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to delete provider.');
+      }
+      
+      // Re-fetch data to update the table by changing a dependency of useEffect
+      // A simple way is to refetch all, or smartly remove from state. Refetching is safer.
+      fetchData(); 
+      closeDeleteDialog();
+    } catch (error: unknown) {
+      // TODO: Show toast notification with error
+      console.error("Delete error:", error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const table = useReactTable({
     data,
@@ -256,6 +353,9 @@ export function ProviderTable() {
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
+    meta: {
+      openDeleteDialog,
+    },
     state: {
       sorting,
       columnFilters,
@@ -275,11 +375,18 @@ export function ProviderTable() {
     if (error.toLowerCase().includes('forbidden')) {
         return <div className="text-red-500">Error: Access Denied. You do not have the necessary permissions.</div>;
     }
-    return <div className="text-red-500">Error fetching providers: {error}</div>;
+    return <div className="text-red-500 text-center p-4">Error fetching providers: {error}</div>;
   }
 
   return (
     <div className="w-full">
+      <DeleteProviderDialog
+        provider={providerToDelete}
+        isOpen={isDeleteDialogOpen}
+        onClose={closeDeleteDialog}
+        onConfirm={handleDeleteProvider}
+        isDeleting={isDeleting}
+      />
       <div className="flex items-center py-4 gap-2">
         <Input
           placeholder="Filter by name/specialization..."

@@ -37,6 +37,17 @@ import {
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { getClinicsForAdmin } from '@/lib/actions/clinic.admin.actions';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 // Frontend data structure (camelCase)
 export interface Clinic {
@@ -86,6 +97,42 @@ export interface BackendClinicData {
   updated_at: string;
 }
 
+// Extracted Delete Confirmation Dialog Component
+const DeleteClinicDialog = ({
+  clinic,
+  isOpen,
+  onClose,
+  onConfirm,
+  isDeleting,
+}: {
+  clinic: Clinic | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  isDeleting: boolean;
+}) => {
+  if (!clinic) return null;
+
+  return (
+    <AlertDialog open={isOpen} onOpenChange={onClose}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This action cannot be undone. This will permanently delete the clinic &quot;{clinic.name}&quot; and all associated data.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={onClose} disabled={isDeleting}>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm} disabled={isDeleting}>
+            {isDeleting ? 'Deleting...' : 'Continue'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+};
+
 export const columns: ColumnDef<Clinic>[] = [
   {
     accessorKey: 'name',
@@ -133,8 +180,10 @@ export const columns: ColumnDef<Clinic>[] = [
   {
     id: 'actions',
     enableHiding: false,
-    cell: ({ row }) => {
+    cell: ({ row, table }) => {
       const clinic = row.original;
+      const { openDeleteDialog } = table.options.meta as { openDeleteDialog: (clinic: Clinic) => void; };
+
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -159,10 +208,9 @@ export const columns: ColumnDef<Clinic>[] = [
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-red-600 hover:!text-red-700 flex items-center cursor-pointer"
-              onClick={() => {
-                // TODO: Implement delete confirmation and API call
-                console.warn(`TODO: Implement delete for clinic ID: ${clinic.id}`);
-                alert(`TODO: Implement delete for clinic: ${clinic.name}`);
+              onClick={(e) => {
+                e.preventDefault();
+                openDeleteDialog(clinic);
               }}
             >
               <Trash2 className="mr-2 h-4 w-4" /> Delete
@@ -182,28 +230,72 @@ export function ClinicTable() {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
-  const [rowSelection, setRowSelection] = React.useState({}); // For future use if checkboxes are needed
+  const [rowSelection, setRowSelection] = React.useState({});
+
+  const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
+  
+  // State for delete dialog
+  const [clinicToDelete, setClinicToDelete] = React.useState<Clinic | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+
+  const fetchData = React.useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const transformedData = await getClinicsForAdmin();
+      setData(transformedData);
+    } catch (e: unknown) {
+      if (e instanceof Error) {
+        setError(e.message);
+      } else {
+        setError('An unknown error occurred while fetching clinics.');
+      }
+      setData([]);
+    }
+    setIsLoading(false);
+  }, []);
 
   React.useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const transformedData = await getClinicsForAdmin();
-        setData(transformedData);
-      } catch (e: unknown) {
-        if (e instanceof Error) {
-            setError(e.message);
-        } else {
-            setError('An unknown error occurred while fetching clinics.');
-        }
-        setData([]); // Clear data on error
-      }
-      setIsLoading(false);
-    };
-
     fetchData();
-  }, []);
+  }, [fetchData]);
+
+  const openDeleteDialog = (clinic: Clinic) => {
+    setClinicToDelete(clinic);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const closeDeleteDialog = () => {
+    setClinicToDelete(null);
+    setIsDeleteDialogOpen(false);
+  };
+
+  const handleDeleteClinic = async () => {
+    if (!clinicToDelete) return;
+    setIsDeleting(true);
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) throw new Error(sessionError?.message || 'User not authenticated.');
+      
+      const response = await fetch(`/api/v1/admin/clinics/${clinicToDelete.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${sessionData.session.access_token}` },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to delete clinic.');
+      }
+      
+      await fetchData(); // Re-fetch data to update the table
+      closeDeleteDialog();
+    } catch (error: unknown) {
+      // TODO: Show toast notification with error
+      console.error("Delete error:", error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const table = useReactTable({
     data,
@@ -216,6 +308,9 @@ export function ClinicTable() {
     getFilteredRowModel: getFilteredRowModel(), // For client-side filtering
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
+    meta: {
+      openDeleteDialog,
+    },
     state: {
       sorting,
       columnFilters,
@@ -243,6 +338,13 @@ export function ClinicTable() {
 
   return (
     <div className="w-full">
+      <DeleteClinicDialog
+        clinic={clinicToDelete}
+        isOpen={isDeleteDialogOpen}
+        onClose={closeDeleteDialog}
+        onConfirm={handleDeleteClinic}
+        isDeleting={isDeleting}
+      />
       <div className="flex items-center py-4">
         <Input
           placeholder="Filter by clinic name..."

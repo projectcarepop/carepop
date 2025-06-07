@@ -1,21 +1,20 @@
+'use client';
+
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ProviderForm } from '../components/ProviderForm';
 import { useRouter } from 'next/navigation';
+import React from 'react';
 
-export default function NewProviderPage() {
-  // const router = useRouter(); // Uncomment if using client-side navigation
+export default function AddProviderPage() {
+  const router = useRouter();
 
   const handleSuccess = () => {
     console.log('Provider created successfully, redirecting...');
-    // TODO: Implement toast notification
-    // toast({ title: "Provider Created", description: "The new provider has been successfully added." });
-    // router.push('/admin/providers'); // Client-side redirect
-    // For Server Components or if client-side router is not preferred here, 
-    // Next.js 13+ App Router might handle redirects differently after Server Actions or form submissions.
-    // If this page becomes a client component due to hooks like useRouter, 
-    // ensure parent components are structured accordingly.
+    // Optionally add a toast notification here
+    router.refresh(); // Invalidate cache to ensure the new provider appears in the list
+    router.push('/admin/providers');
   };
 
   return (
