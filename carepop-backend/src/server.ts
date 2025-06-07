@@ -84,6 +84,11 @@ async function startServer() {
     app.use('/api/v1/admin/providers', adminProviderRoutes);
     logger.info('Admin Provider routes mounted.');
     
+    // Profiles (Admin)
+    const profileAdminRoutes = (await import('./routes/admin/profile.admin.routes')).default;
+    app.use('/api/v1/admin/profiles', profileAdminRoutes);
+    logger.info('Admin Profile routes mounted.');
+
     // Services (Admin)
     const serviceAdminRoutes = (await import('./routes/admin/service.admin.routes')).default;
     app.use('/api/v1/admin/services', serviceAdminRoutes);

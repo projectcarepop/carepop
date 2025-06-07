@@ -134,6 +134,7 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   
   // State for lookup maps
+  const [patientMap, setPatientMap] = React.useState<NameMap>({});
   const [clinicMap, setClinicMap] = React.useState<NameMap>({});
   const [serviceMap, setServiceMap] = React.useState<NameMap>({});
   const [providerMap, setProviderMap] = React.useState<NameMap>({});
@@ -149,18 +150,19 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
         if (sessionError || !sessionData.session) throw new AppError('User not authenticated.', 401);
         const token = sessionData.session.access_token;
         
-        // Fetching all at once. Assuming admin endpoints exist for these.
-        // TODO: Create /api/v1/admin/profiles and /api/v1/admin/services if they don't exist
-        const [clinicsRes, servicesRes, providersRes] = await Promise.all([
+        const [patientsRes, clinicsRes, servicesRes, providersRes] = await Promise.all([
+            fetch('/api/v1/admin/profiles', { headers: { 'Authorization': `Bearer ${token}` } }),
             fetch('/api/v1/admin/clinics', { headers: { 'Authorization': `Bearer ${token}` } }),
             fetch('/api/v1/admin/services', { headers: { 'Authorization': `Bearer ${token}` } }),
             fetch('/api/v1/admin/providers', { headers: { 'Authorization': `Bearer ${token}` } }),
         ]);
 
+        const patients = await patientsRes.json();
         const clinics = await clinicsRes.json();
         const services = await servicesRes.json();
         const providers = await providersRes.json();
 
+        setPatientMap(Object.fromEntries(patients.data.map((p: { user_id: string, full_name: string }) => [p.user_id, p.full_name])));
         setClinicMap(Object.fromEntries(clinics.data.map((c: { id: string, name: string }) => [c.id, c.name])));
         setServiceMap(Object.fromEntries(services.data.map((s: { id: string, name: string }) => [s.id, s.name])));
         setProviderMap(Object.fromEntries(providers.data.map((p: { id: string, first_name: string, last_name: string }) => [p.id, `${p.first_name} ${p.last_name}`])));
@@ -253,6 +255,10 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
 
   const columns: ColumnDef<Appointment>[] = [
     {
+        accessorKey: 'id',
+        header: 'Appointment ID',
+    },
+    {
         accessorKey: 'appointment_datetime',
         header: ({ column }) => <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>Date<ArrowUpDown className="ml-2 h-4 w-4" /></Button>,
         cell: ({ row }) => new Date(row.getValue('appointment_datetime')).toLocaleDateString(),
@@ -262,18 +268,10 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
         header: 'Time',
         cell: ({ row }) => new Date(row.original.appointment_datetime).toLocaleTimeString(),
     },
-    { accessorKey: 'user_id', header: 'Patient ID' },
-    { accessorKey: 'clinic_id', header: 'Clinic ID' },
-    { accessorKey: 'service_id', header: 'Service ID' },
-    { accessorKey: 'provider_id', header: 'Provider ID' },
     {
         accessorKey: 'patient_name',
         header: 'Patient',
         cell: ({ row }) => row.original.patient_name || row.original.user_id
-    },
-    {
-        accessorKey: 'clinic_name',
-        header: 'Clinic',
     },
     {
         accessorKey: 'service_name',
@@ -359,8 +357,7 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
           clinic_id: appt.clinic_id,
           service_id: appt.service_id,
           provider_id: appt.provider_id,
-          // Map names using the lookup tables
-          patient_name: appt.user_id, // For now, just show the ID
+          patient_name: patientMap[appt.user_id] || appt.user_id,
           clinic_name: clinicMap[appt.clinic_id] || 'N/A',
           service_name: serviceMap[appt.service_id] || appt.service_id,
           provider_name: providerMap[appt.provider_id] || 'N/A',
@@ -378,13 +375,13 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
     } finally {
       setIsLoading(false);
     }
-  }, [supabase, clinicId, clinicMap, serviceMap, providerMap]);
+  }, [supabase, clinicId, patientMap, clinicMap, serviceMap, providerMap]);
 
   React.useEffect(() => {
-    if (clinicId && Object.keys(clinicMap).length > 0 && Object.keys(serviceMap).length > 0) {
+    if (clinicId && Object.keys(patientMap).length > 0 && Object.keys(clinicMap).length > 0 && Object.keys(serviceMap).length > 0) {
         fetchData();
     }
-  }, [fetchData, clinicId, clinicMap, serviceMap]);
+  }, [fetchData, clinicId, patientMap, clinicMap, serviceMap]);
 
   const table = useReactTable({
     data,
