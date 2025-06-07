@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { ProfileAdminController } from '../../controllers/admin/profile.admin.controller';
 import { ProfileAdminService } from '../../services/admin/profile.admin.service';
-import { authenticateToken } from 'middleware/authMiddleware';
-import { isAdmin } from 'middleware/role.middleware';
+import { authenticateToken } from '../../middleware/authMiddleware';
+import { isAdmin } from '../../middleware/role.middleware';
 
 const router = Router();
 const profileAdminService = new ProfileAdminService();
