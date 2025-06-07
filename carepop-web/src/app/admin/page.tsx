@@ -194,14 +194,14 @@ export default function AdminDashboardPage() {
           title="Provider Management"
           description="Add, edit, and manage healthcare providers."
           icon={<Users className="w-8 h-8 text-gray-500" />}
-          type="providers"
+          type="clinics"
         />
         <DashboardCard
           href="/admin/appointments"
           title="Appointment Management"
           description="View and confirm patient appointments."
           icon={<CalendarCheck className="w-8 h-8 text-gray-500" />}
-          type="appointments"
+          type="clinics"
         />
       </div>
     </div>

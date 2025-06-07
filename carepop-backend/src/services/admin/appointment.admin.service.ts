@@ -45,20 +45,28 @@ export class AppointmentAdminService {
       .select(`
         id,
         status,
-        appointment_date,
-        appointment_time,
+        appointment_datetime,
         created_at,
-        patient:profiles ( full_name ),
-        clinic:clinics ( name ),
-        service:services ( name ),
-        provider:providers ( first_name, last_name )
+        user_id,
+        clinic:clinic_id ( name ),
+        service:service_id ( name ),
+        provider:provider_id ( first_name, last_name )
       `);
 
     if (error) {
       console.error('Error fetching appointments:', error);
       throw new AppError('Failed to fetch appointments from the database.', 500);
     }
+    
+    // The profiles table is not directly joined, so we'll have to fetch them separately if needed,
+    // or adjust the query if a direct view/function is created.
+    // For now, we will just return the user_id.
 
-    return data || [];
+    return data?.map(a => ({
+      ...a,
+      clinic_name: a.clinic?.name || 'N/A',
+      service_name: a.service?.name || 'N/A',
+      provider_name: a.provider ? `${a.provider.first_name} ${a.provider.last_name}`.trim() : 'N/A'
+    })) || [];
   }
 }
