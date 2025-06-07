@@ -48,9 +48,9 @@ export class AppointmentAdminService {
         appointment_datetime,
         created_at,
         user_id,
-        clinic:clinic_id ( name ),
-        service:service_id ( name ),
-        provider:provider_id ( first_name, last_name )
+        clinic_id,
+        service_id,
+        provider_id
       `);
 
     if (error) {
@@ -58,15 +58,6 @@ export class AppointmentAdminService {
       throw new AppError('Failed to fetch appointments from the database.', 500);
     }
     
-    // The profiles table is not directly joined, so we'll have to fetch them separately if needed,
-    // or adjust the query if a direct view/function is created.
-    // For now, we will just return the user_id.
-
-    return data?.map(a => ({
-      ...a,
-      clinic_name: a.clinic?.name || 'N/A',
-      service_name: a.service?.name || 'N/A',
-      provider_name: a.provider ? `${a.provider.first_name} ${a.provider.last_name}`.trim() : 'N/A'
-    })) || [];
+    return data || [];
   }
 }

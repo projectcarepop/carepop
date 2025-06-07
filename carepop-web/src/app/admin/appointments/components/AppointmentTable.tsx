@@ -28,24 +28,22 @@ import { ArrowUpDown } from 'lucide-react';
 export interface Appointment {
   id: string;
   status: string;
-  appointment_date: string;
-  appointment_time: string;
-  patientName: string;
-  clinicName: string;
-  serviceName: string;
-  providerName: string;
+  appointment_datetime: string;
+  user_id: string;
+  clinic_id: string;
+  service_id: string;
+  provider_id: string;
 }
 
 // Define the raw structure from the backend
 interface BackendAppointment {
     id: string;
     status: string;
-    appointment_date: string;
-    appointment_time: string;
-    profiles: { full_name: string } | null;
-    clinics: { name: string } | null;
-    services: { name: string } | null;
-    providers: { first_name: string, last_name: string } | null;
+    appointment_datetime: string;
+    user_id: string;
+    clinic_id: string;
+    service_id: string;
+    provider_id: string;
 }
 
 export function AppointmentTable() {
@@ -93,18 +91,19 @@ export function AppointmentTable() {
 
   const columns: ColumnDef<Appointment>[] = [
     {
-        accessorKey: 'appointment_date',
+        accessorKey: 'appointment_datetime',
         header: ({ column }) => <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>Date<ArrowUpDown className="ml-2 h-4 w-4" /></Button>,
-        cell: ({ row }) => new Date(row.getValue('appointment_date')).toLocaleDateString(),
+        cell: ({ row }) => new Date(row.getValue('appointment_datetime')).toLocaleDateString(),
     },
     {
-        accessorKey: 'appointment_time',
+        accessorKey: 'appointment_datetime_time',
         header: 'Time',
+        cell: ({ row }) => new Date(row.original.appointment_datetime).toLocaleTimeString(),
     },
-    { accessorKey: 'patientName', header: 'Patient' },
-    { accessorKey: 'clinicName', header: 'Clinic' },
-    { accessorKey: 'serviceName', header: 'Service' },
-    { accessorKey: 'providerName', header: 'Provider' },
+    { accessorKey: 'user_id', header: 'Patient ID' },
+    { accessorKey: 'clinic_id', header: 'Clinic ID' },
+    { accessorKey: 'service_id', header: 'Service ID' },
+    { accessorKey: 'provider_id', header: 'Provider ID' },
     { 
         accessorKey: 'status',
         header: 'Status',
@@ -139,12 +138,11 @@ export function AppointmentTable() {
       const transformedData = (result.data || []).map((appt: BackendAppointment): Appointment => ({
           id: appt.id,
           status: appt.status,
-          appointment_date: appt.appointment_date,
-          appointment_time: appt.appointment_time,
-          patientName: appt.profiles?.full_name ?? 'N/A',
-          clinicName: appt.clinics?.name ?? 'N/A',
-          serviceName: appt.services?.name ?? 'N/A',
-          providerName: appt.providers ? `${appt.providers.first_name} ${appt.providers.last_name}` : 'N/A',
+          appointment_datetime: appt.appointment_datetime,
+          user_id: appt.user_id,
+          clinic_id: appt.clinic_id,
+          service_id: appt.service_id,
+          provider_id: appt.provider_id,
       }));
 
       setData(transformedData);
@@ -212,6 +210,9 @@ export function AppointmentTable() {
           )}
         </TableBody>
       </Table>
+      <div className="p-4 text-center text-sm text-muted-foreground">
+        Note: Displaying IDs for Patient, Clinic, Service, and Provider. Name resolution will be implemented next.
+      </div>
     </div>
   );
 } 
