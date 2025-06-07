@@ -187,36 +187,59 @@ export default function AdminDashboardPage() {
           title="Clinic Management"
           description="Add, edit, and manage FPOP clinics."
           icon={<Stethoscope className="w-8 h-8 text-gray-500" />}
+          type="clinics"
         />
         <DashboardCard
           href="/admin/providers"
           title="Provider Management"
           description="Add, edit, and manage healthcare providers."
           icon={<Users className="w-8 h-8 text-gray-500" />}
+          type="providers"
         />
         <DashboardCard
           href="/admin/appointments"
           title="Appointment Management"
           description="View and confirm patient appointments."
           icon={<CalendarCheck className="w-8 h-8 text-gray-500" />}
+          type="appointments"
         />
       </div>
     </div>
   );
 }
 
-function DashboardCard({ href, title, description, icon }: { href: string; title: string; description: string; icon: React.ReactNode }) {
+const cardStyles = {
+  clinics: "bg-blue-50 border-blue-200 hover:border-blue-400 text-blue-800",
+  providers: "bg-green-50 border-green-200 hover:border-green-400 text-green-800",
+  appointments: "bg-purple-50 border-purple-200 hover:border-purple-400 text-purple-800",
+};
+
+function DashboardCard({ 
+  href, 
+  title, 
+  description, 
+  icon,
+  type 
+}: { 
+  href: string; 
+  title: string; 
+  description: string; 
+  icon: React.ReactNode;
+  type: keyof typeof cardStyles;
+}) {
+  const style = cardStyles[type];
+
   return (
     <Link href={href} className="block group">
-      <Card className="h-full group-hover:border-primary group-hover:bg-muted/50 transition-colors">
+      <Card className={`h-full transition-colors ${style}`}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-base font-semibold">{title}</CardTitle>
-          <div className="text-muted-foreground group-hover:text-primary transition-colors">
+          <div className="text-current opacity-70 group-hover:opacity-100 transition-opacity">
             {icon}
           </div>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-current opacity-90">
             {description}
           </p>
         </CardContent>

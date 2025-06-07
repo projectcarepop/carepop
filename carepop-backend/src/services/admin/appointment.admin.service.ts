@@ -48,10 +48,10 @@ export class AppointmentAdminService {
         appointment_date,
         appointment_time,
         created_at,
-        profiles ( full_name ),
-        clinics ( name ),
-        services ( name ),
-        providers ( first_name, last_name )
+        patient:profiles ( full_name ),
+        clinic:clinics ( name ),
+        service:services ( name ),
+        provider:providers ( first_name, last_name )
       `);
 
     if (error) {

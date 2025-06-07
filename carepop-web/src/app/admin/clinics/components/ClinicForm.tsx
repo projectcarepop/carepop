@@ -174,10 +174,10 @@ export function ClinicForm({ initialData, onSubmitSuccess, mode }: ClinicFormPro
 
       if (onSubmitSuccess) {
         onSubmitSuccess();
-      } else {
-        // Default redirect if no callback is provided
-        router.push('/admin/clinics'); 
       }
+      
+      router.push('/admin/clinics');
+      router.refresh();
       
     } catch (error: unknown) {
       let errorMessage = "An unexpected error occurred.";
