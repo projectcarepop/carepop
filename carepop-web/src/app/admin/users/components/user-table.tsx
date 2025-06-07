@@ -103,7 +103,7 @@ export function UserTable() {
 
       const result = await response.json();
       
-      const mappedData = result.users.map((u: RawUserData) => ({
+      const mappedData = result.data.map((u: RawUserData) => ({
         id: u.user_id,
         email: u.email,
         firstName: u.first_name,
@@ -113,7 +113,7 @@ export function UserTable() {
       }));
 
       setData(mappedData);
-      setTotalPages(Math.ceil(result.total / limit));
+      setTotalPages(Math.ceil(result.count / limit));
 
     } catch (e: unknown) {
       if (e instanceof Error) {

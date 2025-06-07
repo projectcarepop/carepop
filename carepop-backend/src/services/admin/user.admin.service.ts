@@ -58,68 +58,72 @@ export class UserAdminService {
   }
 
   async getUserDetails(userId: string) {
-    const { data: user, error: userError } = await this.supabase.auth.admin.getUserById(userId);
-
-    if (userError) {
+    // Step 1: Get user from auth
+    const { data: authUser, error: authError } = await this.supabase.auth.admin.getUserById(userId);
+    if (authError) {
       throw new AppError('User not found in auth', StatusCodes.NOT_FOUND);
     }
 
+    // Step 2: Get user profile
     const { data: profile, error: profileError } = await this.supabase
       .from('profiles')
-      .select(`
-        *,
-        user_roles!left ( role )
-      `)
+      .select('*')
       .eq('user_id', userId)
       .single();
 
-    if (profileError) {
-      if (profileError.code === 'PGRST116') {
-        const shellProfile = {
-          user_id: userId,
-          first_name: '',
-          last_name: '',
-          email: user.user?.email || '',
-          role: 'user',
-        };
-        return { profile: shellProfile, appointments: [], medicalRecords: [] };
-      }
-      throw new AppError('User profile not found', StatusCodes.NOT_FOUND);
+    if (profileError && profileError.code !== 'PGRST116') { // PQRST116 means no rows found, which is ok
+      console.error('[UserAdminService] Error fetching profile:', profileError);
+      throw new AppError('Error fetching user profile', StatusCodes.INTERNAL_SERVER_ERROR);
     }
-    
+
+    // Step 3: Get user role
+    const { data: roleData, error: roleError } = await this.supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .single();
+
+    if (roleError && roleError.code !== 'PGRST116') {
+      console.error('[UserAdminService] Error fetching role:', roleError);
+      throw new AppError('Error fetching user role', StatusCodes.INTERNAL_SERVER_ERROR);
+    }
+
+    // Step 4: Combine into a final user profile object
     const userProfile = {
-      ...profile,
-      email: user.user?.email,
-      role: profile.user_roles?.role || 'user',
+      ...(profile || { user_id: userId, first_name: '', last_name: '' }), // Use shell if no profile
+      email: authUser.user.email,
+      role: roleData?.role || 'user', // Default to 'user' if no role is set
     };
-    delete (userProfile as any).user_roles;
-
-
+    
+    // Step 5: Get appointments
     const { data: appointments, error: appointmentError } = await this.supabase
       .from('appointments')
-      .select(`
-        *,
-        clinic:clinics (*),
-        service:services (*),
-        provider:providers (*)
-      `)
+      .select('*, clinic:clinics (*), service:services (*), provider:providers (*)')
       .eq('user_id', userId)
       .order('appointment_datetime', { ascending: false });
 
     if (appointmentError) {
+      console.error('[UserAdminService] Error fetching appointments:', appointmentError);
       throw new AppError('Failed to fetch appointments', StatusCodes.INTERNAL_SERVER_ERROR);
     }
 
+    // Step 6: Get medical records
     const { data: medicalRecords, error: medicalRecordsError } = await this.supabase
       .from('user_medical_records')
       .select('*')
       .eq('user_id', userId);
 
     if (medicalRecordsError) {
+      console.error('[UserAdminService] Error fetching medical records:', medicalRecordsError);
       throw new AppError('Failed to fetch medical records', StatusCodes.INTERNAL_SERVER_ERROR);
     }
 
-    return { profile: userProfile, appointments, medicalRecords };
+    // Step 7: Return final combined data structure
+    return { 
+      profile: userProfile, 
+      appointments: appointments || [], 
+      medicalRecords: medicalRecords || [] 
+    };
   }
 
   async updateUser(userId: string, userData: { first_name: string; last_name: string; role: string }) {
