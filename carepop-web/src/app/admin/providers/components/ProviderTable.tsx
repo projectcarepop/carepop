@@ -158,7 +158,9 @@ export function ProviderTable() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [sorting, setSorting] = React.useState<SortingState>([
+    { id: 'lastName', desc: false },
+  ]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
@@ -169,6 +171,15 @@ export function ProviderTable() {
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
+
+      // Maps frontend camelCase sort IDs to backend snake_case column names
+      const sortColumnMap: { [key: string]: string } = {
+        firstName: 'first_name',
+        lastName: 'last_name',
+        email: 'email',
+        createdAt: 'created_at',
+      };
+
       try {
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
 
@@ -178,7 +189,25 @@ export function ProviderTable() {
 
         const token = sessionData.session.access_token;
 
-        const response = await fetch('/api/v1/admin/providers', {
+        // Build query params from table state
+        const params = new URLSearchParams();
+        if (sorting.length > 0) {
+          const sort = sorting[0];
+          const backendSortKey = sortColumnMap[sort.id] || 'created_at';
+          params.append('sortBy', backendSortKey);
+          params.append('sortOrder', sort.desc ? 'desc' : 'asc');
+        } else {
+          // Default sort if none is selected
+          params.append('sortBy', 'created_at');
+          params.append('sortOrder', 'desc');
+        }
+
+        const queryString = params.toString();
+        const apiUrl = `/api/v1/admin/providers${queryString ? `?${queryString}` : ''}`;
+        
+        console.log(`[ProviderTable] Fetching data from: ${apiUrl}`);
+
+        const response = await fetch(apiUrl, {
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
