@@ -30,7 +30,7 @@ export class UserAdminService {
         last_name,
         email,
         created_at,
-        role:user_roles ( role )
+        role:user_roles!inner(role)
       `, { count: 'exact' })
       .range(from, to);
 
@@ -39,7 +39,7 @@ export class UserAdminService {
     }
     
     if (role) {
-      query = query.eq('user_roles.role', role);
+      query = query.eq('role.role', role);
     }
 
     const { data, error, count } = await query;
