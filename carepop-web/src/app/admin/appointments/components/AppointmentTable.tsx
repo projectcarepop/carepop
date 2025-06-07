@@ -64,7 +64,6 @@ export interface Appointment {
   first_name?: string;
   last_name?: string;
   email?: string;
-  contact_no?: string;
   service_name?: string;
   provider_name?: string;
 }
@@ -224,7 +223,6 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
           first_name: patient?.first_name || 'N/A',
           last_name: patient?.last_name || '',
           email: patient?.email || 'N/A',
-          contact_no: patient?.contact_no || 'N/A',
           service_name: serviceMap?.[appt.service_id] || appt.service_id,
           provider_name: providerMap?.[appt.provider_id] || 'N/A',
         };
@@ -378,10 +376,6 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
     {
         accessorKey: 'email',
         header: 'Email'
-    },
-    {
-        accessorKey: 'contact_no',
-        header: 'Contact No.'
     },
     {
         accessorKey: 'service_name',
