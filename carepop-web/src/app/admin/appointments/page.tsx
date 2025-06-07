@@ -51,8 +51,13 @@ export default function AdminAppointmentsPage() {
           </Link>
         </Button>
       </div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Appointment Management</h1>
+      
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold mb-4">Appointment Management</h1>
+      </div>
+      
+      <div className="mb-4 flex justify-start">
+        <span className="mr-2 text-sm font-medium text-muted-foreground py-2">Clinic:</span>
         <div className="w-64">
           <Select onValueChange={setSelectedClinicId} value={selectedClinicId || ''}>
             <SelectTrigger>
