@@ -1,26 +1,42 @@
 import { Router } from 'express';
 import { UserAdminController } from '../../controllers/admin/user.admin.controller';
-import { UserAdminService } from '../../services/admin/user.admin.service';
-import { supabase } from '../../config/supabaseClient';
 import { authenticateToken } from '../../middleware/authMiddleware';
 import { isAdmin } from '../../middleware/role.middleware';
+import { validateRequest } from '../../middleware/validateRequest';
+import { listUsersQuerySchema, getUserParamsSchema } from '../../validation/admin/user.admin.validation';
 
-export const createAdminUserRoutes = (controller: UserAdminController): Router => {
-  const router = Router();
 
-  router.get(
-    '/',
-    authenticateToken,
-    isAdmin,
-    controller.listUsers.bind(controller)
-  );
+export class AdminUserRoutes {
+  router: Router;
 
-  router.get(
-    '/:userId',
-    authenticateToken,
-    isAdmin,
-    controller.getUserDetails.bind(controller)
-  );
+  constructor(private controller: UserAdminController) {
+    this.router = Router();
+    this.initializeRoutes();
+  }
 
-  return router;
-}; 
+  initializeRoutes() {
+    this.router.get(
+      '/',
+      authenticateToken,
+      isAdmin,
+      validateRequest({ query: listUsersQuerySchema }),
+      this.controller.listUsers.bind(this.controller)
+    );
+
+    this.router.get(
+      '/:userId',
+      authenticateToken,
+      isAdmin,
+      validateRequest({ params: getUserParamsSchema }),
+      this.controller.getUserDetails.bind(this.controller)
+    );
+    
+    this.router.put(
+      '/:userId',
+      authenticateToken,
+      isAdmin,
+      // TODO: Add validation for update user
+      this.controller.updateUser.bind(this.controller)
+    );
+  }
+} 

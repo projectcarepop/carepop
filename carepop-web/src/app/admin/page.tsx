@@ -203,6 +203,13 @@ export default function AdminDashboardPage() {
           icon={<CalendarCheck className="w-8 h-8 text-gray-500" />}
           type="clinics"
         />
+        <DashboardCard
+          href="/admin/users"
+          title="User Management"
+          description="View and manage user profiles and records."
+          icon={<Users className="w-8 h-8 text-gray-500" />}
+          type="users"
+        />
       </div>
     </div>
   );
@@ -212,6 +219,7 @@ const cardStyles = {
   clinics: "bg-blue-50 border-blue-200 hover:border-blue-400 text-blue-800",
   providers: "bg-green-50 border-green-200 hover:border-green-400 text-green-800",
   appointments: "bg-purple-50 border-purple-200 hover:border-purple-400 text-purple-800",
+  users: "bg-yellow-50 border-yellow-200 hover:border-yellow-400 text-yellow-800",
 };
 
 function DashboardCard({ 
