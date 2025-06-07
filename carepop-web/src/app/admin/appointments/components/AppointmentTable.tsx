@@ -162,10 +162,18 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
         const services = await servicesRes.json();
         const providers = await providersRes.json();
 
-        setPatientMap(Object.fromEntries(patients.data.map((p: { user_id: string, full_name: string }) => [p.user_id, p.full_name])));
-        setClinicMap(Object.fromEntries(clinics.data.map((c: { id: string, name: string }) => [c.id, c.name])));
-        setServiceMap(Object.fromEntries(services.data.map((s: { id: string, name: string }) => [s.id, s.name])));
-        setProviderMap(Object.fromEntries(providers.data.map((p: { id: string, first_name: string, last_name: string }) => [p.id, `${p.first_name} ${p.last_name}`])));
+        if (patients?.data) {
+          setPatientMap(Object.fromEntries(patients.data.map((p: { user_id: string, full_name: string }) => [p.user_id, p.full_name])));
+        }
+        if (clinics?.data) {
+          setClinicMap(Object.fromEntries(clinics.data.map((c: { id: string, name: string }) => [c.id, c.name])));
+        }
+        if (services?.data) {
+          setServiceMap(Object.fromEntries(services.data.map((s: { id: string, name: string }) => [s.id, s.name])));
+        }
+        if (providers?.data) {
+          setProviderMap(Object.fromEntries(providers.data.map((p: { id: string, first_name: string, last_name: string }) => [p.id, `${p.first_name} ${p.last_name}`])));
+        }
 
       } catch (err: unknown) {
          const message = err instanceof Error ? err.message : "An unknown error occurred";
