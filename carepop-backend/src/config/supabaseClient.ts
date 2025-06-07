@@ -73,7 +73,7 @@ async function initializeSupabase() {
       // Throw error only if service key is absolutely required at startup,
       // otherwise just warn and let parts of the app fail if they try to use it.
       // For profile creation, it IS required.
-      throw new Error('Supabase Service Role Key is missing. Ensure configuration is correct (GCP Secret Manager or .env).');
+      console.warn('Supabase Service Role Key is missing. Admin features will be disabled. Ensure configuration is correct (GCP Secret Manager or .env).');
   }
 
   initializedSupabaseUrl = supabaseUrl; // Store for use in createSupabaseClientWithToken
@@ -82,15 +82,19 @@ async function initializeSupabase() {
   supabaseAnonClient = createClient(supabaseUrl, supabaseAnonKey);
   console.log('Supabase anon client initialized successfully.');
 
-  // Create the service role client instance
-  supabaseServiceRoleClient = createClient(supabaseUrl, supabaseServiceKey);
-  console.log('Supabase service role client initialized successfully.');
+  // Create the service role client instance only if the key is present
+  if (supabaseServiceKey) {
+    supabaseServiceRoleClient = createClient(supabaseUrl, supabaseServiceKey);
+    console.log('Supabase service role client initialized successfully.');
+  } else {
+    console.warn('Supabase service role client NOT initialized due to missing key.');
+  }
 
   // Explicit check for service role client
   if (!supabaseServiceRoleClient) {
-    throw new Error('Failed to create supabaseServiceRoleClient: createClient returned null or undefined.');
-  }
-  if (typeof supabaseServiceRoleClient.from !== 'function') {
+    // This will no longer throw an error, but we log it.
+    console.warn('Failed to create supabaseServiceRoleClient: createClient returned null or undefined or key was missing.');
+  } else if (typeof supabaseServiceRoleClient.from !== 'function') {
     throw new Error('Failed to create supabaseServiceRoleClient: instance does not have a .from method.');
   }
 }

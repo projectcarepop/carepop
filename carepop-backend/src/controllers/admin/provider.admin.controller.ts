@@ -5,8 +5,8 @@ import { CreateProviderBody, UpdateProviderBody, ListProvidersQuery, ProviderIdP
 export class AdminProviderController {
   private adminProviderService: AdminProviderService;
 
-  constructor() {
-    this.adminProviderService = new AdminProviderService();
+  constructor(adminProviderService: AdminProviderService) {
+    this.adminProviderService = adminProviderService;
   }
 
   createProvider = async (req: Request, res: Response, next: NextFunction) => {

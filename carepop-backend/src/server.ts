@@ -9,9 +9,6 @@ import serviceRoutes from './routes/serviceRoutes';
 import appointmentRoutes from './routes/appointmentRoutes';
 import availabilityRoutes from './routes/availabilityRoutes';
 import providerRoutes from './routes/providerRoutes';
-import adminClinicRoutes from './routes/admin/clinic.admin.routes';
-import adminProviderRoutes from './routes/admin/provider.admin.routes';
-import adminDashboardRoutes from './routes/admin/dashboard.admin.routes';
 import { getConfig } from './config/config';
 import { ZodError } from 'zod';
 
@@ -44,15 +41,12 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // --- Setup Swagger (Assuming this function exists elsewhere and is correctly set up if used)
 // if (typeof setupSwagger === 'function') setupSwagger(app);
 
-// --- Mount Routers ---
+// --- Mount Non-Admin Routers ---
 app.use('/api/auth', authRoutes);
 app.use('/api/users', profileRoutes);
 app.use('/api/v1/directory', directoryRoutes);
 app.use('/api/v1', serviceRoutes);
 app.use('/api/v1', providerRoutes);
-app.use('/api/v1/admin', adminDashboardRoutes);
-app.use('/api/v1/admin/clinics', adminClinicRoutes);
-app.use('/api/v1/admin/providers', adminProviderRoutes);
 app.use('/api/v1/appointments', appointmentRoutes);
 app.use('/api/v1/availability', availabilityRoutes);
 
@@ -94,6 +88,44 @@ async function startServer() {
   try {
     await supabaseInitializationPromise; // Wait for Supabase to be ready
     logger.info('Supabase clients initialized successfully by server.');
+
+    // --- DI and Admin Route Mounting ---
+    if (!supabaseServiceRole) {
+      throw new Error("Supabase service role client not available after initialization.");
+    }
+    
+    // Dashboard
+    const { AdminDashboardController } = await import('./controllers/admin/dashboard.admin.controller');
+    const { AdminDashboardService } = await import('./services/admin/dashboard.admin.service');
+    const { createAdminDashboardRoutes } = await import('./routes/admin/dashboard.admin.routes');
+    
+    const adminDashboardService = new AdminDashboardService(supabaseServiceRole);
+    const adminDashboardController = new AdminDashboardController(adminDashboardService);
+    const adminDashboardRoutes = createAdminDashboardRoutes(adminDashboardController);
+    app.use('/api/v1/admin', adminDashboardRoutes);
+    logger.info('Admin Dashboard routes mounted.');
+
+    // Clinics
+    const { AdminClinicController } = await import('./controllers/admin/clinic.admin.controller');
+    const { AdminClinicService } = await import('./services/admin/clinic.admin.service');
+    const { createAdminClinicRoutes } = await import('./routes/admin/clinic.admin.routes');
+
+    const adminClinicService = new AdminClinicService(supabaseServiceRole);
+    const adminClinicController = new AdminClinicController(adminClinicService);
+    const adminClinicRoutes = createAdminClinicRoutes(adminClinicController);
+    app.use('/api/v1/admin/clinics', adminClinicRoutes);
+    logger.info('Admin Clinic routes mounted.');
+
+    // Providers
+    const { AdminProviderController } = await import('./controllers/admin/provider.admin.controller');
+    const { AdminProviderService } = await import('./services/admin/provider.admin.service');
+    const { createAdminProviderRoutes } = await import('./routes/admin/provider.admin.routes');
+    
+    const adminProviderService = new AdminProviderService(supabaseServiceRole);
+    const adminProviderController = new AdminProviderController(adminProviderService);
+    const adminProviderRoutes = createAdminProviderRoutes(adminProviderController);
+    app.use('/api/v1/admin/providers', adminProviderRoutes);
+    logger.info('Admin Provider routes mounted.');
 
     const PORT = config.port;
     app.listen(PORT, () => {

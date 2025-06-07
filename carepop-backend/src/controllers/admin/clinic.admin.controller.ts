@@ -13,9 +13,8 @@ import { supabaseServiceRole } from '../../config/supabaseClient'; // Import the
 export class AdminClinicController {
   private clinicService: AdminClinicService;
 
-  constructor() {
-    // Pass the imported supabaseServiceRole client to the service constructor
-    this.clinicService = new AdminClinicService(supabaseServiceRole);
+  constructor(adminClinicService: AdminClinicService) {
+    this.clinicService = adminClinicService;
     // Bind methods to ensure 'this' context is correct when they are used as route handlers
     this.createClinic = this.createClinic.bind(this);
     this.listClinics = this.listClinics.bind(this);
