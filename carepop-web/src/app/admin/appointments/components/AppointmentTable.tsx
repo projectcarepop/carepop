@@ -167,8 +167,11 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
         setServiceMap(Object.fromEntries(services.data.map((s: { id: string, name: string }) => [s.id, s.name])));
         setProviderMap(Object.fromEntries(providers.data.map((p: { id: string, first_name: string, last_name: string }) => [p.id, `${p.first_name} ${p.last_name}`])));
 
-      } catch {
-         setError("Failed to load required data. Please try again.");
+      } catch (err: unknown) {
+         const message = err instanceof Error ? err.message : "An unknown error occurred";
+         console.error("Failed to load lookup data:", message);
+         setError("Failed to load required data. Please check the console and try again.");
+         setIsLoading(false); 
       }
     };
     fetchLookups();
@@ -378,10 +381,17 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
   }, [supabase, clinicId, patientMap, clinicMap, serviceMap, providerMap]);
 
   React.useEffect(() => {
-    if (clinicId && Object.keys(patientMap).length > 0 && Object.keys(clinicMap).length > 0 && Object.keys(serviceMap).length > 0) {
+    // This effect now ONLY triggers when the necessary data is ready.
+    const allLookupsReady = clinicId && 
+                            Object.keys(patientMap).length > 0 && 
+                            Object.keys(clinicMap).length > 0 && 
+                            Object.keys(serviceMap).length > 0 &&
+                            Object.keys(providerMap).length > 0;
+    
+    if (allLookupsReady) {
         fetchData();
     }
-  }, [fetchData, clinicId, patientMap, clinicMap, serviceMap]);
+  }, [clinicId, patientMap, clinicMap, serviceMap, providerMap, fetchData]);
 
   const table = useReactTable({
     data,
