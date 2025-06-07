@@ -19,13 +19,14 @@ export class AdminProviderService {
   }
 
   async createProvider(providerData: CreateProviderBody): Promise<Provider> {
-    const { firstName, lastName, phoneNumber, ...rest } = providerData;
+    const { firstName, lastName, phoneNumber, isActive, ...rest } = providerData;
 
     const dbPayload = {
       ...rest,
       first_name: firstName,
       last_name: lastName,
       contact_number: phoneNumber,
+      is_active: isActive,
     };
 
     const { data, error } = await this.supabase
@@ -120,7 +121,7 @@ export class AdminProviderService {
   ): Promise<Provider | null> {
     logger.info(`[AdminProviderService] Attempting to update provider ID: ${providerId}`);
     
-    const { firstName, lastName, phoneNumber, ...rest } = updateData;
+    const { firstName, lastName, phoneNumber, isActive, ...rest } = updateData;
 
     const payload: Partial<Provider> & { updated_at: string } = {
       updated_at: new Date().toISOString(),
@@ -130,6 +131,7 @@ export class AdminProviderService {
     if (firstName) payload.first_name = firstName;
     if (lastName) payload.last_name = lastName;
     if (phoneNumber) payload.contact_number = phoneNumber;
+    if (isActive !== undefined) payload.is_active = isActive;
 
     const { data, error } = await this.supabase
       .from('providers')
