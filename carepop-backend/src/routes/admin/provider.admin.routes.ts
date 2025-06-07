@@ -9,7 +9,6 @@ import {
   listProvidersSchema,
   providerIdSchema,
 } from '../../validation/admin/provider.admin.validation';
-import { isAuthenticated } from '../../middleware/authMiddleware';
 
 export const createAdminProviderRoutes = (adminProviderController: AdminProviderController): Router => {
   const router = Router();

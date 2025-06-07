@@ -1,6 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { StatusCodes } from 'http-status-codes';
-import { Database } from '../../types/supabase';
+import { Database } from '../../types/supabase.types';
 import { AppError } from '../../utils/errors';
 import {
   CreateProviderBody,
@@ -28,16 +28,12 @@ export class AdminProviderService {
       if (error.code === '23505') {
         throw new AppError(
           'A provider with this email already exists.',
-          StatusCodes.CONFLICT,
-          'DATABASE_ERROR',
-          { originalError: error }
+          StatusCodes.CONFLICT
         );
       }
       throw new AppError(
         'Failed to create provider in database.',
-        StatusCodes.INTERNAL_SERVER_ERROR,
-        'DATABASE_ERROR',
-        { originalError: error }
+        StatusCodes.INTERNAL_SERVER_ERROR
       );
     }
     return data;
@@ -76,9 +72,7 @@ export class AdminProviderService {
     if (error) {
       throw new AppError(
         'Failed to retrieve providers.',
-        StatusCodes.INTERNAL_SERVER_ERROR,
-        'DATABASE_ERROR',
-        { originalError: error }
+        StatusCodes.INTERNAL_SERVER_ERROR
       );
     }
 
@@ -104,9 +98,7 @@ export class AdminProviderService {
       // PGRST116 means no rows found, which is not an "error" in this context
       throw new AppError(
         'Failed to retrieve provider by ID.',
-        StatusCodes.INTERNAL_SERVER_ERROR,
-        'DATABASE_ERROR',
-        { originalError: error }
+        StatusCodes.INTERNAL_SERVER_ERROR
       );
     }
     return data;
@@ -127,16 +119,12 @@ export class AdminProviderService {
       if (error.code === '23505') {
         throw new AppError(
           'A provider with this email already exists.',
-          StatusCodes.CONFLICT,
-          'DATABASE_ERROR',
-          { originalError: error }
+          StatusCodes.CONFLICT
         );
       }
       throw new AppError(
         'Failed to update provider.',
-        StatusCodes.INTERNAL_SERVER_ERROR,
-        'DATABASE_ERROR',
-        { originalError: error }
+        StatusCodes.INTERNAL_SERVER_ERROR
       );
     }
     return data;
@@ -151,9 +139,7 @@ export class AdminProviderService {
     if (error) {
       throw new AppError(
         'Failed to delete provider.',
-        StatusCodes.INTERNAL_SERVER_ERROR,
-        'DATABASE_ERROR',
-        { originalError: error }
+        StatusCodes.INTERNAL_SERVER_ERROR
       );
     }
     return true;
