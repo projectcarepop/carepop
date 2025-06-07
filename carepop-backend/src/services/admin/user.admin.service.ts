@@ -2,14 +2,15 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { AppError } from '../../utils/errors';
 import { StatusCodes } from 'http-status-codes';
 
-type UserProfileWithRole = {
+// Define a type for the shape of the data returned by the RPC
+type UserWithRole = {
   user_id: string;
   first_name: string | null;
   last_name: string | null;
-  email: string | null;
   created_at: string;
-  role: { role: string }[];
-};
+  role: string | null;
+  email: string | null;
+}
 
 export class UserAdminService {
   private supabase: SupabaseClient;
@@ -19,46 +20,41 @@ export class UserAdminService {
   }
 
   async listUsers(page: number, limit: number, search?: string, role?: string) {
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
+    const { data, error } = await this.supabase.rpc('get_all_users_with_roles');
 
-    let query = this.supabase
-      .from('profiles')
-      .select(`
-        user_id,
-        first_name,
-        last_name,
-        created_at,
-        user_roles ( role )
-      `, { count: 'exact' });
+    if (error) {
+      console.error('[UserAdminService] RPC Error fetching users:', error);
+      throw new AppError('Failed to fetch users via RPC', StatusCodes.INTERNAL_SERVER_ERROR, {
+        rpcError: error,
+      });
+    }
+
+    const typedData: UserWithRole[] = data || [];
+    let filteredData = typedData;
 
     if (search) {
-      query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%`);
+      const lowercasedSearch = search.toLowerCase();
+      filteredData = filteredData.filter(user =>
+        user.first_name?.toLowerCase().includes(lowercasedSearch) ||
+        user.last_name?.toLowerCase().includes(lowercasedSearch) ||
+        user.email?.toLowerCase().includes(lowercasedSearch)
+      );
     }
 
     if (role) {
-      query = query.filter('user_roles.role', 'eq', role);
-    }
-    
-    const { data, error, count } = await query
-      .range(from, to)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('[UserAdminService] Error fetching users:', error);
-      if (error.code === '42P01') {
-        throw new AppError('The user_roles table does not exist or cannot be accessed. Please run migrations.', StatusCodes.INTERNAL_SERVER_ERROR);
-      }
-      throw new AppError('Failed to fetch users', StatusCodes.INTERNAL_SERVER_ERROR);
+      filteredData = filteredData.filter(user => user.role === role);
     }
 
-    const users = data.map((profile: any) => ({
-      ...profile,
-      role: profile.user_roles?.role || 'user',
-      user_roles: undefined,
-    }));
-    
-    return { users, total: count || 0 };
+    const totalCount = filteredData.length;
+
+    const from = (page - 1) * limit;
+    const to = from + limit;
+    const paginatedData = filteredData.slice(from, to);
+
+    return {
+      data: paginatedData,
+      count: totalCount,
+    };
   }
 
   async getUserDetails(userId: string) {
@@ -72,7 +68,7 @@ export class UserAdminService {
       .from('profiles')
       .select(`
         *,
-        user_roles ( role )
+        user_roles!left ( role )
       `)
       .eq('user_id', userId)
       .single();
