@@ -1,40 +1,47 @@
 import { Request, Response, NextFunction } from 'express';
 import { AdminProviderService } from '../../services/admin/provider.admin.service';
-import { CreateProviderBody, UpdateProviderBody, ListProvidersQuery, ProviderIdParams } from '../../validation/admin/provider.admin.validation';
+import { 
+  createProviderSchema,
+  ListProvidersQuery,
+  UpdateProviderBody,
+  ProviderIdParams,
+} from '../../validation/admin/provider.admin.validation';
+import { AuthenticatedRequest } from '../../middleware/authMiddleware';
 
 export class AdminProviderController {
   private adminProviderService: AdminProviderService;
 
   constructor(adminProviderService: AdminProviderService) {
     this.adminProviderService = adminProviderService;
+    this.createProvider = this.createProvider.bind(this);
+    this.listProviders = this.listProviders.bind(this);
+    this.getProviderById = this.getProviderById.bind(this);
+    this.updateProvider = this.updateProvider.bind(this);
+    this.deleteProvider = this.deleteProvider.bind(this);
   }
 
-  createProvider = async (req: Request, res: Response, next: NextFunction) => {
+  async createProvider(req: Request, res: Response, next: NextFunction) {
     try {
-      // Assuming validateRequest middleware populates req.body with validated CreateProviderBody
-      const { body: providerData } = req as unknown as { body: CreateProviderBody }; 
-      
+      const { body: providerData } = createProviderSchema.parse(req);
       const newProvider = await this.adminProviderService.createProvider(providerData);
       res.status(201).json({ message: 'Provider created successfully', data: newProvider });
     } catch (error) {
       next(error);
     }
-  };
+  }
 
-  listProviders = async (req: Request, res: Response, next: NextFunction) => {
+  async listProviders(req: Request, res: Response, next: NextFunction) {
     try {
-      // Assuming validateRequest middleware populates req.query with validated ListProvidersQuery
       const { query: queryParams } = req as unknown as { query: ListProvidersQuery };
       const result = await this.adminProviderService.listProviders(queryParams);
       res.status(200).json(result);
     } catch (error) {
       next(error);
     }
-  };
+  }
 
-  getProviderById = async (req: Request, res: Response, next: NextFunction) => {
+  async getProviderById(req: Request, res: Response, next: NextFunction) {
     try {
-      // Assuming validateRequest middleware populates req.params with validated ProviderIdParams
       const { params: { providerId } } = req as unknown as { params: ProviderIdParams };
       const provider = await this.adminProviderService.getProviderById(providerId);
       if (!provider) {
@@ -44,11 +51,10 @@ export class AdminProviderController {
     } catch (error) {
       next(error);
     }
-  };
+  }
 
-  updateProvider = async (req: Request, res: Response, next: NextFunction) => {
+  async updateProvider(req: Request, res: Response, next: NextFunction) {
     try {
-      // Assuming validateRequest middleware populates req.params and req.body
       const { params: { providerId }, body: providerData } = req as unknown as { params: ProviderIdParams, body: UpdateProviderBody };
       const updatedProvider = await this.adminProviderService.updateProvider(providerId, providerData);
       if (!updatedProvider) {
@@ -58,11 +64,10 @@ export class AdminProviderController {
     } catch (error) {
       next(error);
     }
-  };
+  }
 
-  deleteProvider = async (req: Request, res: Response, next: NextFunction) => {
+  async deleteProvider(req: Request, res: Response, next: NextFunction) {
     try {
-      // Assuming validateRequest middleware populates req.params
       const { params: { providerId } } = req as unknown as { params: ProviderIdParams };
       const success = await this.adminProviderService.deleteProvider(providerId);
       if (!success) {
@@ -72,5 +77,5 @@ export class AdminProviderController {
     } catch (error) {
       next(error);
     }
-  };
+  }
 } 

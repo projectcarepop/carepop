@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { AdminProviderController } from '../../controllers/admin/provider.admin.controller';
-import { authenticateToken } from '../../middleware/authMiddleware';
 import { isAdmin } from '../../middleware/role.middleware';
+import { authenticateToken } from '../../middleware/authMiddleware';
 import { validateRequest } from '../../middleware/validateRequest';
 import {
   createProviderBodySchema,
@@ -9,6 +9,7 @@ import {
   listProvidersSchema,
   providerIdSchema,
 } from '../../validation/admin/provider.admin.validation';
+import { isAuthenticated } from '../../middleware/authMiddleware';
 
 export const createAdminProviderRoutes = (adminProviderController: AdminProviderController): Router => {
   const router = Router();
@@ -46,7 +47,7 @@ export const createAdminProviderRoutes = (adminProviderController: AdminProvider
     '/',
     authenticateToken,
     isAdmin,
-    validateRequest({ body: createProviderBodySchema }),
+    validateRequest(createProviderBodySchema),
     adminProviderController.createProvider
   );
 
