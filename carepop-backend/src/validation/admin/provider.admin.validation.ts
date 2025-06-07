@@ -1,23 +1,33 @@
 import { z } from 'zod';
 
+// Base schema for the provider's body data on creation
 export const createProviderBodySchema = z.object({
-  userId: z.string().uuid().optional().nullable(), // If linking to an existing auth.users
-  firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Last name is required'),
-  email: z.string().email('Invalid email address'),
-  phoneNumber: z.string().optional().nullable(),
-  isActive: z.boolean().optional().default(true),
-  // services: z.array(z.string().uuid()).optional(), // Array of service IDs to associate
+  first_name: z.string({ required_error: 'First name is required.' }).min(1, 'First name cannot be empty.'),
+  last_name: z.string({ required_error: 'Last name is required.' }).min(1, 'Last name cannot be empty.'),
+  email: z.string().email('Invalid email address.').optional(),
+  contact_number: z.string().optional(),
+  sex: z.string().optional(),
+  birth_date: z.string().optional(), // Or z.date() if you handle conversion
+  avatar_url: z.string().url('Invalid URL format.').optional(),
+  is_active: z.boolean().default(true),
+  accepting_new_patients: z.boolean().default(true),
+});
+
+// Schema for the entire create provider request
+export const createProviderSchema = z.object({
+  body: createProviderBodySchema,
 });
 
 export const updateProviderBodySchema = z.object({
-  userId: z.string().uuid().optional().nullable(),
-  firstName: z.string().min(1, 'First name is required').optional(),
-  lastName: z.string().min(1, 'Last name is required').optional(),
-  email: z.string().email('Invalid email address').optional(),
-  phoneNumber: z.string().optional().nullable(),
-  isActive: z.boolean().optional(),
-  // services: z.array(z.string().uuid()).optional(),
+  first_name: z.string().min(1, 'First name cannot be empty.').optional(),
+  last_name: z.string().min(1, 'Last name cannot be empty.').optional(),
+  email: z.string().email('Invalid email address.').optional(),
+  contact_number: z.string().optional(),
+  sex: z.string().optional(),
+  birth_date: z.string().optional(),
+  avatar_url: z.string().url('Invalid URL format.').optional(),
+  is_active: z.boolean().optional(),
+  accepting_new_patients: z.boolean().optional(),
 });
 
 export const listProvidersSchema = z.object({
@@ -47,11 +57,6 @@ export const updateProviderSchema = z.object({
   params: z.object({
     providerId: z.string().uuid('Invalid provider ID format'),
   }),
-});
-
-// Schema for create (only body)
-export const createProviderSchema = z.object({
-  body: createProviderBodySchema,
 });
 
 // Type definitions inferred from schemas

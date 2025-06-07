@@ -14,7 +14,6 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 import { ArrowUpDown, ChevronDown, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
-
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -37,6 +36,7 @@ import {
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { getClinicsForAdmin } from '@/lib/actions/clinic.admin.actions';
+import { useRouter } from 'next/navigation';
 
 // Frontend data structure (camelCase)
 export interface Clinic {
@@ -175,6 +175,7 @@ export const columns: ColumnDef<Clinic>[] = [
 ];
 
 export function ClinicTable() {
+  const router = useRouter();
   const [data, setData] = React.useState<Clinic[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -243,7 +244,7 @@ export function ClinicTable() {
 
   return (
     <div className="w-full">
-      <div className="flex items-center py-4">
+      <div className="flex items-center justify-between py-4">
         <Input
           placeholder="Filter by clinic name..."
           value={(table.getColumn('name')?.getFilterValue() as string) ?? ''}
@@ -252,32 +253,35 @@ export function ClinicTable() {
           }
           className="max-w-sm"
         />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="ml-auto">
-              Columns <ChevronDown className="ml-2 h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {table
-              .getAllColumns()
-              .filter((column) => column.getCanHide())
-              .map((column) => {
-                return (
-                  <DropdownMenuCheckboxItem
-                    key={column.id}
-                    className="capitalize"
-                    checked={column.getIsVisible()}
-                    onCheckedChange={(value) =>
-                      column.toggleVisibility(!!value)
-                    }
-                  >
-                    {column.id}
-                  </DropdownMenuCheckboxItem>
-                );
-              })}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center space-x-2">
+            <Button onClick={() => router.push('/admin/clinics/new')}>Add Clinic</Button>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="ml-auto">
+                    Columns <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                {table
+                    .getAllColumns()
+                    .filter((column) => column.getCanHide())
+                    .map((column) => {
+                    return (
+                        <DropdownMenuCheckboxItem
+                        key={column.id}
+                        className="capitalize"
+                        checked={column.getIsVisible()}
+                        onCheckedChange={(value) =>
+                            column.toggleVisibility(!!value)
+                        }
+                        >
+                        {column.id}
+                        </DropdownMenuCheckboxItem>
+                    );
+                    })}
+                </DropdownMenuContent>
+            </DropdownMenu>
+        </div>
       </div>
       <div className="rounded-md border">
         <Table>
