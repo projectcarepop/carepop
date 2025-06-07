@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { CalendarDays, LogOut, ArrowRight, ChevronDown, Menu } from 'lucide-react';
+import { LogOut, ArrowRight, ChevronDown, Menu } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,16 +51,13 @@ export default function Header() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
               <DropdownMenuItem asChild className="hover:bg-transparent focus:bg-transparent">
-                <Link href="/appointments" className="hover:text-primary focus:text-primary">Appointments</Link>
+                <Link href="/clinic-finder" className="hover:text-primary focus:text-primary">Find a Clinic</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild className="hover:bg-transparent focus:bg-transparent">
                 <Link href="/book-service" className="hover:text-primary focus:text-primary">Book a Service</Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Link href="/clinic-finder" className="flex items-center text-sm font-medium text-secondary hover:text-primary px-3 py-2 rounded-md">
-            Find a Clinic
-          </Link>
         </div>
 
         {/* Desktop Action Buttons */}
@@ -70,12 +67,6 @@ export default function Header() {
               <Link href="/dashboard" className="flex items-center text-sm font-medium text-secondary hover:text-primary px-3 py-2 rounded-md focus:outline-none">
                 <span className="hidden md:inline">Dashboard</span>
               </Link>
-              <Button variant="default" asChild className="bg-primary hover:bg-primary/90 text-primary-foreground focus:outline-none">
-                <Link href="/appointments" className="flex items-center text-sm font-medium">
-                  <CalendarDays className="h-4 w-4 md:mr-1" />
-                  <span className="hidden md:inline">Appointments</span>
-                </Link>
-              </Button>
               <Button variant="outline" onClick={signOut} className="flex items-center text-sm font-medium focus:outline-none">
                 <LogOut className="h-4 w-4 md:mr-1" />
                 <span className="hidden md:inline">Sign Out</span>

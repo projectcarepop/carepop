@@ -22,6 +22,44 @@ const ProviderSelectionStep: React.FC = () => {
     errors 
   } = state;
 
+  const fetchProvidersForService = async (clinicId: string, serviceId: string) => {
+    dispatch({ type: 'SET_PROVIDERS_LOADING', payload: true });
+
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !sessionData.session) {
+        console.error("Auth error:", sessionError);
+        throw new Error('Your session is invalid. Please log in again.');
+      }
+      const token = sessionData.session.access_token;
+      
+      const queryParams = new URLSearchParams({ serviceId }).toString();
+      const res = await fetch(`/api/v1/clinics/${clinicId}/providers?${queryParams}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        }
+      });
+
+      if (!res.ok) {
+        const errorText = res.status === 404 ? 'No providers were found for this service.' : `An unexpected error occurred (Code: ${res.status}).`;
+        throw new Error(errorText);
+      }
+
+      const data = await res.json();
+      if (data.success) {
+        dispatch({ type: 'SET_PROVIDERS_SUCCESS', payload: data.data as Provider[] });
+      } else {
+        throw new Error(data.message || 'Failed to parse provider data.');
+      }
+    } catch (error) {
+      console.error("Error fetching providers:", error);
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred while fetching providers.';
+      dispatch({ type: 'SET_PROVIDERS_ERROR', payload: errorMessage });
+    }
+  };
+
   useEffect(() => {
     if (selectedClinic && selectedService) {
       if (selectedService.requiresProviderAssignment === false) {
@@ -32,54 +70,13 @@ const ProviderSelectionStep: React.FC = () => {
         return; // Important to prevent fetching providers
       }
 
-      dispatch({ type: 'SET_PROVIDERS_LOADING', payload: true });
-      // API Call: GET /api/v1/providers (Backend Integration Guide - Section 2.1)
-      // Query Parameters: clinicId, serviceId
-      const queryParams = new URLSearchParams({
-        serviceId: selectedService.id,
-      }).toString();
-      
-      // Fetch with Auth
-      const supabase = createSupabaseBrowserClient();
-      supabase.auth.getSession().then(({ data: sessionData, error: sessionError }) => {
-        if (sessionError || !sessionData.session) {
-          console.error("Error getting session or no session for provider fetch:", sessionError);
-          dispatch({ type: 'SET_PROVIDERS_ERROR', payload: 'Your session is invalid. Please log in again.' });
-          dispatch({ type: 'SET_PROVIDERS_LOADING', payload: false });
-          return;
-        }
-        const token = sessionData.session.access_token;
-
-        fetch(`/api/v1/clinics/${selectedClinic.id}/providers?${queryParams}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          }
-        })
-          .then(res => {
-            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-            return res.json();
-          })
-          .then(data => {
-            if (data.success) {
-              dispatch({ type: 'SET_PROVIDERS_SUCCESS', payload: data.data as Provider[] });
-            } else {
-              dispatch({ type: 'SET_PROVIDERS_ERROR', payload: data.message || 'Failed to fetch providers.' });
-            }
-          })
-          .catch((error) => {
-            console.error("Error fetching providers:", error);
-            dispatch({ type: 'SET_PROVIDERS_ERROR', payload: error.message || 'An error occurred while fetching providers.' });
-          })
-          .finally(() => {
-            // Ensure loading is set to false in context if not handled by success/error dispatches specifically for this scenario
-            // However, current SET_PROVIDERS_SUCCESS/ERROR actions already set loading to false.
-          });
-      });
+      fetchProvidersForService(selectedClinic.id, selectedService.id);
     } else {
         // Clear providers if clinic or service is not selected
         dispatch({ type: 'SET_PROVIDERS_SUCCESS', payload: [] });
     }
-  }, [selectedClinic, selectedService, dispatch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedClinic, selectedService]);
 
   const handleProviderSelect = (provider: Provider) => {
     dispatch({ type: 'SELECT_PROVIDER', payload: provider });
@@ -127,7 +124,26 @@ const ProviderSelectionStep: React.FC = () => {
       </CardHeader>
       <CardContent className="space-y-6">
         {isLoading.providersForService && <div className="flex items-center space-x-2 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /> <span>Loading available providers...</span></div>}
-        {errors.providersForService && <Alert variant="destructive" className="mt-2"><AlertTitle className="flex items-center"><Info className="h-5 w-5 mr-2"/>Error Loading Providers</AlertTitle><AlertDescription>{errors.providersForService}</AlertDescription></Alert>}
+        
+        {errors.providersForService && (
+          <Alert variant="destructive" className="mt-2">
+            <Info className="h-5 w-5 mr-2"/>
+            <AlertTitle>Error Loading Providers</AlertTitle>
+            <AlertDescription>
+              {errors.providersForService}
+              <Button 
+                onClick={() => fetchProvidersForService(selectedClinic.id, selectedService.id)} 
+                variant="secondary" 
+                size="sm" 
+                className="ml-4"
+                disabled={isLoading.providersForService}
+              >
+                {isLoading.providersForService && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Try Again
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
         
         {!isLoading.providersForService && providersForService.length === 0 && !errors.providersForService && (
           <Alert variant="default" className="border-orange-400/50">

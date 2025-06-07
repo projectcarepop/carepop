@@ -165,100 +165,110 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      <Card className="shadow-lg">
-        <CardHeader className="flex flex-row justify-between items-center">
-          <CardTitle className="text-2xl">Your Profile</CardTitle>
-          <Button asChild variant="outline">
-            <Link href="/create-profile">
-              <Edit3 className="mr-2 h-4 w-4" /> Edit Profile
-            </Link>
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-6 pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-            <div>
-              <Label htmlFor="email" className="text-sm font-medium text-muted-foreground">Email Address</Label>
-              <p id="email" className="text-lg">{user.email}</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <Card className="shadow-lg lg:col-span-2">
+          <CardHeader className="flex flex-row justify-between items-center">
+            <CardTitle className="text-2xl">Your Profile</CardTitle>
+            <Button asChild variant="outline">
+              <Link href="/create-profile">
+                <Edit3 className="mr-2 h-4 w-4" /> Edit Profile
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-6 pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+              <div>
+                <Label htmlFor="email" className="text-sm font-medium text-muted-foreground">Email Address</Label>
+                <p id="email" className="text-lg">{user.email}</p>
+              </div>
+              <div>
+                <Label htmlFor="firstName" className="text-sm font-medium text-muted-foreground">First Name</Label>
+                <p id="firstName" className="text-lg">{profile?.firstName || <span className='text-muted-foreground italic'>Not set</span>}</p>
+              </div>
+              <div>
+                <Label htmlFor="lastName" className="text-sm font-medium text-muted-foreground">Last Name</Label>
+                <p id="lastName" className="text-lg">{profile?.lastName || <span className='text-muted-foreground italic'>Not set</span>}</p>
+              </div>
+              <div>
+                <Label htmlFor="middleInitial" className="text-sm font-medium text-muted-foreground">Middle Initial</Label>
+                <p id="middleInitial" className="text-lg">{profile?.middleInitial || <span className='text-muted-foreground italic'>Not set</span>}</p>
+              </div>
+              <div>
+                <Label htmlFor="dob" className="text-sm font-medium text-muted-foreground">Date of Birth</Label>
+                <p id="dob" className="text-lg">{profile?.dateOfBirth ? new Date(profile.dateOfBirth + 'T00:00:00').toLocaleDateString() : <span className='text-muted-foreground italic'>Not set</span>}</p>
+              </div>
+               <div>
+                <Label htmlFor="age" className="text-sm font-medium text-muted-foreground">Age</Label>
+                <p id="age" className="text-lg">{profile?.age !== undefined && profile.age !== null ? profile.age : <span className='text-muted-foreground italic'>Not set</span>}</p>
+              </div>
+              <div>
+                <Label htmlFor="genderIdentity" className="text-sm font-medium text-muted-foreground">Gender Identity</Label>
+                <p id="genderIdentity" className="text-lg">{profile?.genderIdentity || <span className='text-muted-foreground italic'>Not set</span>}</p>
+              </div>
+              <div>
+                <Label htmlFor="pronouns" className="text-sm font-medium text-muted-foreground">Pronouns</Label>
+                <p id="pronouns" className="text-lg">{profile?.pronouns || <span className='text-muted-foreground italic'>Not set</span>}</p>
+              </div>
+              <div>
+                <Label htmlFor="assignedSexAtBirth" className="text-sm font-medium text-muted-foreground">Assigned Sex at Birth</Label>
+                <p id="assignedSexAtBirth" className="text-lg">{profile?.assignedSexAtBirth || <span className='text-muted-foreground italic'>Not set</span>}</p>
+              </div>
+              <div>
+                <Label htmlFor="civilStatus" className="text-sm font-medium text-muted-foreground">Civil Status</Label>
+                <p id="civilStatus" className="text-lg">{profile?.civilStatus || <span className='text-muted-foreground italic'>Not set</span>}</p>
+              </div>
+              <div>
+                <Label htmlFor="religion" className="text-sm font-medium text-muted-foreground">Religion</Label>
+                <p id="religion" className="text-lg">{profile?.religion || <span className='text-muted-foreground italic'>Not set</span>}</p>
+              </div>
+              <div>
+                <Label htmlFor="occupation" className="text-sm font-medium text-muted-foreground">Occupation</Label>
+                <p id="occupation" className="text-lg">{profile?.occupation || <span className='text-muted-foreground italic'>Not set</span>}</p>
+              </div>
+               <div>
+                <Label htmlFor="contactNo" className="text-sm font-medium text-muted-foreground">Contact Number</Label>
+                <p id="contactNo" className="text-lg">{profile?.contactNo || <span className='text-muted-foreground italic'>Not set</span>}</p>
+              </div>
+              <div>
+                <Label htmlFor="philhealthNo" className="text-sm font-medium text-muted-foreground">PhilHealth No.</Label>
+                <p id="philhealthNo" className="text-lg">{profile?.philhealthNo || <span className='text-muted-foreground italic'>Not set</span>}</p>
+              </div>
+              <div>
+                  <Label htmlFor="address" className="text-sm font-medium text-muted-foreground">Address</Label>
+                  <p id="address" className="text-lg">
+                      {profile?.street || 'N/A'}, {getBarangayName(profile?.barangayCode)}, 
+                      {getCityMunicipalityName(profile?.cityMunicipalityCode)}, {getProvinceName(profile?.provinceCode)}
+                  </p>
+              </div>
             </div>
-            <div>
-              <Label htmlFor="firstName" className="text-sm font-medium text-muted-foreground">First Name</Label>
-              <p id="firstName" className="text-lg">{profile?.firstName || <span className='text-muted-foreground italic'>Not set</span>}</p>
-            </div>
-            <div>
-              <Label htmlFor="lastName" className="text-sm font-medium text-muted-foreground">Last Name</Label>
-              <p id="lastName" className="text-lg">{profile?.lastName || <span className='text-muted-foreground italic'>Not set</span>}</p>
-            </div>
-            <div>
-              <Label htmlFor="middleInitial" className="text-sm font-medium text-muted-foreground">Middle Initial</Label>
-              <p id="middleInitial" className="text-lg">{profile?.middleInitial || <span className='text-muted-foreground italic'>Not set</span>}</p>
-            </div>
-            <div>
-              <Label htmlFor="dob" className="text-sm font-medium text-muted-foreground">Date of Birth</Label>
-              <p id="dob" className="text-lg">{profile?.dateOfBirth ? new Date(profile.dateOfBirth + 'T00:00:00').toLocaleDateString() : <span className='text-muted-foreground italic'>Not set</span>}</p>
-            </div>
-             <div>
-              <Label htmlFor="age" className="text-sm font-medium text-muted-foreground">Age</Label>
-              <p id="age" className="text-lg">{profile?.age !== undefined && profile.age !== null ? profile.age : <span className='text-muted-foreground italic'>Not set</span>}</p>
-            </div>
-            <div>
-              <Label htmlFor="genderIdentity" className="text-sm font-medium text-muted-foreground">Gender Identity</Label>
-              <p id="genderIdentity" className="text-lg">{profile?.genderIdentity || <span className='text-muted-foreground italic'>Not set</span>}</p>
-            </div>
-            <div>
-              <Label htmlFor="pronouns" className="text-sm font-medium text-muted-foreground">Pronouns</Label>
-              <p id="pronouns" className="text-lg">{profile?.pronouns || <span className='text-muted-foreground italic'>Not set</span>}</p>
-            </div>
-            <div>
-              <Label htmlFor="assignedSexAtBirth" className="text-sm font-medium text-muted-foreground">Assigned Sex at Birth</Label>
-              <p id="assignedSexAtBirth" className="text-lg">{profile?.assignedSexAtBirth || <span className='text-muted-foreground italic'>Not set</span>}</p>
-            </div>
-            <div>
-              <Label htmlFor="civilStatus" className="text-sm font-medium text-muted-foreground">Civil Status</Label>
-              <p id="civilStatus" className="text-lg">{profile?.civilStatus || <span className='text-muted-foreground italic'>Not set</span>}</p>
-            </div>
-            <div>
-              <Label htmlFor="religion" className="text-sm font-medium text-muted-foreground">Religion</Label>
-              <p id="religion" className="text-lg">{profile?.religion || <span className='text-muted-foreground italic'>Not set</span>}</p>
-            </div>
-            <div>
-              <Label htmlFor="occupation" className="text-sm font-medium text-muted-foreground">Occupation</Label>
-              <p id="occupation" className="text-lg">{profile?.occupation || <span className='text-muted-foreground italic'>Not set</span>}</p>
-            </div>
-             <div>
-              <Label htmlFor="contactNo" className="text-sm font-medium text-muted-foreground">Contact Number</Label>
-              <p id="contactNo" className="text-lg">{profile?.contactNo || <span className='text-muted-foreground italic'>Not set</span>}</p>
-            </div>
-            <div>
-              <Label htmlFor="philhealthNo" className="text-sm font-medium text-muted-foreground">PhilHealth No.</Label>
-              <p id="philhealthNo" className="text-lg">{profile?.philhealthNo || <span className='text-muted-foreground italic'>Not set</span>}</p>
-            </div>
-            <div>
-                <Label htmlFor="address" className="text-sm font-medium text-muted-foreground">Address</Label>
-                <p id="address" className="text-lg">
-                    {profile?.street || 'N/A'}, {getBarangayName(profile?.barangayCode)}, 
-                    {getCityMunicipalityName(profile?.cityMunicipalityCode)}, {getProvinceName(profile?.provinceCode)}
-                </p>
-            </div>
-          </div>
-          
-          {profile?.avatar_url && (
-            <div className="mt-4">
-              <Label className="text-sm font-medium text-muted-foreground">Avatar</Label>
-              <img src={profile.avatar_url} alt="User avatar" className="w-24 h-24 rounded-full mt-2 border-2 border-primary/50" />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle>Upcoming Appointments</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">No upcoming appointments. Check back later or <Link href="/clinic-finder" className="text-primary hover:underline">find a clinic</Link> to book.</p>
-        </CardContent>
-      </Card>
-
+            
+            {profile?.avatar_url && (
+              <div className="mt-4">
+                <Label className="text-sm font-medium text-muted-foreground">Avatar</Label>
+                <img src={profile.avatar_url} alt="User avatar" className="w-24 h-24 rounded-full mt-2 border-2 border-primary/50" />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        
+        <div className="space-y-8">
+            <Card className="shadow-lg">
+                <CardHeader>
+                    <CardTitle className="text-2xl">Appointments</CardTitle>
+                    <CardDescription>
+                        View your upcoming and past appointments.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Button asChild className="w-full">
+                        <Link href="/dashboard/appointments">
+                            Go to My Appointments
+                        </Link>
+                    </Button>
+                </CardContent>
+            </Card>
+        </div>
+      </div>
     </div>
   );
 } 

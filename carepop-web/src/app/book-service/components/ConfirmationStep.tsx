@@ -164,11 +164,23 @@ const ConfirmationStep: React.FC = () => {
         </div>
 
         {errors.bookingSubmission && (
-            <Alert variant="destructive" className="mt-4">
-                <Info className="h-5 w-5 mr-2"/>
-                <AlertTitle>Booking Failed</AlertTitle>
-                <AlertDescription>{errors.bookingSubmission}</AlertDescription>
-            </Alert>
+          <Alert variant="destructive" className="mt-4">
+            <Info className="h-5 w-5 mr-2"/>
+            <AlertTitle>Booking Failed</AlertTitle>
+            <AlertDescription>
+              {errors.bookingSubmission}
+              <Button
+                onClick={handleSubmitBooking}
+                variant="secondary"
+                size="sm"
+                className="mt-3 w-full"
+                disabled={isLoading.bookingSubmission}
+              >
+                {isLoading.bookingSubmission && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                Try to Book Again
+              </Button>
+            </AlertDescription>
+          </Alert>
         )}
 
       </CardContent>

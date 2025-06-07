@@ -35,6 +35,10 @@ export const authenticateToken = async (req: AuthenticatedRequest, res: Response
       return;
     }
 
+    // ==> START DIAGNOSTIC LOGGING
+    console.log(`[AuthMiddleware - DIAGNOSTIC] Step 1: Token validated for user ID: ${authUser.id}`);
+    // <== END DIAGNOSTIC LOGGING
+
     // Fetch user role from public.user_roles table using service_role client
     let userRole: string | undefined = undefined;
     try {
@@ -43,12 +47,22 @@ export const authenticateToken = async (req: AuthenticatedRequest, res: Response
         .select('role')
         .eq('user_id', authUser.id)
         .single();
+      
+      // ==> START DIAGNOSTIC LOGGING
+      console.log(`[AuthMiddleware - DIAGNOSTIC] Step 2: Querying 'user_roles' for user_id: ${authUser.id}`);
+      if (roleError) {
+        console.log(`[AuthMiddleware - DIAGNOSTIC] Step 3a: Received an error from 'user_roles' query:`, roleError);
+      }
+      if (roleData) {
+        console.log(`[AuthMiddleware - DIAGNOSTIC] Step 3b: Received data from 'user_roles' query:`, roleData);
+        userRole = roleData.role;
+      } else {
+        console.log(`[AuthMiddleware - DIAGNOSTIC] Step 3c: Received NO data from 'user_roles' query.`);
+      }
+      // <== END DIAGNOSTIC LOGGING
 
       if (roleError && roleError.code !== 'PGRST116') { // PGRST116 means no row was found
         console.error('[AuthMiddleware] Error fetching user role using service client:', roleError.message);
-      }
-      if (roleData) {
-        userRole = roleData.role;
       }
     } catch (dbError: any) {
       console.error('[AuthMiddleware] Database error fetching role using service client:', dbError.message);
@@ -61,6 +75,10 @@ export const authenticateToken = async (req: AuthenticatedRequest, res: Response
       role: userRole // Use role from user_roles table
     }; 
     
+    // ==> START DIAGNOSTIC LOGGING
+    console.log(`[AuthMiddleware - DIAGNOSTIC] Step 4: Attaching user object to request:`, req.user);
+    // <== END DIAGNOSTIC LOGGING
+
     console.log(`[AuthMiddleware] User ${authUser.id} authenticated. Role: ${userRole || 'N/A'}`);
     next(); // Proceed to the next middleware or route handler
 
