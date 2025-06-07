@@ -22,45 +22,24 @@ export class UserAdminService {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    let query = this.supabase
-      .from('profiles')
-      .select(`
-        user_id,
-        first_name,
-        last_name,
-        email,
-        created_at,
-        role:user_roles!inner(role)
-      `, { count: 'exact' })
-      .range(from, to);
-
+    let rpcParams: { [key: string]: any } = {};
     if (search) {
-      query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`);
+      rpcParams.search_term = search;
     }
-    
     if (role) {
-      query = query.eq('role.role', role);
+      rpcParams.role_filter = role;
     }
 
-    const { data, error, count } = await query;
+    const { data, error, count } = await this.supabase
+      .rpc('get_users_with_roles', rpcParams, { count: 'exact' })
+      .range(from, to);
 
     if (error) {
       console.error('Error fetching users:', error);
       throw new AppError('Failed to fetch users', StatusCodes.INTERNAL_SERVER_ERROR);
     }
     
-    const profiles = data as UserProfileWithRole[];
-    const users = profiles.map(p => ({
-      user_id: p.user_id,
-      first_name: p.first_name,
-      last_name: p.last_name,
-      email: p.email,
-      created_at: p.created_at,
-      role: p.role[0]?.role || 'user'
-    }));
-
-
-    return { users, total: count || 0 };
+    return { users: data || [], total: count || 0 };
   }
 
   async getUserDetails(userId: string) {
