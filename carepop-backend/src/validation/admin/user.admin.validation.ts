@@ -9,4 +9,10 @@ export const listUsersQuerySchema = z.object({
 
 export const getUserParamsSchema = z.object({
   userId: z.string().uuid(),
+});
+
+export const updateUserBodySchema = z.object({
+  first_name: z.string().min(1).optional(),
+  last_name: z.string().min(1).optional(),
+  role: z.string().min(1),
 }); 
