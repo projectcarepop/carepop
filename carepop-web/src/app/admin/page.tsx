@@ -1,7 +1,7 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Activity, CreditCard, ShieldCheck } from "lucide-react";
+import { Users, Activity, CreditCard, ShieldCheck, CalendarCheck, Stethoscope } from "lucide-react";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
@@ -181,32 +181,44 @@ export default function AdminDashboardPage() {
             </CardContent>
         </Card>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
-        <Link href="/admin/clinics">
-          <Card className="hover:bg-muted/50 transition-colors">
-            <CardHeader>
-              <CardTitle>Manage Clinics</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                View, create, edit, and delete clinics.
-              </p>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/admin/providers">
-          <Card className="hover:bg-muted/50 transition-colors">
-            <CardHeader>
-              <CardTitle>Manage Providers</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                View, create, edit, and delete providers.
-              </p>
-            </CardContent>
-          </Card>
-        </Link>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <DashboardCard
+          href="/admin/clinics"
+          title="Clinic Management"
+          description="Add, edit, and manage FPOP clinics."
+          icon={<Stethoscope className="w-8 h-8 text-gray-500" />}
+        />
+        <DashboardCard
+          href="/admin/providers"
+          title="Provider Management"
+          description="Add, edit, and manage healthcare providers."
+          icon={<Users className="w-8 h-8 text-gray-500" />}
+        />
+        <DashboardCard
+          href="/admin/appointments"
+          title="Appointment Management"
+          description="View and confirm patient appointments."
+          icon={<CalendarCheck className="w-8 h-8 text-gray-500" />}
+        />
       </div>
     </div>
+  );
+}
+
+function DashboardCard({ href, title, description, icon }: { href: string; title: string; description: string; icon: React.ReactNode }) {
+  return (
+    <Link href={href} className="block hover:bg-muted/50 transition-colors rounded-lg">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">{title}</CardTitle>
+          {icon}
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            {description}
+          </p>
+        </CardContent>
+      </Card>
+    </Link>
   );
 } 

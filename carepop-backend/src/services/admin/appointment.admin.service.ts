@@ -1,14 +1,16 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { AppError } from '../../utils/errors';
 import { Database } from '../../types/supabase.types';
-
-type Appointment = Database['public']['Tables']['appointments']['Row'];
+import { supabaseServiceRole } from '../../config/supabaseClient';
 
 export class AppointmentAdminService {
-  constructor(private supabase: SupabaseClient<Database>) {}
+  private supabase: SupabaseClient<Database>;
 
-  async confirmAppointment(appointmentId: string): Promise<Appointment> {
-    // First, fetch the appointment to check its current status
+  constructor() {
+    this.supabase = supabaseServiceRole;
+  }
+
+  async confirmAppointment(appointmentId: string): Promise<Database['public']['Tables']['appointments']['Row']> {
     const { data: existingAppointment, error: fetchError } = await this.supabase
       .from('appointments')
       .select('*')
@@ -19,12 +21,10 @@ export class AppointmentAdminService {
       throw new AppError('Appointment not found.', 404);
     }
 
-    // Check if the appointment is already confirmed or in another non-pending state
     if (existingAppointment.status !== 'pending_confirmation') {
-      throw new AppError(`Appointment cannot be confirmed. Current status: ${existingAppointment.status}`, 409); // 409 Conflict
+      throw new AppError(`Appointment cannot be confirmed. Current status: ${existingAppointment.status}`, 409);
     }
 
-    // Update the appointment status to 'confirmed'
     const { data: updatedAppointment, error: updateError } = await this.supabase
       .from('appointments')
       .update({ status: 'confirmed' })
@@ -39,23 +39,21 @@ export class AppointmentAdminService {
     return updatedAppointment;
   }
 
-  async listAllAppointments(): Promise<any[]> { // Return type changed to any[] to match the new query structure
+  async getAllAppointments(): Promise<any[]> {
     const { data, error } = await this.supabase
       .from('appointments')
       .select(`
         id,
         status,
-        appointment_datetime,
-        profile:profiles ( full_name ),
-        clinic:clinics ( name ),
-        service:services ( name ),
-        provider:providers ( first_name, last_name )
-      `)
-      .order('appointment_datetime', { ascending: false });
+        appointment_date,
+        appointment_time,
+        created_at,
+        patient:profiles!inner(full_name)
+      `);
 
     if (error) {
       console.error('Error fetching appointments:', error);
-      throw new AppError('Failed to fetch appointments.', 500);
+      throw new AppError('Failed to fetch appointments from the database.', 500);
     }
 
     return data || [];

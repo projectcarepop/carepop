@@ -28,115 +28,52 @@ const providerFormSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
   phoneNumber: z.string().optional().nullable(),
   isActive: z.boolean(),
+  services: z.array(z.object({ value: z.string() })).optional(),
 });
 
 // Export ProviderFormValues type
 export type ProviderFormValues = z.infer<typeof providerFormSchema>;
 
-interface ProviderFormProps {
-  initialData?: Partial<ProviderFormValues> & { 
-    id?: string; 
-    isActive?: boolean;
-    // These can remain in the prop type for now, as the page might still fetch them
-    // but the form itself won't use or display them.
-    specialization?: string | null; 
-    licenseNumber?: string | null;  
-    credentials?: string | null;    
-    bio?: string | null;            
-  };
-  onSubmitSuccess?: () => void;
-}
-
-// Interface for the data structure being sent to the backend PUT request
-// This should match the backend's Zod schema (updateProviderBodySchema) which expects camelCase
-interface ProviderUpdateRequestPayload {
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-  phoneNumber?: string | null;
-  isActive?: boolean;
-  // userId?: string | null; // If you plan to update this
-}
+type ProviderFormProps = {
+  initialData?: Partial<ProviderFormValues> & { id?: string };
+  onSubmitSuccess: () => void;
+};
 
 export function ProviderForm({ initialData, onSubmitSuccess }: ProviderFormProps) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const form = useForm<ProviderFormValues>({
     resolver: zodResolver(providerFormSchema),
-    defaultValues: {
-      firstName: initialData?.firstName || "",
-      lastName: initialData?.lastName || "",
-      email: initialData?.email || "",
-      phoneNumber: initialData?.phoneNumber || null,
-      isActive: initialData?.isActive === undefined ? true : initialData.isActive,
-    },
+    defaultValues: initialData || {},
   });
 
   const isEditing = !!initialData?.id;
 
   async function onSubmit(data: ProviderFormValues) {
     form.clearErrors();
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !sessionData?.session) {
+      form.setError("root.submit", { type: "manual", message: "Not authenticated. Please log in." });
+      return;
+    }
+    const token = sessionData.session.access_token;
+    const method = initialData?.id ? 'PUT' : 'POST';
+    const endpoint = initialData?.id ? `/api/v1/admin/providers/${initialData.id}` : '/api/v1/admin/providers';
+
     try {
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !sessionData.session) {
-        throw new Error(sessionError?.message || 'User not authenticated. Please log in.');
-      }
-      const token = sessionData.session.access_token;
-
-      // Construct payload with camelCase keys to match backend Zod schema
-      const payload: ProviderUpdateRequestPayload = {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        email: data.email,
-        phoneNumber: data.phoneNumber, // Use camelCase for the key
-        isActive: data.isActive,
-      };
-      
-      let response;
-      if (isEditing) {
-        if (!initialData?.id) {
-          throw new Error("Provider ID is missing for editing.");
-        }
-
-        console.log('[ProviderForm] Submitting PUT request to:', `/api/v1/admin/providers/${initialData.id}`);
-        console.log('[ProviderForm] Payload:', JSON.stringify(payload, null, 2));
-
-        response = await fetch(`/api/v1/admin/providers/${initialData.id}`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload), 
-        });
-      } else {
-        console.log('[ProviderForm] Submitting POST request to:', `/api/v1/admin/providers`);
-        console.log('[ProviderForm] Payload:', JSON.stringify(payload, null, 2));
-        
-        response = await fetch(`/api/v1/admin/providers`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        });
-      }
+      const response = await fetch(endpoint, {
+        method: method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: `Request failed with status ${response.status}` }));
-        if (errorData.errors && Array.isArray(errorData.errors)) {
-            errorData.errors.forEach((err: { path?: (string | number)[], message: string }) => {
-                if (err.path && err.path.length > 0) {
-                    form.setError(err.path.join('.') as keyof ProviderFormValues, { type: 'manual', message: err.message });
-                } else if (err.message) {
-                    form.setError("root.serverError", { type: 'manual', message: err.message });
-                }
-            });
-        }
-        throw new Error(errorData.message || "Something went wrong while saving the provider.");
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'An unknown error occurred.');
       }
 
-      console.log(isEditing ? "Provider updated successfully" : "Provider created successfully");
       if (onSubmitSuccess) {
         onSubmitSuccess();
       }

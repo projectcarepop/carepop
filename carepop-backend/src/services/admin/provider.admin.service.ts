@@ -112,8 +112,7 @@ export class AdminProviderService {
       .from('providers')
       .update(updateData)
       .eq('id', providerId)
-      .select()
-      .single();
+      .select();
 
     if (error) {
       if (error.code === '23505') {
@@ -127,7 +126,13 @@ export class AdminProviderService {
         StatusCodes.INTERNAL_SERVER_ERROR
       );
     }
-    return data;
+    
+    // If no data was returned, it means the providerId didn't exist
+    if (!data || data.length === 0) {
+      return null;
+    }
+
+    return data[0];
   }
 
   async deleteProvider(providerId: string): Promise<boolean> {
