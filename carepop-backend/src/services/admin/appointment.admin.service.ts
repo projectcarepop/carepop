@@ -39,8 +39,48 @@ export class AppointmentAdminService {
     return updatedAppointment;
   }
 
-  async getAllAppointments(): Promise<any[]> {
-    const { data, error } = await this.supabase
+  async cancelAppointment(appointmentId: string, reason: string): Promise<Database['public']['Tables']['appointments']['Row']> {
+    const { data: existingAppointment, error: fetchError } = await this.supabase
+      .from('appointments')
+      .select('*')
+      .eq('id', appointmentId)
+      .single();
+
+    if (fetchError || !existingAppointment) {
+      throw new AppError('Appointment not found.', 404);
+    }
+    
+    const cancellableStatuses = ['pending_confirmation', 'confirmed'];
+    if (!cancellableStatuses.includes(existingAppointment.status)) {
+        throw new AppError(`Appointment cannot be cancelled. Current status: ${existingAppointment.status}`, 409);
+    }
+
+    const { data: updatedAppointment, error: updateError } = await this.supabase
+      .from('appointments')
+      .update({ 
+          status: 'cancelled_by_clinic',
+          notes_clinic: `Cancelled by admin. Reason: ${reason}` 
+      })
+      .eq('id', appointmentId)
+      .select('*')
+      .single();
+
+    if (updateError) {
+      throw new AppError('Failed to cancel appointment.', 500);
+    }
+
+    // TODO: Implement a robust email notification service
+    console.log(`--- EMAIL NOTIFICATION ---`);
+    console.log(`TO: User ID ${updatedAppointment.user_id}`);
+    console.log(`SUBJECT: Your appointment has been cancelled`);
+    console.log(`BODY: Your appointment has been cancelled by the clinic. Reason: "${reason}"`);
+    console.log(`--------------------------`);
+
+    return updatedAppointment;
+  }
+
+  async getAllAppointments(clinicId?: string): Promise<any[]> {
+    let query = this.supabase
       .from('appointments')
       .select(`
         id,
@@ -52,6 +92,12 @@ export class AppointmentAdminService {
         service_id,
         provider_id
       `);
+
+    if (clinicId) {
+      query = query.eq('clinic_id', clinicId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('Error fetching appointments:', error);

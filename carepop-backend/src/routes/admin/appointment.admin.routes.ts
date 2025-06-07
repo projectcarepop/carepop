@@ -23,4 +23,11 @@ router.patch(
   appointmentAdminController.confirmAppointment.bind(appointmentAdminController)
 );
 
+router.patch(
+  '/:appointmentId/cancel',
+  authenticateToken,
+  isAdmin,
+  appointmentAdminController.cancelAppointment.bind(appointmentAdminController)
+);
+
 export default router; 
