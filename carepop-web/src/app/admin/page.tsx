@@ -8,6 +8,7 @@ import { AlertCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getDashboardStats, grantAdminRole } from "@/lib/actions/dashboard.admin.actions";
 
 interface DashboardStats {
   totalClinics: number;
@@ -23,31 +24,10 @@ export default function AdminDashboardPage() {
 
 
   useEffect(() => {
-    // This is not ideal for Server Components, but for a quick fix to debug, we fetch on client.
-    // In a real app, we'd pass initial data as props from a server component.
     const fetchStats = async () => {
       try {
-        const cookieStore = document.cookie.split('; ').reduce((acc, current) => {
-          const [name, value] = current.split('=');
-          acc[name] = value;
-          return acc;
-        }, {} as Record<string, string>);
-        
-        const authTokenKey = Object.keys(cookieStore).find(name => name.startsWith('sb-') && name.endsWith('-auth-token'));
-        const token = authTokenKey ? cookieStore[authTokenKey] : null;
-
-        if (!token) throw new Error('Authentication token not found.');
-
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
-        const response = await fetch(`${apiBaseUrl}/api/v1/admin/stats`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch dashboard statistics. Please ensure you are logged in as an admin.');
-        }
-        const data = await response.json();
-        setStats(data.data);
+        const result = await getDashboardStats();
+        setStats(result.data);
       } catch (e: unknown) {
         if (e instanceof Error) {
           setError(e.message);
@@ -65,26 +45,8 @@ export default function AdminDashboardPage() {
     setGrantResult(null);
 
     try {
-        const cookieStore = document.cookie.split('; ').reduce((acc, current) => {
-          const [name, value] = current.split('=');
-          acc[name] = value;
-          return acc;
-        }, {} as Record<string, string>);
-        
-        const authTokenKey = Object.keys(cookieStore).find(name => name.startsWith('sb-') && name.endsWith('-auth-token'));
-        const token = authTokenKey ? cookieStore[authTokenKey] : null;
-
-      if (!token) throw new Error('Authentication token not found.');
-
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
-      const response = await fetch(`${apiBaseUrl}/api/v1/admin/users/${userId}/grant-admin`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-
-      const result = await response.json();
+      const result = await grantAdminRole(userId);
       setGrantResult(result);
-
     } catch (e: unknown) {
       if (e instanceof Error) {
         setGrantResult({ success: false, message: e.message });

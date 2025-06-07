@@ -250,81 +250,55 @@ export const getUserProfileService = async (userId: string): Promise<Profile & {
   }
 
   // Fetch user role
-  const { data: userRoleData, error: roleError } = await supabaseServiceRole
+  const { data: roleData, error: roleError } = await supabaseServiceRole
     .from('user_roles')
     .select('role')
     .eq('user_id', userId)
     .single();
-
-  if (roleError && roleError.code !== 'PGRST116') { // PGRST116 means no role found, which might be acceptable
+  
+  if (roleError && roleError.code !== 'PGRST116') {
     logger.error(`[ProfileService] Supabase error fetching role for user ${userId}:`, JSON.stringify(roleError, null, 2));
-    // Depending on requirements, you might want to throw an error or proceed without a role
-    // For now, we'll log and proceed, the role will be undefined.
+    // Decide if fetching role is critical. If so, throw. If not, just log and continue.
+    // For now, let's treat it as non-critical but log it.
   }
   
-  const role = userRoleData?.role;
-
-  if (!profileData) {
-    // This handles the case where PGRST116 occurred for profileData or it was just null
-    // If role was also not found, that's fine. If profile doesn't exist, return null.
-    logger.warn(`[ProfileService] Profile not found for user ${userId}.`);
+  // If no profile and no role, the user essentially doesn't exist in our custom tables.
+  if (!profileData && !roleData) {
+    logger.warn(`[ProfileService] No profile or role found for user ${userId}.`);
     return null;
   }
 
-  logger.info(`[ProfileService] Profile fetched successfully for user ${userId}. Role: ${role || 'N/A'}. Decrypting sensitive fields.`);
+  // CRITICAL FIX: Initialize with an empty object if profileData is null
+  const combinedData: Partial<Profile & { role?: string }> = profileData ? { ...profileData } : {};
+
+  if (roleData) {
+    combinedData.role = roleData.role;
+  }
+  
+  logger.info(`[ProfileService] Profile fetched successfully for user ${userId}. Role: ${combinedData.role || 'N/A'}. Decrypting sensitive fields.`);
 
   // Decrypt sensitive fields before returning the profile
-  const fullyProcessedProfile = { ...profileData } as Profile; // Cast to ensure type from DB
+  const fieldsToDecrypt: (keyof Profile)[] = [
+    'date_of_birth',
+    'philhealth_no',
+    'contact_no',
+    'street',
+    'gender_identity',
+    'pronouns',
+    'assigned_sex_at_birth'
+  ];
 
-  if (fullyProcessedProfile.date_of_birth) {
-    try {
-      fullyProcessedProfile.date_of_birth = await encryptionService.decrypt(fullyProcessedProfile.date_of_birth);
-    } catch (decryptionError) {
-      logger.error(`[ProfileService] Failed to decrypt date_of_birth for user ${userId}:`, decryptionError);
-    }
-  }
-  if (fullyProcessedProfile.philhealth_no) {
-    try {
-      fullyProcessedProfile.philhealth_no = await encryptionService.decrypt(fullyProcessedProfile.philhealth_no);
-    } catch (decryptionError) {
-      logger.error(`[ProfileService] Failed to decrypt philhealth_no for user ${userId}:`, decryptionError);
-    }
-  }
-  if (fullyProcessedProfile.contact_no) {
-    try {
-      fullyProcessedProfile.contact_no = await encryptionService.decrypt(fullyProcessedProfile.contact_no);
-    } catch (decryptionError) {
-      logger.error(`[ProfileService] Failed to decrypt contact_no for user ${userId}:`, decryptionError);
-    }
-  }
-  if (fullyProcessedProfile.street) {
-    try {
-      fullyProcessedProfile.street = await encryptionService.decrypt(fullyProcessedProfile.street);
-    } catch (decryptionError) {
-      logger.error(`[ProfileService] Failed to decrypt street for user ${userId}:`, decryptionError);
-    }
-  }
-  if (fullyProcessedProfile.gender_identity) {
-    try {
-      fullyProcessedProfile.gender_identity = await encryptionService.decrypt(fullyProcessedProfile.gender_identity);
-    } catch (decryptionError) {
-      logger.error(`[ProfileService] Failed to decrypt gender_identity for user ${userId}:`, decryptionError);
-    }
-  }
-  if (fullyProcessedProfile.pronouns) {
-    try {
-      fullyProcessedProfile.pronouns = await encryptionService.decrypt(fullyProcessedProfile.pronouns);
-    } catch (decryptionError) {
-      logger.error(`[ProfileService] Failed to decrypt pronouns for user ${userId}:`, decryptionError);
-    }
-  }
-  if (fullyProcessedProfile.assigned_sex_at_birth) { 
-    try {
-      fullyProcessedProfile.assigned_sex_at_birth = await encryptionService.decrypt(fullyProcessedProfile.assigned_sex_at_birth);
-    } catch (decryptionError) {
-      logger.error(`[ProfileService] Failed to decrypt assigned_sex_at_birth for user ${userId}:`, decryptionError);
+  for (const field of fieldsToDecrypt) {
+    const value = combinedData[field];
+    if (typeof value === 'string') {
+        try {
+            // The type assertion is safe here because we've checked it's a string
+            (combinedData[field] as any) = await encryptionService.decrypt(value);
+        } catch (decryptionError) {
+            logger.error(`[ProfileService] Failed to decrypt ${field} for user ${userId}:`, decryptionError);
+        }
     }
   }
 
-  return { ...fullyProcessedProfile, role }; // Combine profile with role
+  return combinedData as Profile & { role?: string };
 }; 
