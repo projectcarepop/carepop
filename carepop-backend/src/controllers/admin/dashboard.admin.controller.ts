@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { getDashboardStats, grantAdminRole } from '../../services/admin/clinic.admin.service';
+import { getDashboardStats, grantAdminRole } from '../../services/admin/dashboard.admin.service';
 import { supabaseServiceRole } from '../../config/supabaseClient';
 
 export const getStats = async (req: Request, res: Response, next: NextFunction) => {
