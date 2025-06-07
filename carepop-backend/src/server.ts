@@ -41,59 +41,27 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // --- Setup Swagger (Assuming this function exists elsewhere and is correctly set up if used)
 // if (typeof setupSwagger === 'function') setupSwagger(app);
 
-// --- Mount Non-Admin Routers ---
-app.use('/api/auth', authRoutes);
-app.use('/api/users', profileRoutes);
-app.use('/api/v1/directory', directoryRoutes);
-app.use('/api/v1', serviceRoutes);
-app.use('/api/v1', providerRoutes);
-app.use('/api/v1/appointments', appointmentRoutes);
-app.use('/api/v1/availability', availabilityRoutes);
-
-// --- Centralized Error Handling ---
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  if (err instanceof ZodError) {
-    logger.error('Zod Validation Error:', {
-      message: err.message,
-      errors: err.errors,
-      originalError: err,
-      stack: err.stack
-    });
-    if (res.headersSent) {
-      return next(err);
-    }
-    return res.status(400).json({
-      message: 'Validation failed',
-      errors: err.flatten().fieldErrors
-    });
-  } else {
-    logger.error(`Unhandled Error: ${err.message}`, {
-      error: err,
-      stack: err.stack,
-    });
-    if (res.headersSent) {
-      return next(err);
-    }
-    res.status(500).json({ message: 'Internal Server Error', error: err.message });
-  }
-});
-
-// --- 404 Handler ---
-app.use((req: Request, res: Response) => {
-  res.status(404).json({ message: 'Resource not found' });
-});
-
 // --- Start Server Async ---
 async function startServer() {
   try {
     await supabaseInitializationPromise; // Wait for Supabase to be ready
     logger.info('Supabase clients initialized successfully by server.');
 
-    // --- DI and Admin Route Mounting ---
+    // --- DI and Route Mounting ---
     if (!supabaseServiceRole) {
       throw new Error("Supabase service role client not available after initialization.");
     }
 
+    // --- Mount Non-Admin Routers ---
+    app.use('/api/auth', authRoutes);
+    app.use('/api/users', profileRoutes);
+    app.use('/api/v1/directory', directoryRoutes);
+    app.use('/api/v1', serviceRoutes);
+    app.use('/api/v1', providerRoutes);
+    app.use('/api/v1/appointments', appointmentRoutes);
+    app.use('/api/v1/availability', availabilityRoutes);
+    logger.info('Non-admin routes mounted.');
+    
     // --- Mount Admin Routes (Order is important: specific routes before general ones) ---
     
     // Clinics (More specific)
@@ -125,6 +93,39 @@ async function startServer() {
     const adminDashboardRoutes = createAdminDashboardRoutes(adminDashboardController);
     app.use('/api/v1/admin', adminDashboardRoutes);
     logger.info('Admin Dashboard routes mounted.');
+
+    // --- Centralized Error Handling (MUST be after all routes) ---
+    app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+      if (err instanceof ZodError) {
+        logger.error('Zod Validation Error:', {
+          message: err.message,
+          errors: err.errors,
+          originalError: err,
+          stack: err.stack
+        });
+        if (res.headersSent) {
+          return next(err);
+        }
+        return res.status(400).json({
+          message: 'Validation failed',
+          errors: err.flatten().fieldErrors
+        });
+      } else {
+        logger.error(`Unhandled Error: ${err.message}`, {
+          error: err,
+          stack: err.stack,
+        });
+        if (res.headersSent) {
+          return next(err);
+        }
+        res.status(500).json({ message: 'Internal Server Error', error: err.message });
+      }
+    });
+
+    // --- 404 Handler (MUST be the last route handler) ---
+    app.use((req: Request, res: Response) => {
+      res.status(404).json({ message: 'Resource not found' });
+    });
 
     const PORT = config.port;
     app.listen(PORT, () => {
