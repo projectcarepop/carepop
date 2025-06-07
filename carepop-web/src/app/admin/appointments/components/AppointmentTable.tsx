@@ -28,7 +28,8 @@ import { ArrowUpDown } from 'lucide-react';
 export interface Appointment {
   id: string;
   status: string;
-  appointment_datetime: string;
+  appointment_date: string;
+  appointment_time: string;
   patientName: string;
   clinicName: string;
   serviceName: string;
@@ -39,7 +40,8 @@ export interface Appointment {
 interface BackendAppointment {
     id: string;
     status: string;
-    appointment_datetime: string;
+    appointment_date: string;
+    appointment_time: string;
     profiles: { full_name: string } | null;
     clinics: { name: string } | null;
     services: { name: string } | null;
@@ -91,9 +93,13 @@ export function AppointmentTable() {
 
   const columns: ColumnDef<Appointment>[] = [
     {
-        accessorKey: 'appointment_datetime',
-        header: ({ column }) => <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>Date & Time<ArrowUpDown className="ml-2 h-4 w-4" /></Button>,
-        cell: ({ row }) => new Date(row.getValue('appointment_datetime')).toLocaleString(),
+        accessorKey: 'appointment_date',
+        header: ({ column }) => <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>Date<ArrowUpDown className="ml-2 h-4 w-4" /></Button>,
+        cell: ({ row }) => new Date(row.getValue('appointment_date')).toLocaleDateString(),
+    },
+    {
+        accessorKey: 'appointment_time',
+        header: 'Time',
     },
     { accessorKey: 'patientName', header: 'Patient' },
     { accessorKey: 'clinicName', header: 'Clinic' },
@@ -133,7 +139,8 @@ export function AppointmentTable() {
       const transformedData = (result.data || []).map((appt: BackendAppointment): Appointment => ({
           id: appt.id,
           status: appt.status,
-          appointment_datetime: appt.appointment_datetime,
+          appointment_date: appt.appointment_date,
+          appointment_time: appt.appointment_time,
           patientName: appt.profiles?.full_name ?? 'N/A',
           clinicName: appt.clinics?.name ?? 'N/A',
           serviceName: appt.services?.name ?? 'N/A',

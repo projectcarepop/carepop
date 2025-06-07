@@ -7,6 +7,7 @@ import {
   ListProvidersQuery,
   UpdateProviderBody,
 } from '../../validation/admin/provider.admin.validation';
+import logger from '../../utils/logger';
 
 type Provider = Database['public']['Tables']['providers']['Row'];
 
@@ -108,13 +109,21 @@ export class AdminProviderService {
     providerId: string,
     updateData: UpdateProviderBody
   ): Promise<Provider | null> {
+    logger.info(`[AdminProviderService] Attempting to update provider ID: ${providerId}`);
+
+    const payload = {
+      ...updateData,
+      updated_at: new Date().toISOString(),
+    };
+
     const { data, error } = await this.supabase
       .from('providers')
-      .update(updateData)
+      .update(payload)
       .eq('id', providerId)
       .select();
 
     if (error) {
+      logger.error(`[AdminProviderService] Supabase error updating provider ID ${providerId}:`, { error });
       if (error.code === '23505') {
         throw new AppError(
           'A provider with this email already exists.',
@@ -127,11 +136,12 @@ export class AdminProviderService {
       );
     }
     
-    // If no data was returned, it means the providerId didn't exist
     if (!data || data.length === 0) {
+      logger.warn(`[AdminProviderService] No provider found with ID: ${providerId} to update.`);
       return null;
     }
 
+    logger.info(`[AdminProviderService] Successfully updated provider ID: ${providerId}`);
     return data[0];
   }
 
