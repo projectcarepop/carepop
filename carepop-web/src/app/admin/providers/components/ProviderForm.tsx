@@ -43,7 +43,14 @@ export function ProviderForm({ initialData, onSubmitSuccess }: ProviderFormProps
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const form = useForm<ProviderFormValues>({
     resolver: zodResolver(providerFormSchema),
-    defaultValues: initialData || {},
+    defaultValues: {
+      firstName: initialData?.firstName || '',
+      lastName: initialData?.lastName || '',
+      email: initialData?.email || '',
+      phoneNumber: initialData?.phoneNumber || '',
+      isActive: initialData?.isActive === undefined ? true : initialData.isActive,
+      services: initialData?.services || [],
+    },
   });
 
   const isEditing = !!initialData?.id;
@@ -99,7 +106,7 @@ export function ProviderForm({ initialData, onSubmitSuccess }: ProviderFormProps
               <FormItem>
                 <FormLabel>First Name</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter first name" {...field} />
+                  <Input placeholder="Enter first name" {...field} value={field.value ?? ''} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -112,7 +119,7 @@ export function ProviderForm({ initialData, onSubmitSuccess }: ProviderFormProps
               <FormItem>
                 <FormLabel>Last Name</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter last name" {...field} />
+                  <Input placeholder="Enter last name" {...field} value={field.value ?? ''} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -125,7 +132,7 @@ export function ProviderForm({ initialData, onSubmitSuccess }: ProviderFormProps
               <FormItem>
                 <FormLabel>Email</FormLabel>
                 <FormControl>
-                  <Input type="email" placeholder="Enter email address" {...field} />
+                  <Input type="email" placeholder="Enter email address" {...field} value={field.value ?? ''} />
                 </FormControl>
                 <FormMessage />
               </FormItem>

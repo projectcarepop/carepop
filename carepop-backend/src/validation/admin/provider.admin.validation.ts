@@ -2,15 +2,12 @@ import { z } from 'zod';
 
 // Base schema for the provider's body data on creation
 export const createProviderBodySchema = z.object({
-  first_name: z.string({ required_error: 'First name is required.' }).min(1, 'First name cannot be empty.'),
-  last_name: z.string({ required_error: 'Last name is required.' }).min(1, 'Last name cannot be empty.'),
-  email: z.string().email('Invalid email address.').optional(),
-  contact_number: z.string().optional(),
-  sex: z.string().optional(),
-  birth_date: z.string().optional(), // Or z.date() if you handle conversion
-  avatar_url: z.string().url('Invalid URL format.').optional(),
-  is_active: z.boolean().default(true),
-  accepting_new_patients: z.boolean().default(true),
+  firstName: z.string({ required_error: 'First name is required.' }).min(1, 'First name cannot be empty.'),
+  lastName: z.string({ required_error: 'Last name is required.' }).min(1, 'Last name cannot be empty.'),
+  email: z.string().email('Invalid email address.'),
+  phoneNumber: z.string().optional().nullable(),
+  isActive: z.boolean().default(true),
+  // services are handled separately
 });
 
 // Schema for the entire create provider request
@@ -19,15 +16,11 @@ export const createProviderSchema = z.object({
 });
 
 export const updateProviderBodySchema = z.object({
-  first_name: z.string().min(1, 'First name cannot be empty.').optional(),
-  last_name: z.string().min(1, 'Last name cannot be empty.').optional(),
+  firstName: z.string().min(1, 'First name cannot be empty.').optional(),
+  lastName: z.string().min(1, 'Last name cannot be empty.').optional(),
   email: z.string().email('Invalid email address.').optional(),
-  contact_number: z.string().optional(),
-  sex: z.string().optional(),
-  birth_date: z.string().optional(),
-  avatar_url: z.string().url('Invalid URL format.').optional(),
-  is_active: z.boolean().optional(),
-  accepting_new_patients: z.boolean().optional(),
+  phoneNumber: z.string().optional().nullable(),
+  isActive: z.boolean().optional(),
 });
 
 export const listProvidersSchema = z.object({
