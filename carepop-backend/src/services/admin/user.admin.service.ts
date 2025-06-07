@@ -27,15 +27,18 @@ export class UserAdminService {
       role_filter: role || null,
     };
 
+    console.log('[UserAdminService] Calling RPC "get_users_with_roles" with params:', rpcParams);
+
     const { data, error, count } = await this.supabase
       .rpc('get_users_with_roles', rpcParams, { count: 'exact' })
       .range(from, to);
 
     if (error) {
-      console.error('Error fetching users:', error);
+      console.error('[UserAdminService] Error from RPC call:', error);
       throw new AppError('Failed to fetch users', StatusCodes.INTERNAL_SERVER_ERROR);
     }
     
+    console.log(`[UserAdminService] RPC call successful. Fetched ${data?.length} users. Total count: ${count}`);
     return { users: data || [], total: count || 0 };
   }
 
