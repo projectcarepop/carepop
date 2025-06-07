@@ -127,34 +127,34 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
   const [data, setData] = React.useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [appointmentToCancel, setAppointmentToCancel] = React.useState<Appointment | null>(null);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = React.useState(false);
   const [isCancelling, setIsCancelling] = React.useState(false);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
-  
-  // State for lookup maps
-  const [patientMap, setPatientMap] = React.useState<NameMap>({});
-  const [clinicMap, setClinicMap] = React.useState<NameMap>({});
-  const [serviceMap, setServiceMap] = React.useState<NameMap>({});
-  const [providerMap, setProviderMap] = React.useState<NameMap>({});
-  const { toast } = useToast();
 
+  const [patientMap, setPatientMap] = React.useState<NameMap | null>(null);
+  const [clinicMap, setClinicMap] = React.useState<NameMap | null>(null);
+  const [serviceMap, setServiceMap] = React.useState<NameMap | null>(null);
+  const [providerMap, setProviderMap] = React.useState<NameMap | null>(null);
+  
+  const { toast } = useToast();
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
 
-  // Effect to fetch all lookup data
+  // Effect to fetch all lookup data ONCE
   React.useEffect(() => {
     const fetchLookups = async () => {
       try {
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
         if (sessionError || !sessionData.session) throw new AppError('User not authenticated.', 401);
         const token = sessionData.session.access_token;
-        
+        const headers = { 'Authorization': `Bearer ${token}` };
+
         const [patientsRes, clinicsRes, servicesRes, providersRes] = await Promise.all([
-            fetch('/api/v1/admin/profiles', { headers: { 'Authorization': `Bearer ${token}` } }),
-            fetch('/api/v1/admin/clinics', { headers: { 'Authorization': `Bearer ${token}` } }),
-            fetch('/api/v1/admin/services', { headers: { 'Authorization': `Bearer ${token}` } }),
-            fetch('/api/v1/admin/providers', { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch('/api/v1/admin/profiles', { headers }),
+          fetch('/api/v1/admin/clinics', { headers }),
+          fetch('/api/v1/admin/services', { headers }),
+          fetch('/api/v1/admin/providers', { headers }),
         ]);
 
         const patients = await patientsRes.json();
@@ -162,28 +162,66 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
         const services = await servicesRes.json();
         const providers = await providersRes.json();
 
-        if (patients?.data) {
-          setPatientMap(Object.fromEntries(patients.data.map((p: { user_id: string, full_name: string }) => [p.user_id, p.full_name])));
-        }
-        if (clinics?.data) {
-          setClinicMap(Object.fromEntries(clinics.data.map((c: { id: string, name: string }) => [c.id, c.name])));
-        }
-        if (services?.data) {
-          setServiceMap(Object.fromEntries(services.data.map((s: { id: string, name: string }) => [s.id, s.name])));
-        }
-        if (providers?.data) {
-          setProviderMap(Object.fromEntries(providers.data.map((p: { id: string, first_name: string, last_name: string }) => [p.id, `${p.first_name} ${p.last_name}`])));
-        }
-
-      } catch (err: unknown) {
-         const message = err instanceof Error ? err.message : "An unknown error occurred";
-         console.error("Failed to load lookup data:", message);
-         setError("Failed to load required data. Please check the console and try again.");
-         setIsLoading(false); 
+        setPatientMap(patients?.data ? Object.fromEntries(patients.data.map((p: any) => [p.user_id, p.full_name])) : {});
+        setClinicMap(clinics?.data ? Object.fromEntries(clinics.data.map((c: any) => [c.id, c.name])) : {});
+        setServiceMap(services?.data ? Object.fromEntries(services.data.map((s: any) => [s.id, s.name])) : {});
+        setProviderMap(providers?.data ? Object.fromEntries(providers.data.map((p: any) => [p.id, `${p.first_name} ${p.last_name}`])) : {});
+      
+      } catch (e) {
+        setError('Failed to load required page metadata. Please refresh.');
+        setIsLoading(false); // Stop loading on metadata failure
       }
     };
     fetchLookups();
   }, [supabase]);
+
+
+  // New, dedicated fetcher for appointment data
+  const fetchAppointments = React.useCallback(async () => {
+    if (!clinicId || !patientMap || !clinicMap || !serviceMap || !providerMap) {
+      return; // Do not fetch if lookups are not ready
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) throw new AppError('User not authenticated.', 401);
+      const token = sessionData.session.access_token;
+      
+      const params = new URLSearchParams({ clinicId });
+      const response = await fetch(`/api/v1/admin/appointments?${params.toString()}`, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (!response.ok) throw new AppError('Failed to fetch appointments.', response.status);
+
+      const result = await response.json();
+      const transformedData = (result.data || []).map((appt: BackendAppointment): Appointment => ({
+        id: appt.id,
+        status: appt.status,
+        appointment_datetime: appt.appointment_datetime,
+        user_id: appt.user_id,
+        clinic_id: appt.clinic_id,
+        service_id: appt.service_id,
+        provider_id: appt.provider_id,
+        patient_name: patientMap[appt.user_id] || appt.user_id,
+        clinic_name: clinicMap[appt.clinic_id] || 'N/A',
+        service_name: serviceMap[appt.service_id] || appt.service_id,
+        provider_name: providerMap[appt.provider_id] || 'N/A',
+      }));
+      setData(transformedData);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'An unknown error occurred.';
+      setError(`Failed to load appointments: ${message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [clinicId, supabase, patientMap, clinicMap, serviceMap, providerMap]);
+
+
+  // Effect to fetch appointments when lookups or clinicId change
+  React.useEffect(() => {
+    fetchAppointments();
+  }, [fetchAppointments]);
+
 
   const handleConfirm = async (appointmentId: string) => {
     // Optimistically update the UI
@@ -204,7 +242,7 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
 
       if (!response.ok) {
         // Revert the optimistic update on failure
-        fetchData(); // Refetch to get the true state
+        fetchAppointments(); // Use the new dedicated fetcher
         throw new AppError('Failed to confirm appointment.', response.status);
       }
     } catch (e: unknown) {
@@ -215,8 +253,6 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
       } else {
         setError('An unknown error occurred.');
       }
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -253,7 +289,7 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
         }
 
         toast({ title: "Success", description: "Appointment has been cancelled." });
-        fetchData(); // Refresh the table data
+        fetchAppointments(); // Use the new dedicated fetcher
         
       } catch (e: unknown) {
         const message = e instanceof Error ? e.message : 'An unknown error occurred.';
@@ -342,64 +378,6 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
         },
     },
   ];
-
-  const fetchData = React.useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !sessionData.session) throw new AppError('User not authenticated.', 401);
-
-      const params = new URLSearchParams();
-      params.append('clinicId', clinicId);
-
-      const response = await fetch(`/api/v1/admin/appointments?${params.toString()}`, {
-        headers: { 'Authorization': `Bearer ${sessionData.session.access_token}` },
-      });
-      if (!response.ok) throw new AppError('Failed to fetch appointments.', response.status);
-
-      const result = await response.json();
-      
-      const transformedData = (result.data || []).map((appt: BackendAppointment): Appointment => ({
-          id: appt.id,
-          status: appt.status,
-          appointment_datetime: appt.appointment_datetime,
-          user_id: appt.user_id,
-          clinic_id: appt.clinic_id,
-          service_id: appt.service_id,
-          provider_id: appt.provider_id,
-          patient_name: patientMap[appt.user_id] || appt.user_id,
-          clinic_name: clinicMap[appt.clinic_id] || 'N/A',
-          service_name: serviceMap[appt.service_id] || appt.service_id,
-          provider_name: providerMap[appt.provider_id] || 'N/A',
-      }));
-
-      setData(transformedData);
-    } catch (e: unknown) {
-      if (e instanceof AppError) {
-        setError(e.message);
-      } else if (e instanceof Error) {
-        setError(e.message);
-      } else {
-        setError('An unknown error occurred.');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [supabase, clinicId, patientMap, clinicMap, serviceMap, providerMap]);
-
-  React.useEffect(() => {
-    // This effect now ONLY triggers when the necessary data is ready.
-    const allLookupsReady = clinicId && 
-                            Object.keys(patientMap).length > 0 && 
-                            Object.keys(clinicMap).length > 0 && 
-                            Object.keys(serviceMap).length > 0 &&
-                            Object.keys(providerMap).length > 0;
-    
-    if (allLookupsReady) {
-        fetchData();
-    }
-  }, [clinicId, patientMap, clinicMap, serviceMap, providerMap, fetchData]);
 
   const table = useReactTable({
     data,
