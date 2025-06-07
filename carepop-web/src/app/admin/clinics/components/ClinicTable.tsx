@@ -36,7 +36,6 @@ import {
 } from '@/components/ui/table';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
-import { getClinicsForAdmin } from '@/lib/actions/clinic.admin.actions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -109,6 +108,20 @@ const DeleteClinicDialog = ({
   );
 };
 
+// Define a type for the raw clinic data from the API to avoid using 'any'
+interface RawClinicData {
+  id: string;
+  name: string;
+  full_address?: string | null;
+  locality?: string | null;
+  region?: string | null;
+  contact_phone?: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  // include other snake_case fields from the API as needed
+}
+
 export function ClinicTable() {
   const [data, setData] = React.useState<Clinic[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -118,6 +131,11 @@ export function ClinicTable() {
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
+  
+  // Pagination state
+  const [page, setPage] = React.useState(1);
+  const [totalPages, setTotalPages] = React.useState(0);
+  const [limit] = React.useState(10);
 
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
   
@@ -129,8 +147,46 @@ export function ClinicTable() {
     setIsLoading(true);
     setError(null);
     try {
-      const transformedData = await getClinicsForAdmin();
-      setData(transformedData);
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) {
+        throw new Error(sessionError?.message || 'User not authenticated.');
+      }
+      const token = sessionData.session.access_token;
+
+      const params = new URLSearchParams();
+      params.append('page', page.toString());
+      params.append('limit', limit.toString());
+      // Add sorting and filtering params if needed in the future
+
+      const response = await fetch('/api/v1/admin/clinics?' + params.toString(), {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch clinics.');
+      }
+
+      const result = await response.json();
+      
+      // Assuming backend sends snake_case and we need to map to camelCase
+      const mappedData = result.data.map((c: RawClinicData) => ({
+        id: c.id,
+        name: c.name,
+        fullAddress: c.full_address,
+        locality: c.locality,
+        region: c.region,
+        contactPhone: c.contact_phone,
+        isActive: c.is_active,
+        createdAt: c.created_at,
+        updatedAt: c.updated_at,
+      }));
+
+      setData(mappedData);
+      setTotalPages(result.meta.totalPages);
+
     } catch (e: unknown) {
       if (e instanceof Error) {
         setError(e.message);
@@ -140,7 +196,7 @@ export function ClinicTable() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [supabase.auth, page, limit]);
 
   React.useEffect(() => {
     fetchData();
@@ -406,16 +462,16 @@ export function ClinicTable() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page <= 1}
           >
             Previous
           </Button>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
+            onClick={() => setPage(p => p + 1)}
+            disabled={page >= totalPages}
           >
             Next
           </Button>

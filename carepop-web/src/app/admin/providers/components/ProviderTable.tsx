@@ -47,6 +47,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useImperativeHandle, forwardRef } from 'react';
 
 export interface Provider {
   id: string;
@@ -204,7 +205,11 @@ export const columns: ColumnDef<Provider>[] = [
   },
 ];
 
-export function ProviderTable() {
+export interface ProviderTableHandle {
+  refreshData: () => void;
+}
+
+const ProviderTable = forwardRef<ProviderTableHandle>((props, ref) => {
   const [data, setData] = React.useState<Provider[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -215,6 +220,11 @@ export function ProviderTable() {
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
+  
+  // Pagination state
+  const [page, setPage] = React.useState(1);
+  const [totalPages, setTotalPages] = React.useState(0);
+  const [limit] = React.useState(10);
   
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
 
@@ -244,8 +254,10 @@ export function ProviderTable() {
 
       const token = sessionData.session.access_token;
 
-      // Build query params from table state
       const params = new URLSearchParams();
+      params.append('page', page.toString());
+      params.append('limit', limit.toString());
+
       if (sorting.length > 0) {
         const sort = sorting[0];
         const backendSortKey = sortColumnMap[sort.id] || 'created_at';
@@ -257,17 +269,17 @@ export function ProviderTable() {
         params.append('sortOrder', 'desc');
       }
 
-      const queryString = params.toString();
-      const apiUrl = `/api/v1/admin/providers${queryString ? `?${queryString}` : ''}`;
+      const searchTerm = (columnFilters.find(f => f.id === 'lastName')?.value as string) || '';
+      if(searchTerm) {
+        params.append('searchTerm', searchTerm);
+      }
       
-      console.log(`[ProviderTable] Fetching data from: ${apiUrl}`);
-
-      const response = await fetch(apiUrl, {
+      const response = await fetch('/api/v1/admin/providers?' + params.toString(), {
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
-      }); 
+      });
+
       if (!response.ok) {
         if (response.status === 401) throw new Error('Unauthorized: Access token might be invalid or expired.');
         if (response.status === 403) throw new Error('Forbidden: You do not have permission to access this resource.');
@@ -287,6 +299,7 @@ export function ProviderTable() {
         // user_id is not in Provider interface, so it will be omitted unless added to Provider
       }));
       setData(transformedData);
+      setTotalPages(result.meta.totalPages);
     } catch (e: unknown) {
       if (e instanceof Error) {
           setError(e.message);
@@ -296,11 +309,15 @@ export function ProviderTable() {
       setData([]);
     }
     setIsLoading(false);
-  }, [sorting, columnFilters, supabase]);
+  }, [sorting, columnFilters, supabase.auth, page, limit]);
 
   React.useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useImperativeHandle(ref, () => ({
+    refreshData: fetchData,
+  }));
 
   const openDeleteDialog = (provider: Provider) => {
     setProviderToDelete(provider);
@@ -497,7 +514,7 @@ export function ProviderTable() {
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  No results.
+                  {isLoading ? 'Loading...' : error ? `Error: ${error}`: 'No results.'}
                 </TableCell>
               </TableRow>
             )}
@@ -506,24 +523,22 @@ export function ProviderTable() {
       </div>
       <div className="flex items-center justify-end space-x-2 py-4">
         <div className="flex-1 text-sm text-muted-foreground">
-          Page {table.getState().pagination?.pageIndex !== undefined ? table.getState().pagination.pageIndex + 1 : 1} of{" "}
-          {table.getPageCount() > 0 ? table.getPageCount() : 1} 
-          (Total: {table.getFilteredRowModel().rows.length} rows)
+           Page {page} of {totalPages}
         </div>
         <div className="space-x-2">
           <Button
             variant="outline"
             size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page <= 1}
           >
             Previous
           </Button>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
+            onClick={() => setPage(p => p + 1)}
+            disabled={page >= totalPages}
           >
             Next
           </Button>
@@ -531,4 +546,8 @@ export function ProviderTable() {
       </div>
     </div>
   );
-} 
+});
+
+ProviderTable.displayName = 'ProviderTable';
+
+export { ProviderTable }; 

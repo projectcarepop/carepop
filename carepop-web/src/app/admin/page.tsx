@@ -207,11 +207,13 @@ export default function AdminDashboardPage() {
 
 function DashboardCard({ href, title, description, icon }: { href: string; title: string; description: string; icon: React.ReactNode }) {
   return (
-    <Link href={href} className="block hover:bg-muted/50 transition-colors rounded-lg">
-      <Card>
+    <Link href={href} className="block group">
+      <Card className="h-full group-hover:border-primary group-hover:bg-muted/50 transition-colors">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">{title}</CardTitle>
-          {icon}
+          <CardTitle className="text-base font-semibold">{title}</CardTitle>
+          <div className="text-muted-foreground group-hover:text-primary transition-colors">
+            {icon}
+          </div>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">

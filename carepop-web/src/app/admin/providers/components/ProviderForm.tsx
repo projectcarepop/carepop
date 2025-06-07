@@ -1,7 +1,7 @@
 'use client';
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,41 +15,48 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-// import { Textarea } from "@/components/ui/textarea"; // REMOVED Textarea import
-import React, { useMemo } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-// import { toast } from "@/components/ui/use-toast"; // Assuming you have toasts
+import { useRouter } from 'next/navigation';
+import { useMemo } from 'react';
 
-// Define the Zod schema based on backend validation
-// This should align with CreateProviderBody and UpdateProviderBody from the backend
-const providerFormSchema = z.object({
+// This is the data structure the form expects for initialData
+interface ProviderData {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string | null;
+  isActive: boolean;
+  services?: { value: string }[]; // Or whatever shape services take
+}
+
+interface ProviderFormProps {
+  initialData?: ProviderData | null;
+}
+
+const formSchema = z.object({
   firstName: z.string().min(1, { message: "First name is required." }),
   lastName: z.string().min(1, { message: "Last name is required." }),
   email: z.string().email({ message: "Invalid email address." }),
   phoneNumber: z.string().optional().nullable(),
   isActive: z.boolean(),
-  services: z.array(z.object({ value: z.string() })).optional(),
+  services: z.array(z.string()).optional(),
 });
 
-// Export ProviderFormValues type
-export type ProviderFormValues = z.infer<typeof providerFormSchema>;
+type ProviderFormValues = z.infer<typeof formSchema>;
 
-type ProviderFormProps = {
-  initialData?: Partial<ProviderFormValues> & { id?: string };
-  onSubmitSuccess: () => void;
-};
-
-export function ProviderForm({ initialData, onSubmitSuccess }: ProviderFormProps) {
+export function ProviderForm({ initialData }: ProviderFormProps) {
+  const router = useRouter();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const form = useForm<ProviderFormValues>({
-    resolver: zodResolver(providerFormSchema),
+    resolver: zodResolver(formSchema),
     defaultValues: {
       firstName: initialData?.firstName || '',
       lastName: initialData?.lastName || '',
       email: initialData?.email || '',
       phoneNumber: initialData?.phoneNumber || '',
-      isActive: initialData?.isActive === undefined ? true : initialData.isActive,
-      services: initialData?.services || [],
+      isActive: initialData?.isActive ?? true,
+      services: initialData?.services?.map(s => s.value) || [],
     },
   });
 
@@ -63,8 +70,8 @@ export function ProviderForm({ initialData, onSubmitSuccess }: ProviderFormProps
       return;
     }
     const token = sessionData.session.access_token;
-    const method = initialData?.id ? 'PUT' : 'POST';
-    const endpoint = initialData?.id ? `/api/v1/admin/providers/${initialData.id}` : '/api/v1/admin/providers';
+    const method = isEditing ? 'PUT' : 'POST';
+    const endpoint = isEditing ? `/api/v1/admin/providers/${initialData.id}` : '/api/v1/admin/providers';
 
     try {
       const response = await fetch(endpoint, {
@@ -81,9 +88,8 @@ export function ProviderForm({ initialData, onSubmitSuccess }: ProviderFormProps
         throw new Error(errorData.message || 'An unknown error occurred.');
       }
 
-      if (onSubmitSuccess) {
-        onSubmitSuccess();
-      }
+      router.push('/admin/providers');
+      router.refresh();
       
     } catch (error: unknown) {
         let errorMessage = "An unexpected error occurred.";
@@ -98,7 +104,7 @@ export function ProviderForm({ initialData, onSubmitSuccess }: ProviderFormProps
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <FormField
             control={form.control}
             name="firstName"
@@ -106,7 +112,7 @@ export function ProviderForm({ initialData, onSubmitSuccess }: ProviderFormProps
               <FormItem>
                 <FormLabel>First Name</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter first name" {...field} value={field.value ?? ''} />
+                  <Input placeholder="John" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -119,49 +125,54 @@ export function ProviderForm({ initialData, onSubmitSuccess }: ProviderFormProps
               <FormItem>
                 <FormLabel>Last Name</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter last name" {...field} value={field.value ?? ''} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Email</FormLabel>
-                <FormControl>
-                  <Input type="email" placeholder="Enter email address" {...field} value={field.value ?? ''} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="phoneNumber"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Phone Number (Optional)</FormLabel>
-                <FormControl>
-                  <Input placeholder="Enter phone number" {...field} value={field.value ?? ''} />
+                  <Input placeholder="Doe" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
-
-        <Controller
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email</FormLabel>
+              <FormControl>
+                <Input placeholder="john.doe@example.com" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="phoneNumber"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Phone Number</FormLabel>
+              <FormControl>
+                <Input placeholder="+1234567890" {...field} value={field.value ?? ''} />
+              </FormControl>
+              <FormDescription>
+                Optional contact number for the provider.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <FormField
           control={form.control}
           name="isActive"
           render={({ field }) => (
             <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
               <div className="space-y-0.5">
-                <FormLabel className="text-base">Active Status</FormLabel>
+                <FormLabel className="text-base">
+                  Active Status
+                </FormLabel>
                 <FormDescription>
-                  Inactive providers will not be available for new bookings or shown in public searches.
+                  Inactive providers will not be visible to users.
                 </FormDescription>
               </div>
               <FormControl>
@@ -173,10 +184,23 @@ export function ProviderForm({ initialData, onSubmitSuccess }: ProviderFormProps
             </FormItem>
           )}
         />
+        
+        <div className="p-4 border-dashed border-2 rounded-lg text-center">
+            <p className="text-muted-foreground">Service selection will be available here soon.</p>
+        </div>
+        
+        {form.formState.errors.root?.submit && (
+           <p className="text-sm font-medium text-destructive">{form.formState.errors.root.submit.message}</p>
+        )}
 
-        <Button type="submit" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting ? "Saving..." : (isEditing ? "Save Changes" : "Create Provider")}
-        </Button>
+        <div className="flex justify-end space-x-4">
+            <Button type="button" variant="outline" onClick={() => router.back()}>
+                Cancel
+            </Button>
+            <Button type="submit" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? 'Saving...' : (isEditing ? 'Save Changes' : 'Create Provider')}
+            </Button>
+        </div>
       </form>
     </Form>
   );

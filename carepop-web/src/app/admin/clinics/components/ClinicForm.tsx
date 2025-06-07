@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea"; // Assuming you might need it for longer fields like operating hours
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-// import { toast } from "@/components/ui/use-toast"; // Placeholder for toast notifications
+import { useToast } from "@/hooks/use-toast";
 
 // Zod schema for clinic form validation - should mirror backend schema
 const clinicFormSchema = z.object({
@@ -75,6 +75,7 @@ interface ClinicApiPayload {
 export function ClinicForm({ initialData, onSubmitSuccess, mode }: ClinicFormProps) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const router = useRouter();
+  const { toast } = useToast();
   
   const form = useForm<ClinicFormValues>({
     resolver: zodResolver(clinicFormSchema),
@@ -169,7 +170,7 @@ export function ClinicForm({ initialData, onSubmitSuccess, mode }: ClinicFormPro
       const responseData = await response.json();
       console.log(mode === 'edit' ? "Clinic updated successfully:" : "Clinic created successfully:", responseData);
       
-      // toast({ title: mode === 'edit' ? "Clinic Updated" : "Clinic Created", description: `The clinic ${data.name} has been successfully saved.` });
+      toast({ title: mode === 'edit' ? "Clinic Updated" : "Clinic Created", description: `The clinic ${data.name} has been successfully saved.` });
 
       if (onSubmitSuccess) {
         onSubmitSuccess();
@@ -185,7 +186,7 @@ export function ClinicForm({ initialData, onSubmitSuccess, mode }: ClinicFormPro
       }
       console.error("Submit error:", errorMessage);
       form.setError("root.submit", { type: "manual", message: errorMessage });
-      // toast({ title: "Error", description: errorMessage, variant: "destructive" });
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
     }
   }
 
@@ -460,9 +461,14 @@ export function ClinicForm({ initialData, onSubmitSuccess, mode }: ClinicFormPro
           </p>
         )}
 
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Saving..." : (mode === 'edit' ? "Save Changes" : "Create Clinic")}
-        </Button>
+        <div className="flex justify-end space-x-4 pt-4 border-t">
+           <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : (mode === 'create' ? 'Create Clinic' : 'Save Changes')}
+            </Button>
+        </div>
       </form>
     </Form>
   );
