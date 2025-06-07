@@ -11,6 +11,7 @@ import {
   useReactTable,
   ColumnFiltersState,
   getFilteredRowModel,
+  getFacetedUniqueValues,
 } from '@tanstack/react-table';
 import {
   Table,
@@ -45,6 +46,14 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../../../../components/ui/tooltip";
+import { ClipboardCopy } from "lucide-react";
+import { DatePicker } from "../../../../components/ui/date-picker";
 
 // Define the structure of an Appointment for the frontend
 export interface Appointment {
@@ -52,11 +61,10 @@ export interface Appointment {
   status: string;
   appointment_datetime: string;
   user_id: string;
-  clinic_id: string;
-  service_id: string;
-  provider_id: string;
-  patient_name?: string;
-  clinic_name?: string;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  contact_no?: string;
   service_name?: string;
   provider_name?: string;
 }
@@ -71,6 +79,17 @@ interface BackendAppointment {
     service_id: string;
     provider_id: string;
 }
+
+// Define the structure for a single patient's data in the map
+interface PatientDetails {
+  first_name: string;
+  last_name: string;
+  email: string;
+  contact_no: string;
+}
+
+// The patient map will hold user_id -> PatientDetails
+type PatientMap = { [userId: string]: PatientDetails };
 
 // Define types for our lookup maps
 type NameMap = { [id: string]: string };
@@ -132,8 +151,9 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
   const [appointmentToCancel, setAppointmentToCancel] = React.useState<Appointment | null>(null);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = React.useState(false);
   const [isCancelling, setIsCancelling] = React.useState(false);
+  const [date, setDate] = React.useState<Date | undefined>(undefined);
 
-  const [patientMap, setPatientMap] = React.useState<NameMap | null>(null);
+  const [patientMap, setPatientMap] = React.useState<PatientMap | null>(null);
   const [clinicMap, setClinicMap] = React.useState<NameMap | null>(null);
   const [serviceMap, setServiceMap] = React.useState<NameMap | null>(null);
   const [providerMap, setProviderMap] = React.useState<NameMap | null>(null);
@@ -162,14 +182,14 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
         const services = await servicesRes.json();
         const providers = await providersRes.json();
 
-        setPatientMap(patients?.data ? Object.fromEntries(patients.data.map((p: any) => [p.user_id, p.full_name])) : {});
-        setClinicMap(clinics?.data ? Object.fromEntries(clinics.data.map((c: any) => [c.id, c.name])) : {});
-        setServiceMap(services?.data ? Object.fromEntries(services.data.map((s: any) => [s.id, s.name])) : {});
-        setProviderMap(providers?.data ? Object.fromEntries(providers.data.map((p: any) => [p.id, `${p.first_name} ${p.last_name}`])) : {});
+        setPatientMap(patients?.data ? Object.fromEntries(patients.data.map((p: PatientDetails & { user_id: string }) => [p.user_id, p])) : {});
+        setClinicMap(clinics?.data ? Object.fromEntries(clinics.data.map((c: { id: string, name: string }) => [c.id, c.name])) : {});
+        setServiceMap(services?.data ? Object.fromEntries(services.data.map((s: { id: string, name: string }) => [s.id, s.name])) : {});
+        setProviderMap(providers?.data ? Object.fromEntries(providers.data.map((p: { id: string, first_name: string, last_name: string }) => [p.id, `${p.first_name} ${p.last_name}`])) : {});
       
-      } catch (e) {
+      } catch {
         setError('Failed to load required page metadata. Please refresh.');
-        setIsLoading(false); // Stop loading on metadata failure
+        setIsLoading(false);
       }
     };
     fetchLookups();
@@ -194,20 +214,22 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
       if (!response.ok) throw new AppError('Failed to fetch appointments.', response.status);
 
       const result = await response.json();
-      const transformedData = (result.data || []).map((appt: BackendAppointment): Appointment => ({
-        id: appt.id,
-        status: appt.status,
-        appointment_datetime: appt.appointment_datetime,
-        user_id: appt.user_id,
-        clinic_id: appt.clinic_id,
-        service_id: appt.service_id,
-        provider_id: appt.provider_id,
-        patient_name: patientMap[appt.user_id] || appt.user_id,
-        clinic_name: clinicMap[appt.clinic_id] || 'N/A',
-        service_name: serviceMap[appt.service_id] || appt.service_id,
-        provider_name: providerMap[appt.provider_id] || 'N/A',
-      }));
-      setData(transformedData);
+      const transformedData = (result.data || []).map((appt: BackendAppointment): Appointment => {
+        const patient = patientMap?.[appt.user_id];
+        return {
+          id: appt.id,
+          status: appt.status,
+          appointment_datetime: appt.appointment_datetime,
+          user_id: appt.user_id,
+          first_name: patient?.first_name || 'N/A',
+          last_name: patient?.last_name || '',
+          email: patient?.email || 'N/A',
+          contact_no: patient?.contact_no || 'N/A',
+          service_name: serviceMap?.[appt.service_id] || appt.service_id,
+          provider_name: providerMap?.[appt.provider_id] || 'N/A',
+        };
+    });
+    setData(transformedData);
     } catch (e) {
       const message = e instanceof Error ? e.message : 'An unknown error occurred.';
       setError(`Failed to load appointments: ${message}`);
@@ -302,23 +324,64 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
 
   const columns: ColumnDef<Appointment>[] = [
     {
-        accessorKey: 'id',
-        header: 'Appointment ID',
-    },
-    {
         accessorKey: 'appointment_datetime',
         header: ({ column }) => <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>Date<ArrowUpDown className="ml-2 h-4 w-4" /></Button>,
-        cell: ({ row }) => new Date(row.getValue('appointment_datetime')).toLocaleDateString(),
+        cell: ({ row }) => {
+            const date = new Date(row.getValue('appointment_datetime'))
+            return <div>{date.toLocaleDateString()}</div>
+        },
+        filterFn: (row, columnId, filterValue) => {
+            if (!filterValue) return true;
+            const rowDate = new Date(row.getValue(columnId));
+            const filterDate = new Date(filterValue);
+            // Compare only the year, month, and day
+            return rowDate.getFullYear() === filterDate.getFullYear() &&
+                   rowDate.getMonth() === filterDate.getMonth() &&
+                   rowDate.getDate() === filterDate.getDate();
+        }
     },
     {
-        accessorKey: 'appointment_datetime_time',
-        header: 'Time',
-        cell: ({ row }) => new Date(row.original.appointment_datetime).toLocaleTimeString(),
+        accessorKey: 'id',
+        header: 'Appt. ID',
+        cell: ({ row }) => {
+            const id = row.getValue('id') as string;
+            return (
+                <div className="flex items-center gap-2">
+                    <span>{id.substring(0, 8)}...</span>
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => navigator.clipboard.writeText(id)}>
+                                    <ClipboardCopy className="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Copy full ID</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                </div>
+            )
+        }
     },
     {
-        accessorKey: 'patient_name',
+        id: 'patient',
         header: 'Patient',
-        cell: ({ row }) => row.original.patient_name || row.original.user_id
+        cell: ({ row }) => {
+            const firstName = row.original.first_name;
+            const lastName = row.original.last_name;
+            const fullName = (firstName === 'N/A' && !lastName) ? 'N/A' : `${firstName} ${lastName}`.trim();
+            return <div>{fullName}</div>;
+        },
+        accessorFn: row => `${row.first_name} ${row.last_name}`,
+    },
+    {
+        accessorKey: 'email',
+        header: 'Email'
+    },
+    {
+        accessorKey: 'contact_no',
+        header: 'Contact No.'
     },
     {
         accessorKey: 'service_name',
@@ -336,9 +399,10 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
             let variant: "default" | "secondary" | "destructive" | "outline" = "secondary";
             if (status === 'confirmed') variant = 'default';
             if (status === 'cancelled_by_clinic') variant = 'destructive';
-            if (status === 'completed') variant = 'outline'; // Assuming 'outline' can be green-ish
+            if (status === 'completed') variant = 'outline';
             
-            return <Badge variant={variant} className="capitalize">{status.replace(/_/g, " ")}</Badge>
+            const statusText = status.replace(/_/g, " ").replace('pending confirmation', 'Pending');
+            return <Badge variant={variant} className="capitalize">{statusText}</Badge>
         }
     },
     {
@@ -382,9 +446,9 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
   const table = useReactTable({
     data,
     columns,
-    state: { 
-        sorting,
-        columnFilters,
+    state: {
+      sorting,
+      columnFilters,
     },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
@@ -392,6 +456,7 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
   });
 
   if (isLoading) return <div>Loading appointments...</div>;
@@ -402,12 +467,44 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
         <div className="flex items-center py-4 gap-4">
             <Input
                 placeholder="Filter by patient name..."
-                value={(table.getColumn('patient_name')?.getFilterValue() as string) ?? ''}
+                value={(table.getColumn('patient')?.getFilterValue() as string) ?? ""}
                 onChange={(event) =>
-                    table.getColumn('patient_name')?.setFilterValue(event.target.value)
+                    table.getColumn('patient')?.setFilterValue(event.target.value)
                 }
                 className="max-w-sm"
             />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="ml-2">
+                  Service
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {(() => {
+                  const serviceMap = table.getColumn('service_name')?.getFacetedUniqueValues();
+                  if (!serviceMap) return <div className="p-2">Loading...</div>;
+
+                  const services = Array.from(serviceMap.keys()).sort();
+
+                  return services.map((service) => (
+                    <DropdownMenuCheckboxItem
+                      key={service}
+                      className="capitalize"
+                      checked={table.getColumn('service_name')?.getFilterValue() === service}
+                      onCheckedChange={(value) => {
+                          if (value) {
+                            table.getColumn('service_name')?.setFilterValue(service);
+                          } else {
+                            table.getColumn('service_name')?.setFilterValue(undefined);
+                          }
+                      }}
+                    >
+                      {service}
+                    </DropdownMenuCheckboxItem>
+                  ));
+                })()}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="ml-auto">
@@ -440,6 +537,13 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
                 })()}
               </DropdownMenuContent>
             </DropdownMenu>
+            <DatePicker 
+              date={date} 
+              setDate={(newDate) => {
+                setDate(newDate);
+                table.getColumn('appointment_datetime')?.setFilterValue(newDate);
+              }} 
+            />
         </div>
         <div className="rounded-md border">
           <Table>
@@ -474,6 +578,28 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
               )}
             </TableBody>
           </Table>
+        </div>
+        <div className="flex items-center justify-end space-x-2 py-4">
+            <div className="flex-1 text-sm text-muted-foreground">
+                Page {table.getState().pagination.pageIndex + 1} of{" "}
+                {table.getPageCount()}
+            </div>
+            <Button
+                variant="outline"
+                size="sm"
+                onClick={() => table.previousPage()}
+                disabled={!table.getCanPreviousPage()}
+            >
+                Previous
+            </Button>
+            <Button
+                variant="outline"
+                size="sm"
+                onClick={() => table.nextPage()}
+                disabled={!table.getCanNextPage()}
+            >
+                Next
+            </Button>
         </div>
         <CancelAppointmentDialog 
           appointment={appointmentToCancel}

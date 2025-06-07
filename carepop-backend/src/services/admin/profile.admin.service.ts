@@ -13,7 +13,13 @@ export class ProfileAdminService {
   async getAllProfiles(): Promise<any[]> {
     const { data, error } = await this.supabase
       .from('profiles')
-      .select('user_id, full_name');
+      .select(`
+        user_id,
+        first_name,
+        last_name,
+        contact_no,
+        email
+      `);
 
     if (error) {
       console.error('Error fetching profiles:', error);
