@@ -53,7 +53,8 @@ import {
   TooltipTrigger,
 } from "../../../../components/ui/tooltip";
 import { ClipboardCopy } from "lucide-react";
-import { DatePicker } from "../../../../components/ui/date-picker";
+import { DateRange } from "react-day-picker";
+import { DateRangePicker } from "../../../../components/ui/date-range-picker";
 
 // Define the structure of an Appointment for the frontend
 export interface Appointment {
@@ -150,7 +151,7 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
   const [appointmentToCancel, setAppointmentToCancel] = React.useState<Appointment | null>(null);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = React.useState(false);
   const [isCancelling, setIsCancelling] = React.useState(false);
-  const [date, setDate] = React.useState<Date | undefined>(undefined);
+  const [date, setDate] = React.useState<DateRange | undefined>(undefined);
 
   const [patientMap, setPatientMap] = React.useState<PatientMap | null>(null);
   const [clinicMap, setClinicMap] = React.useState<NameMap | null>(null);
@@ -328,14 +329,13 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
             const date = new Date(row.getValue('appointment_datetime'))
             return <div>{date.toLocaleDateString()}</div>
         },
-        filterFn: (row, columnId, filterValue) => {
-            if (!filterValue) return true;
+        filterFn: (row, columnId, value: DateRange) => {
+            if (!value?.from) return true;
             const rowDate = new Date(row.getValue(columnId));
-            const filterDate = new Date(filterValue);
-            // Compare only the year, month, and day
-            return rowDate.getFullYear() === filterDate.getFullYear() &&
-                   rowDate.getMonth() === filterDate.getMonth() &&
-                   rowDate.getDate() === filterDate.getDate();
+            const startDate = value.from;
+            const endDate = value.to ? new Date(value.to.getTime() + 86400000 - 1) : new Date(startDate.getTime() + 86400000 - 1) ; // include whole day
+
+            return rowDate >= startDate && rowDate <= endDate;
         }
     },
     {
@@ -413,21 +413,19 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
                         {appointment.status === 'pending_confirmation' && (
                             <DropdownMenuItem onClick={() => handleConfirm(appointment.id)}>
                                 Confirm Appointment
                             </DropdownMenuItem>
                         )}
                         {appointment.status !== 'cancelled_by_clinic' && appointment.status !== 'completed' && (
-                            <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                    className="text-red-600"
-                                    onClick={() => handleOpenCancelDialog(appointment)}
-                                >
-                                    Cancel Appointment
-                                </DropdownMenuItem>
-                            </>
+                            <DropdownMenuItem 
+                                className="text-red-600"
+                                onClick={() => handleOpenCancelDialog(appointment)}
+                            >
+                                Cancel Appointment
+                            </DropdownMenuItem>
                         )}
                         {/* Future actions can be added here */}
                     </DropdownMenuContent>
@@ -458,7 +456,7 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
 
   return (
     <div>
-        <div className="flex items-center py-4 gap-4">
+        <div className="flex items-center py-4">
             <Input
                 placeholder="Filter by patient name..."
                 value={(table.getColumn('patient')?.getFilterValue() as string) ?? ""}
@@ -467,77 +465,79 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
                 }
                 className="max-w-sm"
             />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="ml-2">
-                  Service
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {(() => {
-                  const serviceMap = table.getColumn('service_name')?.getFacetedUniqueValues();
-                  if (!serviceMap) return <div className="p-2">Loading...</div>;
+            <div className="ml-auto flex items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline">
+                      Service
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {(() => {
+                      const serviceMap = table.getColumn('service_name')?.getFacetedUniqueValues();
+                      if (!serviceMap) return <div className="p-2">Loading...</div>;
 
-                  const services = Array.from(serviceMap.keys()).sort();
+                      const services = Array.from(serviceMap.keys()).sort();
 
-                  return services.map((service) => (
-                    <DropdownMenuCheckboxItem
-                      key={service}
-                      className="capitalize"
-                      checked={table.getColumn('service_name')?.getFilterValue() === service}
-                      onCheckedChange={(value) => {
-                          if (value) {
-                            table.getColumn('service_name')?.setFilterValue(service);
-                          } else {
-                            table.getColumn('service_name')?.setFilterValue(undefined);
-                          }
-                      }}
-                    >
-                      {service}
-                    </DropdownMenuCheckboxItem>
-                  ));
-                })()}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="ml-auto">
-                  Status <ArrowUpDown className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {(() => {
-                  const statusMap = table.getColumn('status')?.getFacetedUniqueValues();
-                  if (!statusMap) return <div className="p-2">Loading statuses...</div>;
+                      return services.map((service) => (
+                        <DropdownMenuCheckboxItem
+                          key={service}
+                          className="capitalize"
+                          checked={table.getColumn('service_name')?.getFilterValue() === service}
+                          onCheckedChange={(value) => {
+                              if (value) {
+                                table.getColumn('service_name')?.setFilterValue(service);
+                              } else {
+                                table.getColumn('service_name')?.setFilterValue(undefined);
+                              }
+                          }}
+                        >
+                          {service}
+                        </DropdownMenuCheckboxItem>
+                      ));
+                    })()}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline">
+                      Status <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {(() => {
+                      const statusMap = table.getColumn('status')?.getFacetedUniqueValues();
+                      if (!statusMap) return <div className="p-2">Loading statuses...</div>;
 
-                  const statuses = Array.from(statusMap.keys()).sort();
+                      const statuses = Array.from(statusMap.keys()).sort();
 
-                  return statuses.map((statusValue) => (
-                    <DropdownMenuCheckboxItem
-                      key={statusValue}
-                      className="capitalize"
-                      checked={table.getColumn('status')?.getFilterValue() === statusValue}
-                      onCheckedChange={(value) => {
-                          if (value) {
-                              table.getColumn('status')?.setFilterValue(statusValue);
-                          } else {
-                              table.getColumn('status')?.setFilterValue(undefined);
-                          }
-                      }}
-                    >
-                      {statusValue}
-                    </DropdownMenuCheckboxItem>
-                  ));
-                })()}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DatePicker 
-              date={date} 
-              setDate={(newDate) => {
-                setDate(newDate);
-                table.getColumn('appointment_datetime')?.setFilterValue(newDate);
-              }} 
-            />
+                      return statuses.map((statusValue) => (
+                        <DropdownMenuCheckboxItem
+                          key={statusValue}
+                          className="capitalize"
+                          checked={table.getColumn('status')?.getFilterValue() === statusValue}
+                          onCheckedChange={(value) => {
+                              if (value) {
+                                  table.getColumn('status')?.setFilterValue(statusValue);
+                              } else {
+                                  table.getColumn('status')?.setFilterValue(undefined);
+                              }
+                          }}
+                        >
+                          {statusValue}
+                        </DropdownMenuCheckboxItem>
+                      ));
+                    })()}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <DateRangePicker 
+                  date={date} 
+                  setDate={(newDateRange) => {
+                    setDate(newDateRange);
+                    table.getColumn('appointment_datetime')?.setFilterValue(newDateRange);
+                  }} 
+                />
+            </div>
         </div>
         <div className="rounded-md border">
           <Table>
