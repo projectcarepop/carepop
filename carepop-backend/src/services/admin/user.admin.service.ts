@@ -22,44 +22,81 @@ export class UserAdminService {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    const rpcParams = {
-      search_term: search || null,
-      role_filter: role || null,
-    };
+    let query = this.supabase
+      .from('profiles')
+      .select(`
+        user_id,
+        first_name,
+        last_name,
+        created_at,
+        user_roles ( role )
+      `, { count: 'exact' });
 
-    console.log('[UserAdminService] Calling RPC "get_users_with_roles" with params:', rpcParams);
+    if (search) {
+      query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%`);
+    }
 
-    const { data, error, count } = await this.supabase
-      .rpc('get_users_with_roles', rpcParams, { count: 'exact' })
-      .range(from, to);
-
-    if (error) {
-      console.error('[UserAdminService] Error from RPC call:', error);
-      throw new AppError('Failed to fetch users', StatusCodes.INTERNAL_SERVER_ERROR);
+    if (role) {
+      query = query.filter('user_roles.role', 'eq', role);
     }
     
-    console.log(`[UserAdminService] RPC call successful. Fetched ${data?.length} users. Total count: ${count}`);
-    return { users: data || [], total: count || 0 };
+    const { data, error, count } = await query
+      .range(from, to)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('[UserAdminService] Error fetching users:', error);
+      if (error.code === '42P01') {
+        throw new AppError('The user_roles table does not exist or cannot be accessed. Please run migrations.', StatusCodes.INTERNAL_SERVER_ERROR);
+      }
+      throw new AppError('Failed to fetch users', StatusCodes.INTERNAL_SERVER_ERROR);
+    }
+
+    const users = data.map((profile: any) => ({
+      ...profile,
+      role: profile.user_roles?.role || 'user',
+      user_roles: undefined,
+    }));
+    
+    return { users, total: count || 0 };
   }
 
   async getUserDetails(userId: string) {
+    const { data: user, error: userError } = await this.supabase.auth.admin.getUserById(userId);
+
+    if (userError) {
+      throw new AppError('User not found in auth', StatusCodes.NOT_FOUND);
+    }
+
     const { data: profile, error: profileError } = await this.supabase
       .from('profiles')
       .select(`
         *,
-        role:user_roles ( role )
+        user_roles ( role )
       `)
       .eq('user_id', userId)
       .single();
 
     if (profileError) {
-      throw new AppError('User not found', StatusCodes.NOT_FOUND);
+      if (profileError.code === 'PGRST116') {
+        const shellProfile = {
+          user_id: userId,
+          first_name: '',
+          last_name: '',
+          email: user.user?.email || '',
+          role: 'user',
+        };
+        return { profile: shellProfile, appointments: [], medicalRecords: [] };
+      }
+      throw new AppError('User profile not found', StatusCodes.NOT_FOUND);
     }
-
-    const typedProfile = profile as any;
-    const userRole = typedProfile.role[0]?.role || 'user';
-    delete typedProfile.role;
-    const userProfile = { ...typedProfile, role: userRole };
+    
+    const userProfile = {
+      ...profile,
+      email: user.user?.email,
+      role: profile.user_roles?.role || 'user',
+    };
+    delete (userProfile as any).user_roles;
 
 
     const { data: appointments, error: appointmentError } = await this.supabase
@@ -103,8 +140,14 @@ export class UserAdminService {
     if (profileError) {
       throw new AppError('Failed to update user profile', StatusCodes.INTERNAL_SERVER_ERROR);
     }
-    
-    // TODO: Handle role update in user_roles table
+
+    const { error: roleError } = await this.supabase
+      .from('user_roles')
+      .upsert({ user_id: userId, role: userData.role }, { onConflict: 'user_id' });
+
+    if (roleError) {
+      throw new AppError('Failed to update user role', StatusCodes.INTERNAL_SERVER_ERROR);
+    }
 
     return profile;
   }
