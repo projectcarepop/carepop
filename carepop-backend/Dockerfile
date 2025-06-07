@@ -25,6 +25,10 @@ RUN npm run build
 FROM base AS production
 # Set NODE_ENV to production
 ENV NODE_ENV=production
+
+# Copy the .env file first, so the app can access environment variables
+COPY .env ./
+
 # Copy built code and dependencies from the builder stage
 COPY --from=builder /usr/src/app/dist ./dist
 COPY --from=builder /usr/src/app/node_modules ./node_modules
