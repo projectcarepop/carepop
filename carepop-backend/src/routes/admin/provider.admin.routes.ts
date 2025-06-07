@@ -46,7 +46,7 @@ export const createAdminProviderRoutes = (adminProviderController: AdminProvider
     '/',
     authenticateToken,
     isAdmin,
-    validateRequest(createProviderBodySchema),
+    validateRequest({ body: createProviderBodySchema }),
     adminProviderController.createProvider
   );
 
