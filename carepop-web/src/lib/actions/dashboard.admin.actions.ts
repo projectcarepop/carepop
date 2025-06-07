@@ -1,12 +1,11 @@
 'use server';
 
-import { createServerClient } from '@supabase/ssr';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { Database } from '@/lib/types/supabase.types';
+import { Database } from '../../types/supabase';
 
-export async function getDashboardStats() {
-  const cookieStore = cookies();
-  const supabase = createServerClient<Database>(
+const createSupabaseServerClient = (cookieStore: Awaited<ReturnType<typeof cookies>>) => {
+  return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -14,9 +13,28 @@ export async function getDashboardStats() {
         get(name: string) {
           return cookieStore.get(name)?.value;
         },
+        set(name: string, value: string, options: CookieOptions) {
+          try {
+            cookieStore.set({ name, value, ...options });
+          } catch (error) {
+            // The `set` method was called from a Server Component.
+          }
+        },
+        remove(name: string, options: CookieOptions) {
+          try {
+            cookieStore.set({ name, value: '', ...options });
+          } catch (error) {
+            // The `delete` method was called from a Server Component.
+          }
+        },
       },
     }
   );
+};
+
+export async function getDashboardStats() {
+  const cookieStore = await cookies();
+  const supabase = createSupabaseServerClient(cookieStore);
 
   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
@@ -49,18 +67,8 @@ export async function getDashboardStats() {
 }
 
 export async function grantAdminRole(userId: string) {
-    const cookieStore = cookies();
-    const supabase = createServerClient<Database>(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                get(name: string) {
-                    return cookieStore.get(name)?.value;
-                },
-            },
-        }
-    );
+    const cookieStore = await cookies();
+    const supabase = createSupabaseServerClient(cookieStore);
 
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 

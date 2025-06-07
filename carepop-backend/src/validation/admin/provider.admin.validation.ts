@@ -24,7 +24,7 @@ export const listProvidersSchema = z.object({
   query: z.object({
     page: z.coerce.number().int().positive().optional().default(1),
     limit: z.coerce.number().int().positive().optional().default(10),
-    sortBy: z.enum(['lastName', 'firstName', 'createdAt', 'updatedAt']).optional().default('createdAt'),
+    sortBy: z.enum(['last_name', 'first_name', 'created_at', 'updated_at']).optional().default('created_at'),
     sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
     searchTerm: z.string().optional(),
     isActive: z.preprocess((val) => {
