@@ -36,7 +36,7 @@ import {
 } from '@/components/ui/table';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client'; // Assuming this is your Supabase client helper
+import { getClinicsForAdmin } from '@/lib/actions/clinic.admin.actions';
 
 // Frontend data structure (camelCase)
 export interface Clinic {
@@ -63,7 +63,7 @@ export interface Clinic {
 }
 
 // Backend data structure (snake_case)
-interface BackendClinicData {
+export interface BackendClinicData {
   id: string;
   name: string;
   full_address?: string | null;
@@ -183,60 +183,13 @@ export function ClinicTable() {
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({}); // For future use if checkboxes are needed
-  
-  const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
 
   React.useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-
-        if (sessionError || !sessionData.session) {
-          throw new Error(sessionError?.message || 'User not authenticated.');
-        }
-
-        const token = sessionData.session.access_token;
-        // IMPORTANT: This API endpoint /api/v1/admin/clinics needs to be created in your backend.
-        const response = await fetch('/api/v1/admin/clinics', {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-
-        if (!response.ok) {
-          if (response.status === 401) throw new Error('Unauthorized: Access token might be invalid or expired.');
-          if (response.status === 403) throw new Error('Forbidden: You do not have permission to access this resource.');
-          throw new Error(`Failed to fetch clinics: ${response.statusText} (Status: ${response.status})`);
-        }
-        
-        const result = await response.json();
-        
-        // Transform snake_case from backend to camelCase for frontend
-        const transformedData = (result.data || []).map((clinic: BackendClinicData) => ({
-          id: clinic.id,
-          name: clinic.name,
-          fullAddress: clinic.full_address,
-          streetAddress: clinic.street_address,
-          locality: clinic.locality,
-          region: clinic.region,
-          postalCode: clinic.postal_code,
-          countryCode: clinic.country_code,
-          latitude: clinic.latitude,
-          longitude: clinic.longitude,
-          contactPhone: clinic.contact_phone,
-          contactEmail: clinic.contact_email,
-          websiteUrl: clinic.website_url,
-          operatingHours: clinic.operating_hours,
-          servicesOffered: clinic.services_offered,
-          fpopChapterAffiliation: clinic.fpop_chapter_affiliation,
-          additionalNotes: clinic.additional_notes,
-          isActive: clinic.is_active,
-          createdAt: clinic.created_at,
-          updatedAt: clinic.updated_at,
-        }));
+        const transformedData = await getClinicsForAdmin();
         setData(transformedData);
       } catch (e: unknown) {
         if (e instanceof Error) {
@@ -248,8 +201,9 @@ export function ClinicTable() {
       }
       setIsLoading(false);
     };
+
     fetchData();
-  }, [supabase]); // Removed sorting and columnFilters from dependency array for now, add back if server-side sorting/filtering is implemented
+  }, []);
 
   const table = useReactTable({
     data,
