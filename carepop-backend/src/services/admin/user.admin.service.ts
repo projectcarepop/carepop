@@ -22,13 +22,10 @@ export class UserAdminService {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    let rpcParams: { [key: string]: any } = {};
-    if (search) {
-      rpcParams.search_term = search;
-    }
-    if (role) {
-      rpcParams.role_filter = role;
-    }
+    const rpcParams = {
+      search_term: search || null,
+      role_filter: role || null,
+    };
 
     const { data, error, count } = await this.supabase
       .rpc('get_users_with_roles', rpcParams, { count: 'exact' })
