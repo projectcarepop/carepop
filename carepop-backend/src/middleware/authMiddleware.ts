@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { supabase, supabaseServiceRole } from '../config/supabaseClient'; // Adjust path if necessary
+import 'multer'; // This will import the global Express.Multer types
 
 // Extend Express Request type to include 'user'
 export interface AuthenticatedRequest extends Request {
@@ -9,6 +10,7 @@ export interface AuthenticatedRequest extends Request {
     role?: string | string[]; // Add role to the interface
     // Add other user properties from JWT if needed, e.g., role
   };
+  file?: any; // Using 'any' as a temporary workaround for Multer type issue
 }
 
 export const authenticateToken = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {

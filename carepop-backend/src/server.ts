@@ -83,6 +83,16 @@ async function startServer() {
     const adminProviderRoutes = createAdminProviderRoutes(adminProviderController);
     app.use('/api/v1/admin/providers', adminProviderRoutes);
     logger.info('Admin Provider routes mounted.');
+
+    // Users (Admin)
+    const { UserAdminController } = await import('./controllers/admin/user.admin.controller');
+    const { UserAdminService } = await import('./services/admin/user.admin.service');
+    const { createAdminUserRoutes } = await import('./routes/admin/user.admin.routes');
+    const userAdminService = new UserAdminService(supabaseServiceRole);
+    const userAdminController = new UserAdminController(userAdminService);
+    const adminUserRoutes = createAdminUserRoutes(userAdminController);
+    app.use('/api/v1/admin/users', adminUserRoutes);
+    logger.info('Admin User routes mounted.');
     
     // Profiles (Admin)
     const profileAdminRoutes = (await import('./routes/admin/profile.admin.routes')).default;
@@ -98,6 +108,34 @@ async function startServer() {
     const appointmentAdminRoutes = (await import('./routes/admin/appointment.admin.routes')).default;
     app.use('/api/v1/admin/appointments', appointmentAdminRoutes);
     logger.info('Admin Appointment routes mounted.');
+
+    // Reports (Admin)
+    const { ReportAdminController } = await import('./controllers/admin/report.admin.controller');
+    const { ReportAdminService } = await import('./services/admin/report.admin.service');
+    const { createAdminReportRoutes, createAdminSingleReportRoutes } = await import('./routes/admin/report.admin.routes');
+    const reportAdminService = new ReportAdminService(supabaseServiceRole);
+    const reportAdminController = new ReportAdminController(reportAdminService);
+    
+    const adminReportRoutes = createAdminReportRoutes(reportAdminController);
+    app.use('/api/v1/admin/appointments/:appointmentId/reports', adminReportRoutes);
+
+    const adminSingleReportRoutes = createAdminSingleReportRoutes(reportAdminController);
+    app.use('/api/v1/admin/reports', adminSingleReportRoutes);
+    logger.info('Admin Report routes mounted.');
+
+    // Medical Records (Admin)
+    const { MedicalRecordAdminController } = await import('./controllers/admin/medicalRecord.admin.controller');
+    const { MedicalRecordAdminService } = await import('./services/admin/medicalRecord.admin.service');
+    const { createAdminMedicalRecordRoutes, createAdminSingleMedicalRecordRoutes } = await import('./routes/admin/medicalRecord.admin.routes');
+    const medicalRecordAdminService = new MedicalRecordAdminService(supabaseServiceRole);
+    const medicalRecordAdminController = new MedicalRecordAdminController(medicalRecordAdminService);
+
+    const adminMedicalRecordRoutes = createAdminMedicalRecordRoutes(medicalRecordAdminController);
+    app.use('/api/v1/admin/users/:userId/records', adminMedicalRecordRoutes);
+    
+    const adminSingleMedicalRecordRoutes = createAdminSingleMedicalRecordRoutes(medicalRecordAdminController);
+    app.use('/api/v1/admin/records', adminSingleMedicalRecordRoutes);
+    logger.info('Admin Medical Record routes mounted.');
 
     // Dashboard (Most general admin route, mounted last)
     const { AdminDashboardController } = await import('./controllers/admin/dashboard.admin.controller');
