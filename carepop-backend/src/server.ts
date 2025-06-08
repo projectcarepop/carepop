@@ -84,6 +84,16 @@ async function startServer() {
     app.use('/api/v1/admin/providers', adminProviderRoutes);
     logger.info('Admin Provider routes mounted.');
 
+    // Suppliers (Admin)
+    const supplierAdminRoutes = (await import('./routes/admin/supplier.admin.routes')).default;
+    app.use('/api/v1/admin/suppliers', supplierAdminRoutes);
+    logger.info('Admin Supplier routes mounted.');
+
+    // Inventory Items (Admin)
+    const inventoryItemAdminRoutes = (await import('./routes/admin/inventory-item.admin.routes')).default;
+    app.use('/api/v1/admin/inventory-items', inventoryItemAdminRoutes);
+    logger.info('Admin Inventory Item routes mounted.');
+
     // Users (Admin)
     const { UserAdminController } = await import('./controllers/admin/user.admin.controller');
     const { UserAdminService } = await import('./services/admin/user.admin.service');

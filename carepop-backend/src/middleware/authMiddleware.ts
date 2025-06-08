@@ -88,4 +88,11 @@ export const authenticateToken = async (req: AuthenticatedRequest, res: Response
     res.status(500).json({ message: 'Internal server error during authentication.', details: err.message });
     return;
   }
+};
+
+export const isAdmin = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ message: 'Forbidden: Administrator access required.' });
+  }
+  next();
 }; 
