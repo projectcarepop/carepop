@@ -19,7 +19,13 @@ export class MedicalRecordAdminController {
       console.log('Request File:', req.file);
       
       const { userId } = getRecordsParamsSchema.parse(req.params);
-      const { recordTitle, recordDetails } = createRecordBodySchema.parse(req.body);
+      
+      // Manually extract and validate form fields from req.body
+      const { recordTitle, recordDetails } = req.body;
+      if (!recordTitle || typeof recordTitle !== 'string') {
+        return res.status(400).json({ message: 'Record title is required and must be a string.' });
+      }
+
       const adminId = req.user!.id;
       const file = req.file;
       
