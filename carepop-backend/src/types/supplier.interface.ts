@@ -6,6 +6,6 @@ export interface ISupplier {
   contact_phone?: string | null;
   address?: string | null;
   is_active: boolean | null;
-  created_at: string;
-  updated_at: string;
+  created_at: string | null;
+  updated_at: string | null;
 } 

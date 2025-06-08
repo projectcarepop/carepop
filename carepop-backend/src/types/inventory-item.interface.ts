@@ -22,6 +22,6 @@ export interface IInventoryItem {
   fda_registration_number?: string | null;
   controlled_substance_code?: string | null;
   prescription_requirement?: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at: string | null;
+  updated_at: string | null;
 } 
