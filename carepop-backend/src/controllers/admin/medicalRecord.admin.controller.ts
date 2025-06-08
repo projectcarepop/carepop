@@ -14,6 +14,10 @@ export class MedicalRecordAdminController {
 
   async createRecord(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
+      console.log('--- CREATE MEDICAL RECORD ---');
+      console.log('Request Body:', JSON.stringify(req.body, null, 2));
+      console.log('Request File:', req.file);
+      
       const { userId } = getRecordsParamsSchema.parse(req.params);
       const { recordTitle, recordDetails } = createRecordBodySchema.parse(req.body);
       const adminId = req.user!.id;
