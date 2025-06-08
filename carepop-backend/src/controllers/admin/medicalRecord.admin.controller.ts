@@ -20,10 +20,11 @@ export class MedicalRecordAdminController {
       
       const { userId } = getRecordsParamsSchema.parse(req.params);
       
-      const recordTitle = req.body.recordTitle || '';
-      const recordDetails = req.body.recordDetails || '';
-      
-      if (!recordTitle) {
+      // Manually and safely extract fields from the multipart form body
+      const recordTitle = req.body?.recordTitle;
+      const recordDetails = req.body?.recordDetails;
+
+      if (!recordTitle || typeof recordTitle !== 'string') {
         return res.status(400).json({ message: 'Record title is required.' });
       }
 
