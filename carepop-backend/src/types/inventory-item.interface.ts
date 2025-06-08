@@ -16,7 +16,7 @@ export interface IInventoryItem {
   max_stock_level?: number | null;
   purchase_cost?: number | null;
   selling_price?: number | null;
-  is_active: boolean;
+  is_active: boolean | null;
   supplier_id?: string | null;
   storage_requirements?: string | null;
   fda_registration_number?: string | null;
