@@ -7,6 +7,23 @@ export class AppointmentAdminController {
     this.confirmAppointment = this.confirmAppointment.bind(this);
     this.getAllAppointments = this.getAllAppointments.bind(this);
     this.cancelAppointment = this.cancelAppointment.bind(this);
+    this.getAppointmentReport = this.getAppointmentReport.bind(this);
+  }
+
+  async getAppointmentReport(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { appointmentId } = req.params;
+      if (!appointmentId) {
+        throw new AppError('Appointment ID is required.', 400);
+      }
+      const report = await this.appointmentAdminService.getAppointmentReport(appointmentId);
+      res.status(200).json({
+        message: 'Appointment report retrieved successfully.',
+        data: report,
+      });
+    } catch (error) {
+      next(error);
+    }
   }
 
   async confirmAppointment(req: Request, res: Response, next: NextFunction): Promise<void> {

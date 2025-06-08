@@ -106,4 +106,19 @@ export class AppointmentAdminService {
     
     return data || [];
   }
+
+  async getAppointmentReport(appointmentId: string): Promise<Database['public']['Tables']['appointment_reports']['Row'] | null> {
+    const { data, error } = await this.supabase
+      .from('appointment_reports')
+      .select('*')
+      .eq('appointment_id', appointmentId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching appointment report:', error);
+      throw new AppError('Failed to fetch appointment report from the database.', 500);
+    }
+
+    return data;
+  }
 }

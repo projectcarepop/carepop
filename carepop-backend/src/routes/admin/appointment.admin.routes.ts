@@ -16,6 +16,13 @@ router.get(
   appointmentAdminController.getAllAppointments.bind(appointmentAdminController)
 );
 
+router.get(
+  '/:appointmentId/report',
+  authenticateToken,
+  isAdmin,
+  appointmentAdminController.getAppointmentReport.bind(appointmentAdminController)
+);
+
 router.patch(
   '/:appointmentId/confirm',
   authenticateToken,
