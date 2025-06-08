@@ -45,16 +45,13 @@ export class InventoryItemAdminService {
     return data;
   }
 
-  async updateInventoryItem(id: string, itemData: Partial<InventoryItemData>): Promise<IInventoryItem> {
-    const { data, error } = await this.supabase
+  async updateInventoryItem(id: string, itemData: Partial<InventoryItemData>): Promise<void> {
+    const { error } = await this.supabase
       .from('inventory_items')
       .update({ ...itemData, updated_at: new Date().toISOString() })
       .eq('id', id)
-      .select()
-      .single();
     
     if (error) throw new Error(error.message);
-    return data;
   }
 
   async deleteInventoryItem(id: string): Promise<{ message: string }> {

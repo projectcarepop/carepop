@@ -42,8 +42,8 @@ export class SupplierAdminController {
     try {
       const { id } = req.params;
       const validatedBody = updateSupplierSchema.parse(req.body);
-      const updatedSupplier = await this.supplierService.updateSupplier(id, validatedBody);
-      res.status(StatusCodes.OK).json({ success: true, data: updatedSupplier });
+      await this.supplierService.updateSupplier(id, validatedBody);
+      res.status(StatusCodes.OK).json({ success: true, message: 'Supplier updated successfully.' });
     } catch (error) {
       next(error);
     }

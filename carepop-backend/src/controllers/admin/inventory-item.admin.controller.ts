@@ -42,8 +42,8 @@ export class InventoryItemAdminController {
     try {
       const { id } = req.params;
       const validatedBody = updateInventoryItemSchema.parse(req.body);
-      const updatedItem = await this.inventoryItemService.updateInventoryItem(id, validatedBody);
-      res.status(StatusCodes.OK).json({ success: true, data: updatedItem });
+      await this.inventoryItemService.updateInventoryItem(id, validatedBody);
+      res.status(StatusCodes.OK).json({ success: true, message: 'Inventory item updated successfully.' });
     } catch (error) {
       next(error);
     }

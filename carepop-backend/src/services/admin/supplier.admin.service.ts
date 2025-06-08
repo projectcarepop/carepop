@@ -39,16 +39,13 @@ export class SupplierAdminService {
     return data;
   }
 
-  async updateSupplier(id: string, supplierData: Partial<SupplierData>): Promise<ISupplier> {
-    const { data, error } = await this.supabase
+  async updateSupplier(id: string, supplierData: Partial<SupplierData>): Promise<void> {
+    const { error } = await this.supabase
       .from('suppliers')
       .update({ ...supplierData, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single();
+      .eq('id', id);
     
     if (error) throw new Error(error.message);
-    return data;
   }
 
   async deleteSupplier(id: string): Promise<{ message: string }> {
