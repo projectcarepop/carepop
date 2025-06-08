@@ -1,12 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ReportForm } from './report-form';
-import { getAppointmentReport, saveAppointmentReport } from '@/lib/actions/admin.actions';
-import { IAppointmentReport } from '@/lib/types/appointment-report.interface';
 
 interface Appointment {
   id: string;
@@ -18,31 +15,6 @@ interface Appointment {
 }
 
 export function AppointmentsList({ appointments }: { appointments: Appointment[] }) {
-  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-  const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
-  const [existingReport, setExistingReport] = useState<IAppointmentReport | null>(null);
-  const [isLoadingReport, setIsLoadingReport] = useState(false);
-
-  const handleManageReportClick = async (appointmentId: string) => {
-    setSelectedAppointmentId(appointmentId);
-    setIsLoadingReport(true);
-    setIsReportModalOpen(true);
-    const report = await getAppointmentReport(appointmentId);
-    setExistingReport(report);
-    setIsLoadingReport(false);
-  };
-
-  const handleCloseModal = () => {
-    setIsReportModalOpen(false);
-    setSelectedAppointmentId(null);
-    setExistingReport(null);
-  };
-
-  const handleSaveReport = async (reportData: Partial<IAppointmentReport>) => {
-    await saveAppointmentReport(reportData);
-    // You might want to refresh the data here if needed
-  };
-
   if (!appointments || appointments.length === 0) {
     return (
       <Card>
@@ -77,22 +49,16 @@ export function AppointmentsList({ appointments }: { appointments: Appointment[]
               </div>
               <div className="flex items-center space-x-4">
                 <Badge variant={appt.status === 'Confirmed' ? 'default' : 'secondary'}>{appt.status}</Badge>
-                <Button size="sm" onClick={() => handleManageReportClick(appt.id)}>Manage Report</Button>
+                <Button size="sm" asChild>
+                  <Link href={`/admin/appointments/${appt.id}/report`}>
+                    View Report
+                  </Link>
+                </Button>
               </div>
             </div>
           ))}
         </CardContent>
       </Card>
-      
-      {!isLoadingReport && (
-        <ReportForm
-          isOpen={isReportModalOpen}
-          onClose={handleCloseModal}
-          appointmentId={selectedAppointmentId}
-          existingReport={existingReport}
-          onSave={handleSaveReport}
-        />
-      )}
     </>
   );
 } 
