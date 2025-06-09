@@ -6,15 +6,9 @@ import { validateRequest } from '../../middleware/validateRequest';
 import {
   createProviderBodySchema,
   updateProviderBodySchema,
-  listProvidersSchema,
-  providerIdSchema,
+  listProvidersQuerySchema,
+  providerIdParamSchema,
 } from '../../validation/admin/provider.admin.validation';
-import {
-  getProviderHandler,
-  updateProviderHandler,
-  deleteProviderHandler,
-} from '../../controllers/admin/provider.admin.controller';
-import { validate } from '../../middleware/validate';
 
 export const createAdminProviderRoutes = (adminProviderController: AdminProviderController): Router => {
   const router = Router();
@@ -120,7 +114,7 @@ export const createAdminProviderRoutes = (adminProviderController: AdminProvider
     '/',
     authenticateToken,
     isAdmin,
-    validateRequest({ query: listProvidersSchema.shape.query }),
+    validateRequest({ query: listProvidersQuerySchema }),
     adminProviderController.listProviders
   );
 
@@ -161,8 +155,8 @@ export const createAdminProviderRoutes = (adminProviderController: AdminProvider
     '/:providerId',
     authenticateToken,
     isAdmin,
-    validateRequest({ params: providerIdSchema.shape.params }),
-    getProviderHandler
+    validateRequest({ params: providerIdParamSchema }),
+    adminProviderController.getProviderById
   );
 
   /**
@@ -210,9 +204,9 @@ export const createAdminProviderRoutes = (adminProviderController: AdminProvider
     isAdmin,
     validateRequest({
       body: updateProviderBodySchema,
-      params: providerIdSchema.shape.params
+      params: providerIdParamSchema,
     }),
-    updateProviderHandler
+    adminProviderController.updateProvider
   );
 
   /**
@@ -248,11 +242,9 @@ export const createAdminProviderRoutes = (adminProviderController: AdminProvider
     '/:providerId',
     authenticateToken,
     isAdmin,
-    validateRequest({ params: providerIdSchema.shape.params }),
-    deleteProviderHandler
+    validateRequest({ params: providerIdParamSchema }),
+    adminProviderController.deleteProvider
   );
 
   return router;
-};
-
-export default router; 
+}; 

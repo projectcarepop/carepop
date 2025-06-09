@@ -5,9 +5,8 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { serviceCategorySchema, TServiceCategory } from '@/lib/types/service-category.types';
 import { TApiError, TApiSuccess } from '@/lib/types/api.types';
 import { fromZodError } from 'zod-validation-error';
-import { cookies } from 'next/headers';
 
-const getSupabase = () => createSupabaseServerClient(cookies());
+const getSupabase = () => createSupabaseServerClient();
 
 export async function getAllServiceCategories(options?: { page?: number, limit?: number, search?: string }): Promise<TApiSuccess<{ categories: TServiceCategory[], total: number }> | TApiError> {
   const page = options?.page || 1;

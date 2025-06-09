@@ -10,8 +10,10 @@ import {
 import logger from '../../utils/logger';
 
 type Provider = Database['public']['Tables']['providers']['Row'];
-type ProviderInsert = Database['public']['Tables']['providers']['Insert'];
-type ProviderUpdate = Database['public']['Tables']['providers']['Update'];
+type ProviderInsert = Database['public']['Tables']['providers']['Insert'] & { specialization?: string | null, license_number?: string | null, credentials?: string | null, bio?: string | null };
+type ProviderUpdate = Database['public']['Tables']['providers']['Update'] & { specialization?: string | null, license_number?: string | null, credentials?: string | null, bio?: string | null };
+
+export type ProviderWithServices = Provider & { serviceIds: string[] };
 
 export class AdminProviderService {
   private supabase: SupabaseClient<Database>;
@@ -132,7 +134,7 @@ export class AdminProviderService {
     };
   }
 
-  async getProviderById(providerId: string): Promise<Provider | null> {
+  async getProviderById(providerId: string): Promise<ProviderWithServices | null> {
     const { data, error } = await this.supabase
       .from('providers')
       .select('*, services:provider_services(service_id)')

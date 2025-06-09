@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Hospital, Stethoscope, Settings, Users, Archive, CalendarCheck, LogOut, CircleUser, Package2 } from 'lucide-react';
+import { LayoutDashboard, Hospital, Stethoscope, Settings, Users, Archive, CalendarCheck, LogOut, CircleUser } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';

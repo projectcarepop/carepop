@@ -4,7 +4,7 @@ import {
   createProviderSchema,
   ListProvidersQuery,
   UpdateProviderBody,
-  ProviderIdParams,
+  ProviderIdParam,
 } from '../../validation/admin/provider.admin.validation';
 import { AuthenticatedRequest } from '../../middleware/authMiddleware';
 
@@ -42,7 +42,7 @@ export class AdminProviderController {
 
   async getProviderById(req: Request, res: Response, next: NextFunction) {
     try {
-      const { params: { providerId } } = req as unknown as { params: ProviderIdParams };
+      const { params: { providerId } } = req as unknown as { params: ProviderIdParam };
       const provider = await this.adminProviderService.getProviderById(providerId);
       if (!provider) {
         return res.status(404).json({ message: 'Provider not found' });
@@ -55,7 +55,7 @@ export class AdminProviderController {
 
   async updateProvider(req: Request, res: Response, next: NextFunction) {
     try {
-      const { params: { providerId }, body: providerData } = req as unknown as { params: ProviderIdParams, body: UpdateProviderBody };
+      const { params: { providerId }, body: providerData } = req as unknown as { params: ProviderIdParam, body: UpdateProviderBody };
       const updatedProvider = await this.adminProviderService.updateProvider(providerId, providerData);
       if (!updatedProvider) {
         return res.status(404).json({ message: 'Provider not found' });
@@ -68,7 +68,7 @@ export class AdminProviderController {
 
   async deleteProvider(req: Request, res: Response, next: NextFunction) {
     try {
-      const { params: { providerId } } = req as unknown as { params: ProviderIdParams };
+      const { params: { providerId } } = req as unknown as { params: ProviderIdParam };
       const success = await this.adminProviderService.deleteProvider(providerId);
       if (!success) {
         return res.status(404).json({ message: 'Provider not found or could not be deleted' });

@@ -23,16 +23,7 @@ const toastVariants = cva(
   }
 )
 
-const ToastProvider = React.forwardRef<
-  React.ElementRef<typeof ToastPrimitives.Provider>,
-  React.ComponentPropsWithoutRef<typeof ToastPrimitives.Provider>
->(({ ...props }, ref) => (
-    <ToastPrimitives.Provider
-        ref={ref}
-        {...props}
-    />
-))
-ToastProvider.displayName = ToastPrimitives.Provider.displayName
+const ToastProvider = ToastPrimitives.Provider
 
 const ToastViewport = React.forwardRef<
   React.ElementRef<typeof ToastPrimitives.Viewport>,

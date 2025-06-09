@@ -10,12 +10,14 @@ export const createSupabaseServerClient = () => {
     {
       cookies: {
         get(name: string) {
+          // @ts-expect-error - Linter incorrectly assumes cookies() is a promise
           return cookieStore.get(name)?.value
         },
         set(name: string, value: string, options: CookieOptions) {
           try {
+            // @ts-expect-error - Linter incorrectly assumes cookies() is a promise
             cookieStore.set({ name, value, ...options })
-          } catch (error) {
+          } catch {
             // The `set` method was called from a Server Component.
             // This can be ignored if you have middleware refreshing
             // user sessions.
@@ -23,8 +25,9 @@ export const createSupabaseServerClient = () => {
         },
         remove(name: string, options: CookieOptions) {
           try {
+            // @ts-expect-error - Linter incorrectly assumes cookies() is a promise
             cookieStore.set({ name, value: '', ...options })
-          } catch (error) {
+          } catch {
             // The `delete` method was called from a Server Component.
             // This can be ignored if you have middleware refreshing
             // user sessions.

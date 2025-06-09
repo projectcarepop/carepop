@@ -1,10 +1,8 @@
 import { Request, Response } from 'express';
 import { AppointmentAdminService } from '../../services/admin/appointment.admin.service';
-import { AppError } from '../../utils/AppError';
-import { createSupabaseAdmin } from '../../services/supabase.service';
+import { AppError } from '../../utils/errors';
 
-const supabase = createSupabaseAdmin();
-const appointmentService = new AppointmentAdminService(supabase);
+const appointmentService = new AppointmentAdminService();
 
 export const getAllAppointments = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -21,7 +19,8 @@ export const getAllAppointments = async (req: Request, res: Response): Promise<v
             res.status(error.statusCode).json({ message: error.message });
         } else {
             console.error(error);
-            res.status(500).json({ message: 'An unexpected error occurred.' });
+            const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+            res.status(500).json({ message });
         }
     }
 };
@@ -36,7 +35,8 @@ export const confirmAppointment = async (req: Request, res: Response): Promise<v
             res.status(error.statusCode).json({ message: error.message });
         } else {
             console.error(error);
-            res.status(500).json({ message: 'An unexpected error occurred.' });
+            const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+            res.status(500).json({ message });
         }
     }
 };
@@ -57,7 +57,8 @@ export const cancelAppointment = async (req: Request, res: Response): Promise<vo
             res.status(error.statusCode).json({ message: error.message });
         } else {
             console.error(error);
-            res.status(500).json({ message: 'An unexpected error occurred.' });
+            const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+            res.status(500).json({ message });
         }
     }
 };
@@ -78,7 +79,8 @@ export const getAppointmentReport = async (req: Request, res: Response): Promise
             res.status(error.statusCode).json({ message: error.message });
         } else {
             console.error(error);
-            res.status(500).json({ message: 'An internal server error occurred' });
+            const message = error instanceof Error ? error.message : 'An internal server error occurred';
+            res.status(500).json({ message });
         }
     }
 }; 

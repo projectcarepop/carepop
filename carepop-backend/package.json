@@ -6,7 +6,8 @@
     "build": "tsc",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "start": "node dist/server.js",
-    "test": "jest --coverage"
+    "test": "jest --coverage",
+    "gen:types": "supabase gen types typescript --project-id lpaqfvfuzfqsrciawipu --schema public > src/types/supabase.types.ts"
   },
   "keywords": [],
   "author": "",

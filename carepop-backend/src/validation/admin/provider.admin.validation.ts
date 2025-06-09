@@ -50,7 +50,7 @@ export const updateProviderBodySchema = providerBodyBaseSchema.partial();
 
 // Schema for validating the provider ID in URL params
 export const providerIdParamSchema = z.object({
-  id: z.string().uuid('Invalid provider ID format'),
+  providerId: z.string().uuid('Invalid provider ID format'),
 });
 
 // Export TypeScript types inferred from schemas
