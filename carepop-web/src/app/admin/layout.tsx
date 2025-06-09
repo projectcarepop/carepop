@@ -35,7 +35,7 @@ const AdminHeader = () => {
                     height={32}
                     className="hidden sm:block"
                 />
-                <h1 className="text-xl font-semibold tracking-tight hidden sm:block">CAREPOP ADMIN</h1>
+                <h1 className="text-xl font-semibold tracking-tight hidden sm:block text-primary">carepop admin</h1>
             </div>
             
             <div className="flex items-center gap-4">

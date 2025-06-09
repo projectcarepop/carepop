@@ -105,16 +105,22 @@ export const columns: ColumnDef<TServiceCategory>[] = [
 export function ServiceCategoryTable() {
   const [data, setData] = useState<TServiceCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [sorting, setSorting] = useState<SortingState>([])
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [totalPages, setTotalPages] = useState(0);
 
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const result = await getAllServiceCategories();
-       if (result.success) {
-        setData(result.data);
-      } else {
-        throw new Error(result.error.message);
+      const result = await getAllServiceCategories({ 
+        page: pagination.pageIndex + 1, 
+        limit: pagination.pageSize 
+      });
+      if (result.success && result.data) {
+        setData(result.data.categories);
+        setTotalPages(Math.ceil(result.data.total / pagination.pageSize));
+      } else if (!result.success) {
+        throw new Error(result.error?.message || "Failed to fetch data");
       }
     } catch (error) {
         if (error instanceof Error) {
@@ -135,7 +141,7 @@ export function ServiceCategoryTable() {
     return () => {
         window.removeEventListener('serviceCategoryDeleted', handleCategoryDeleted);
     }
-  }, []);
+  }, [pagination]);
 
   const table = useReactTable({
     data,
@@ -144,71 +150,80 @@ export function ServiceCategoryTable() {
     getPaginationRowModel: getPaginationRowModel(),
     onSortingChange: setSorting,
     getSortedRowModel: getSortedRowModel(),
+    onPaginationChange: setPagination,
+    manualPagination: true,
+    pageCount: totalPages,
     state: {
       sorting,
+      pagination,
     },
   });
 
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id}>
-              {headerGroup.headers.map((header) => {
-                return (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
-                  </TableHead>
-                );
-              })}
-            </TableRow>
-          ))}
-        </TableHeader>
-        <TableBody>
-          {table.getRowModel().rows?.length ? (
-            table.getRowModel().rows.map((row) => (
-              <TableRow
-                key={row.original.id}
-                data-state={row.getIsSelected() && 'selected'}
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
+    <div className="space-y-4">
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  return (
+                    <TableHead key={header.id}>
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </TableHead>
+                  );
+                })}
               </TableRow>
-            ))
-          ) : (
-            <TableRow>
-              <TableCell colSpan={columns.length} className="h-24 text-center">
-                {isLoading ? "Loading..." : "No results."}
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-      <div className="flex items-center justify-end space-x-2 p-4">
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.original.id}
+                  data-state={row.getIsSelected() && 'selected'}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  {isLoading ? "Loading..." : "No results."}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      <div className="flex items-center justify-end space-x-4 py-4">
+        <span className="flex-1 text-sm text-muted-foreground">
+            Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+        </span>
         <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.previousPage()}
-          disabled={!table.getCanPreviousPage()}
+            variant="outline"
+            size="sm"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
         >
-          Previous
+            Previous
         </Button>
         <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.nextPage()}
-          disabled={!table.getCanNextPage()}
+            variant="outline"
+            size="sm"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
         >
-          Next
+            Next
         </Button>
       </div>
     </div>

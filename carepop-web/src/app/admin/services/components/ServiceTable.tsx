@@ -13,7 +13,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table';
-import { ArrowUpDown, ChevronDown, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -34,17 +34,9 @@ import {
 } from '@/components/ui/table';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { useToast } from '@/components/ui/use-toast';
+import { AppError } from '@/lib/utils';
 
 // Frontend data structure (camelCase) for a Service
 export interface Service {
@@ -59,42 +51,6 @@ export interface Service {
     name: string;
   } | null;
 }
-
-// Dialog for delete confirmation
-const DeleteServiceDialog = ({
-  service,
-  isOpen,
-  onClose,
-  onConfirm,
-  isDeleting,
-}: {
-  service: Service | null;
-  isOpen: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-  isDeleting: boolean;
-}) => {
-  if (!service) return null;
-
-  return (
-    <AlertDialog open={isOpen} onOpenChange={onClose}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This action cannot be undone. This will permanently delete the service &quot;{service.name}&quot;.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel onClick={onClose} disabled={isDeleting}>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm} disabled={isDeleting}>
-            {isDeleting ? 'Deleting...' : 'Continue'}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-};
 
 // Raw data type from API (snake_case)
 interface RawServiceData {
@@ -119,26 +75,31 @@ export function ServiceTable() {
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   
-  const [serviceToDelete, setServiceToDelete] = React.useState<Service | null>(null);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
-  const [isDeleting, setIsDeleting] = React.useState(false);
+  const [pagination, setPagination] = React.useState({
+    pageIndex: 0, // DANT-TABLE USES 0-INDEXED PAGES
+    pageSize: 10,
+  });
+  const [totalPages, setTotalPages] = React.useState(0);
+  const [search, setSearch] = React.useState('');
 
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
+  const { toast } = useToast();
 
   const fetchData = React.useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !sessionData.session) {
-        throw new Error(sessionError?.message || 'User not authenticated.');
-      }
-      const token = sessionData.session.access_token;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('User not authenticated.');
+      
+      const params = new URLSearchParams({
+        page: (pagination.pageIndex + 1).toString(),
+        limit: pagination.pageSize.toString(),
+      });
+      if (search) params.append('search', search);
 
-      const response = await fetch('/api/v1/admin/services', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const response = await fetch(`/api/v1/admin/services?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
       if (!response.ok) {
@@ -147,7 +108,6 @@ export function ServiceTable() {
       }
 
       const result = await response.json();
-      
       const mappedData = result.data.map((s: RawServiceData) => ({
         id: s.id,
         name: s.name,
@@ -159,105 +119,76 @@ export function ServiceTable() {
       }));
 
       setData(mappedData);
-
-    } catch (e: unknown) {
-      if (e instanceof Error) {
-        setError(e.message);
-      } else {
-        setError('An unknown error occurred while fetching service data.');
-      }
+      setTotalPages(result.meta?.totalPages || 0);
+    } catch (e) {
+      const error = e as Error;
+      setError(error.message);
     } finally {
       setIsLoading(false);
     }
-  }, [supabase.auth]);
+  }, [pagination, search, supabase.auth]);
 
   React.useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  const openDeleteDialog = (service: Service) => {
-    setServiceToDelete(service);
-    setIsDeleteDialogOpen(true);
-  };
+  const handleDelete = async (serviceId: string) => {
+    if (!confirm('Are you sure you want to delete this service? This action cannot be undone.')) return;
 
-  const closeDeleteDialog = () => {
-    setServiceToDelete(null);
-    setIsDeleteDialogOpen(false);
-  };
-
-  const handleDeleteService = async () => {
-    if (!serviceToDelete) return;
-    setIsDeleting(true);
     try {
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !sessionData.session) {
-        throw new Error(sessionError?.message || 'User not authenticated.');
-      }
-      const token = sessionData.session.access_token;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new AppError("Not authenticated", {} as Response);
       
-      const response = await fetch(`/api/v1/admin/services/${serviceToDelete.id}`, {
+      const response = await fetch(`/api/v1/admin/services/${serviceId}`, {
         method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to delete service.');
+        throw new AppError(errorData.message || 'Failed to delete service.', response);
       }
       
-      // Refresh data after delete
+      toast({
+        title: "Success",
+        description: "Service deleted successfully."
+      });
       fetchData();
-
-    } catch (e: unknown) {
-      if (e instanceof Error) {
-        // You might want to show a toast notification here
-        console.error(e.message);
-      }
-    } finally {
-      setIsDeleting(false);
-      closeDeleteDialog();
+    } catch (err) {
+      const error = err as AppError | Error;
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
-  
+
+  const formatCurrency = (amount: number | null | undefined) => {
+    if (amount === null || amount === undefined) return 'N/A';
+    return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(amount);
+  };
+
   const columns: ColumnDef<Service>[] = [
     {
       accessorKey: 'name',
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-        >
-          Service Name
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
+      header: 'Service Name',
       cell: ({ row }) => <div className="font-medium">{row.getValue('name')}</div>,
     },
     {
       accessorKey: 'category.name',
       header: 'Category',
-      cell: ({ row }) => {
-        const category = row.original.category;
-        return category ? category.name : 'N/A';
-      },
+      cell: ({ row }) => row.original.category?.name || 'N/A',
     },
     {
       accessorKey: 'cost',
       header: 'Cost',
-      cell: ({ row }) => {
-        const cost = parseFloat(row.getValue('cost') || '0');
-        const formatted = new Intl.NumberFormat('en-US', {
-          style: 'currency',
-          currency: 'PHP', // Assuming PHP, change if needed
-        }).format(cost);
-        return <div>{formatted}</div>;
-      },
+      cell: ({ row }) => formatCurrency(row.getValue('cost')),
     },
     {
       accessorKey: 'typicalDurationMinutes',
-      header: 'Duration (min)',
+      header: 'Duration (Mins)',
+      cell: ({ row }) => row.getValue('typicalDurationMinutes') || 'N/A',
     },
     {
       accessorKey: 'isActive',
@@ -270,30 +201,30 @@ export function ServiceTable() {
     },
     {
       id: 'actions',
-      enableHiding: false,
       cell: ({ row }) => {
         const service = row.original;
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem asChild>
-                <Link href={`/admin/services/${service.id}/edit`}>
-                  <Edit className="mr-2 h-4 w-4" /> Edit
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => openDeleteDialog(service)} className="text-red-600">
-                <Trash2 className="mr-2 h-4 w-4" /> Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="text-right">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Open menu</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href={`/admin/services/${service.id}/edit`}>Edit Service</Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleDelete(service.id)} className="text-destructive">
+                  Delete Service
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         );
       },
     },
@@ -308,30 +239,25 @@ export function ServiceTable() {
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    onColumnVisibilityChange: setColumnVisibility,
+    onPaginationChange: setPagination,
     state: {
       sorting,
       columnFilters,
       columnVisibility,
+      pagination,
     },
+    manualPagination: true,
+    pageCount: totalPages,
   });
-
-  if (isLoading) {
-    return <div>Loading services...</div>;
-  }
-
-  if (error) {
-    return <div className="text-red-500">Error: {error}</div>;
-  }
 
   return (
     <div className="w-full">
       <div className="flex items-center py-4">
         <Input
-          placeholder="Filter by service name..."
-          value={(table.getColumn('name')?.getFilterValue() as string) ?? ''}
-          onChange={(event) =>
-            table.getColumn('name')?.setFilterValue(event.target.value)
-          }
+          placeholder="Filter by service name, category..."
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
           className="max-w-sm"
         />
       </div>
@@ -340,56 +266,45 @@ export function ServiceTable() {
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  return (
-                    <TableHead key={header.id}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                    </TableHead>
-                  );
-                })}
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
               </TableRow>
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">Loading...</TableCell>
+              </TableRow>
+            ) : error ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center text-destructive">{error}</TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && 'selected'}
-                >
+                <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'} className="hover:bg-muted/50">
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center"
-                >
-                  No services found.
-                </TableCell>
+                <TableCell colSpan={columns.length} className="h-24 text-center">No results.</TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-end space-x-2 py-4">
-        <div className="text-sm text-muted-foreground">
-          Page {table.getState().pagination.pageIndex + 1} of{' '}
-          {table.getPageCount()}
-        </div>
+      <div className="flex items-center justify-end space-x-4 py-4">
+        <span className="text-sm text-muted-foreground">
+          Page {pagination.pageIndex + 1} of {totalPages}
+        </span>
         <Button
           variant="outline"
           size="sm"
@@ -407,13 +322,6 @@ export function ServiceTable() {
           Next
         </Button>
       </div>
-      <DeleteServiceDialog 
-        service={serviceToDelete}
-        isOpen={isDeleteDialogOpen}
-        onClose={closeDeleteDialog}
-        onConfirm={handleDeleteService}
-        isDeleting={isDeleting}
-      />
     </div>
   );
 } 

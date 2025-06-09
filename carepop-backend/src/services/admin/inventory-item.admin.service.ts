@@ -26,17 +26,30 @@ export class InventoryItemAdminService {
     );
   }
 
-  async getAllInventoryItems(): Promise<IInventoryItem[]> {
-    const { data, error } = await this.supabase
+  async getAllInventoryItems(options: { page: number, limit: number, search?: string }): Promise<{ data: IInventoryItem[], total: number }> {
+    const { page, limit, search } = options;
+    const offset = (page - 1) * limit;
+
+    let query = this.supabase
       .from('inventory_items')
       .select(`
         *,
         supplier:suppliers(id, name)
-      `)
-      .order('item_name', { ascending: true });
+      `, { count: 'exact' });
+
+    if (search) {
+      // Using or filter for searching across multiple fields
+      query = query.or(`item_name.ilike.%${search}%,sku.ilike.%${search}%,category.ilike.%${search}%`);
+    }
+
+    query = query
+      .order('item_name', { ascending: true })
+      .range(offset, offset + limit - 1);
+
+    const { data, error, count } = await query;
     
     if (error) throw new Error(error.message);
-    return data || [];
+    return { data: data || [], total: count || 0 };
   }
 
   async getInventoryItemById(id: string): Promise<IInventoryItem | null> {

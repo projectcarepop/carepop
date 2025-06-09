@@ -4,91 +4,77 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%; /* #FFFFFF */
-    --foreground: 210 11% 15%; /* #212529 */
-
-    --card: 210 17% 98%; /* #F8F9FA */
-    --card-foreground: 210 11% 15%; /* #212529 */
-
-    --popover: 0 0% 100%; /* #FFFFFF */
-    --popover-foreground: 210 11% 15%; /* #212529 */
-
-    --primary: 349 100% 65%; /* #ff4d6d */
-    --primary-foreground: 0 0% 100%; /* #FFFFFF */
-
-    --secondary: 230 71% 27%; /* #142474 */
-    --secondary-foreground: 0 0% 100%; /* #FFFFFF */
-
-    --muted: 210 17% 98%; /* #F8F9FA */
-    --muted-foreground: 208 7% 46%; /* #6C757D */
-
-    --accent: 349 90% 80%; /* Lighter pink for hover - was 197 71% 73% (#87CEEB) */
-    --accent-foreground: 210 11% 15%; /* #212529 - Should remain readable */
-
-    --destructive: 348 83% 47%; /* #DC143C */
-    --destructive-foreground: 0 0% 100%; /* #FFFFFF */
-
-    --border: 210 14% 89%; /* #DEE2E6 */
-    --input: 210 14% 89%; /* #DEE2E6 (border for input, background is var(--background)) */
-    --ring: 349 100% 65%; /* #ff4d6d (focus ring, using primary color) */
-
+    --background: 0 0% 100%;
+    --foreground: 210 11% 15%;
+    --card: 210 17% 98%;
+    --card-foreground: 210 11% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 11% 15%;
+    --primary: 349 100% 65%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 230 71% 27%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 210 17% 98%;
+    --muted-foreground: 208 7% 46%;
+    --accent: 349 90% 90%;
+    --accent-foreground: 210 11% 15%;
+    --destructive: 348 83% 47%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 152 69% 31%;
+    --success-foreground: 0 0% 100%;
+    --warning: 45 100% 51%;
+    --warning-foreground: 210 11% 15%;
+    --info: 215 91% 54%;
+    --info-foreground: 0 0% 100%;
+    --border: 210 14% 89%;
+    --input: 210 14% 89%;
+    --ring: 349 100% 65%;
     --radius: 0.5rem;
-
-    /* Custom colors from mobile theme not directly mapped by Shadcn default names */
-    --success: 152 69% 31%; /* #198754 */
-    --success-foreground: 0 0% 100%; /* #FFFFFF */
-    --warning: 45 100% 51%; /* #FFC107 */
-    --warning-foreground: 210 11% 15%; /* #212529 */
   }
 
   .dark {
-    /* TODO: Define dark theme colors based on mobile theme if a dark mode is planned */
-    /* For now, keeping a slightly adjusted version of the previous dark theme as a placeholder */
-    --background: 210 11% 15%;      /* Example: #212529 */
-    --foreground: 0 0% 98%;          /* Example: #FAFAFA */
-    --card: 210 10% 20%;             /* Example */
-    --card-foreground: 0 0% 98%;     /* Example */
-    --popover: 210 10% 20%;          /* Example */
-    --popover-foreground: 0 0% 98%;  /* Example */
-    --primary: 349 100% 70%;         /* Lighter pink for dark mode */
-    --primary-foreground: 0 0% 10%;   /* Darker text for lighter pink */
-    --secondary: 230 71% 65%;        /* Lighter secondary for dark mode */
+    /* TODO: Define dark theme colors based on the original brand palette */
+    --background: 210 11% 15%;
+    --foreground: 0 0% 98%;
+    --card: 210 10% 20%;
+    --card-foreground: 0 0% 98%;
+    --popover: 210 10% 20%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 349 100% 70%;
+    --primary-foreground: 0 0% 10%;
+    --secondary: 230 71% 65%;
     --secondary-foreground: 0 0% 100%;
     --muted: 210 10% 25%;
     --muted-foreground: 210 5% 63%;
-    --accent: 349 80% 60%;           /* Pink for hover in dark - was 197 71% 55% */
-    --accent-foreground: 0 0% 100%; /* White text, should be fine on the pink */
-    --destructive: 348 83% 60%;      /* Adjusted destructive for dark mode */
+    --accent: 349 80% 60%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 348 83% 60%;
     --destructive-foreground: 0 0% 100%;
     --border: 210 10% 30%;
     --input: 210 10% 30%;
-    --ring: 349 100% 70%;            /* Lighter pink ring for dark mode */
-    --success: 152 69% 40%;          /* Adjusted success for dark mode */
+    --ring: 349 100% 70%;
+    --success: 152 69% 40%;
     --success-foreground: 0 0% 100%;
-    --warning: 45 100% 60%;          /* Adjusted warning for dark mode */
+    --warning: 45 100% 60%;
     --warning-foreground: 210 11% 15%;
+    --info: 215 91% 64%;
+    --info-foreground: 0 0% 100%;
   }
 }
 
 @layer base {
-  /* * {
-    border-width: 1px;
-    border-style: solid;
-    border-color: hsl(var(--border));
-  } */
   body {
-    background-color: hsl(var(--background)); /* Restore intended background color */
-    color: hsl(var(--foreground));
-    font-family: var(--font-space-grotesk), sans-serif; /* Apply Space Grotesk as base font */
+    @apply bg-background text-foreground font-sans;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
-  /* Utility class for Space Grotesk (can be kept for explicit use or removed if body default is enough) */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+  }
+
   .font-space-grotesk {
     font-family: var(--font-space-grotesk), sans-serif;
   }
-
-  /* Utility class for Inter */
   .font-inter {
     font-family: var(--font-inter), sans-serif;
   }

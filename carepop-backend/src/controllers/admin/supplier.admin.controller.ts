@@ -8,8 +8,19 @@ export class SupplierAdminController {
 
   async getAllSuppliers(req: Request, res: Response, next: NextFunction) {
     try {
-      const suppliers = await this.supplierService.getAllSuppliers();
-      res.status(StatusCodes.OK).json({ success: true, data: suppliers });
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const search = req.query.search as string | undefined;
+
+      const { data, total } = await this.supplierService.getAllSuppliers({ page, limit, search });
+
+      res.status(StatusCodes.OK).json({ 
+        success: true, 
+        data,
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
+        totalItems: total
+      });
     } catch (error) {
       next(error);
     }

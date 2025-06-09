@@ -13,7 +13,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -36,6 +36,8 @@ import {
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { AppError } from '@/lib/utils';
+import { useToast } from '@/components/ui/use-toast';
 
 // Frontend data structure for a User
 export interface User {
@@ -66,12 +68,15 @@ export function UserTable() {
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   
-  const [page, setPage] = React.useState(1);
+  const [pagination, setPagination] = React.useState({
+    pageIndex: 0,
+    pageSize: 10,
+  });
   const [totalPages, setTotalPages] = React.useState(0);
-  const [limit] = React.useState(10);
   const [search, setSearch] = React.useState('');
 
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
+  const { toast } = useToast();
   
   const fetchData = React.useCallback(async () => {
     setIsLoading(true);
@@ -84,8 +89,8 @@ export function UserTable() {
       const token = sessionData.session.access_token;
 
       const params = new URLSearchParams();
-      params.append('page', page.toString());
-      params.append('limit', limit.toString());
+      params.append('page', (pagination.pageIndex + 1).toString());
+      params.append('limit', pagination.pageSize.toString());
       if (search) {
         params.append('search', search);
       }
@@ -113,7 +118,7 @@ export function UserTable() {
       }));
 
       setData(mappedData);
-      setTotalPages(Math.ceil(result.count / limit));
+      setTotalPages(Math.ceil(result.count / pagination.pageSize));
 
     } catch (e: unknown) {
       if (e instanceof Error) {
@@ -124,24 +129,57 @@ export function UserTable() {
     } finally {
       setIsLoading(false);
     }
-  }, [supabase.auth, page, limit, search]);
+  }, [supabase.auth, pagination, search]);
 
   React.useEffect(() => {
     fetchData();
   }, [fetchData]);
   
+  const handleDelete = async (userId: string) => {
+    if (!confirm('Are you sure you want to delete this user? This may be irreversible.')) {
+      return;
+    }
+
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new AppError("You must be logged in to delete users.", {} as Response);
+
+        const response = await fetch(`/api/v1/admin/users/${userId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+            },
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new AppError(errorData.message || 'Failed to delete user.', response);
+        }
+
+        toast({
+            title: "Success",
+            description: "User has been deleted successfully.",
+        });
+
+        // Refetch data to update the table
+        fetchData(); 
+
+    } catch (err) {
+        const error = err as AppError | Error;
+        toast({
+            title: "Error",
+            description: error.message,
+            variant: "destructive",
+        });
+    }
+  };
+
+
   const columns: ColumnDef<User>[] = [
     {
       accessorKey: 'lastName',
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-        >
-          Name
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
+      header: 'Name',
       cell: ({ row }) => {
         const user = row.original;
         const name = `${user.firstName || ''} ${user.lastName || ''}`.trim();
@@ -151,6 +189,7 @@ export function UserTable() {
     {
       accessorKey: 'email',
       header: 'Email',
+      cell: ({ row }) => <div className="font-medium">{row.getValue('email')}</div>,
     },
     {
       accessorKey: 'role',
@@ -171,21 +210,35 @@ export function UserTable() {
       cell: ({ row }) => {
         const user = row.original;
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href={`/admin/users/${user.id}`}>View Details</Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="text-right">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Open menu</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href={`/admin/users/${user.id}`}>View Details</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={`/admin/users/${user.id}/edit`}>Edit User</Link>
+                </DropdownMenuItem>
+                {user.role !== 'admin' && (
+                  <DropdownMenuItem asChild>
+                    <Link href={`/admin/users/${user.id}/upload-medical-record`}>Upload Record</Link>
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleDelete(user.id)} className="text-destructive">
+                  Delete User
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         );
       },
     },
@@ -201,10 +254,12 @@ export function UserTable() {
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
+    onPaginationChange: setPagination,
     state: {
       sorting,
       columnFilters,
       columnVisibility,
+      pagination,
     },
     manualPagination: true,
     pageCount: totalPages,
@@ -258,6 +313,7 @@ export function UserTable() {
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && 'selected'}
+                  className="hover:bg-muted/50"
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
@@ -271,7 +327,10 @@ export function UserTable() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
                   No results.
                 </TableCell>
               </TableRow>
@@ -279,25 +338,26 @@ export function UserTable() {
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-end space-x-2 py-4">
-        <div className="space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage(page - 1)}
-            disabled={page <= 1}
-          >
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage(page + 1)}
-            disabled={page >= totalPages}
-          >
-            Next
-          </Button>
-        </div>
+      <div className="flex items-center justify-end space-x-4 py-4">
+        <span className="text-sm text-muted-foreground">
+          Page {pagination.pageIndex + 1} of {totalPages}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => table.previousPage()}
+          disabled={!table.getCanPreviousPage()}
+        >
+          Previous
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => table.nextPage()}
+          disabled={!table.getCanNextPage()}
+        >
+          Next
+        </Button>
       </div>
     </div>
   );

@@ -13,12 +13,11 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table';
-import { ArrowUpDown, ChevronDown, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -36,79 +35,24 @@ import {
 } from '@/components/ui/table';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { useToast } from '@/components/ui/use-toast';
+import { AppError } from '@/lib/utils';
 
 // Frontend data structure (camelCase)
 export interface Clinic {
   id: string;
   name: string;
   fullAddress?: string | null;
-  streetAddress?: string | null;
   locality?: string | null;
   region?: string | null;
-  postalCode?: string | null;
-  countryCode?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
   contactPhone?: string | null;
-  contactEmail?: string | null;
-  websiteUrl?: string | null;
-  operatingHours?: string | null;
-  servicesOffered?: string[] | null;
-  fpopChapterAffiliation?: string | null;
-  additionalNotes?: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-// Extracted Delete Confirmation Dialog Component
-const DeleteClinicDialog = ({
-  clinic,
-  isOpen,
-  onClose,
-  onConfirm,
-  isDeleting,
-}: {
-  clinic: Clinic | null;
-  isOpen: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-  isDeleting: boolean;
-}) => {
-  if (!clinic) return null;
-
-  return (
-    <AlertDialog open={isOpen} onOpenChange={onClose}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This action cannot be undone. This will permanently delete the clinic &quot;{clinic.name}&quot; and all associated data.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel onClick={onClose} disabled={isDeleting}>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm} disabled={isDeleting}>
-            {isDeleting ? 'Deleting...' : 'Continue'}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-};
-
-// Define a type for the raw clinic data from the API to avoid using 'any'
+// Type for the raw clinic data from the API
 interface RawClinicData {
   id: string;
   name: string;
@@ -119,7 +63,6 @@ interface RawClinicData {
   is_active: boolean;
   created_at: string;
   updated_at: string;
-  // include other snake_case fields from the API as needed
 }
 
 export function ClinicTable() {
@@ -130,19 +73,17 @@ export function ClinicTable() {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
-  const [rowSelection, setRowSelection] = React.useState({});
   
-  // Pagination state
-  const [page, setPage] = React.useState(1);
+  const [pagination, setPagination] = React.useState({
+    pageIndex: 0, // tanstack-table uses 0-indexed pages
+    pageSize: 10,
+  });
   const [totalPages, setTotalPages] = React.useState(0);
-  const [limit] = React.useState(10);
+  const [search, setSearch] = React.useState('');
 
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
+  const { toast } = useToast();
   
-  const [clinicToDelete, setClinicToDelete] = React.useState<Clinic | null>(null);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
-  const [isDeleting, setIsDeleting] = React.useState(false);
-
   const fetchData = React.useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -154,14 +95,12 @@ export function ClinicTable() {
       const token = sessionData.session.access_token;
 
       const params = new URLSearchParams();
-      params.append('page', page.toString());
-      params.append('limit', limit.toString());
-      // Add sorting and filtering params if needed in the future
+      params.append('page', (pagination.pageIndex + 1).toString());
+      params.append('limit', pagination.pageSize.toString());
+      if (search) params.append('search', search);
 
       const response = await fetch('/api/v1/admin/clinics?' + params.toString(), {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!response.ok) {
@@ -171,7 +110,6 @@ export function ClinicTable() {
 
       const result = await response.json();
       
-      // Assuming backend sends snake_case and we need to map to camelCase
       const mappedData = result.data.map((c: RawClinicData) => ({
         id: c.id,
         name: c.name,
@@ -188,139 +126,106 @@ export function ClinicTable() {
       setTotalPages(result.meta.totalPages);
 
     } catch (e: unknown) {
-      if (e instanceof Error) {
-        setError(e.message);
-      } else {
-        setError('An unknown error occurred while fetching clinic data.');
-      }
+      const error = e as Error;
+      setError(error.message);
     } finally {
       setIsLoading(false);
     }
-  }, [supabase.auth, page, limit]);
+  }, [supabase.auth, pagination, search]);
 
   React.useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  const openDeleteDialog = (clinic: Clinic) => {
-    setClinicToDelete(clinic);
-    setIsDeleteDialogOpen(true);
-  };
+  const handleDelete = async (clinicId: string) => {
+    if (!confirm('Are you sure you want to delete this clinic? This action cannot be undone.')) return;
 
-  const closeDeleteDialog = () => {
-    setClinicToDelete(null);
-    setIsDeleteDialogOpen(false);
-  };
-
-  const handleDeleteClinic = async () => {
-    if (!clinicToDelete) return;
-    setIsDeleting(true);
     try {
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !sessionData.session) {
-        throw new Error("User not authenticated.");
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new AppError("Not authenticated", {} as Response);
       
-      const response = await fetch(`/api/v1/admin/clinics/${clinicToDelete.id}`, {
+      const response = await fetch(`/api/v1/admin/clinics/${clinicId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${sessionData.session.access_token}`,
-        },
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to delete clinic.');
+        throw new AppError(errorData.message || 'Failed to delete clinic.', response);
       }
       
-      await fetchData(); 
-      
+      toast({
+        title: "Success",
+        description: "Clinic deleted successfully."
+      });
+      fetchData(); // Refresh data
+
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'An unknown error occurred during deletion.';
-      console.error(message);
-    } finally {
-      setIsDeleting(false);
-      closeDeleteDialog();
+      const error = err as AppError | Error;
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
   
   const columns: ColumnDef<Clinic>[] = [
     {
       accessorKey: 'name',
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-        >
-          Name
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
-      cell: ({ row }) => <div>{row.getValue('name')}</div>,
+      header: 'Name',
+      cell: ({ row }) => <div className="font-medium">{row.getValue('name')}</div>,
     },
     {
       accessorKey: 'locality',
-      header: 'City / Locality',
-      cell: ({ row }) => <div>{row.getValue('locality') || 'N/A'}</div>,
-    },
-    {
-      accessorKey: 'region',
-      header: 'Region',
-      cell: ({ row }) => <div>{row.getValue('region') || 'N/A'}</div>,
+      header: 'Location',
+      cell: ({ row }) => {
+        const clinic = row.original;
+        return `${clinic.locality || 'N/A'}, ${clinic.region || 'N/A'}`;
+      },
     },
     {
       accessorKey: 'contactPhone',
-      header: 'Phone',
-      cell: ({ row }) => <div>{row.getValue('contactPhone') || 'N/A'}</div>,
+      header: 'Contact Phone',
+      cell: ({ row }) => row.getValue('contactPhone') || 'N/A',
     },
     {
       accessorKey: 'isActive',
       header: 'Status',
-      cell: ({ row }) => (
-        <Badge variant={row.getValue('isActive') ? 'default' : 'secondary'}>
-          {row.getValue('isActive') ? 'Active' : 'Inactive'}
-        </Badge>
-      ),
-      filterFn: (row, id, value) => {
-        if (Array.isArray(value)) {
-          return value.includes(row.getValue(id)?.toString() || '');
-        }
-        return (row.getValue(id)?.toString() || '') === value;
+      cell: ({ row }) => {
+        const isActive = row.getValue('isActive');
+        return <Badge variant={isActive ? 'default' : 'secondary'}>{isActive ? 'Active' : 'Inactive'}</Badge>;
       },
     },
     {
       id: 'actions',
-      enableHiding: false,
       cell: ({ row }) => {
         const clinic = row.original;
-        
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem asChild>
-                <Link href={`/admin/clinics/${clinic.id}/edit`} className="flex items-center cursor-pointer">
-                  <Edit className="mr-2 h-4 w-4" /> Edit
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-red-600 hover:!text-red-700 flex items-center cursor-pointer"
-                onClick={(e) => {
-                  e.preventDefault();
-                  openDeleteDialog(clinic);
-                }}
-              >
-                <Trash2 className="mr-2 h-4 w-4" /> Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="text-right">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Open menu</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href={`/admin/clinics/${clinic.id}`}>View Details</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={`/admin/clinics/${clinic.id}/edit`}>Edit Clinic</Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleDelete(clinic.id)} className="text-destructive">
+                  Delete Clinic
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         );
       },
     },
@@ -336,116 +241,66 @@ export function ClinicTable() {
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
+    onPaginationChange: setPagination,
     state: {
       sorting,
       columnFilters,
       columnVisibility,
-      rowSelection,
+      pagination,
     },
-    meta: {
-      openDeleteDialog
-    }
+    manualPagination: true,
+    pageCount: totalPages,
   });
-
-  if (isLoading) {
-    return <div>Loading clinics...</div>;
-  }
-
-  if (error) {
-    return <div className="text-red-500">Error loading clinics: {error}</div>;
-  }
 
   return (
     <div className="w-full">
-      <DeleteClinicDialog
-        clinic={clinicToDelete}
-        isOpen={isDeleteDialogOpen}
-        onClose={closeDeleteDialog}
-        onConfirm={handleDeleteClinic}
-        isDeleting={isDeleting}
-      />
-      <div className="flex items-center justify-between py-4">
+      <div className="flex items-center py-4">
         <Input
-          placeholder="Filter by clinic name..."
-          value={(table.getColumn('name')?.getFilterValue() as string) ?? ''}
-          onChange={(event) =>
-            table.getColumn('name')?.setFilterValue(event.target.value)
-          }
+          placeholder="Filter by clinic name, location..."
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
           className="max-w-sm"
         />
-         <div className="flex items-center space-x-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="ml-auto">
-                  Columns <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {table
-                  .getAllColumns()
-                  .filter((column) => column.getCanHide())
-                  .map((column) => {
-                    return (
-                      <DropdownMenuCheckboxItem
-                        key={column.id}
-                        className="capitalize"
-                        checked={column.getIsVisible()}
-                        onCheckedChange={(value) =>
-                          column.toggleVisibility(!!value)
-                        }
-                      >
-                        {column.id}
-                      </DropdownMenuCheckboxItem>
-                    );
-                  })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-        </div>
       </div>
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  return (
-                    <TableHead key={header.id}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                    </TableHead>
-                  );
-                })}
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
               </TableRow>
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  Loading...
+                </TableCell>
+              </TableRow>
+            ) : error ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center text-red-500">
+                  {error}
+                </TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && 'selected'}
-                >
+                <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'} className="hover:bg-muted/50">
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center"
-                >
+                <TableCell colSpan={columns.length} className="h-24 text-center">
                   No results.
                 </TableCell>
               </TableRow>
@@ -453,29 +308,26 @@ export function ClinicTable() {
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-end space-x-2 py-4">
-        <div className="flex-1 text-sm text-muted-foreground">
-          {table.getFilteredSelectedRowModel().rows.length} of{' '}
-          {table.getFilteredRowModel().rows.length} row(s) selected.
-        </div>
-        <div className="space-x-2">
+      <div className="flex items-center justify-end space-x-4 py-4">
+          <span className="text-sm text-muted-foreground">
+            Page {pagination.pageIndex + 1} of {totalPages}
+          </span>
           <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page <= 1}
+              variant="outline"
+              size="sm"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
           >
-            Previous
+              Previous
           </Button>
           <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage(p => p + 1)}
-            disabled={page >= totalPages}
+              variant="outline"
+              size="sm"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
           >
-            Next
+              Next
           </Button>
-        </div>
       </div>
     </div>
   );

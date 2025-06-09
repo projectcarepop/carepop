@@ -26,14 +26,26 @@ export class SupplierAdminService {
     );
   }
 
-  async getAllSuppliers(): Promise<ISupplier[]> {
-    const { data, error } = await this.supabase
+  async getAllSuppliers(options: { page: number, limit: number, search?: string }): Promise<{ data: ISupplier[], total: number }> {
+    const { page, limit, search } = options;
+    const offset = (page - 1) * limit;
+
+    let query = this.supabase
       .from('suppliers')
-      .select('*')
-      .order('name', { ascending: true });
+      .select('*', { count: 'exact' });
+
+    if (search) {
+      query = query.or(`name.ilike.%${search}%,contact_person.ilike.%${search}%,contact_email.ilike.%${search}%`);
+    }
+
+    query = query
+      .order('name', { ascending: true })
+      .range(offset, offset + limit - 1);
+
+    const { data, error, count } = await query;
     
     if (error) throw new Error(error.message);
-    return data || [];
+    return { data: data || [], total: count || 0 };
   }
 
   async getSupplierById(id: string): Promise<ISupplier | null> {

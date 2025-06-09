@@ -14,10 +14,30 @@ export class ServiceAdminController {
 
   async getAllServices(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const services = await this.serviceAdminService.getAllServices();
+      console.log('======> getAllServices Controller <======');
+      console.log('Request Query:', req.query);
+
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const search = req.query.search as string | undefined;
+
+      console.log(`Parsed Params: page=${page}, limit=${limit}, search=${search}`);
+
+      const { data, count } = await this.serviceAdminService.getAllServices({ page, limit, search });
+      
+      const totalPages = Math.ceil(count / limit);
+      console.log(`Response Meta: totalItems=${count}, totalPages=${totalPages}`);
+      console.log('=======================================');
+
       res.status(200).json({
         message: 'Services retrieved successfully.',
-        data: services,
+        data,
+        meta: {
+          total: count,
+          page,
+          limit,
+          totalPages: totalPages,
+        }
       });
     } catch (error) {
       next(error);

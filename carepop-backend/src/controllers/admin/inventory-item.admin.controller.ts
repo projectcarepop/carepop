@@ -8,8 +8,19 @@ export class InventoryItemAdminController {
 
   async getAllInventoryItems(req: Request, res: Response, next: NextFunction) {
     try {
-      const items = await this.inventoryItemService.getAllInventoryItems();
-      res.status(StatusCodes.OK).json({ success: true, data: items });
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const search = req.query.search as string | undefined;
+
+      const { data, total } = await this.inventoryItemService.getAllInventoryItems({ page, limit, search });
+      
+      res.status(StatusCodes.OK).json({ 
+        success: true, 
+        data,
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
+        totalItems: total
+      });
     } catch (error) {
       next(error);
     }

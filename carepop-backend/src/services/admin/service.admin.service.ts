@@ -10,8 +10,11 @@ export class ServiceAdminService {
     this.supabase = supabaseServiceRole;
   }
 
-  async getAllServices(): Promise<any[]> {
-    const { data, error } = await this.supabase
+  async getAllServices(options: { page: number; limit: number; search?: string }): Promise<{ data: any[], count: number }> {
+    const { page, limit, search } = options;
+    const offset = (page - 1) * limit;
+
+    let query = this.supabase
       .from('services')
       .select(`
         id,
@@ -22,16 +25,23 @@ export class ServiceAdminService {
         typical_duration_minutes,
         is_active,
         category:service_categories(id, name)
-      `);
+      `, { count: 'exact' });
+
+    if (search) {
+      query = query.ilike('name', `%${search}%`);
+    }
+
+    const { data, error, count } = await query
+      .order('name', { ascending: true })
+      .range(offset, offset + limit -1);
+
 
     if (error) {
       console.error('Error fetching services:', error);
       throw new AppError('Failed to fetch services from the database.', 500);
     }
     
-    // The query returns `category` as an object {id, name}. We can leave it like that
-    // or flatten it if needed, but nested is often better for the frontend.
-    return data || [];
+    return { data: data || [], count: count ?? 0 };
   }
 
   async getServiceById(id: string): Promise<any> {
