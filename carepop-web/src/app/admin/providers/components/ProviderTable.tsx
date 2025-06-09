@@ -135,9 +135,6 @@ export function ProviderTable() {
                             <DropdownMenuItem asChild>
                                 <Link href={`/admin/providers/${row.original.id}/edit`}>Edit Details</Link>
                             </DropdownMenuItem>
-                             <DropdownMenuItem asChild>
-                                <Link href={`/admin/providers/${row.original.id}/services`}>Manage Services</Link>
-                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => handleDelete(row.original.id)} className="text-destructive">
                                 Delete Provider

@@ -33,6 +33,7 @@ export class AdminProviderService {
         licenseNumber,
         credentials,
         bio,
+        avatarUrl,
         ...rest 
     } = providerData;
 
@@ -46,6 +47,7 @@ export class AdminProviderService {
       license_number: licenseNumber,
       credentials: credentials,
       bio: bio,
+      avatar_url: avatarUrl,
     };
 
     const { data: provider, error } = await this.supabase
@@ -175,6 +177,7 @@ export class AdminProviderService {
         licenseNumber,
         credentials,
         bio,
+        avatarUrl,
         ...rest 
     } = updateData;
 
@@ -188,6 +191,7 @@ export class AdminProviderService {
     if (licenseNumber) payload.license_number = licenseNumber;
     if (credentials) payload.credentials = credentials;
     if (bio) payload.bio = bio;
+    if (avatarUrl) payload.avatar_url = avatarUrl;
 
 
     const { data: provider, error } = await this.supabase

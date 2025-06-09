@@ -22,6 +22,8 @@ export const providerFormSchema = z.object({
   isActive: z.boolean(),
   serviceIds: z.array(z.string()).optional(),
   weeklyAvailability: z.array(weeklyAvailabilitySchema).optional(),
+  avatarUrl: z.string().optional().nullable(),
+  avatarFile: z.instanceof(File).optional(),
 });
 
 export type TimeSlot = z.infer<typeof timeSlotSchema>;

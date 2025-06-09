@@ -38,6 +38,7 @@ const providerBodyBaseSchema = z.object({
   isActive: z.boolean().optional(),
   serviceIds: z.array(z.string().uuid()).optional(),
   weeklyAvailability: weeklyAvailabilitySchema.optional(),
+  avatarUrl: z.string().url().optional().nullable(),
 });
 
 // Schema for creating a provider

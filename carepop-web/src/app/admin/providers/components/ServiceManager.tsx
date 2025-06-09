@@ -19,6 +19,7 @@ import { DataTablePagination } from '@/components/ui/data-table-pagination';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { fetcher } from '@/lib/utils';
 import { ProviderFormValues } from './providerForm-types';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 interface Service {
     id: string;
@@ -45,15 +46,33 @@ export function ServiceManager({ form }: ServiceManagerProps) {
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 5 });
+    const [accessToken, setAccessToken] = useState<string | null>(null);
+    const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+
+    useEffect(() => {
+        const getSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            setAccessToken(session?.access_token || null);
+        };
+        getSession();
+    }, [supabase]);
+
+    const apiUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL;
 
     // Fetch categories
-    const { data: categoriesData } = useSWR('/api/v1/admin/service-categories', fetcher);
+    const categoriesUrl = accessToken ? `${apiUrl}/api/v1/admin/service-categories` : null;
+    const { data: categoriesData } = useSWR(
+        categoriesUrl ? [categoriesUrl, accessToken] : null,
+        fetcher
+    );
+
     useEffect(() => {
         if (categoriesData) setCategories(categoriesData.data);
     }, [categoriesData]);
 
     // Fetch services
     const servicesUrl = useMemo(() => {
+        if (!accessToken) return null;
         const params = new URLSearchParams({
             page: (pagination.pageIndex + 1).toString(),
             limit: pagination.pageSize.toString(),
@@ -62,10 +81,13 @@ export function ServiceManager({ form }: ServiceManagerProps) {
         if (selectedCategory !== 'all') {
             params.append('categoryId', selectedCategory);
         }
-        return `/api/v1/admin/services?${params.toString()}`;
-    }, [pagination, debouncedSearchTerm, selectedCategory]);
+        return `${apiUrl}/api/v1/admin/services?${params.toString()}`;
+    }, [pagination, debouncedSearchTerm, selectedCategory, accessToken, apiUrl]);
 
-    const { data: servicesData, isLoading } = useSWR(servicesUrl, fetcher);
+    const { data: servicesData, isLoading } = useSWR(
+        servicesUrl ? [servicesUrl, accessToken] : null,
+        fetcher
+    );
 
     const pageCount = servicesData?.meta?.totalPages ?? 0;
 
@@ -128,6 +150,8 @@ export function ServiceManager({ form }: ServiceManagerProps) {
         const selectedIds = Object.keys(rowSelection).filter(key => rowSelection[key]);
         form.setValue('serviceIds', selectedIds, { shouldDirty: true });
     }, [rowSelection, form]);
+
+    if (!apiUrl) return <p>Backend URL not configured.</p>
 
     return (
         <Card>

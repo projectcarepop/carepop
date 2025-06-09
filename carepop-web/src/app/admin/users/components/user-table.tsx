@@ -206,9 +206,6 @@ export function UserTable() {
                 <DropdownMenuItem asChild>
                   <Link href={`/admin/users/${user.id}`}>View Details</Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href={`/admin/users/${user.id}/edit`}>Edit User</Link>
-                </DropdownMenuItem>
                 {user.role !== 'admin' && (
                   <DropdownMenuItem asChild>
                     <Link href={`/admin/users/${user.id}/upload-medical-record`}>Upload Record</Link>
