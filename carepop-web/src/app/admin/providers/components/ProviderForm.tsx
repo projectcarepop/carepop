@@ -1,7 +1,7 @@
 'use client';
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, FormProvider } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -28,25 +28,10 @@ interface ProviderData extends Partial<ProviderFormValues> {
 
 interface ProviderFormProps {
   initialData?: ProviderData | null;
+  onSubmitSuccess: () => void;
 }
 
-const defaultAvailability = {
-  isActive: false,
-  startTime: '09:00',
-  endTime: '17:00',
-};
-
-const defaultWeeklyAvailability = {
-  monday: defaultAvailability,
-  tuesday: defaultAvailability,
-  wednesday: defaultAvailability,
-  thursday: defaultAvailability,
-  friday: defaultAvailability,
-  saturday: { ...defaultAvailability, isActive: false },
-  sunday: { ...defaultAvailability, isActive: false },
-};
-
-export function ProviderForm({ initialData }: ProviderFormProps) {
+export function ProviderForm({ initialData, onSubmitSuccess }: ProviderFormProps) {
   const router = useRouter();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const form = useForm<ProviderFormValues>({
@@ -56,15 +41,20 @@ export function ProviderForm({ initialData }: ProviderFormProps) {
       lastName: initialData?.lastName || '',
       email: initialData?.email || '',
       phoneNumber: initialData?.phoneNumber || '',
+      specialization: initialData?.specialization || '',
+      licenseNumber: initialData?.licenseNumber || '',
+      credentials: initialData?.credentials || '',
+      bio: initialData?.bio || '',
       isActive: initialData?.isActive ?? true,
-      services: initialData?.services || [],
-      weeklyAvailability: initialData?.weeklyAvailability || defaultWeeklyAvailability,
+      serviceIds: initialData?.serviceIds || [],
+      weeklyAvailability: initialData?.weeklyAvailability || [],
     },
   });
 
   const isEditing = !!initialData?.id;
 
   async function onSubmit(data: ProviderFormValues) {
+    console.log("Submitting data:", data);
     form.clearErrors();
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !sessionData?.session) {
@@ -90,8 +80,7 @@ export function ProviderForm({ initialData }: ProviderFormProps) {
         throw new Error(errorData.message || 'An unknown error occurred.');
       }
 
-      router.push('/admin/providers');
-      router.refresh();
+      onSubmitSuccess();
       
     } catch (error: unknown) {
         let errorMessage = "An unexpected error occurred.";
@@ -104,17 +93,45 @@ export function ProviderForm({ initialData }: ProviderFormProps) {
   }
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+    <FormProvider {...form}>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <FormField
+              control={form.control}
+              name="firstName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>First Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="John" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="lastName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Last Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Doe" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
           <FormField
             control={form.control}
-            name="firstName"
+            name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>First Name</FormLabel>
+                <FormLabel>Email</FormLabel>
                 <FormControl>
-                  <Input placeholder="John" {...field} />
+                  <Input placeholder="john.doe@example.com" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -122,88 +139,91 @@ export function ProviderForm({ initialData }: ProviderFormProps) {
           />
           <FormField
             control={form.control}
-            name="lastName"
+            name="phoneNumber"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Last Name</FormLabel>
+                <FormLabel>Phone Number</FormLabel>
                 <FormControl>
-                  <Input placeholder="Doe" {...field} />
+                  <Input placeholder="+1234567890" {...field} value={field.value ?? ''} />
                 </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Email</FormLabel>
-              <FormControl>
-                <Input placeholder="john.doe@example.com" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="phoneNumber"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Phone Number</FormLabel>
-              <FormControl>
-                <Input placeholder="+1234567890" {...field} value={field.value ?? ''} />
-              </FormControl>
-              <FormDescription>
-                Optional contact number for the provider.
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        <FormField
-          control={form.control}
-          name="isActive"
-          render={({ field }) => (
-            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-              <div className="space-y-0.5">
-                <FormLabel className="text-base">
-                  Active Status
-                </FormLabel>
                 <FormDescription>
-                  Inactive providers will not be visible to users.
+                  Optional contact number for the provider.
                 </FormDescription>
-              </div>
-              <FormControl>
-                <Switch
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                />
-              </FormControl>
-            </FormItem>
-          )}
-        />
-        
-        <AvailabilityManager form={form} />
-        
-        <ServiceManager form={form} />
-        
-        {form.formState.errors.root?.submit && (
-           <p className="text-sm font-medium text-destructive">{form.formState.errors.root.submit.message}</p>
-        )}
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-        <div className="flex justify-end space-x-4">
-            <Button type="button" variant="outline" onClick={() => router.back()}>
-                Cancel
-            </Button>
-            <Button type="submit" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? 'Saving...' : (isEditing ? 'Save Changes' : 'Create Provider')}
-            </Button>
-        </div>
-      </form>
-    </Form>
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+               <FormField
+                  control={form.control}
+                  name="specialization"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Specialization</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., General Practice, Dermatology" {...field} value={field.value ?? ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <FormField
+                  control={form.control}
+                  name="licenseNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>License Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., 12345678" {...field} value={field.value ?? ''} />
+                      </FormControl>
+                       <FormMessage />
+                    </FormItem>
+                  )}
+                />
+           </div>
+          
+          <FormField
+            control={form.control}
+            name="isActive"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <FormLabel className="text-base">
+                    Active Status
+                  </FormLabel>
+                  <FormDescription>
+                    Inactive providers will not be visible to users.
+                  </FormDescription>
+                </div>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+          
+          <AvailabilityManager name="weeklyAvailability" />
+          
+          <ServiceManager form={form} />
+          
+          {form.formState.errors.root?.submit && (
+             <p className="text-sm font-medium text-destructive">{form.formState.errors.root.submit.message}</p>
+          )}
+
+          <div className="flex justify-end space-x-4">
+              <Button type="button" variant="outline" onClick={() => router.back()}>
+                  Cancel
+              </Button>
+              <Button type="submit" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? 'Saving...' : (isEditing ? 'Save Changes' : 'Create Provider')}
+              </Button>
+          </div>
+        </form>
+      </Form>
+    </FormProvider>
   );
 } 

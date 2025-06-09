@@ -12,6 +12,7 @@ import { DataTablePagination } from '@/components/ui/data-table-pagination';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { fetcher } from '@/lib/utils';
 import { ProviderFormValues } from './providerForm-types';
+import { Table as TanstackTable } from '@tanstack/react-table';
 
 interface Service {
     id: string;
@@ -32,7 +33,7 @@ interface ServiceManagerProps {
 }
 
 export function ServiceManager({ form }: ServiceManagerProps) {
-    const [selectedServices, setSelectedServices] = useState<string[]>(form.getValues('services') || []);
+    const [selectedServices, setSelectedServices] = useState<string[]>(form.getValues('serviceIds') || []);
     const [categories, setCategories] = useState<ServiceCategory[]>([]);
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
     const [searchTerm, setSearchTerm] = useState('');
@@ -65,10 +66,27 @@ export function ServiceManager({ form }: ServiceManagerProps) {
             ? selectedServices.filter(id => id !== serviceId)
             : [...selectedServices, serviceId];
         setSelectedServices(newSelectedServices);
-        form.setValue('services', newSelectedServices, { shouldDirty: true });
+        form.setValue('serviceIds', newSelectedServices, { shouldDirty: true });
     };
     
     const pageCount = servicesData?.totalPages ?? 0;
+
+    const table = {
+        getState: () => ({ pagination }),
+        setPageIndex: (updater: number | ((old: number) => number)) => {
+            const newPageIndex = typeof updater === 'function' ? updater(pagination.pageIndex) : updater;
+            setPagination(prev => ({ ...prev, pageIndex: newPageIndex }));
+        },
+        getPageCount: () => pageCount,
+        getCanPreviousPage: () => pagination.pageIndex > 0,
+        getCanNextPage: () => pagination.pageIndex < pageCount - 1,
+        previousPage: () => setPagination(prev => ({ ...prev, pageIndex: prev.pageIndex - 1 })),
+        nextPage: () => setPagination(prev => ({...prev, pageIndex: prev.pageIndex + 1})),
+        setPageSize: (updater: number | ((old: number) => number)) => {
+            const newPageSize = typeof updater === 'function' ? updater(pagination.pageSize) : updater;
+            setPagination({ pageIndex: 0, pageSize: newPageSize});
+        },
+    }
 
     return (
         <Card>
@@ -125,7 +143,7 @@ export function ServiceManager({ form }: ServiceManagerProps) {
                         </TableBody>
                     </Table>
                 </div>
-                 <DataTablePagination table={{ getState: () => ({ pagination }), setPageIndex: (index) => setPagination(prev => ({ ...prev, pageIndex: index })), getPageCount: () => pageCount } as any} />
+                 <DataTablePagination table={table as TanstackTable<Service>} />
             </CardContent>
         </Card>
     );

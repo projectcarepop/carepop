@@ -10,6 +10,8 @@ import {
 import logger from '../../utils/logger';
 
 type Provider = Database['public']['Tables']['providers']['Row'];
+type ProviderInsert = Database['public']['Tables']['providers']['Insert'];
+type ProviderUpdate = Database['public']['Tables']['providers']['Update'];
 
 export class AdminProviderService {
   private supabase: SupabaseClient<Database>;
@@ -19,14 +21,29 @@ export class AdminProviderService {
   }
 
   async createProvider(providerData: CreateProviderBody): Promise<Provider> {
-    const { firstName, lastName, phoneNumber, isActive, services, ...rest } = providerData;
+    const { 
+        firstName, 
+        lastName, 
+        phoneNumber,
+        serviceIds,
+        weeklyAvailability,
+        specialization,
+        licenseNumber,
+        credentials,
+        bio,
+        ...rest 
+    } = providerData;
 
-    const dbPayload = {
+    const dbPayload: ProviderInsert = {
       ...rest,
       first_name: firstName,
       last_name: lastName,
       contact_number: phoneNumber,
-      is_active: isActive,
+      weekly_availability: weeklyAvailability,
+      specialization: specialization,
+      license_number: licenseNumber,
+      credentials: credentials,
+      bio: bio,
     };
 
     const { data: provider, error } = await this.supabase
@@ -36,7 +53,8 @@ export class AdminProviderService {
       .single();
 
     if (error) {
-      if (error.code === '23505') {
+      logger.error('Failed to create provider in database.', { error });
+      if (error.code === '23505') { // Unique constraint violation
         throw new AppError(
           'A provider with this email already exists.',
           StatusCodes.CONFLICT
@@ -48,13 +66,15 @@ export class AdminProviderService {
       );
     }
     
-    if (services && services.length > 0) {
-        const serviceLinks = services.map(serviceId => ({
+    if (serviceIds && serviceIds.length > 0) {
+        const serviceLinks = serviceIds.map(serviceId => ({
             provider_id: provider.id,
             service_id: serviceId,
         }));
         const { error: serviceError } = await this.supabase.from('provider_services').insert(serviceLinks);
         if (serviceError) {
+            logger.error(`Failed to link services for new provider ID ${provider.id}`, { serviceError });
+            // Note: In a real-world scenario, you might want to transactionally roll back the provider creation.
             throw new AppError('Failed to link services to provider.', StatusCodes.INTERNAL_SERVER_ERROR);
         }
     }
@@ -74,11 +94,12 @@ export class AdminProviderService {
 
     let query = this.supabase
       .from('providers')
-      .select('*', { count: 'exact' });
+      .select('*, services: service_categories(id, name)', { count: 'exact' });
+
 
     if (searchTerm) {
       query = query.or(
-        `first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`
+        `first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,contact_email.ilike.%${searchTerm}%,specialization.ilike.%${searchTerm}%`
       );
     }
 
@@ -93,6 +114,7 @@ export class AdminProviderService {
     const { data, error, count } = await query;
 
     if (error) {
+      logger.error('Failed to retrieve providers.', { error });
       throw new AppError(
         'Failed to retrieve providers.',
         StatusCodes.INTERNAL_SERVER_ERROR
@@ -113,18 +135,26 @@ export class AdminProviderService {
   async getProviderById(providerId: string): Promise<Provider | null> {
     const { data, error } = await this.supabase
       .from('providers')
-      .select('*')
+      .select('*, services:provider_services(service_id)')
       .eq('id', providerId)
       .single();
 
     if (error && error.code !== 'PGRST116') {
-      // PGRST116 means no rows found, which is not an "error" in this context
+      logger.error(`Failed to retrieve provider by ID ${providerId}`, { error });
       throw new AppError(
         'Failed to retrieve provider by ID.',
         StatusCodes.INTERNAL_SERVER_ERROR
       );
     }
-    return data;
+    
+    if (!data) {
+        return null;
+    }
+    
+    // Transform the services into a simple array of IDs for the form
+    const serviceIds = data.services.map((s: any) => s.service_id);
+
+    return { ...data, serviceIds };
   }
 
   async updateProvider(
@@ -133,18 +163,30 @@ export class AdminProviderService {
   ): Promise<Provider | null> {
     logger.info(`[AdminProviderService] Attempting to update provider ID: ${providerId}`);
     
-    const { firstName, lastName, phoneNumber, isActive, weeklyAvailability, services, ...rest } = updateData;
+    const { 
+        firstName, 
+        lastName, 
+        phoneNumber, 
+        serviceIds,
+        weeklyAvailability,
+        specialization,
+        licenseNumber,
+        credentials,
+        bio,
+        ...rest 
+    } = updateData;
 
-    const payload: Partial<Provider> & { updated_at: string; weekly_availability?: any } = {
-      updated_at: new Date().toISOString(),
-      ...rest,
-    };
+    const payload: any = { ...rest };
 
     if (firstName) payload.first_name = firstName;
     if (lastName) payload.last_name = lastName;
     if (phoneNumber) payload.contact_number = phoneNumber;
-    if (isActive !== undefined) payload.is_active = isActive;
     if (weeklyAvailability) payload.weekly_availability = weeklyAvailability;
+    if (specialization) payload.specialization = specialization;
+    if (licenseNumber) payload.license_number = licenseNumber;
+    if (credentials) payload.credentials = credentials;
+    if (bio) payload.bio = bio;
+
 
     const { data: provider, error } = await this.supabase
       .from('providers')
@@ -167,21 +209,23 @@ export class AdminProviderService {
       );
     }
     
-    if (services) {
+    if (serviceIds) {
         // First, delete all existing services for this provider
         const { error: deleteError } = await this.supabase.from('provider_services').delete().eq('provider_id', providerId);
         if (deleteError) {
+            logger.error(`Failed to update provider services (delete step) for provider ID ${providerId}`, { deleteError });
             throw new AppError('Failed to update provider services (delete step).', StatusCodes.INTERNAL_SERVER_ERROR);
         }
 
         // Then, insert the new ones
-        if (services.length > 0) {
-            const serviceLinks = services.map(serviceId => ({
+        if (serviceIds.length > 0) {
+            const serviceLinks = serviceIds.map(serviceId => ({
                 provider_id: providerId,
                 service_id: serviceId,
             }));
             const { error: insertError } = await this.supabase.from('provider_services').insert(serviceLinks);
             if (insertError) {
+                logger.error(`Failed to update provider services (insert step) for provider ID ${providerId}`, { insertError });
                 throw new AppError('Failed to update provider services (insert step).', StatusCodes.INTERNAL_SERVER_ERROR);
             }
         }
@@ -196,39 +240,24 @@ export class AdminProviderService {
     return provider;
   }
 
-  async updateProviderAvailability(
-    providerId: string,
-    weeklyAvailability: any
-  ): Promise<Provider | null> {
-    const { data, error } = await this.supabase
-      .from('providers')
-      .update({ weekly_availability: weeklyAvailability })
-      .eq('id', providerId)
-      .select()
-      .single();
-
-    if (error) {
-      logger.error(`[AdminProviderService] Supabase error updating availability for provider ID ${providerId}:`, { error });
-      throw new AppError(
-        'Failed to update provider availability.',
-        StatusCodes.INTERNAL_SERVER_ERROR
-      );
-    }
-    return data;
-  }
-
   async deleteProvider(providerId: string): Promise<boolean> {
-    const { error } = await this.supabase
+    const { count, error } = await this.supabase
       .from('providers')
-      .delete()
+      .delete({ count: 'exact' })
       .eq('id', providerId);
 
     if (error) {
+       logger.error(`Failed to delete provider ID ${providerId}`, { error });
       throw new AppError(
         'Failed to delete provider.',
         StatusCodes.INTERNAL_SERVER_ERROR
       );
     }
-    return true;
+    
+    if (count === 0) {
+        logger.warn(`Attempted to delete non-existent provider ID: ${providerId}`);
+    }
+
+    return count ? count > 0 : false;
   }
 } 
