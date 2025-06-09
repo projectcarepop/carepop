@@ -1,265 +1,60 @@
-'use client';
-
+import { Suspense } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Activity, CreditCard, ShieldCheck, CalendarCheck, Stethoscope, Archive } from "lucide-react";
+import { Users, Hospital, Settings, CalendarCheck, Clock, AlertTriangle, CalendarClock } from "lucide-react";
 import Link from "next/link";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { getDashboardStats, grantAdminRole } from "@/lib/actions/dashboard.admin.actions";
+import { getDashboardStats } from "@/lib/actions/dashboard.admin.actions";
+import PendingAppointments from './components/PendingAppointments';
 
-interface DashboardStats {
-  totalClinics: number;
-  totalProviders: number;
+async function Stats() {
+    const statsResponse = await getDashboardStats();
+    const stats = statsResponse?.data || {};
+    const pendingAppointments = stats.pendingAppointments || [];
+
+    const statsCards = [
+        { title: "Upcoming Appointments (Today)", value: stats.appointmentsTodayCount ?? 0, icon: CalendarCheck, description: "Confirmed for today.", link: "/admin/appointments" },
+        { title: "Pending Appointments", value: stats.pendingAppointmentsCount ?? 0, icon: Clock, description: "Awaiting confirmation.", link: "/admin/appointments" },
+        { title: "Total Future Appointments", value: stats.futureAppointmentsCount ?? 0, icon: CalendarClock, description: "All upcoming.", link: "/admin/appointments" },
+        { title: "Inventory Alerts", value: stats.inventoryAlertsCount ?? 0, icon: AlertTriangle, description: "Items out of stock.", critical: true, link: "/admin/inventory" },
+        { title: "Total Clinics", value: stats.totalClinics ?? 0, icon: Hospital, description: "Clinics in system.", link: "/admin/clinics" },
+        { title: "Total Providers", value: stats.totalProviders ?? 0, icon: Users, description: "Registered providers.", link: "/admin/providers" },
+        { title: "Total Services", value: stats.totalServices ?? 0, icon: Settings, description: "Unique services.", link: "/admin/services" },
+    ]
+
+    return (
+        <div className="flex flex-col gap-6">
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+                {statsCards.map(card => (
+                    <Link key={card.title} href={card.link || '#'} className="group">
+                        <Card className={`h-full transition-all group-hover:shadow-lg ${card.critical && card.value > 0 ? "border-destructive bg-destructive/5" : "hover:bg-muted"}`}>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
+                                <card.icon className={`h-4 w-4 text-muted-foreground ${card.critical && card.value > 0 ? "text-destructive" : ""}`} />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold">{card.value}</div>
+                                <p className="text-xs text-muted-foreground">{card.description}</p>
+                            </CardContent>
+                        </Card>
+                    </Link>
+                ))}
+            </div>
+            <PendingAppointments appointments={pendingAppointments} />
+        </div>
+    );
 }
 
 export default function AdminDashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [userId, setUserId] = useState('');
-  const [granting, setGranting] = useState(false);
-  const [grantResult, setGrantResult] = useState<{success: boolean, message: string} | null>(null);
-
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const result = await getDashboardStats();
-        setStats(result.data);
-      } catch (e: unknown) {
-        if (e instanceof Error) {
-          setError(e.message);
-        } else {
-          setError("An unknown error occurred while fetching stats.");
-        }
-      }
-    };
-    fetchStats();
-  }, []);
-
-  const handleGrantAdmin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setGranting(true);
-    setGrantResult(null);
-
-    try {
-      const result = await grantAdminRole(userId);
-      setGrantResult(result);
-    } catch (e: unknown) {
-      if (e instanceof Error) {
-        setGrantResult({ success: false, message: e.message });
-      } else {
-        setGrantResult({ success: false, message: 'An unknown error occurred while granting the role.' });
-      }
-    } finally {
-      setGranting(false);
-    }
-  };
-
-
-  if (error) {
     return (
-      <div className="p-8">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>
-            {error}
-          </AlertDescription>
-        </Alert>
-      </div>
+        <div className="flex flex-col gap-6">
+             <div>
+                <h1 className="text-2xl font-semibold tracking-tight">Admin Dashboard</h1>
+                <p className="text-muted-foreground mt-1">
+                    Welcome to the Admin Dashboard. This is your central hub for managing the CarePoP/QueerCare platform. From here, you can manage services, oversee providers, view user information (with appropriate permissions), manage inventory, and generate reports to ensure the smooth operation and impact of our healthcare services.
+                </p>
+            </div>
+            <Suspense fallback={<p>Loading stats...</p>}>
+                <Stats />
+            </Suspense>
+        </div>
     );
-  }
-
-  if (!stats) {
-     return <div className="p-8">Loading dashboard...</div>;
-  }
-
-  return (
-    <div className="flex-1 space-y-4 p-8 pt-6">
-      <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-      </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Clinics
-            </CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalClinics}</div>
-            <p className="text-xs text-muted-foreground">
-              Total number of clinics in the system.
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Providers
-            </CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalProviders}</div>
-            <p className="text-xs text-muted-foreground">
-             Total number of providers registered.
-            </p>
-          </CardContent>
-        </Card>
-        {/* Placeholder cards for future stats */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Appointments Today</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">N/A</div>
-            <p className="text-xs text-muted-foreground">
-              Coming soon.
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">New Users This Month</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">N/A</div>
-            <p className="text-xs text-muted-foreground">
-              Coming soon.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Admin Tools</CardTitle>
-                <ShieldCheck className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-                <form onSubmit={handleGrantAdmin} className="space-y-4">
-                    <div>
-                        <label htmlFor="userId" className="block text-sm font-medium text-gray-700">Grant Admin Role</label>
-                        <div className="mt-1 flex space-x-2">
-                            <Input
-                                id="userId"
-                                name="userId"
-                                type="text"
-                                required
-                                value={userId}
-                                onChange={(e) => setUserId(e.target.value)}
-                                placeholder="Enter User ID"
-                                className="flex-grow"
-                            />
-                            <Button type="submit" disabled={granting || !userId}>
-                                {granting ? 'Granting...' : 'Grant'}
-                            </Button>
-                        </div>
-                        <p className="mt-2 text-sm text-gray-500">
-                            Enter the Supabase User ID of the user you want to make an admin.
-                        </p>
-                    </div>
-                </form>
-                {grantResult && (
-                  <div className="mt-4">
-                    <Alert variant={grantResult.success ? 'default' : 'destructive'}>
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertTitle>{grantResult.success ? 'Success' : 'Error'}</AlertTitle>
-                      <AlertDescription>
-                        {grantResult.message}
-                      </AlertDescription>
-                    </Alert>
-                  </div>
-                )}
-            </CardContent>
-        </Card>
-      </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <DashboardCard
-          href="/admin/clinics"
-          title="Clinic Management"
-          description="Add, edit, and manage FPOP clinics."
-          icon={<Stethoscope className="w-8 h-8 text-gray-500" />}
-          type="clinics"
-        />
-        <DashboardCard
-          href="/admin/providers"
-          title="Provider Management"
-          description="Add, edit, and manage healthcare providers."
-          icon={<Users className="w-8 h-8 text-gray-500" />}
-          type="clinics"
-        />
-        <DashboardCard
-          href="/admin/appointments"
-          title="Appointment Management"
-          description="View and confirm patient appointments."
-          icon={<CalendarCheck className="w-8 h-8 text-gray-500" />}
-          type="clinics"
-        />
-        <DashboardCard
-          href="/admin/users"
-          title="User Management"
-          description="View and manage user profiles and records."
-          icon={<Users className="w-8 h-8 text-gray-500" />}
-          type="users"
-        />
-        <DashboardCard
-          href="/admin/inventory"
-          title="Inventory Management"
-          description="Manage suppliers and stock levels."
-          icon={<Archive className="w-8 h-8 text-gray-500" />}
-          type="inventory"
-        />
-      </div>
-    </div>
-  );
-}
-
-const cardStyles = {
-  clinics: "bg-blue-50 border-blue-200 hover:border-blue-400 text-blue-800",
-  providers: "bg-green-50 border-green-200 hover:border-green-400 text-green-800",
-  appointments: "bg-purple-50 border-purple-200 hover:border-purple-400 text-purple-800",
-  users: "bg-yellow-50 border-yellow-200 hover:border-yellow-400 text-yellow-800",
-  inventory: "bg-red-50 border-red-200 hover:border-red-400 text-red-800",
-};
-
-function DashboardCard({ 
-  href, 
-  title, 
-  description, 
-  icon,
-  type 
-}: { 
-  href: string; 
-  title: string; 
-  description: string; 
-  icon: React.ReactNode;
-  type: keyof typeof cardStyles;
-}) {
-  const style = cardStyles[type];
-
-  return (
-    <Link href={href} className="block group">
-      <Card className={`h-full transition-colors ${style}`}>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-base font-semibold">{title}</CardTitle>
-          <div className="text-current opacity-70 group-hover:opacity-100 transition-opacity">
-            {icon}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-current opacity-90">
-            {description}
-          </p>
-        </CardContent>
-      </Card>
-    </Link>
-  );
 } 

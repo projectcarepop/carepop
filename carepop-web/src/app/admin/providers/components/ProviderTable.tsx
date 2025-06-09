@@ -13,7 +13,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table';
-import { ArrowUpDown, ChevronDown, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { ArrowUpDown, ChevronDown, MoreHorizontal, Edit, Trash2, Settings2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -185,6 +185,11 @@ export const columns: ColumnDef<Provider>[] = [
               <DropdownMenuItem asChild>
                  <Link href={`/admin/providers/${provider.id}/edit`} className="flex items-center">
                     <Edit className="mr-2 h-4 w-4" /> Edit
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                 <Link href={`/admin/providers/${provider.id}/services`} className="flex items-center">
+                    <Settings2 className="mr-2 h-4 w-4" /> Manage Services
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />

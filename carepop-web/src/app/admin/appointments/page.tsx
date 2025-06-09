@@ -2,11 +2,12 @@
 
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { PlusCircle } from 'lucide-react';
 import { AppointmentTable } from './components/AppointmentTable'; 
 import { useState, useEffect, useMemo } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface Clinic {
   id: string;
@@ -32,7 +33,7 @@ export default function AdminAppointmentsPage() {
         const result = await response.json();
         setClinics(result.data);
         if (result.data.length > 0) {
-            setSelectedClinicId(result.data[0].id); // Default to the first clinic
+            setSelectedClinicId(result.data[0].id);
         }
       } catch (error) {
         console.error("Error fetching clinics:", error);
@@ -42,43 +43,47 @@ export default function AdminAppointmentsPage() {
   }, [supabase]);
 
   return (
-    <div className="container mx-auto py-10">
-      <div className="mb-6">
-        <Button variant="outline" asChild>
-          <Link href="/admin">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Admin Dashboard
+    <div className="flex flex-col w-full gap-4">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Appointment Management</h1>
+        <Button asChild>
+          <Link href="/admin/appointments/new">
+             <PlusCircle className="mr-2 h-4 w-4" /> Book New Appointment
           </Link>
         </Button>
       </div>
-      
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-4">Appointment Management</h1>
-      </div>
-      
-      <div className="mb-4 flex justify-start">
-        <span className="mr-2 text-sm font-medium text-muted-foreground py-2">Clinic:</span>
-        <div className="w-64">
-          <Select onValueChange={setSelectedClinicId} value={selectedClinicId || ''}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select a clinic..." />
-            </SelectTrigger>
-            <SelectContent>
-              {clinics.map(clinic => (
-                <SelectItem key={clinic.id} value={clinic.id}>{clinic.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      
-      {selectedClinicId ? (
-        <AppointmentTable clinicId={selectedClinicId} />
-      ) : (
-        <div className="text-center p-8 border rounded-md">
-            {clinics.length > 0 ? "Select a clinic to view appointments." : "Loading clinics..."}
-        </div>
-      )}
+       <p className="text-muted-foreground">
+        View, confirm, and manage all appointments across your clinics.
+      </p>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-4">
+            <CardTitle className="text-md whitespace-nowrap">Select Clinic</CardTitle>
+            <div className="w-full max-w-sm">
+                <Select onValueChange={setSelectedClinicId} value={selectedClinicId || ''}>
+                    <SelectTrigger>
+                    <SelectValue placeholder="Select a clinic..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                    {clinics.map(clinic => (
+                        <SelectItem key={clinic.id} value={clinic.id}>{clinic.name}</SelectItem>
+                    ))}
+                    </SelectContent>
+                </Select>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+            {selectedClinicId ? (
+                <AppointmentTable clinicId={selectedClinicId} />
+            ) : (
+                <div className="text-center p-8 text-muted-foreground">
+                    {clinics.length > 0 ? "Select a clinic to view appointments." : "No clinics found or loading..."}
+                </div>
+            )}
+        </CardContent>
+      </Card>
     </div>
   );
 } 
