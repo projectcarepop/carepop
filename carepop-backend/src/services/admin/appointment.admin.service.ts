@@ -125,65 +125,34 @@ export class AppointmentAdminService {
     const { clinicId, page = 1, limit = 10, search } = options;
     const offset = (page - 1) * limit;
 
-    // Step 1: Fetch paginated appointments
-    let appointmentsQuery = this.supabase
+    let query = this.supabase
       .from('appointments')
-      .select(`*`, { count: 'exact' });
+      .select(`
+        *,
+        user:users(first_name, last_name, email),
+        service:services(name),
+        provider:providers(first_name, last_name)
+      `, { count: 'exact' });
 
     if (clinicId) {
-      appointmentsQuery = appointmentsQuery.eq('clinic_id', clinicId);
+      query = query.eq('clinic_id', clinicId);
     }
     
-    // TODO: Implement a more robust search. The previous implementation was unreliable.
-    // This would likely require a dedicated database function or view.
     if (search) {
-      console.warn('Search is not fully implemented for appointments yet.');
+       query = query.or(`service.name.ilike.%${search}%,provider.first_name.ilike.%${search}%,provider.last_name.ilike.%${search}%,user.first_name.ilike.%${search}%,user.last_name.ilike.%${search}%,user.email.ilike.%${search}%`);
     }
 
-    appointmentsQuery = appointmentsQuery.range(offset, offset + limit - 1)
+    query = query.range(offset, offset + limit - 1)
                  .order('appointment_datetime', { ascending: false });
 
-    const { data: appointments, error: appointmentsError, count } = await appointmentsQuery;
+    const { data, error, count } = await query;
 
-    if (appointmentsError) {
-      console.error('Error fetching appointments:', appointmentsError);
+    if (error) {
+      console.error('Error fetching appointments:', error);
       throw new AppError('Failed to fetch appointments from the database.', 500);
     }
-    if (!appointments || appointments.length === 0) {
-      return { data: [], total: 0 };
-    }
-
-    // Step 2: Collect unique, non-null IDs from the appointments
-    const userIds = [...new Set(appointments.map(a => a.user_id).filter((id): id is string => !!id))];
-    const serviceIds = [...new Set(appointments.map(a => a.service_id).filter((id): id is string => !!id))];
-    const providerIds = [...new Set(appointments.map(a => a.provider_id).filter((id): id is string => !!id))];
-
-    // Step 3: Fetch all related data in parallel
-    const [profilesRes, servicesRes, providersRes] = await Promise.all([
-      userIds.length ? this.supabase.from('profiles').select('user_id, first_name, last_name, email').in('user_id', userIds) : Promise.resolve({ data: [], error: null }),
-      serviceIds.length ? this.supabase.from('services').select('id, name').in('id', serviceIds) : Promise.resolve({ data: [], error: null }),
-      providerIds.length ? this.supabase.from('providers').select('id, first_name, last_name').in('id', providerIds) : Promise.resolve({ data: [], error: null })
-    ]);
-
-    if (profilesRes.error || servicesRes.error || providersRes.error) {
-      console.error({ profilesError: profilesRes.error, servicesError: servicesRes.error, providersError: providersRes.error });
-      throw new AppError('Failed to fetch related appointment data.', 500);
-    }
-
-    // Step 4: Create maps for efficient lookup
-    const profilesMap = new Map(profilesRes.data?.map(p => [p.user_id, p]));
-    const servicesMap = new Map(servicesRes.data?.map(s => [s.id, s]));
-    const providersMap = new Map(providersRes.data?.map(p => [p.id, p]));
-
-    // Step 5: Manually embed the related data into each appointment
-    const enrichedData = appointments.map(appt => ({
-      ...appt,
-      users: appt.user_id ? profilesMap.get(appt.user_id) || null : null,
-      services: appt.service_id ? servicesMap.get(appt.service_id) || null : null,
-      providers: appt.provider_id ? providersMap.get(appt.provider_id) || null : null,
-    }));
     
-    return { data: enrichedData, total: count || 0 };
+    return { data: data || [], total: count || 0 };
   }
 
   async getAppointmentReport(appointmentId: string): Promise<Database['public']['Tables']['appointment_reports']['Row'] | null> {

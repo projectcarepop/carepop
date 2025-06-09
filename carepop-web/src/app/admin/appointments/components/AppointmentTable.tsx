@@ -43,15 +43,15 @@ export interface Appointment {
   status: string;
   appointment_datetime: string;
   cancellation_reason?: string | null;
-  users: {
+  user: {
     first_name: string;
     last_name: string;
     email: string;
   } | null;
-  services: {
+  service: {
     name: string;
   } | null;
-  providers: {
+  provider: {
     first_name: string;
     last_name: string;
   } | null;
@@ -78,25 +78,25 @@ export const columns: ColumnDef<Appointment>[] = [
     id: 'patientName',
     header: 'Patient Name',
     cell: ({ row }) => {
-      const user = row.original.users;
+      const user = row.original.user;
       return user ? `${user.first_name} ${user.last_name}` : 'N/A';
     },
   },
   {
     id: 'patientEmail',
     header: 'Email',
-    cell: ({ row }) => row.original.users?.email ?? 'N/A',
+    cell: ({ row }) => row.original.user?.email ?? 'N/A',
   },
   {
     id: 'service',
     header: 'Service',
-    cell: ({ row }) => row.original.services?.name ?? 'N/A',
+    cell: ({ row }) => row.original.service?.name ?? 'N/A',
   },
   {
     id: 'provider',
     header: 'Provider',
     cell: ({ row }) => {
-        const provider = row.original.providers;
+        const provider = row.original.provider;
         return provider ? `${provider.first_name} ${provider.last_name}` : 'N/A';
     }
   },
