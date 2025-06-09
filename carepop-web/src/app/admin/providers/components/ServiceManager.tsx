@@ -4,6 +4,13 @@ import { useState, useEffect, useMemo } from 'react';
 import useSWR from 'swr';
 import { useDebounce } from 'use-debounce';
 import { UseFormReturn } from 'react-hook-form';
+import { 
+    ColumnDef,
+    flexRender,
+    getCoreRowModel,
+    getPaginationRowModel,
+    useReactTable,
+} from '@tanstack/react-table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -12,7 +19,6 @@ import { DataTablePagination } from '@/components/ui/data-table-pagination';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { fetcher } from '@/lib/utils';
 import { ProviderFormValues } from './providerForm-types';
-import { Table as TanstackTable } from '@tanstack/react-table';
 
 interface Service {
     id: string;
@@ -33,7 +39,7 @@ interface ServiceManagerProps {
 }
 
 export function ServiceManager({ form }: ServiceManagerProps) {
-    const [selectedServices, setSelectedServices] = useState<string[]>(form.getValues('serviceIds') || []);
+    const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
     const [categories, setCategories] = useState<ServiceCategory[]>([]);
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
     const [searchTerm, setSearchTerm] = useState('');
@@ -61,32 +67,67 @@ export function ServiceManager({ form }: ServiceManagerProps) {
 
     const { data: servicesData, isLoading } = useSWR(servicesUrl, fetcher);
 
-    const handleSelectService = (serviceId: string) => {
-        const newSelectedServices = selectedServices.includes(serviceId)
-            ? selectedServices.filter(id => id !== serviceId)
-            : [...selectedServices, serviceId];
-        setSelectedServices(newSelectedServices);
-        form.setValue('serviceIds', newSelectedServices, { shouldDirty: true });
-    };
-    
-    const pageCount = servicesData?.totalPages ?? 0;
+    const pageCount = servicesData?.meta?.totalPages ?? 0;
 
-    const table = {
-        getState: () => ({ pagination }),
-        setPageIndex: (updater: number | ((old: number) => number)) => {
-            const newPageIndex = typeof updater === 'function' ? updater(pagination.pageIndex) : updater;
-            setPagination(prev => ({ ...prev, pageIndex: newPageIndex }));
+    const columns = useMemo<ColumnDef<Service>[]>(() => [
+        {
+            id: 'select',
+            header: ({ table }) => (
+                <Checkbox
+                    checked={table.getIsAllPageRowsSelected()}
+                    onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+                    aria-label="Select all"
+                />
+            ),
+            cell: ({ row }) => (
+                <Checkbox
+                    checked={row.getIsSelected()}
+                    onCheckedChange={(value) => row.toggleSelected(!!value)}
+                    aria-label="Select row"
+                />
+            ),
+            enableSorting: false,
+            enableHiding: false,
         },
-        getPageCount: () => pageCount,
-        getCanPreviousPage: () => pagination.pageIndex > 0,
-        getCanNextPage: () => pagination.pageIndex < pageCount - 1,
-        previousPage: () => setPagination(prev => ({ ...prev, pageIndex: prev.pageIndex - 1 })),
-        nextPage: () => setPagination(prev => ({...prev, pageIndex: prev.pageIndex + 1})),
-        setPageSize: (updater: number | ((old: number) => number)) => {
-            const newPageSize = typeof updater === 'function' ? updater(pagination.pageSize) : updater;
-            setPagination({ pageIndex: 0, pageSize: newPageSize});
+        {
+            accessorKey: 'name',
+            header: 'Service',
         },
-    }
+        {
+            accessorKey: 'category.name',
+            header: 'Category',
+        },
+    ], []);
+
+    const table = useReactTable({
+        data: servicesData?.data ?? [],
+        columns,
+        pageCount,
+        state: {
+            pagination,
+            rowSelection,
+        },
+        enableRowSelection: true,
+        onRowSelectionChange: setRowSelection,
+        getCoreRowModel: getCoreRowModel(),
+        getPaginationRowModel: getPaginationRowModel(),
+        manualPagination: true,
+        onPaginationChange: setPagination,
+    });
+    
+    useEffect(() => {
+        const initialServiceIds = form.getValues('serviceIds') || [];
+        const initialSelection = initialServiceIds.reduce((acc, id) => {
+            acc[id] = true;
+            return acc;
+        }, {} as Record<string, boolean>);
+        setRowSelection(initialSelection);
+    }, []);
+
+    useEffect(() => {
+        const selectedIds = Object.keys(rowSelection).filter(key => rowSelection[key]);
+        form.setValue('serviceIds', selectedIds, { shouldDirty: true });
+    }, [rowSelection, form]);
 
     return (
         <Card>
@@ -115,35 +156,36 @@ export function ServiceManager({ form }: ServiceManagerProps) {
                 <div className="rounded-md border">
                     <Table>
                         <TableHeader>
-                           <TableRow>
-                                <TableHead className="w-[50px]">Select</TableHead>
-                                <TableHead>Service</TableHead>
-                                <TableHead>Category</TableHead>
-                            </TableRow>
+                            {table.getHeaderGroups().map(headerGroup => (
+                                <TableRow key={headerGroup.id}>
+                                    {headerGroup.headers.map(header => (
+                                        <TableHead key={header.id} style={{ width: header.getSize() !== 150 ? header.getSize() : undefined }}>
+                                            {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                                        </TableHead>
+                                    ))}
+                                </TableRow>
+                            ))}
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
-                                <TableRow><TableCell colSpan={3} className="text-center h-24">Loading...</TableCell></TableRow>
-                            ) : servicesData?.data.length === 0 ? (
-                                <TableRow><TableCell colSpan={3} className="text-center h-24">No services found.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={columns.length} className="text-center h-24">Loading...</TableCell></TableRow>
+                            ) : table.getRowModel().rows.length === 0 ? (
+                                <TableRow><TableCell colSpan={columns.length} className="text-center h-24">No services found.</TableCell></TableRow>
                             ) : (
-                                servicesData?.data.map((service: Service) => (
-                                    <TableRow key={service.id}>
-                                        <TableCell>
-                                            <Checkbox
-                                                checked={selectedServices.includes(service.id)}
-                                                onCheckedChange={() => handleSelectService(service.id)}
-                                            />
-                                        </TableCell>
-                                        <TableCell>{service.name}</TableCell>
-                                        <TableCell>{service.category?.name || 'N/A'}</TableCell>
+                                table.getRowModel().rows.map((row) => (
+                                    <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
+                                        {row.getVisibleCells().map((cell) => (
+                                            <TableCell key={cell.id}>
+                                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                            </TableCell>
+                                        ))}
                                     </TableRow>
                                 ))
                             )}
                         </TableBody>
                     </Table>
                 </div>
-                 <DataTablePagination table={table as TanstackTable<Service>} />
+                 <DataTablePagination table={table} />
             </CardContent>
         </Card>
     );

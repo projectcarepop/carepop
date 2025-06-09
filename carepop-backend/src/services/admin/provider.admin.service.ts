@@ -96,12 +96,12 @@ export class AdminProviderService {
 
     let query = this.supabase
       .from('providers')
-      .select('*, services: service_categories(id, name)', { count: 'exact' });
+      .select('*', { count: 'exact' });
 
 
     if (searchTerm) {
       query = query.or(
-        `first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,contact_email.ilike.%${searchTerm}%,specialization.ilike.%${searchTerm}%`
+        `first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,specialization.ilike.%${searchTerm}%`
       );
     }
 

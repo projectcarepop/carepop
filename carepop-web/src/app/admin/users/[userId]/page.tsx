@@ -5,8 +5,7 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { notFound } from 'next/navigation';
 
-export default async function UserDetailPage({ params }: { params: { userId: string } }) {
-  const userId = params.userId;
+export default async function UserDetailPage({ params: { userId } }: { params: { userId: string } }) {
   const supabase = createClient();
 
   const {

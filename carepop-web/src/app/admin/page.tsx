@@ -96,7 +96,7 @@ export default function AdminDashboardPage() {
              <div>
                 <h1 className="text-2xl font-semibold tracking-tight">Admin Dashboard</h1>
                 <p className="text-muted-foreground mt-1">
-                    Welcome to the Admin Dashboard. This is your central hub for managing the CarePoP/QueerCare platform. From here, you can manage services, oversee providers, view user information (with appropriate permissions), manage inventory, and generate reports to ensure the smooth operation and impact of our healthcare services.
+                    Welcome to the Admin Dashboard. This is your central hub for managing the carepop platform. From here, you can manage services, oversee providers, view user information (with appropriate permissions), manage inventory, and generate reports to ensure the smooth operation and impact of our healthcare services.
                 </p>
             </div>
             <Suspense fallback={<p className="text-muted-foreground">Loading dashboard stats...</p>}>
