@@ -36,6 +36,7 @@ import { DataTablePagination } from '@/components/ui/data-table-pagination';
 import Link from 'next/link';
 import { ConfirmAppointmentDialog } from './ConfirmAppointmentDialog';
 import { CancelAppointmentDialog } from './CancelAppointmentDialog';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 export interface Appointment {
   id: string;
@@ -162,12 +163,27 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
   });
   const [searchTerm, setSearchTerm] = React.useState('');
   const [debouncedSearch] = useDebounce(searchTerm, 500);
+  const [accessToken, setAccessToken] = React.useState<string | null>(null);
+  const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
 
-  const currentPage = pagination.pageIndex + 1;
+  React.useEffect(() => {
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setAccessToken(session?.access_token || null);
+    };
+    getSession();
+  }, [supabase]);
 
-  const url = clinicId ? `/api/v1/admin/appointments?clinicId=${clinicId}&page=${currentPage}&limit=${pagination.pageSize}&search=${debouncedSearch}` : null;
+  const apiUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL;
+
+  const url = clinicId && accessToken ? 
+    `${apiUrl}/api/v1/admin/appointments?clinicId=${clinicId}&page=${pagination.pageIndex + 1}&limit=${pagination.pageSize}&search=${debouncedSearch}` 
+    : null;
   
-  const { data, error, isLoading } = useSWR(url, fetcher);
+  const { data, error, isLoading } = useSWR(
+    url ? [url, accessToken] : null, 
+    fetcher
+  );
 
   const tableData = React.useMemo(() => data?.data || [], [data]);
   const totalRecords = React.useMemo(() => data?.total || 0, [data]);
@@ -190,6 +206,7 @@ export function AppointmentTable({ clinicId }: { clinicId: string }) {
     manualFiltering: true,
   });
 
+  if (!apiUrl) return <div>Backend API URL not configured.</div>
   if (error && url) return <div>Failed to load appointments. Please try again.</div>;
 
   return (
