@@ -20,8 +20,13 @@ export class UserAdminService {
   }
 
   async listUsers(page: number, limit: number, search?: string, role?: string) {
-    const { data, error } = await this.supabase.rpc('get_all_users_with_roles');
-
+    const { data, error } = await this.supabase.rpc('search_users', {
+        search_term: search || '',
+        role_filter: role || '',
+        page_num: page,
+        page_size: limit,
+    });
+    
     if (error) {
       console.error('[UserAdminService] RPC Error fetching users:', error);
       throw new AppError('Failed to fetch users via RPC', StatusCodes.INTERNAL_SERVER_ERROR, {
@@ -29,30 +34,11 @@ export class UserAdminService {
       });
     }
 
-    const typedData: UserWithRole[] = data || [];
-    let filteredData = typedData;
-
-    if (search) {
-      const lowercasedSearch = search.toLowerCase();
-      filteredData = filteredData.filter(user =>
-        user.first_name?.toLowerCase().includes(lowercasedSearch) ||
-        user.last_name?.toLowerCase().includes(lowercasedSearch) ||
-        user.email?.toLowerCase().includes(lowercasedSearch)
-      );
-    }
-
-    if (role) {
-      filteredData = filteredData.filter(user => user.role === role);
-    }
-
-    const totalCount = filteredData.length;
-
-    const from = (page - 1) * limit;
-    const to = from + limit;
-    const paginatedData = filteredData.slice(from, to);
+    const users = data || [];
+    const totalCount = users.length > 0 ? users[0].total_count : 0;
 
     return {
-      data: paginatedData,
+      data: users,
       count: totalCount,
     };
   }

@@ -59,9 +59,8 @@ export class AdminClinicController {
         searchByName, // If implementing search
       };
 
-      // 3. Fetch clinics and total count
-      const clinics = await this.clinicService.listClinics(serviceOptions);
-      const totalItems = await this.clinicService.countClinics({ isActive, searchByName /* pass other relevant filters */ });
+      // 3. Fetch clinics and total count in a single call
+      const { data: clinics, count: totalItems } = await this.clinicService.listClinics(serviceOptions);
       
       // 4. Calculate pagination metadata
       const totalPages = Math.ceil(totalItems / limit);

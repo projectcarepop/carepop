@@ -74,12 +74,12 @@ export class AdminClinicService {
     }
   }
 
-  async listClinics(options: ListClinicsOptions = {}): Promise<Clinic[]> {
+  async listClinics(options: ListClinicsOptions = {}): Promise<{ data: Clinic[]; count: number }> {
     const { page = 1, limit = 10, isActive, sortBy = 'name', sortOrder = 'asc', searchByName } = options;
 
     let query = this.supabase
       .from('clinics')
-      .select('*');
+      .select('*', { count: 'exact' });
 
     // Filtering
     if (typeof isActive === 'boolean') {
@@ -102,7 +102,7 @@ export class AdminClinicService {
     const offset = (page - 1) * limit;
     query = query.range(offset, offset + limit - 1);
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
 
     if (error) {
       logger.error('Error listing clinics in Supabase (AdminClinicService):', error);
@@ -110,10 +110,10 @@ export class AdminClinicService {
     }
     // After regenerating types, if Clinic is Database['public']['Tables']['clinics']['Row'], this cast might not be needed
     // or might need adjustment if the local Clinic interface diverges significantly.
-    return (data as Clinic[]) || [];
+    return { data: (data as Clinic[]) || [], count: count || 0 };
   }
 
-  async countClinics(options: Pick<ListClinicsOptions, 'isActive' | 'searchByName' /* add other filter options here */> = {}): Promise<number> {
+  async countClinics(options: Pick<ListClinicsOptions, 'isActive' | 'searchByName'> = {}): Promise<number> {
     const { isActive, searchByName } = options;
     let query = this.supabase
       .from('clinics')
