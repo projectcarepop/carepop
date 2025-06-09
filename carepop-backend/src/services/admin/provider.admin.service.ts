@@ -186,7 +186,7 @@ export class AdminProviderService {
     if (firstName) payload.first_name = firstName;
     if (lastName) payload.last_name = lastName;
     if (phoneNumber) payload.contact_number = phoneNumber;
-    if (weeklyAvailability) payload.weekly_availability = weeklyAvailability;
+    if (weeklyAvailability) payload.weekly_availability = JSON.stringify(weeklyAvailability);
     if (specialization) payload.specialization = specialization;
     if (licenseNumber) payload.license_number = licenseNumber;
     if (credentials) payload.credentials = credentials;
