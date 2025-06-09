@@ -11,8 +11,8 @@ export class ServiceCategoryAdminService {
   }
 
   async getAllServiceCategories(): Promise<any[]> {
-    const { data, error } = await (this.supabase
-      .from('service_categories') as any)
+    const { data, error } = await (this.supabase as any)
+      .from('service_categories')
       .select('id, name, description');
 
     if (error) {
@@ -24,8 +24,8 @@ export class ServiceCategoryAdminService {
   }
 
   async getServiceCategoryById(id: string): Promise<any> {
-    const { data, error } = await (this.supabase
-      .from('service_categories') as any)
+    const { data, error } = await (this.supabase as any)
+      .from('service_categories')
       .select('id, name, description')
       .eq('id', id)
       .single();
@@ -43,8 +43,8 @@ export class ServiceCategoryAdminService {
   }
 
   async createServiceCategory(categoryData: any): Promise<any> {
-    const { data, error } = await (this.supabase
-      .from('service_categories') as any)
+    const { data, error } = await (this.supabase as any)
+      .from('service_categories')
       .insert([categoryData])
       .select()
       .single();
@@ -58,8 +58,8 @@ export class ServiceCategoryAdminService {
   }
 
   async updateServiceCategory(id: string, categoryData: any): Promise<any> {
-    const { data, error } = await (this.supabase
-      .from('service_categories') as any)
+    const { data, error } = await (this.supabase as any)
+      .from('service_categories')
       .update(categoryData)
       .eq('id', id)
       .select()
@@ -78,8 +78,8 @@ export class ServiceCategoryAdminService {
   }
 
   async deleteServiceCategory(id: string): Promise<void> {
-    const { error } = await (this.supabase
-      .from('service_categories') as any)
+    const { error } = await (this.supabase as any)
+      .from('service_categories')
       .delete()
       .eq('id', id);
 
