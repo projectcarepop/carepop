@@ -34,7 +34,7 @@ export class UserAdminService {
       });
     }
 
-    const users = data || [];
+    const users = Array.isArray(data) ? data : [];
     const totalCount = users.length > 0 ? users[0].total_count : 0;
 
     return {
