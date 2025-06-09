@@ -1,7 +1,7 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Activity, CreditCard, ShieldCheck, CalendarCheck, Stethoscope } from "lucide-react";
+import { Users, Activity, CreditCard, ShieldCheck, CalendarCheck, Stethoscope, Archive } from "lucide-react";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
@@ -210,6 +210,13 @@ export default function AdminDashboardPage() {
           icon={<Users className="w-8 h-8 text-gray-500" />}
           type="users"
         />
+        <DashboardCard
+          href="/admin/inventory"
+          title="Inventory Management"
+          description="Manage suppliers and stock levels."
+          icon={<Archive className="w-8 h-8 text-gray-500" />}
+          type="inventory"
+        />
       </div>
     </div>
   );
@@ -220,6 +227,7 @@ const cardStyles = {
   providers: "bg-green-50 border-green-200 hover:border-green-400 text-green-800",
   appointments: "bg-purple-50 border-purple-200 hover:border-purple-400 text-purple-800",
   users: "bg-yellow-50 border-yellow-200 hover:border-yellow-400 text-yellow-800",
+  inventory: "bg-red-50 border-red-200 hover:border-red-400 text-red-800",
 };
 
 function DashboardCard({ 

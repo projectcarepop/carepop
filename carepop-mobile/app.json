@@ -22,7 +22,9 @@
       "package": "com.carepop.mobile",
       "edgeToEdgeEnabled": true
     },
-    "web": {},
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
     "extra": {
       "eas": {
         "projectId": "3a4725aa-3ba5-4437-88d6-ea043602ccd4"

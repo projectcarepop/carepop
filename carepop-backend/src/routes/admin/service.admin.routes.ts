@@ -15,4 +15,32 @@ router.get(
   serviceAdminController.getAllServices.bind(serviceAdminController)
 );
 
+router.get(
+  '/:id',
+  authenticateToken,
+  isAdmin,
+  serviceAdminController.getServiceById.bind(serviceAdminController)
+);
+
+router.post(
+  '/',
+  authenticateToken,
+  isAdmin,
+  serviceAdminController.createService.bind(serviceAdminController)
+);
+
+router.put(
+  '/:id',
+  authenticateToken,
+  isAdmin,
+  serviceAdminController.updateService.bind(serviceAdminController)
+);
+
+router.delete(
+  '/:id',
+  authenticateToken,
+  isAdmin,
+  serviceAdminController.deleteService.bind(serviceAdminController)
+);
+
 export default router; 

@@ -1,11 +1,12 @@
-import { type CookieOptions, createServerClient } from '@supabase/ssr'
-import { ReadonlyRequestCookies } from 'next/dist/server/web/spec-extension/adapters/request-cookies'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
-export const createClient = (cookieStore: ReadonlyRequestCookies) => {
-  // Create a server client and export it
+export const createClient = () => {
+  const cookieStore = cookies()
+
   return createServerClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
         get(name: string) {

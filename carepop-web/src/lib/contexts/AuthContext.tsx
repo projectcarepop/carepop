@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-import { User, AuthError, PostgrestError, Session } from '@supabase/supabase-js';
+import { User, AuthError, PostgrestError, Session, SupabaseClient } from '@supabase/supabase-js';
 import { useRouter, usePathname } from 'next/navigation';
 
 export interface Profile {
@@ -60,6 +60,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<AuthError | PostgrestError | Error | null>(null);
+
+  // For debugging purposes: expose supabase client to window in dev mode
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    interface CustomWindow extends Window {
+      supabase?: SupabaseClient;
+    }
+    (window as CustomWindow).supabase = supabase;
+  }
 
   useEffect(() => {
     console.log('[AuthContext] Main useEffect triggered. Pathname:', pathname);

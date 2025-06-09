@@ -114,6 +114,26 @@ async function startServer() {
     app.use('/api/v1/admin/services', serviceAdminRoutes);
     logger.info('Admin Service routes mounted.');
 
+    // Provider-Service Assignments (Admin) - Nested Routes
+    const { ProviderServiceAdminController } = await import('./controllers/admin/provider-service.admin.controller');
+    const { ProviderServiceAdminService } = await import('./services/admin/provider-service.admin.service');
+    const { createProviderServicesRoutes, createServiceProvidersRoutes } = await import('./routes/admin/provider-service.admin.routes');
+    
+    const providerServiceAdminService = new ProviderServiceAdminService();
+    const providerServiceAdminController = new ProviderServiceAdminController(providerServiceAdminService);
+    
+    const providerServicesRoutes = createProviderServicesRoutes(providerServiceAdminController);
+    app.use('/api/v1/admin/providers/:providerId/services', providerServicesRoutes);
+
+    const serviceProvidersRoutes = createServiceProvidersRoutes(providerServiceAdminController);
+    app.use('/api/v1/admin/services/:serviceId/providers', serviceProvidersRoutes);
+    logger.info('Admin Provider-Service assignment routes mounted.');
+
+    // Service Categories (Admin)
+    const serviceCategoryAdminRoutes = (await import('./routes/admin/service-category.admin.routes')).default;
+    app.use('/api/v1/admin/service-categories', serviceCategoryAdminRoutes);
+    logger.info('Admin Service Category routes mounted.');
+
     // Appointments (Admin)
     const appointmentAdminRoutes = (await import('./routes/admin/appointment.admin.routes')).default;
     app.use('/api/v1/admin/appointments', appointmentAdminRoutes);
