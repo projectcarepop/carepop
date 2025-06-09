@@ -22,10 +22,13 @@ export default function AdminAppointmentsPage() {
   useEffect(() => {
     const fetchClinics = async () => {
       try {
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL;
+        if (!backendUrl) throw new Error("Backend URL is not configured.");
+
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
         if (sessionError || !sessionData.session) throw new Error("Not authenticated");
         
-        const response = await fetch('/api/v1/admin/clinics', {
+        const response = await fetch(`${backendUrl}/api/v1/admin/clinics`, {
             headers: { 'Authorization': `Bearer ${sessionData.session.access_token}` }
         });
         if (!response.ok) throw new Error("Failed to fetch clinics");

@@ -129,7 +129,7 @@ export class AppointmentAdminService {
       .from('appointments')
       .select(`
         *,
-        user:profiles(first_name, last_name, email),
+        user:profiles!user_id(first_name, last_name, email),
         service:services(name),
         provider:providers(first_name, last_name)
       `, { count: 'exact' });

@@ -20,11 +20,12 @@ export class UserAdminService {
   }
 
   async listUsers(page: number, limit: number, search?: string, role?: string) {
+    const offset = (page - 1) * limit;
     const { data, error } = await this.supabase.rpc('search_users', {
         search_term: search || '',
         role_filter: role || '',
-        page_num: page,
-        page_size: limit,
+        limit_val: limit,
+        offset_val: offset,
     });
     
     if (error) {
