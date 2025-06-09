@@ -2,6 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { AppError } from '../../utils/errors';
 import { Database } from '../../types/supabase.types';
 import { supabaseServiceRole } from '../../config/supabaseClient';
+import { ListAppointmentsQuery } from '../../validation/admin/appointment.admin.validation';
 
 export class AppointmentAdminService {
   private supabase: SupabaseClient<Database>;
@@ -60,6 +61,59 @@ export class AppointmentAdminService {
     }
   
     return updatedAppointment;
+  }
+
+  async listAll(queryParams: ListAppointmentsQuery) {
+    const { 
+        page = 1, 
+        limit = 10, 
+        userId, 
+        time_frame,
+        sortBy = 'appointment_datetime',
+        sortOrder = 'desc'
+    } = queryParams;
+
+    const offset = (page - 1) * limit;
+    const now = new Date().toISOString();
+
+    let query = this.supabase
+        .from('appointments')
+        .select(`
+            *,
+            service:services(name),
+            provider:providers(first_name, last_name),
+            clinic:clinics(name)
+        `, { count: 'exact' });
+
+    if (userId) {
+        query = query.eq('user_id', userId);
+    }
+
+    if (time_frame === 'upcoming') {
+        query = query.gte('appointment_datetime', now);
+    } else if (time_frame === 'past') {
+        query = query.lt('appointment_datetime', now);
+    }
+
+    query = query.order(sortBy, { ascending: sortOrder === 'asc' })
+                 .range(offset, offset + limit - 1);
+
+    const { data, error, count } = await query;
+    
+    if (error) {
+        console.error('Error fetching appointments list:', error);
+        throw new AppError('Failed to fetch appointments from the database.', 500);
+    }
+    
+    return {
+        data: data ?? [],
+        meta: {
+            totalItems: count ?? 0,
+            itemsPerPage: limit,
+            currentPage: page,
+            totalPages: count ? Math.ceil(count / limit) : 0,
+        },
+    };
   }
 
   async getAllAppointments(options: { 

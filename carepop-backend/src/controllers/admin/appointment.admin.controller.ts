@@ -1,10 +1,12 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { AppointmentAdminService } from '../../services/admin/appointment.admin.service';
 import { AppError } from '../../utils/errors';
+import { StatusCodes } from 'http-status-codes';
+import { ListAppointmentsQuery } from '../../validation/admin/appointment.admin.validation';
 
 const appointmentService = new AppointmentAdminService();
 
-export const getAllAppointments = async (req: Request, res: Response): Promise<void> => {
+export const getAllAppointments = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
         const { clinicId, page, limit, search } = req.query;
         const result = await appointmentService.getAllAppointments({
@@ -82,5 +84,14 @@ export const getAppointmentReport = async (req: Request, res: Response): Promise
             const message = error instanceof Error ? error.message : 'An internal server error occurred';
             res.status(500).json({ message });
         }
+    }
+};
+
+export const listAllAppointments = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const result = await appointmentService.listAll(req.query as unknown as ListAppointmentsQuery);
+        res.status(StatusCodes.OK).json(result);
+    } catch (error) {
+        next(error);
     }
 }; 

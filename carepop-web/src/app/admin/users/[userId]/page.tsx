@@ -22,19 +22,29 @@ export default async function UserDetailPage({ params: { userId } }: { params: {
     return notFound();
   }
   
-  const response = await fetch(`${apiUrl}/api/v1/admin/users/${userId}`, {
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-    },
-    cache: 'no-store',
-  });
+  const [userResponse, medicalRecordsResponse] = await Promise.all([
+    fetch(`${apiUrl}/api/v1/admin/users/${userId}`, {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      cache: 'no-store',
+    }),
+    fetch(`${apiUrl}/api/v1/admin/users/${userId}/medical-records`, {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      cache: 'no-store',
+    })
+  ]);
 
-  if (!response.ok) {
-    console.error(`Failed to fetch user data for ${userId}: ${response.statusText}`);
+  if (!userResponse.ok) {
+    console.error(`Failed to fetch user data for ${userId}: ${userResponse.statusText}`);
     return notFound();
   }
   
-  const userData = await response.json();
+  const userData = await userResponse.json();
+  // We don't fail the whole page if medical records fail, just show an empty list.
+  const medicalRecordsData = medicalRecordsResponse.ok ? await medicalRecordsResponse.json() : [];
 
   if (!userData) {
     return notFound();
@@ -57,8 +67,8 @@ export default async function UserDetailPage({ params: { userId } }: { params: {
       
       <UserDetailTabs 
         profile={userData.profile}
-        appointments={userData.appointments}
-        medicalRecords={userData.medical_records}
+        appointments={userData.appointments || []}
+        medicalRecords={medicalRecordsData.records || []}
         userId={userId}
       />
     </div>

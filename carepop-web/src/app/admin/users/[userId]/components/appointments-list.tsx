@@ -1,64 +1,34 @@
 'use client';
 
-import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AppointmentSubTable } from './AppointmentSubTable';
 
-interface Appointment {
-  id: string;
-  appointment_datetime: string;
-  status: string;
-  service?: { name: string };
-  clinic?: { name: string };
-  provider?: { name: string };
+interface AppointmentsListProps {
+  userId: string;
 }
 
-export function AppointmentsList({ appointments }: { appointments: Appointment[] }) {
-  if (!appointments || appointments.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Appointments</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p>This user has no appointments.</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
+export function AppointmentsList({ userId }: AppointmentsListProps) {
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <CardTitle>Appointments</CardTitle>
-          <CardDescription>A list of the user&apos;s past and upcoming appointments.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {appointments.map((appt) => (
-            <div key={appt.id} className="flex items-center justify-between rounded-lg border p-4">
-              <div>
-                <p className="font-semibold">{appt.service?.name || 'Service Name'}</p>
-                <p className="text-sm text-muted-foreground">
-                  at {appt.clinic?.name || 'Clinic Name'} with {appt.provider?.name || 'Provider Name'}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {new Date(appt.appointment_datetime).toLocaleString()}
-                </p>
-              </div>
-              <div className="flex items-center space-x-4">
-                <Badge variant={appt.status === 'Confirmed' ? 'default' : 'secondary'}>{appt.status}</Badge>
-                <Button size="sm" asChild>
-                  <Link href={`/admin/appointments/${appt.id}/report`}>
-                    View Report
-                  </Link>
-                </Button>
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-    </>
+    <Card>
+      <CardHeader>
+        <CardTitle>Appointments</CardTitle>
+        <CardDescription>A list of the user&apos;s past and upcoming appointments.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Tabs defaultValue="upcoming">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+            <TabsTrigger value="past">Past</TabsTrigger>
+          </TabsList>
+          <TabsContent value="upcoming">
+              <AppointmentSubTable userId={userId} type="upcoming" />
+          </TabsContent>
+          <TabsContent value="past">
+              <AppointmentSubTable userId={userId} type="past" />
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
   );
 } 
