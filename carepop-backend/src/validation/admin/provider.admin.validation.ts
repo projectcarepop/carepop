@@ -1,14 +1,65 @@
 import { z } from 'zod';
 
-// Base schema for the provider's body data on creation
-export const createProviderBodySchema = z.object({
-  firstName: z.string({ required_error: 'First name is required.' }).min(1, 'First name cannot be empty.'),
-  lastName: z.string({ required_error: 'Last name is required.' }).min(1, 'Last name cannot be empty.'),
-  email: z.string().email('Invalid email address.'),
-  phoneNumber: z.string().optional().nullable(),
-  isActive: z.boolean().default(true),
-  // services are handled separately
+// Schema for querying a list of providers
+export const listProvidersQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  sortBy: z.string().optional(),
+  sortOrder: z.enum(['asc', 'desc']).optional(),
+  searchTerm: z.string().optional(),
+  isActive: z.preprocess(val => {
+    if (val === 'true') return true;
+    if (val === 'false') return false;
+    return undefined;
+  }, z.boolean().optional()),
 });
+
+// Schemas for provider availability
+const dayAvailabilitySchema = z.object({
+    isActive: z.boolean(),
+    startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format, expected HH:mm"),
+    endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format, expected HH:mm"),
+});
+
+const weeklyAvailabilitySchema = z.object({
+    monday: dayAvailabilitySchema,
+    tuesday: dayAvailabilitySchema,
+    wednesday: dayAvailabilitySchema,
+    thursday: dayAvailabilitySchema,
+    friday: dayAvailabilitySchema,
+    saturday: dayAvailabilitySchema,
+    sunday: dayAvailabilitySchema,
+}).optional();
+
+// Base schema for provider data
+const providerBaseSchema = z.object({
+  email: z.string().email(),
+  firstName: z.string().min(1),
+  lastName: z.string().min(1),
+  phoneNumber: z.string().optional().nullable(),
+  isActive: z.boolean().optional(),
+  services: z.array(z.string().uuid()).optional(),
+  weeklyAvailability: weeklyAvailabilitySchema,
+});
+
+// Schema for creating a provider
+export const createProviderBodySchema = providerBaseSchema.extend({
+  isActive: z.boolean().optional().default(true),
+});
+
+// Schema for updating a provider (all fields are optional)
+export const updateProviderBodySchema = providerBaseSchema.partial();
+
+// Schema for validating the provider ID in URL params
+export const providerIdParamSchema = z.object({
+  id: z.string().uuid(),
+});
+
+// Export TypeScript types inferred from schemas
+export type ListProvidersQuery = z.infer<typeof listProvidersQuerySchema>;
+export type CreateProviderBody = z.infer<typeof createProviderBodySchema>;
+export type UpdateProviderBody = z.infer<typeof updateProviderBodySchema>;
+export type ProviderIdParam = z.infer<typeof providerIdParamSchema>;
 
 // Schema for the entire create provider request
 export const createProviderSchema = z.object({
@@ -21,6 +72,43 @@ export const updateProviderBodySchema = z.object({
   email: z.string().email('Invalid email address.').optional(),
   phoneNumber: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
+  weeklyAvailability: z.object({
+    monday: z.object({
+      isActive: z.boolean(),
+      startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format, expected HH:mm"),
+      endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format, expected HH:mm"),
+    }),
+    tuesday: z.object({
+      isActive: z.boolean(),
+      startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format, expected HH:mm"),
+      endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format, expected HH:mm"),
+    }),
+    wednesday: z.object({
+      isActive: z.boolean(),
+      startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format, expected HH:mm"),
+      endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format, expected HH:mm"),
+    }),
+    thursday: z.object({
+      isActive: z.boolean(),
+      startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format, expected HH:mm"),
+      endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format, expected HH:mm"),
+    }),
+    friday: z.object({
+      isActive: z.boolean(),
+      startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format, expected HH:mm"),
+      endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format, expected HH:mm"),
+    }),
+    saturday: z.object({
+      isActive: z.boolean(),
+      startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format, expected HH:mm"),
+      endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format, expected HH:mm"),
+    }),
+    sunday: z.object({
+      isActive: z.boolean(),
+      startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format, expected HH:mm"),
+      endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format, expected HH:mm"),
+    }),
+  }).optional(),
 });
 
 export const listProvidersSchema = z.object({
@@ -50,10 +138,4 @@ export const updateProviderSchema = z.object({
   params: z.object({
     providerId: z.string().uuid('Invalid provider ID format'),
   }),
-});
-
-// Type definitions inferred from schemas
-export type CreateProviderBody = z.infer<typeof createProviderBodySchema>;
-export type UpdateProviderBody = z.infer<typeof updateProviderBodySchema>;
-export type ListProvidersQuery = z.infer<typeof listProvidersSchema.shape.query>;
-export type ProviderIdParams = z.infer<typeof providerIdSchema.shape.params>; 
+}); 

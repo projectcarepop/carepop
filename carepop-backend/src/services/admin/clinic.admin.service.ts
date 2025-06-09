@@ -152,39 +152,49 @@ export class AdminClinicService {
     return data as Clinic | null; 
   }
 
-  async createClinic(clinicData: CreateClinicInput /* creatorUserId: string - Removed */): Promise<Clinic> {
-    // Payload should only contain fields present in ClinicInsertPayload (derived from DB schema)
+  async createClinic(clinicData: CreateClinicInput): Promise<Clinic> {
+    const { services_offered, ...restOfClinicData } = clinicData;
+    
     const payload: ClinicInsertPayload = {
-      ...clinicData, // Spread validated input data
-      // created_by and updated_by are removed as they are not in the schema
-      // created_at and updated_at are typically handled by DB default (TIMESTAMPTZ NOW())
+      ...restOfClinicData,
     };
 
-    const { data, error } = await this.supabase
+    const { data: clinic, error } = await this.supabase
       .from('clinics')
       .insert(payload)
       .select('*')
       .single(); 
 
-    if (error || !data) {
+    if (error || !clinic) {
       logger.error('Error creating clinic in Supabase (AdminClinicService):', error);
       throw new Error(`Could not create clinic: ${error?.message || 'No data returned'}`);
     }
-    return data as Clinic;
+
+    if (services_offered && services_offered.length > 0) {
+        const serviceLinks = services_offered.map(serviceId => ({
+            clinic_id: clinic.id,
+            service_id: serviceId,
+        }));
+        const { error: serviceError } = await this.supabase.from('clinic_services').insert(serviceLinks);
+        if (serviceError) {
+            throw new AppError('Failed to link services to clinic.', 500);
+        }
+    }
+
+    return clinic as Clinic;
   }
 
-  async updateClinic(clinicId: string, clinicData: UpdateClinicInput /* updatorUserId: string - Removed */): Promise<Clinic | null> {
+  async updateClinic(clinicId: string, clinicData: UpdateClinicInput): Promise<Clinic | null> {
     logger.info(`[AdminClinicService] updateClinic CALLED for ID: ${clinicId}`);
+    const { services_offered, ...restOfClinicData } = clinicData;
 
-    // Payload should only contain fields present in ClinicUpdatePayload (derived from DB schema)
     const payload: ClinicUpdatePayload = {
-      ...clinicData, // Spread validated input data
-      // updated_by is removed as it's not in the schema
-      updated_at: new Date().toISOString(), // Explicitly set updated_at, assuming this is desired behavior
+      ...restOfClinicData,
+      updated_at: new Date().toISOString(),
     };
     
     try {
-      const { data, error } = await this.supabase
+      const { data: clinic, error } = await this.supabase
         .from('clinics')
         .update(payload)
         .eq('id', clinicId)
@@ -193,22 +203,37 @@ export class AdminClinicService {
 
       if (error) {
         logger.error(`[AdminClinicService] Supabase error updating clinic ID ${clinicId}:`, error);
-        // Consider if specific error codes should lead to different handling or logging
-        // For example, if error.code === 'PGRST116' (resource not found), it's a 404 scenario
-        if (error.code === 'PGRST116') { // Not found
+        if (error.code === 'PGRST116') {
           return null;
         }
-        throw error; // Re-throw other Supabase errors to be caught by controller
+        throw error;
       }
 
-      if (!data) {
+      if (services_offered) {
+        const { error: deleteError } = await this.supabase.from('clinic_services').delete().eq('clinic_id', clinicId);
+        if (deleteError) {
+            throw new AppError('Failed to update clinic services (delete step).', 500);
+        }
+
+        if (services_offered.length > 0) {
+            const serviceLinks = services_offered.map(serviceId => ({
+                clinic_id: clinicId,
+                service_id: serviceId,
+            }));
+            const { error: insertError } = await this.supabase.from('clinic_services').insert(serviceLinks);
+            if (insertError) {
+                throw new AppError('Failed to update clinic services (insert step).', 500);
+            }
+        }
+      }
+
+      if (!clinic) {
         logger.warn(`[AdminClinicService] No data returned from Supabase after update for clinic ID ${clinicId}.`);
-        // This case might also indicate the clinic was not found if .single() is used and returns null without an error
         return null;
       }
       
       logger.info(`[AdminClinicService] Clinic ID ${clinicId} updated successfully.`);
-      return data as Clinic;
+      return clinic as Clinic;
     } catch (error) {
       logger.error(`[AdminClinicService] Exception in updateClinic for ID ${clinicId}:`, error);
       // Re-throw the error to be handled by the controller and global error handler

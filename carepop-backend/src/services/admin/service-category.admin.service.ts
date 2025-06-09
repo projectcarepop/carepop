@@ -3,6 +3,12 @@ import { Database } from '../../types/supabase.types';
 import { supabaseServiceRole } from '../../config/supabaseClient';
 import { AppError } from '../../utils/errors';
 
+interface ServiceCategory {
+    id: string;
+    name: string;
+    description: string | null;
+}
+
 export class ServiceCategoryAdminService {
   private supabase: SupabaseClient<Database>;
 
@@ -10,8 +16,8 @@ export class ServiceCategoryAdminService {
     this.supabase = supabaseServiceRole;
   }
 
-  async getAllServiceCategories(): Promise<any[]> {
-    const { data, error } = await (this.supabase as any)
+  async getAllServiceCategories(): Promise<ServiceCategory[]> {
+    const { data, error } = await this.supabase
       .from('service_categories')
       .select('id, name, description');
 
@@ -23,8 +29,8 @@ export class ServiceCategoryAdminService {
     return data || [];
   }
 
-  async getServiceCategoryById(id: string): Promise<any> {
-    const { data, error } = await (this.supabase as any)
+  async getServiceCategoryById(id: string): Promise<ServiceCategory> {
+    const { data, error } = await this.supabase
       .from('service_categories')
       .select('id, name, description')
       .eq('id', id)
@@ -42,8 +48,8 @@ export class ServiceCategoryAdminService {
     return data;
   }
 
-  async createServiceCategory(categoryData: any): Promise<any> {
-    const { data, error } = await (this.supabase as any)
+  async createServiceCategory(categoryData: Omit<ServiceCategory, 'id'>): Promise<ServiceCategory> {
+    const { data, error } = await this.supabase
       .from('service_categories')
       .insert([categoryData])
       .select()
@@ -57,8 +63,8 @@ export class ServiceCategoryAdminService {
     return data;
   }
 
-  async updateServiceCategory(id: string, categoryData: any): Promise<any> {
-    const { data, error } = await (this.supabase as any)
+  async updateServiceCategory(id: string, categoryData: Partial<ServiceCategory>): Promise<ServiceCategory> {
+    const { data, error } = await this.supabase
       .from('service_categories')
       .update(categoryData)
       .eq('id', id)
@@ -78,7 +84,7 @@ export class ServiceCategoryAdminService {
   }
 
   async deleteServiceCategory(id: string): Promise<void> {
-    const { error } = await (this.supabase as any)
+    const { error } = await this.supabase
       .from('service_categories')
       .delete()
       .eq('id', id);

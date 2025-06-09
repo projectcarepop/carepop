@@ -1,82 +1,84 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response } from 'express';
 import { AppointmentAdminService } from '../../services/admin/appointment.admin.service';
-import { AppError } from '../../utils/errors';
+import { AppError } from '../../utils/AppError';
+import { createSupabaseAdmin } from '../../services/supabase.service';
 
-export class AppointmentAdminController {
-  constructor(private appointmentAdminService: AppointmentAdminService) {
-    this.confirmAppointment = this.confirmAppointment.bind(this);
-    this.getAllAppointments = this.getAllAppointments.bind(this);
-    this.cancelAppointment = this.cancelAppointment.bind(this);
-    this.getAppointmentReport = this.getAppointmentReport.bind(this);
-  }
+const supabase = createSupabaseAdmin();
+const appointmentService = new AppointmentAdminService(supabase);
 
-  async getAppointmentReport(req: Request, res: Response, next: NextFunction): Promise<void> {
+export const getAllAppointments = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { appointmentId } = req.params;
-      if (!appointmentId) {
-        throw new AppError('Appointment ID is required.', 400);
-      }
-      const report = await this.appointmentAdminService.getAppointmentReport(appointmentId);
-      res.status(200).json({
-        message: 'Appointment report retrieved successfully.',
-        data: report,
-      });
+        const { clinicId, page, limit, search } = req.query;
+        const result = await appointmentService.getAllAppointments({
+            clinicId: clinicId as string,
+            page: page ? parseInt(page as string) : 1,
+            limit: limit ? parseInt(limit as string) : 10,
+            search: search as string,
+        });
+        res.status(200).json(result);
     } catch (error) {
-      next(error);
+        if (error instanceof AppError) {
+            res.status(error.statusCode).json({ message: error.message });
+        } else {
+            console.error(error);
+            res.status(500).json({ message: 'An unexpected error occurred.' });
+        }
     }
-  }
+};
 
-  async confirmAppointment(req: Request, res: Response, next: NextFunction): Promise<void> {
+export const confirmAppointment = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { appointmentId } = req.params;
-      if (!appointmentId) {
-        throw new AppError('Appointment ID is required.', 400);
-      }
-
-      const confirmedAppointment = await this.appointmentAdminService.confirmAppointment(appointmentId);
-
-      res.status(200).json({
-        message: 'Appointment confirmed successfully.',
-        data: confirmedAppointment,
-      });
+        const { appointmentId } = req.params;
+        const updatedAppointment = await appointmentService.confirmAppointment(appointmentId);
+        res.status(200).json(updatedAppointment);
     } catch (error) {
-      next(error);
+        if (error instanceof AppError) {
+            res.status(error.statusCode).json({ message: error.message });
+        } else {
+            console.error(error);
+            res.status(500).json({ message: 'An unexpected error occurred.' });
+        }
     }
-  }
+};
 
-  async getAllAppointments(req: Request, res: Response, next: NextFunction): Promise<void> {
+export const cancelAppointment = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { clinicId } = req.query;
-      const appointments = await this.appointmentAdminService.getAllAppointments(clinicId as string | undefined);
-      res.status(200).json({
-        message: 'Appointments retrieved successfully.',
-        data: appointments,
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
+        const { appointmentId } = req.params;
+        const { reason } = req.body;
 
-  async cancelAppointment(req: Request, res: Response, next: NextFunction): Promise<void> {
+        if (!reason) {
+            throw new AppError('Cancellation reason is required.', 400);
+        }
+
+        const updatedAppointment = await appointmentService.cancelAppointment(appointmentId, reason);
+        res.status(200).json(updatedAppointment);
+    } catch (error) {
+        if (error instanceof AppError) {
+            res.status(error.statusCode).json({ message: error.message });
+        } else {
+            console.error(error);
+            res.status(500).json({ message: 'An unexpected error occurred.' });
+        }
+    }
+};
+
+export const getAppointmentReport = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { appointmentId } = req.params;
-      const { reason } = req.body;
-
-      if (!appointmentId) {
-        throw new AppError('Appointment ID is required.', 400);
-      }
-      if (!reason) {
-          throw new AppError('A cancellation reason is required.', 400);
-      }
-
-      const cancelledAppointment = await this.appointmentAdminService.cancelAppointment(appointmentId, reason);
-
-      res.status(200).json({
-        message: 'Appointment cancelled successfully.',
-        data: cancelledAppointment,
-      });
+        const { appointmentId } = req.params;
+        if (!appointmentId) {
+            throw new AppError('Appointment ID is required.', 400);
+        }
+        const report = await appointmentService.getAppointmentReport(appointmentId);
+        res.status(200).json({
+            message: 'Appointment report retrieved successfully.',
+            data: report,
+        });
     } catch (error) {
-      next(error);
+        if (error instanceof AppError) {
+            res.status(error.statusCode).json({ message: error.message });
+        } else {
+            console.error(error);
+            res.status(500).json({ message: 'An internal server error occurred' });
+        }
     }
-  }
-} 
+}; 

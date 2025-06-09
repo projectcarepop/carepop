@@ -1,40 +1,12 @@
 import { Router } from 'express';
-import { AppointmentAdminController } from '../../controllers/admin/appointment.admin.controller';
-import { AppointmentAdminService } from '../../services/admin/appointment.admin.service';
-import { authenticateToken } from '../../middleware/authMiddleware';
-import { isAdmin } from '../../middleware/role.middleware';
+import * as appointmentController from '../../controllers/admin/appointment.admin.controller';
+import { authenticateToken, isAdmin } from '../../middleware/authMiddleware';
 
 const router = Router();
 
-const appointmentAdminService = new AppointmentAdminService();
-const appointmentAdminController = new AppointmentAdminController(appointmentAdminService);
-
-router.get(
-  '/',
-  authenticateToken,
-  isAdmin,
-  appointmentAdminController.getAllAppointments.bind(appointmentAdminController)
-);
-
-router.get(
-  '/:appointmentId/report',
-  authenticateToken,
-  isAdmin,
-  appointmentAdminController.getAppointmentReport.bind(appointmentAdminController)
-);
-
-router.patch(
-  '/:appointmentId/confirm',
-  authenticateToken,
-  isAdmin,
-  appointmentAdminController.confirmAppointment.bind(appointmentAdminController)
-);
-
-router.patch(
-  '/:appointmentId/cancel',
-  authenticateToken,
-  isAdmin,
-  appointmentAdminController.cancelAppointment.bind(appointmentAdminController)
-);
+router.get('/', authenticateToken, isAdmin, appointmentController.getAllAppointments);
+router.patch('/:appointmentId/confirm', authenticateToken, isAdmin, appointmentController.confirmAppointment);
+router.patch('/:appointmentId/cancel', authenticateToken, isAdmin, appointmentController.cancelAppointment);
+router.get('/:appointmentId/report', authenticateToken, isAdmin, appointmentController.getAppointmentReport);
 
 export default router; 

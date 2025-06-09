@@ -1,6 +1,8 @@
 'use client';
 
 import * as React from 'react';
+import useSWR from 'swr';
+import { useDebounce } from 'use-debounce';
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -36,8 +38,9 @@ import {
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-import { AppError } from '@/lib/utils';
+import { AppError, fetcher } from '@/lib/utils';
 import { useToast } from '@/components/ui/use-toast';
+import { DataTablePagination } from '@/components/ui/data-table-pagination';
 
 // Frontend data structure for a User
 export interface User {
@@ -61,9 +64,6 @@ interface RawUserData {
 
 export function UserTable() {
   const [data, setData] = React.useState<User[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
@@ -73,41 +73,38 @@ export function UserTable() {
     pageSize: 10,
   });
   const [totalPages, setTotalPages] = React.useState(0);
-  const [search, setSearch] = React.useState('');
+  const [searchTerm, setSearchTerm] = React.useState('');
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
+  const [token, setToken] = React.useState<string | null>(null);
 
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
   const { toast } = useToast();
   
-  const fetchData = React.useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !sessionData.session) {
-        throw new Error(sessionError?.message || 'User not authenticated.');
-      }
-      const token = sessionData.session.access_token;
+  React.useEffect(() => {
+    const fetchToken = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setToken(session?.access_token || null);
+    };
+    fetchToken();
+  }, [supabase.auth]);
+  
+  const apiUrl = React.useMemo(() => {
+    const params = new URLSearchParams();
+    params.append('page', (pagination.pageIndex + 1).toString());
+    params.append('limit', pagination.pageSize.toString());
+    if (debouncedSearchTerm) {
+      params.append('search', debouncedSearchTerm);
+    }
+    return '/api/v1/admin/users?' + params.toString();
+  }, [pagination, debouncedSearchTerm]);
+  
+  const { data: result, error: swrError, isLoading, mutate } = useSWR(
+    token ? [apiUrl, token] : null,
+    fetcher
+  );
 
-      const params = new URLSearchParams();
-      params.append('page', (pagination.pageIndex + 1).toString());
-      params.append('limit', pagination.pageSize.toString());
-      if (search) {
-        params.append('search', search);
-      }
-
-      const response = await fetch('/api/v1/admin/users?' + params.toString(), {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch users.');
-      }
-
-      const result = await response.json();
-      
+  React.useEffect(() => {
+    if (result) {
       const mappedData = result.data.map((u: RawUserData) => ({
         id: u.user_id,
         email: u.email,
@@ -119,22 +116,9 @@ export function UserTable() {
 
       setData(mappedData);
       setTotalPages(Math.ceil(result.count / pagination.pageSize));
-
-    } catch (e: unknown) {
-      if (e instanceof Error) {
-        setError(e.message);
-      } else {
-        setError('An unknown error occurred while fetching user data.');
-      }
-    } finally {
-      setIsLoading(false);
     }
-  }, [supabase.auth, pagination, search]);
+  }, [result, pagination.pageSize]);
 
-  React.useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-  
   const handleDelete = async (userId: string) => {
     if (!confirm('Are you sure you want to delete this user? This may be irreversible.')) {
       return;
@@ -162,9 +146,7 @@ export function UserTable() {
             description: "User has been deleted successfully.",
         });
 
-        // Refetch data to update the table
-        fetchData(); 
-
+        mutate();
     } catch (err) {
         const error = err as AppError | Error;
         toast({
@@ -270,8 +252,8 @@ export function UserTable() {
       <div className="flex items-center py-4">
         <Input
           placeholder="Filter by name or email..."
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
           className="max-w-sm"
         />
       </div>
@@ -302,10 +284,10 @@ export function UserTable() {
                   Loading...
                 </TableCell>
               </TableRow>
-            ) : error ? (
+            ) : swrError ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center text-red-500">
-                  {error}
+                <TableCell colSpan={columns.length} className="h-24 text-center text-destructive">
+                  {swrError.message}
                 </TableCell>
               </TableRow>
             ) : table.getRowModel().rows?.length ? (
@@ -338,27 +320,7 @@ export function UserTable() {
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-end space-x-4 py-4">
-        <span className="text-sm text-muted-foreground">
-          Page {pagination.pageIndex + 1} of {totalPages}
-        </span>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.previousPage()}
-          disabled={!table.getCanPreviousPage()}
-        >
-          Previous
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.nextPage()}
-          disabled={!table.getCanNextPage()}
-        >
-          Next
-        </Button>
-      </div>
+      <DataTablePagination table={table} />
     </div>
   );
 } 

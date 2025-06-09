@@ -1,8 +1,7 @@
 'use client';
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
+import { useForm, UseFormReturn } from "react-hook-form";
 import React, { useMemo } from 'react';
 import { useRouter } from 'next/navigation'; // For potential redirect
 
@@ -21,32 +20,12 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea"; // Assuming you might need it for longer fields like operating hours
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { useToast } from "@/hooks/use-toast";
-
-// Zod schema for clinic form validation - should mirror backend schema
-const clinicFormSchema = z.object({
-  name: z.string().min(1, { message: "Clinic name is required." }),
-  fullAddress: z.string().optional().nullable(),      // Mapped from full_address
-  streetAddress: z.string().optional().nullable(),  // Mapped from street_address
-  locality: z.string().optional().nullable(),         // Mapped from locality (City)
-  region: z.string().optional().nullable(),           // Mapped from region (State/Province)
-  postalCode: z.string().optional().nullable(),     // Mapped from postal_code
-  countryCode: z.string().optional().nullable(),    // Mapped from country_code
-  latitude: z.number().optional().nullable(),         // Mapped from latitude
-  longitude: z.number().optional().nullable(),        // Mapped from longitude
-  contactPhone: z.string().optional().nullable(),
-  contactEmail: z.string().email({ message: "Invalid email address." }).optional().nullable(),
-  websiteUrl: z.string().url({ message: "Invalid URL." }).optional().nullable(), // Mapped from website_url
-  operatingHours: z.string().optional().nullable(),
-  servicesOffered: z.array(z.string()).optional().nullable(), // For simplicity, handle as comma-separated string in Textarea, then split
-  fpopChapterAffiliation: z.string().optional().nullable(),
-  additionalNotes: z.string().optional().nullable(),
-  isActive: z.boolean(),
-});
-
-export type ClinicFormValues = z.infer<typeof clinicFormSchema>;
+import { ServiceManager } from '../../providers/components/ServiceManager';
+import { clinicFormSchema, ClinicFormValues } from './clinicForm-types';
+import { ProviderFormValues } from '../../providers/components/providerForm-types';
 
 interface ClinicFormProps {
-  initialData?: Partial<ClinicFormValues> & { id?: string };
+  initialData?: Partial<ClinicFormValues> & { id?: string; servicesOffered?: string[] };
   onSubmitSuccess?: () => void;
   mode: 'create' | 'edit';
 }
@@ -93,7 +72,7 @@ export function ClinicForm({ initialData, onSubmitSuccess, mode }: ClinicFormPro
       contactEmail: initialData?.contactEmail || "",
       websiteUrl: initialData?.websiteUrl || "",
       operatingHours: initialData?.operatingHours || "",
-      servicesOffered: initialData?.servicesOffered || [], // Default to empty array
+      services: initialData?.services || initialData?.servicesOffered || [],
       fpopChapterAffiliation: initialData?.fpopChapterAffiliation || "",
       additionalNotes: initialData?.additionalNotes || "",
       isActive: initialData?.isActive === undefined ? true : initialData.isActive,
@@ -125,7 +104,7 @@ export function ClinicForm({ initialData, onSubmitSuccess, mode }: ClinicFormPro
         contact_email: data.contactEmail,
         website_url: data.websiteUrl,
         operating_hours: data.operatingHours,
-        services_offered: data.servicesOffered, // Directly pass the array
+        services_offered: data.services,
         fpop_chapter_affiliation: data.fpopChapterAffiliation,
         additional_notes: data.additionalNotes,
         is_active: data.isActive,
@@ -380,27 +359,15 @@ export function ClinicForm({ initialData, onSubmitSuccess, mode }: ClinicFormPro
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="servicesOffered"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Services Offered</FormLabel>
-              <FormControl>
-                {/* For array of strings. Convert array to comma-separated string for Textarea and back on change. */}
-                <Textarea 
-                  placeholder="Enter services, separated by commas" 
-                  {...field} 
-                  value={Array.isArray(field.value) ? field.value.join(', ') : ''} 
-                  onChange={(e) => field.onChange(e.target.value ? e.target.value.split(',').map(s => s.trim()) : [])}
-                />
-              </FormControl>
-              <FormDescription>List services separated by commas.</FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="p-4 border-t">
+            <h3 className="text-lg font-medium">Services Offered</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+                Select all services that this clinic provides.
+            </p>
+            <ServiceManager form={form as unknown as UseFormReturn<ProviderFormValues>} />
+        </div>
 
+        <h3 className="text-lg font-medium pt-4 border-t">FPOP Chapter Details</h3>
         <FormField
           control={form.control}
           name="fpopChapterAffiliation"

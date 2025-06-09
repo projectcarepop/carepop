@@ -24,3 +24,17 @@ export function getErrorMessage(error: unknown): string {
   }
   return String(error);
 }
+
+export const fetcher = async ([url, token]: [string, string]) => {
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+  if (!res.ok) {
+    const errorInfo = await res.json();
+    const error = new Error(errorInfo.message || 'An error occurred while fetching the data.');
+    throw error;
+  }
+
+  return res.json();
+};

@@ -9,6 +9,12 @@ import {
   listProvidersSchema,
   providerIdSchema,
 } from '../../validation/admin/provider.admin.validation';
+import {
+  getProviderHandler,
+  updateProviderHandler,
+  deleteProviderHandler,
+} from '../../controllers/admin/provider.admin.controller';
+import { validate } from '../../middleware/validate';
 
 export const createAdminProviderRoutes = (adminProviderController: AdminProviderController): Router => {
   const router = Router();
@@ -156,7 +162,7 @@ export const createAdminProviderRoutes = (adminProviderController: AdminProvider
     authenticateToken,
     isAdmin,
     validateRequest({ params: providerIdSchema.shape.params }),
-    adminProviderController.getProviderById
+    getProviderHandler
   );
 
   /**
@@ -206,7 +212,7 @@ export const createAdminProviderRoutes = (adminProviderController: AdminProvider
       body: updateProviderBodySchema,
       params: providerIdSchema.shape.params
     }),
-    adminProviderController.updateProvider
+    updateProviderHandler
   );
 
   /**
@@ -243,8 +249,10 @@ export const createAdminProviderRoutes = (adminProviderController: AdminProvider
     authenticateToken,
     isAdmin,
     validateRequest({ params: providerIdSchema.shape.params }),
-    adminProviderController.deleteProvider
+    deleteProviderHandler
   );
 
   return router;
-}; 
+};
+
+export default router; 

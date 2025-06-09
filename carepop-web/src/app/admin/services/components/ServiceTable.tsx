@@ -1,6 +1,8 @@
 'use client';
 
 import * as React from 'react';
+import useSWR from 'swr';
+import { useDebounce } from 'use-debounce';
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -36,7 +38,8 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
-import { AppError } from '@/lib/utils';
+import { AppError, fetcher } from '@/lib/utils';
+import { DataTablePagination } from '@/components/ui/data-table-pagination';
 
 // Frontend data structure (camelCase) for a Service
 export interface Service {
@@ -68,9 +71,6 @@ interface RawServiceData {
 
 export function ServiceTable() {
   const [data, setData] = React.useState<Service[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
@@ -80,34 +80,37 @@ export function ServiceTable() {
     pageSize: 10,
   });
   const [totalPages, setTotalPages] = React.useState(0);
-  const [search, setSearch] = React.useState('');
+  const [searchTerm, setSearchTerm] = React.useState('');
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
+  const [token, setToken] = React.useState<string | null>(null);
 
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
   const { toast } = useToast();
 
-  const fetchData = React.useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
+  React.useEffect(() => {
+    const fetchToken = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('User not authenticated.');
-      
-      const params = new URLSearchParams({
-        page: (pagination.pageIndex + 1).toString(),
-        limit: pagination.pageSize.toString(),
-      });
-      if (search) params.append('search', search);
+      setToken(session?.access_token || null);
+    };
+    fetchToken();
+  }, [supabase.auth]);
 
-      const response = await fetch(`/api/v1/admin/services?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
+  const apiUrl = React.useMemo(() => {
+    const params = new URLSearchParams({
+      page: (pagination.pageIndex + 1).toString(),
+      limit: pagination.pageSize.toString(),
+    });
+    if (debouncedSearchTerm) params.append('search', debouncedSearchTerm);
+    return `/api/v1/admin/services?${params.toString()}`;
+  }, [pagination, debouncedSearchTerm]);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch services.');
-      }
+  const { data: result, error: swrError, isLoading, mutate } = useSWR(
+    token ? [apiUrl, token] : null,
+    fetcher
+  );
 
-      const result = await response.json();
+  React.useEffect(() => {
+    if (result) {
       const mappedData = result.data.map((s: RawServiceData) => ({
         id: s.id,
         name: s.name,
@@ -120,17 +123,8 @@ export function ServiceTable() {
 
       setData(mappedData);
       setTotalPages(result.meta?.totalPages || 0);
-    } catch (e) {
-      const error = e as Error;
-      setError(error.message);
-    } finally {
-      setIsLoading(false);
     }
-  }, [pagination, search, supabase.auth]);
-
-  React.useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  }, [result]);
 
   const handleDelete = async (serviceId: string) => {
     if (!confirm('Are you sure you want to delete this service? This action cannot be undone.')) return;
@@ -153,7 +147,7 @@ export function ServiceTable() {
         title: "Success",
         description: "Service deleted successfully."
       });
-      fetchData();
+      mutate();
     } catch (err) {
       const error = err as AppError | Error;
       toast({
@@ -255,9 +249,9 @@ export function ServiceTable() {
     <div className="w-full">
       <div className="flex items-center py-4">
         <Input
-          placeholder="Filter by service name, category..."
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Filter by service name..."
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
           className="max-w-sm"
         />
       </div>
@@ -279,9 +273,9 @@ export function ServiceTable() {
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center">Loading...</TableCell>
               </TableRow>
-            ) : error ? (
+            ) : swrError ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center text-destructive">{error}</TableCell>
+                <TableCell colSpan={columns.length} className="h-24 text-center text-destructive">{swrError.message}</TableCell>
               </TableRow>
             ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
@@ -301,27 +295,7 @@ export function ServiceTable() {
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-end space-x-4 py-4">
-        <span className="text-sm text-muted-foreground">
-          Page {pagination.pageIndex + 1} of {totalPages}
-        </span>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.previousPage()}
-          disabled={!table.getCanPreviousPage()}
-        >
-          Previous
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.nextPage()}
-          disabled={!table.getCanNextPage()}
-        >
-          Next
-        </Button>
-      </div>
+      <DataTablePagination table={table} />
     </div>
   );
 } 

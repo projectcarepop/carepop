@@ -1,16 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import useSWR from 'swr';
+import { useDebounce } from 'use-debounce';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
+import { MoreHorizontal } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Link from 'next/link';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-import { PlusCircle, MoreHorizontal } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/components/ui/use-toast';
-import { AppError, getErrorMessage } from '@/lib/utils';
+import { AppError, getErrorMessage, fetcher } from '@/lib/utils';
+import { DataTablePagination } from '@/components/ui/data-table-pagination';
+import { ColumnDef, useReactTable, getCoreRowModel, getPaginationRowModel, flexRender } from '@tanstack/react-table';
 
 interface IInventoryItem {
   id: string;
@@ -26,79 +30,67 @@ interface IInventoryItem {
 }
 
 export function InventoryItemsList() {
-  const supabase = createSupabaseBrowserClient();
-  const [items, setItems] = useState<IInventoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [page, setPage] = useState(1);
+  const [data, setData] = useState<IInventoryItem[]>([]);
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [totalPages, setTotalPages] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
+  const [token, setToken] = useState<string | null>(null);
+
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const { toast } = useToast();
 
   useEffect(() => {
-    const fetchItems = async () => {
-      try {
-        setLoading(true);
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) throw new Error("Not authenticated");
-
-        const params = new URLSearchParams({
-          page: page.toString(),
-          limit: '10',
-        });
-
-        if (searchTerm) {
-          params.append('search', searchTerm);
-        }
-        
-        const response = await fetch(`/api/v1/admin/inventory-items?${params.toString()}`, {
-          headers: { 'Authorization': `Bearer ${session.access_token}` },
-        });
-
-        if (!response.ok) {
-          throw new AppError('Failed to fetch inventory items', response);
-        }
-
-        const result = await response.json();
-        setItems(result.data);
-        setTotalPages(result.totalPages);
-      } catch (err) {
-        const errorMessage = getErrorMessage(err);
-        setError(errorMessage);
-        toast({
-          title: 'Error fetching items',
-          description: errorMessage,
-          variant: 'destructive',
-        });
-      } finally {
-        setLoading(false);
-      }
+    const fetchToken = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setToken(session?.access_token || null);
     };
+    fetchToken();
+  }, [supabase.auth]);
 
-    fetchItems();
-  }, [supabase, page, searchTerm, toast]);
+  const apiUrl = useMemo(() => {
+    const params = new URLSearchParams({
+      page: (pagination.pageIndex + 1).toString(),
+      limit: pagination.pageSize.toString(),
+    });
+    if (debouncedSearchTerm) {
+      params.append('search', debouncedSearchTerm);
+    }
+    return `/api/v1/admin/inventory-items?${params.toString()}`;
+  }, [pagination, debouncedSearchTerm]);
+
+  const { data: result, error: swrError, isLoading, mutate } = useSWR(
+    token ? [apiUrl, token] : null,
+    fetcher
+  );
+
+  useEffect(() => {
+    if (result) {
+      setData(result.data);
+      setTotalPages(result.totalPages);
+    }
+  }, [result]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this item? This action cannot be undone.')) return;
     
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
+      if (!token) throw new AppError("Not authenticated", {} as Response);
       
       const response = await fetch(`/api/v1/admin/inventory-items/${id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${session.access_token}` },
+        headers: { 'Authorization': `Bearer ${token}` },
       });
 
       if (!response.ok) {
         throw new AppError('Failed to delete item', response);
       }
 
-      setItems(items.filter(item => item.id !== id));
       toast({
         title: "Success",
         description: "Item successfully deleted."
       });
+      mutate();
     } catch (err) {
       const errorMessage = getErrorMessage(err);
       toast({
@@ -109,104 +101,108 @@ export function InventoryItemsList() {
     }
   };
 
-  const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setPage(1); // Reset to first page on new search
-    // The useEffect hook will trigger the fetch
-  };
-
-  if (loading) return <p>Loading inventory items...</p>;
-  if (error) return <p className="text-red-500">{error}</p>;
+  const columns = useMemo<ColumnDef<IInventoryItem>[]>(() => [
+    { accessorKey: 'item_name', header: 'Item Name' },
+    { accessorKey: 'sku', header: 'SKU' },
+    { accessorKey: 'category', header: 'Category' },
+    { accessorKey: 'quantity_on_hand', header: 'Qty On Hand' },
+    {
+      accessorKey: 'is_active',
+      header: 'Status',
+      cell: ({ row }) => (
+        <Badge variant={row.original.is_active ? 'default' : 'destructive'}>
+          {row.original.is_active ? 'Active' : 'Inactive'}
+        </Badge>
+      )
+    },
+    {
+      id: 'actions',
+      header: () => <div className="text-right">Actions</div>,
+      cell: ({ row }) => (
+        <div className="text-right">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href={`/admin/inventory/items/${row.original.id}/edit`}>Edit</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDelete(row.original.id)} className="text-destructive">
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )
+    }
+  ], [handleDelete]);
+  
+  const table = useReactTable({
+    data,
+    columns,
+    pageCount: totalPages,
+    state: {
+      pagination,
+    },
+    onPaginationChange: setPagination,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    manualPagination: true,
+  });
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <form onSubmit={handleSearch} className="flex gap-2">
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <div className="flex gap-2">
           <Input 
             placeholder="Search by name, SKU, etc..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="max-w-sm"
           />
-          <Button type="submit">Search</Button>
-        </form>
-        <Button asChild>
-          <Link href="/admin/inventory/items/new">
-            <PlusCircle className="mr-2 h-4 w-4" /> New Item
-          </Link>
-        </Button>
+        </div>
       </div>
       <div className="rounded-md border">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>Item Name</TableHead>
-              <TableHead>SKU</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Qty On Hand</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
+            {table.getHeaderGroups().map(headerGroup => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map(header => (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
           </TableHeader>
           <TableBody>
-            {items.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell className="font-medium">{item.item_name}</TableCell>
-                <TableCell>{item.sku || 'N/A'}</TableCell>
-                <TableCell>{item.category || 'N/A'}</TableCell>
-                <TableCell>{item.quantity_on_hand}</TableCell>
-                <TableCell>
-                  <Badge variant={item.is_active ? 'default' : 'destructive'}>
-                    {item.is_active ? 'Active' : 'Inactive'}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem asChild>
-                          <Link href={`/admin/inventory/items/${item.id}/edit`}>Edit</Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDelete(item.id)} className="text-destructive">
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                </TableCell>
+             {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">Loading...</TableCell>
+              </TableRow>
+            ) : swrError ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center text-destructive">{swrError.message}</TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id}>
+                 {row.getVisibleCells().map(cell => (
+                  <TableCell key={cell.id}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
-
-       <div className="flex items-center justify-end space-x-4 py-4">
-          <span className="text-sm text-muted-foreground">
-            Page {page} of {totalPages}
-          </span>
-          <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(prev => Math.max(1, prev - 1))}
-              disabled={page <= 1}
-          >
-              Previous
-          </Button>
-          <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
-              disabled={page >= totalPages}
-          >
-              Next
-          </Button>
-      </div>
+      <DataTablePagination table={table} />
     </div>
   );
 } 

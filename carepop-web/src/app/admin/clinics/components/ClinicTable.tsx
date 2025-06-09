@@ -14,6 +14,8 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 import { MoreHorizontal } from 'lucide-react';
+import useSWR from 'swr';
+import { useDebounce } from 'use-debounce';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -37,7 +39,8 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
-import { AppError } from '@/lib/utils';
+import { AppError, fetcher } from '@/lib/utils';
+import { DataTablePagination } from '@/components/ui/data-table-pagination';
 
 // Frontend data structure (camelCase)
 export interface Clinic {
@@ -67,9 +70,6 @@ interface RawClinicData {
 
 export function ClinicTable() {
   const [data, setData] = React.useState<Clinic[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
@@ -79,37 +79,36 @@ export function ClinicTable() {
     pageSize: 10,
   });
   const [totalPages, setTotalPages] = React.useState(0);
-  const [search, setSearch] = React.useState('');
+  const [searchTerm, setSearchTerm] = React.useState('');
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 500); // 500ms delay
+  const [token, setToken] = React.useState<string | null>(null);
 
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
   const { toast } = useToast();
+
+  React.useEffect(() => {
+    const fetchToken = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setToken(session?.access_token || null);
+    };
+    fetchToken();
+  }, [supabase.auth]);
   
-  const fetchData = React.useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !sessionData.session) {
-        throw new Error(sessionError?.message || 'User not authenticated.');
-      }
-      const token = sessionData.session.access_token;
+  const apiUrl = React.useMemo(() => {
+    const params = new URLSearchParams();
+    params.append('page', (pagination.pageIndex + 1).toString());
+    params.append('limit', pagination.pageSize.toString());
+    if (debouncedSearchTerm) params.append('search', debouncedSearchTerm);
+    return `/api/v1/admin/clinics?${params.toString()}`;
+  }, [pagination, debouncedSearchTerm]);
 
-      const params = new URLSearchParams();
-      params.append('page', (pagination.pageIndex + 1).toString());
-      params.append('limit', pagination.pageSize.toString());
-      if (search) params.append('search', search);
+  const { data: result, error: swrError, isLoading, mutate } = useSWR(
+    token ? [apiUrl, token] : null, 
+    fetcher
+  );
 
-      const response = await fetch('/api/v1/admin/clinics?' + params.toString(), {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch clinics.');
-      }
-
-      const result = await response.json();
-      
+  React.useEffect(() => {
+    if (result) {
       const mappedData = result.data.map((c: RawClinicData) => ({
         id: c.id,
         name: c.name,
@@ -121,22 +120,11 @@ export function ClinicTable() {
         createdAt: c.created_at,
         updatedAt: c.updated_at,
       }));
-
       setData(mappedData);
       setTotalPages(result.meta.totalPages);
-
-    } catch (e: unknown) {
-      const error = e as Error;
-      setError(error.message);
-    } finally {
-      setIsLoading(false);
     }
-  }, [supabase.auth, pagination, search]);
-
-  React.useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
+  }, [result]);
+  
   const handleDelete = async (clinicId: string) => {
     if (!confirm('Are you sure you want to delete this clinic? This action cannot be undone.')) return;
 
@@ -158,7 +146,7 @@ export function ClinicTable() {
         title: "Success",
         description: "Clinic deleted successfully."
       });
-      fetchData(); // Refresh data
+      mutate(); // Revalidate data after delete
 
     } catch (err: unknown) {
       const error = err as AppError | Error;
@@ -214,9 +202,6 @@ export function ClinicTable() {
                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href={`/admin/clinics/${clinic.id}`}>View Details</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
                   <Link href={`/admin/clinics/${clinic.id}/edit`}>Edit Clinic</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -256,9 +241,9 @@ export function ClinicTable() {
     <div className="w-full">
       <div className="flex items-center py-4">
         <Input
-          placeholder="Filter by clinic name, location..."
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Filter clinics by name, location..."
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
           className="max-w-sm"
         />
       </div>
@@ -282,10 +267,10 @@ export function ClinicTable() {
                   Loading...
                 </TableCell>
               </TableRow>
-            ) : error ? (
+            ) : swrError ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center text-red-500">
-                  {error}
+                <TableCell colSpan={columns.length} className="h-24 text-center text-destructive">
+                  {swrError.message}
                 </TableCell>
               </TableRow>
             ) : table.getRowModel().rows?.length ? (
@@ -308,27 +293,7 @@ export function ClinicTable() {
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-end space-x-4 py-4">
-          <span className="text-sm text-muted-foreground">
-            Page {pagination.pageIndex + 1} of {totalPages}
-          </span>
-          <Button
-              variant="outline"
-              size="sm"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
-          >
-              Previous
-          </Button>
-          <Button
-              variant="outline"
-              size="sm"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
-          >
-              Next
-          </Button>
-      </div>
+      <DataTablePagination table={table} />
     </div>
   );
 } 

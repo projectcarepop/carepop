@@ -1,16 +1,21 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import useSWR from 'swr';
+import { useDebounce } from 'use-debounce';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
+import { MoreHorizontal } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Link from 'next/link';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-import { PlusCircle, MoreHorizontal } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/components/ui/use-toast';
-import { AppError, getErrorMessage } from '@/lib/utils';
+import { AppError, getErrorMessage, fetcher } from '@/lib/utils';
+import { DataTablePagination } from '@/components/ui/data-table-pagination';
+import { ColumnDef, useReactTable, getCoreRowModel, getPaginationRowModel } from '@tanstack/react-table';
+import { flexRender } from '@tanstack/react-table';
 
 interface ISupplier {
   id: string;
@@ -21,73 +26,63 @@ interface ISupplier {
 }
 
 export function SuppliersList() {
-  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
-  const [suppliers, setSuppliers] = useState<ISupplier[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [page, setPage] = useState(1);
+  const [data, setData] = useState<ISupplier[]>([]);
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [totalPages, setTotalPages] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
+  const [token, setToken] = useState<string | null>(null);
+
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const { toast } = useToast();
 
-  const fetchSuppliers = useMemo(() => async () => {
-    try {
-      setLoading(true);
+  useEffect(() => {
+    const fetchToken = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
+      setToken(session?.access_token || null);
+    };
+    fetchToken();
+  }, [supabase.auth]);
 
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: '10',
-      });
-      if (searchTerm) {
-        params.append('search', searchTerm);
-      }
-
-      const response = await fetch(`/api/v1/admin/suppliers?${params.toString()}`, {
-        headers: { 'Authorization': `Bearer ${session.access_token}` },
-      });
-
-      if (!response.ok) {
-        throw new AppError('Failed to fetch suppliers', response);
-      }
-
-      const result = await response.json();
-      setSuppliers(result.data);
-      setTotalPages(result.totalPages);
-    } catch (err) {
-      const errorMessage = getErrorMessage(err);
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
+  const apiUrl = useMemo(() => {
+    const params = new URLSearchParams({
+      page: (pagination.pageIndex + 1).toString(),
+      limit: pagination.pageSize.toString(),
+    });
+    if (debouncedSearchTerm) {
+      params.append('search', debouncedSearchTerm);
     }
-  }, [supabase, page, searchTerm]);
+    return `/api/v1/admin/suppliers?${params.toString()}`;
+  }, [pagination, debouncedSearchTerm]);
+
+  const { data: result, error: swrError, isLoading, mutate } = useSWR(
+    token ? [apiUrl, token] : null,
+    fetcher
+  );
 
   useEffect(() => {
-    fetchSuppliers();
-  }, [fetchSuppliers]);
+    if (result) {
+      setData(result.data);
+      setTotalPages(result.totalPages);
+    }
+  }, [result]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this supplier? This action cannot be undone.')) return;
     
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new AppError("Not authenticated", {} as Response);
+      if (!token) throw new AppError("Not authenticated", {} as Response);
       
-      const response = await fetch(`/api/v1/admin/suppliers/${id}`, {
+      await fetch(`/api/v1/admin/suppliers/${id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${session.access_token}` },
+        headers: { 'Authorization': `Bearer ${token}` },
       });
-
-      if (!response.ok) {
-        throw new AppError('Failed to delete supplier', response);
-      }
 
       toast({
         title: "Success",
         description: "Supplier deleted successfully.",
       });
-      fetchSuppliers(); // Refetch data
+      mutate(); // Refetch data
 
     } catch (err) {
       const errorMessage = getErrorMessage(err);
@@ -99,79 +94,105 @@ export function SuppliersList() {
     }
   };
   
-  const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setPage(1); // Reset to first page
-    fetchSuppliers();
-  };
+  const columns = useMemo<ColumnDef<ISupplier>[]>(() => [
+    { accessorKey: 'name', header: 'Name' },
+    { accessorKey: 'contact_person', header: 'Contact Person' },
+    { accessorKey: 'contact_email', header: 'Contact Email' },
+    { 
+      accessorKey: 'is_active', 
+      header: 'Status',
+      cell: ({ row }) => (
+        <Badge variant={row.original.is_active ? 'default' : 'secondary'}>
+          {row.original.is_active ? 'Active' : 'Inactive'}
+        </Badge>
+      )
+    },
+    {
+      id: 'actions',
+      header: () => <div className="text-right">Actions</div>,
+      cell: ({ row }) => (
+        <div className="text-right">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href={`/admin/inventory/suppliers/${row.original.id}/edit`}>Edit</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDelete(row.original.id)} className="text-destructive">
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      ),
+    },
+  ], [handleDelete]);
 
-  if (loading && suppliers.length === 0) return <p className="text-muted-foreground">Loading suppliers...</p>;
-  if (error) return <p className="text-destructive">{error}</p>;
-
+  const table = useReactTable({
+    data,
+    columns,
+    pageCount: totalPages,
+    state: {
+      pagination,
+    },
+    onPaginationChange: setPagination,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    manualPagination: true,
+  });
+  
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <form onSubmit={handleSearchSubmit} className="flex gap-2">
+        <div className="flex gap-2">
           <Input 
             placeholder="Search by name or contact..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="max-w-sm"
           />
-          <Button type="submit">Search</Button>
-        </form>
-        <Button asChild>
-          <Link href="/admin/inventory/suppliers/new">
-            <PlusCircle className="mr-2 h-4 w-4" /> New Supplier
-          </Link>
-        </Button>
+        </div>
       </div>
       <div className="rounded-md border">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Contact Person</TableHead>
-              <TableHead>Contact Email</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right w-[100px]">Actions</TableHead>
-            </TableRow>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
           </TableHeader>
           <TableBody>
-            {suppliers.length > 0 ? suppliers.map((supplier) => (
-              <TableRow key={supplier.id} className="hover:bg-muted/50">
-                <TableCell className="font-medium">{supplier.name}</TableCell>
-                <TableCell>{supplier.contact_person || 'N/A'}</TableCell>
-                <TableCell>{supplier.contact_email || 'N/A'}</TableCell>
-                <TableCell>
-                  <Badge variant={supplier.is_active ? 'default' : 'secondary'}>
-                    {supplier.is_active ? 'Active' : 'Inactive'}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
-                        <span className="sr-only">Open menu</span>
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem asChild>
-                        <Link href={`/admin/inventory/suppliers/${supplier.id}/edit`}>Edit</Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDelete(supplier.id)} className="text-destructive">
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">Loading...</TableCell>
+              </TableRow>
+            ) : swrError ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center text-destructive">{swrError.message}</TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows.length > 0 ? table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id} className="hover:bg-muted/50">
+                 {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
               </TableRow>
             )) : (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
+                <TableCell colSpan={columns.length} className="h-24 text-center">
                   No suppliers found.
                 </TableCell>
               </TableRow>
@@ -179,27 +200,7 @@ export function SuppliersList() {
           </TableBody>
         </Table>
       </div>
-       <div className="flex items-center justify-end space-x-4 py-4">
-          <span className="text-sm text-muted-foreground">
-            Page {page} of {totalPages}
-          </span>
-          <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page <= 1}
-          >
-              Previous
-          </Button>
-          <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-          >
-              Next
-          </Button>
-      </div>
+      <DataTablePagination table={table} />
     </div>
   );
 } 

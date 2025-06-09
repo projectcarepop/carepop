@@ -2,7 +2,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -18,45 +17,48 @@ import { Switch } from "@/components/ui/switch";
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
+import { providerFormSchema, ProviderFormValues } from './providerForm-types';
+import { AvailabilityManager } from './AvailabilityManager';
+import { ServiceManager } from './ServiceManager';
 
 // This is the data structure the form expects for initialData
-interface ProviderData {
+interface ProviderData extends Partial<ProviderFormValues> {
   id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phoneNumber: string | null;
-  isActive: boolean;
-  services?: { value: string }[]; // Or whatever shape services take
 }
 
 interface ProviderFormProps {
   initialData?: ProviderData | null;
 }
 
-const formSchema = z.object({
-  firstName: z.string().min(1, { message: "First name is required." }),
-  lastName: z.string().min(1, { message: "Last name is required." }),
-  email: z.string().email({ message: "Invalid email address." }),
-  phoneNumber: z.string().optional().nullable(),
-  isActive: z.boolean(),
-  services: z.array(z.string()).optional(),
-});
+const defaultAvailability = {
+  isActive: false,
+  startTime: '09:00',
+  endTime: '17:00',
+};
 
-type ProviderFormValues = z.infer<typeof formSchema>;
+const defaultWeeklyAvailability = {
+  monday: defaultAvailability,
+  tuesday: defaultAvailability,
+  wednesday: defaultAvailability,
+  thursday: defaultAvailability,
+  friday: defaultAvailability,
+  saturday: { ...defaultAvailability, isActive: false },
+  sunday: { ...defaultAvailability, isActive: false },
+};
 
 export function ProviderForm({ initialData }: ProviderFormProps) {
   const router = useRouter();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const form = useForm<ProviderFormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(providerFormSchema),
     defaultValues: {
       firstName: initialData?.firstName || '',
       lastName: initialData?.lastName || '',
       email: initialData?.email || '',
       phoneNumber: initialData?.phoneNumber || '',
       isActive: initialData?.isActive ?? true,
-      services: initialData?.services?.map(s => s.value) || [],
+      services: initialData?.services || [],
+      weeklyAvailability: initialData?.weeklyAvailability || defaultWeeklyAvailability,
     },
   });
 
@@ -185,9 +187,9 @@ export function ProviderForm({ initialData }: ProviderFormProps) {
           )}
         />
         
-        <div className="p-4 border-dashed border-2 rounded-lg text-center">
-            <p className="text-muted-foreground">Service selection will be available here soon.</p>
-        </div>
+        <AvailabilityManager form={form} />
+        
+        <ServiceManager form={form} />
         
         {form.formState.errors.root?.submit && (
            <p className="text-sm font-medium text-destructive">{form.formState.errors.root.submit.message}</p>

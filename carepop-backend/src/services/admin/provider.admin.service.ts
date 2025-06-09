@@ -19,7 +19,7 @@ export class AdminProviderService {
   }
 
   async createProvider(providerData: CreateProviderBody): Promise<Provider> {
-    const { firstName, lastName, phoneNumber, isActive, ...rest } = providerData;
+    const { firstName, lastName, phoneNumber, isActive, services, ...rest } = providerData;
 
     const dbPayload = {
       ...rest,
@@ -29,7 +29,7 @@ export class AdminProviderService {
       is_active: isActive,
     };
 
-    const { data, error } = await this.supabase
+    const { data: provider, error } = await this.supabase
       .from('providers')
       .insert([dbPayload])
       .select()
@@ -47,7 +47,19 @@ export class AdminProviderService {
         StatusCodes.INTERNAL_SERVER_ERROR
       );
     }
-    return data;
+    
+    if (services && services.length > 0) {
+        const serviceLinks = services.map(serviceId => ({
+            provider_id: provider.id,
+            service_id: serviceId,
+        }));
+        const { error: serviceError } = await this.supabase.from('provider_services').insert(serviceLinks);
+        if (serviceError) {
+            throw new AppError('Failed to link services to provider.', StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    return provider;
   }
 
   async listProviders(queryParams: ListProvidersQuery) {
@@ -121,9 +133,9 @@ export class AdminProviderService {
   ): Promise<Provider | null> {
     logger.info(`[AdminProviderService] Attempting to update provider ID: ${providerId}`);
     
-    const { firstName, lastName, phoneNumber, isActive, ...rest } = updateData;
+    const { firstName, lastName, phoneNumber, isActive, weeklyAvailability, services, ...rest } = updateData;
 
-    const payload: Partial<Provider> & { updated_at: string } = {
+    const payload: Partial<Provider> & { updated_at: string; weekly_availability?: any } = {
       updated_at: new Date().toISOString(),
       ...rest,
     };
@@ -132,12 +144,14 @@ export class AdminProviderService {
     if (lastName) payload.last_name = lastName;
     if (phoneNumber) payload.contact_number = phoneNumber;
     if (isActive !== undefined) payload.is_active = isActive;
+    if (weeklyAvailability) payload.weekly_availability = weeklyAvailability;
 
-    const { data, error } = await this.supabase
+    const { data: provider, error } = await this.supabase
       .from('providers')
       .update(payload)
       .eq('id', providerId)
-      .select();
+      .select()
+      .single();
 
     if (error) {
       logger.error(`[AdminProviderService] Supabase error updating provider ID ${providerId}:`, { error });
@@ -153,13 +167,54 @@ export class AdminProviderService {
       );
     }
     
-    if (!data || data.length === 0) {
+    if (services) {
+        // First, delete all existing services for this provider
+        const { error: deleteError } = await this.supabase.from('provider_services').delete().eq('provider_id', providerId);
+        if (deleteError) {
+            throw new AppError('Failed to update provider services (delete step).', StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+
+        // Then, insert the new ones
+        if (services.length > 0) {
+            const serviceLinks = services.map(serviceId => ({
+                provider_id: providerId,
+                service_id: serviceId,
+            }));
+            const { error: insertError } = await this.supabase.from('provider_services').insert(serviceLinks);
+            if (insertError) {
+                throw new AppError('Failed to update provider services (insert step).', StatusCodes.INTERNAL_SERVER_ERROR);
+            }
+        }
+    }
+    
+    if (!provider) {
       logger.warn(`[AdminProviderService] No provider found with ID: ${providerId} to update.`);
       return null;
     }
 
     logger.info(`[AdminProviderService] Successfully updated provider ID: ${providerId}`);
-    return data[0];
+    return provider;
+  }
+
+  async updateProviderAvailability(
+    providerId: string,
+    weeklyAvailability: any
+  ): Promise<Provider | null> {
+    const { data, error } = await this.supabase
+      .from('providers')
+      .update({ weekly_availability: weeklyAvailability })
+      .eq('id', providerId)
+      .select()
+      .single();
+
+    if (error) {
+      logger.error(`[AdminProviderService] Supabase error updating availability for provider ID ${providerId}:`, { error });
+      throw new AppError(
+        'Failed to update provider availability.',
+        StatusCodes.INTERNAL_SERVER_ERROR
+      );
+    }
+    return data;
   }
 
   async deleteProvider(providerId: string): Promise<boolean> {

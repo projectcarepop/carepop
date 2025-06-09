@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import useSWR from 'swr';
+import { useDebounce } from 'use-debounce';
 import {
   ColumnDef,
   flexRender,
@@ -31,13 +33,15 @@ import { deleteServiceCategory, getAllServiceCategories } from '@/lib/actions/se
 import { useToast } from '@/components/ui/use-toast';
 import { AppError } from '@/lib/utils/errors';
 import { TServiceCategory } from '@/lib/types/service-category.types';
+import { Input } from '@/components/ui/input';
+import { DataTablePagination } from '@/components/ui/data-table-pagination';
 
-const ActionsCell = ({ category }: { category: TServiceCategory }) => {
+const ActionsCell = ({ category, onDeleted }: { category: TServiceCategory; onDeleted: () => void }) => {
   const { toast } = useToast();
-  
+
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this service category?')) return;
-    if (!category.id) return; // Should not happen, but for type safety
+    if (!category.id) return;
 
     try {
       await deleteServiceCategory(category.id);
@@ -45,10 +49,9 @@ const ActionsCell = ({ category }: { category: TServiceCategory }) => {
         title: 'Success',
         description: `Service category "${category.name}" deleted successfully.`,
       });
-      // This will trigger a re-fetch in the parent component
-       window.dispatchEvent(new CustomEvent('serviceCategoryDeleted'));
+      onDeleted();
     } catch (error) {
-       const errorMessage = error instanceof AppError ? error.message : 'An unexpected error occurred.';
+      const errorMessage = error instanceof AppError ? error.message : 'An unexpected error occurred.';
       toast({
         title: 'Error',
         description: `Failed to delete category: ${errorMessage}`,
@@ -77,71 +80,51 @@ const ActionsCell = ({ category }: { category: TServiceCategory }) => {
   );
 };
 
-export const columns: ColumnDef<TServiceCategory>[] = [
-  {
-    accessorKey: 'name',
-    header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Name
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        )
-      },
-  },
-  {
-    accessorKey: 'description',
-    header: 'Description',
-  },
-  {
-    id: 'actions',
-    cell: ({ row }) => <ActionsCell category={row.original} />,
-  },
-];
-
 export function ServiceCategoryTable() {
   const [data, setData] = useState<TServiceCategory[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [totalPages, setTotalPages] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
 
-  const fetchData = async () => {
-    setIsLoading(true);
-    try {
-      const result = await getAllServiceCategories({ 
-        page: pagination.pageIndex + 1, 
-        limit: pagination.pageSize 
-      });
-      if (result.success && result.data) {
-        setData(result.data.categories);
-        setTotalPages(Math.ceil(result.data.total / pagination.pageSize));
-      } else if (!result.success) {
-        throw new Error(result.error?.message || "Failed to fetch data");
-      }
-    } catch (error) {
-        if (error instanceof Error) {
-            console.error("Error fetching service categories:", error.message);
-        } else {
-            console.error("An unknown error occurred while fetching service categories");
-        }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const swrKey = useMemo(() => ({
+    page: pagination.pageIndex + 1,
+    limit: pagination.pageSize,
+    search: debouncedSearchTerm,
+  }), [pagination, debouncedSearchTerm]);
+
+  const { data: result, error, isLoading, mutate } = useSWR(swrKey, getAllServiceCategories);
+
+  const columns: ColumnDef<TServiceCategory>[] = useMemo(
+    () => [
+      {
+        accessorKey: 'name',
+        header: ({ column }) => (
+          <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
+            Name
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
+      },
+      {
+        accessorKey: 'description',
+        header: 'Description',
+      },
+      {
+        id: 'actions',
+        cell: ({ row }) => <ActionsCell category={row.original} onDeleted={mutate} />,
+      },
+    ],
+    [mutate]
+  );
 
   useEffect(() => {
-    fetchData();
-
-    const handleCategoryDeleted = () => fetchData();
-    window.addEventListener('serviceCategoryDeleted', handleCategoryDeleted);
-    return () => {
-        window.removeEventListener('serviceCategoryDeleted', handleCategoryDeleted);
+    if (result?.success && result.data) {
+      setData(result.data.categories);
+      setTotalPages(Math.ceil(result.data.total / pagination.pageSize));
     }
-  }, [pagination]);
+  }, [result, pagination.pageSize]);
 
   const table = useReactTable({
     data,
@@ -161,71 +144,53 @@ export function ServiceCategoryTable() {
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center">
+        <Input
+          placeholder="Filter by category name..."
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
+          className="max-w-sm"
+        />
+      </div>
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  return (
-                    <TableHead key={header.id}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                    </TableHead>
-                  );
-                })}
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
               </TableRow>
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">Loading...</TableCell>
+              </TableRow>
+            ) : error ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center text-destructive">{error.message}</TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.original.id}
-                  data-state={row.getIsSelected() && 'selected'}
-                >
+                <TableRow key={row.original.id} data-state={row.getIsSelected() && 'selected'}>
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
+                    <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
                   ))}
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
-                  {isLoading ? "Loading..." : "No results."}
-                </TableCell>
+                <TableCell colSpan={columns.length} className="h-24 text-center">No results.</TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-end space-x-4 py-4">
-        <span className="flex-1 text-sm text-muted-foreground">
-            Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
-        </span>
-        <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-        >
-            Previous
-        </Button>
-        <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-        >
-            Next
-        </Button>
-      </div>
+      <DataTablePagination table={table} />
     </div>
   );
 } 

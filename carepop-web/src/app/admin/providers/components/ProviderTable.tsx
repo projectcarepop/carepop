@@ -1,330 +1,220 @@
 'use client';
 
-import * as React from 'react';
-import {
-  ColumnDef,
-  ColumnFiltersState,
-  SortingState,
-  VisibilityState,
-  flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  useReactTable,
-} from '@tanstack/react-table';
-import { MoreHorizontal } from 'lucide-react';
-
-import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import Link from 'next/link';
+import { useEffect, useState, useMemo } from 'react';
+import useSWR from 'swr';
+import { useDebounce } from 'use-debounce';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from '@/components/ui/badge';
+import { MoreHorizontal } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import Link from 'next/link';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/components/ui/use-toast';
-import { AppError } from '@/lib/utils';
-import { useImperativeHandle, forwardRef } from 'react';
+import { AppError, getErrorMessage, fetcher } from '@/lib/utils';
+import { DataTablePagination } from '@/components/ui/data-table-pagination';
+import { ColumnDef, useReactTable, getCoreRowModel, getPaginationRowModel, flexRender } from '@tanstack/react-table';
 
-export interface Provider {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  specialization?: string | null;
-  licenseNumber?: string | null;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+// Define the structure for a Provider
+interface IProvider {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    contact_number: string | null;
+    is_active: boolean;
+    user_id: string;
 }
 
-interface BackendProviderData {
-  id: string;
-  first_name: string;
-  last_name: string;
-  contact_email: string;
-  specialization?: string | null;
-  license_number?: string | null;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
+export function ProviderTable() {
+    const [data, setData] = useState<IProvider[]>([]);
+    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+    const [totalPages, setTotalPages] = useState(1);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
+    const [token, setToken] = useState<string | null>(null);
 
-export interface ProviderTableHandle {
-  refreshData: () => void;
-}
+    const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+    const { toast } = useToast();
 
-const ProviderTable = forwardRef<ProviderTableHandle>((props, ref) => {
-  const [data, setData] = React.useState<Provider[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
+    useEffect(() => {
+        const fetchToken = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            setToken(session?.access_token || null);
+        };
+        fetchToken();
+    }, [supabase.auth]);
 
-  const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
-  
-  const [page, setPage] = React.useState(1);
-  const [totalPages, setTotalPages] = React.useState(0);
-  const [limit] = React.useState(10);
-  const [search, setSearch] = React.useState('');
-  
-  const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
-  const { toast } = useToast();
+    const apiUrl = useMemo(() => {
+        const params = new URLSearchParams({
+            page: (pagination.pageIndex + 1).toString(),
+            limit: pagination.pageSize.toString(),
+        });
+        if (debouncedSearchTerm) {
+            params.append('search', debouncedSearchTerm);
+        }
+        return `/api/v1/admin/providers?${params.toString()}`;
+    }, [pagination, debouncedSearchTerm]);
 
-  const fetchData = React.useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('User not authenticated.');
-      
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
-      });
-      if (search) params.append('search', search);
+    const { data: result, error: swrError, isLoading, mutate } = useSWR(
+        token ? [apiUrl, token] : null,
+        fetcher
+    );
 
-      const response = await fetch(`/api/v1/admin/providers?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
+    useEffect(() => {
+        if (result?.data) {
+            setData(result.data.providers || result.data || []);
+            setTotalPages(result.data.totalPages || 0);
+        }
+    }, [result]);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch providers.');
-      }
+    const handleDelete = async (providerId: string) => {
+        if (!confirm('Are you sure you want to delete this provider? This action cannot be undone.')) return;
 
-      const result = await response.json();
-      const mappedData = result.data.map((p: BackendProviderData) => ({
-        id: p.id,
-        firstName: p.first_name,
-        lastName: p.last_name,
-        email: p.contact_email,
-        specialization: p.specialization,
-        licenseNumber: p.license_number,
-        isActive: p.is_active,
-        createdAt: p.created_at,
-        updatedAt: p.updated_at,
-      }));
+        try {
+            if (!token) throw new AppError("Not authenticated", {} as Response);
+            
+            const response = await fetch(`/api/v1/admin/providers/${providerId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
 
-      setData(mappedData);
-      setTotalPages(result.meta.totalPages);
-    } catch (e) {
-      const error = e as Error;
-      setError(error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [page, limit, search, supabase.auth]);
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new AppError(errorData.message || 'Failed to delete provider.', response);
+            }
 
-  useImperativeHandle(ref, () => ({
-    refreshData: fetchData,
-  }));
+            toast({
+                title: 'Success',
+                description: 'Provider deleted successfully.',
+            });
+            mutate();
+        } catch (err) {
+            const errorMessage = getErrorMessage(err);
+            toast({
+                title: 'Error',
+                description: errorMessage,
+                variant: 'destructive',
+            });
+        }
+    };
 
-  React.useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    const columns = useMemo<ColumnDef<IProvider>[]>(() => [
+        {
+            accessorKey: 'first_name',
+            header: 'Name',
+            cell: ({ row }) => `${row.original.first_name} ${row.original.last_name}`
+        },
+        { accessorKey: 'email', header: 'Email' },
+        { accessorKey: 'contact_number', header: 'Phone' },
+        {
+            accessorKey: 'is_active',
+            header: 'Status',
+            cell: ({ row }) => (
+                <Badge variant={row.original.is_active ? 'default' : 'secondary'}>
+                    {row.original.is_active ? 'Active' : 'Inactive'}
+                </Badge>
+            )
+        },
+        {
+            id: 'actions',
+            header: () => <div className="text-right">Actions</div>,
+            cell: ({ row }) => (
+                <div className="text-right">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                                <span className="sr-only">Open menu</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem asChild>
+                                <Link href={`/admin/providers/${row.original.id}/edit`}>Edit Details</Link>
+                            </DropdownMenuItem>
+                             <DropdownMenuItem asChild>
+                                <Link href={`/admin/providers/${row.original.id}/services`}>Manage Services</Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleDelete(row.original.id)} className="text-destructive">
+                                Delete Provider
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            )
+        }
+    ], [handleDelete]);
+    
+    const table = useReactTable({
+        data,
+        columns,
+        pageCount: totalPages,
+        state: {
+            pagination,
+        },
+        onPaginationChange: setPagination,
+        getCoreRowModel: getCoreRowModel(),
+        getPaginationRowModel: getPaginationRowModel(),
+        manualPagination: true,
+    });
 
-  const handleDelete = async (providerId: string) => {
-    if (!confirm('Are you sure you want to delete this provider? This action cannot be undone.')) return;
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new AppError("Not authenticated");
-      
-      const response = await fetch(`/api/v1/admin/providers/${providerId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${session.access_token}` },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new AppError(errorData.message || 'Failed to delete provider.');
-      }
-      
-      toast({
-        title: "Success",
-        description: "Provider deleted successfully."
-      });
-      fetchData();
-
-    } catch (err) {
-      const error = err as AppError | Error;
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const columns: ColumnDef<Provider>[] = [
-    {
-      accessorKey: 'name',
-      header: 'Name',
-      cell: ({ row }) => {
-        const provider = row.original;
-        return <div className="font-medium">{`${provider.firstName} ${provider.lastName}`}</div>;
-      },
-    },
-    {
-      accessorKey: 'email',
-      header: 'Email',
-    },
-    {
-      accessorKey: 'specialization',
-      header: 'Specialization',
-      cell: ({ row }) => row.getValue('specialization') || 'N/A',
-    },
-    {
-      accessorKey: 'isActive',
-      header: 'Status',
-      cell: ({ row }) => (
-        <Badge variant={row.getValue('isActive') ? 'default' : 'secondary'}>
-          {row.getValue('isActive') ? 'Active' : 'Inactive'}
-        </Badge>
-      ),
-    },
-    {
-      id: 'actions',
-      cell: ({ row }) => {
-        const provider = row.original;
-        return (
-          <div className="text-right">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 w-8 p-0">
-                  <span className="sr-only">Open menu</span>
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                <DropdownMenuItem asChild>
-                  <Link href={`/admin/providers/${provider.id}/edit`}>Edit Provider</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                   <Link href={`/admin/providers/${provider.id}/services`}>
-                      Manage Services
-                   </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => handleDelete(provider.id)} className="text-destructive">
-                  Delete Provider
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        );
-      },
-    },
-  ];
-
-  const table = useReactTable({
-    data,
-    columns,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    onColumnVisibilityChange: setColumnVisibility,
-    state: {
-      sorting,
-      columnFilters,
-      columnVisibility,
-    },
-    manualPagination: true,
-    pageCount: totalPages,
-  });
-
-  return (
-    <div className="w-full">
-      <div className="flex items-center py-4">
-        <Input
-          placeholder="Filter by name, email, specialization..."
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          className="max-w-sm"
-        />
-      </div>
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">Loading...</TableCell>
-              </TableRow>
-            ) : error ? (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center text-destructive">{error}</TableCell>
-              </TableRow>
-            ) : table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'} className="hover:bg-muted/50">
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">No results.</TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      <div className="flex items-center justify-end space-x-2 py-4">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setPage(p => Math.max(1, p - 1))}
-          disabled={page === 1}
-        >
-          Previous
-        </Button>
-        <span className="text-sm">Page {page} of {totalPages}</span>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-          disabled={page === totalPages || totalPages === 0}
-        >
-          Next
-        </Button>
-      </div>
-    </div>
-  );
-});
-
-ProviderTable.displayName = 'ProviderTable';
-
-export { ProviderTable }; 
+    return (
+        <div className="space-y-4">
+            <div className="flex justify-between items-center">
+                <div className="flex gap-2">
+                    <Input
+                        placeholder="Search by name, email..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="max-w-sm"
+                    />
+                </div>
+            </div>
+            <div className="rounded-md border">
+                <Table>
+                    <TableHeader>
+                        {table.getHeaderGroups().map(headerGroup => (
+                            <TableRow key={headerGroup.id}>
+                                {headerGroup.headers.map(header => (
+                                    <TableHead key={header.id}>
+                                        {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                                    </TableHead>
+                                ))}
+                            </TableRow>
+                        ))}
+                    </TableHeader>
+                    <TableBody>
+                        {isLoading ? (
+                            <TableRow>
+                                <TableCell colSpan={columns.length} className="h-24 text-center">Loading...</TableCell>
+                            </TableRow>
+                        ) : swrError ? (
+                            <TableRow>
+                                <TableCell colSpan={columns.length} className="h-24 text-center text-destructive">{swrError.message}</TableCell>
+                            </TableRow>
+                        ) : table.getRowModel().rows.length > 0 ? (
+                            table.getRowModel().rows.map(row => (
+                                <TableRow key={row.id}>
+                                    {row.getVisibleCells().map(cell => (
+                                        <TableCell key={cell.id}>
+                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                        </TableCell>
+                                    ))}
+                                </TableRow>
+                            ))
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={columns.length} className="h-24 text-center">No providers found.</TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </div>
+            <DataTablePagination table={table} />
+        </div>
+    );
+} 

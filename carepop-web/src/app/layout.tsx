@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import ConditionalHeader from "@/components/layout/ConditionalHeader";
-import Footer from "@/components/layout/Footer";
+import ConditionalFooter from "@/components/layout/ConditionalFooter";
 import { AuthProvider } from "@/lib/contexts/AuthContext"; // Assuming this path
 import { Toaster } from 'sonner';
 
@@ -73,7 +73,7 @@ export default function RootLayout({
           <main className="flex-grow">
             {children}
           </main>
-          <Footer />
+          <ConditionalFooter />
           <Toaster richColors />
         </AuthProvider>
       </body>
