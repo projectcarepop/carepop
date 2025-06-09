@@ -162,15 +162,20 @@ export function ServiceForm({ initialData }: { initialData?: ServiceFormValues &
           render={({ field }) => (
             <FormItem>
               <FormLabel>Category</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                <Select
+                  onValueChange={(value) => field.onChange(value === "__NONE__" ? null : value)}
+                  defaultValue={field.value ?? "__NONE__"}
+                >
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a category" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
-                    {categories.map((cat) => (
+                    <SelectItem value="__NONE__">None</SelectItem>
+                    {categories
+                      .filter(cat => cat && cat.id) 
+                      .map((cat) => (
                       <SelectItem key={cat.id} value={cat.id}>
                         {cat.name}
                       </SelectItem>
