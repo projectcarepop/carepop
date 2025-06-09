@@ -129,7 +129,7 @@ export class AppointmentAdminService {
       .from('appointments')
       .select(`
         *,
-        user:users(first_name, last_name, email),
+        user:profiles(first_name, last_name, email),
         service:services(name),
         provider:providers(first_name, last_name)
       `, { count: 'exact' });
@@ -139,7 +139,7 @@ export class AppointmentAdminService {
     }
     
     if (search) {
-       query = query.or(`service.name.ilike.%${search}%,provider.first_name.ilike.%${search}%,provider.last_name.ilike.%${search}%,user.first_name.ilike.%${search}%,user.last_name.ilike.%${search}%,user.email.ilike.%${search}%`);
+      console.warn('Search functionality across multiple fields is temporarily disabled.');
     }
 
     query = query.range(offset, offset + limit - 1)
@@ -148,7 +148,7 @@ export class AppointmentAdminService {
     const { data, error, count } = await query;
 
     if (error) {
-      console.error('Error fetching appointments:', error);
+      console.error('Error fetching appointments:', { message: error.message, details: error.details, hint: error.hint });
       throw new AppError('Failed to fetch appointments from the database.', 500);
     }
     
