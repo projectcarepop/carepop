@@ -198,7 +198,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       const token = sessionParam.access_token;
-      const response = await fetch(`/api/v1/admin/users/profile`, {
+      const response = await fetch(`/api/v1/users/profile`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -255,6 +255,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log(`[AuthContext] fetchProfile: Successfully fetched profile data from API for ${userParam.id}`);
       setProfile(fetchedProfileData);
       setError(null);
+      console.log('[AuthContext] fetchProfile: Profile state updated successfully with:', JSON.stringify(fetchedProfileData, null, 2));
       return fetchedProfileData;
 
     } catch (e: unknown) {
@@ -267,35 +268,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const exposedFetchProfile = async (userForProfile: User): Promise<Profile | null> => {
-    const { data: { session } } = await supabase.auth.getSession();
-    return fetchProfile(userForProfile, session);
+    const { data } = await supabase.auth.getSession();
+    return await fetchProfile(userForProfile, data.session);
   };
 
   const signInWithEmail = async (email: string, password?: string) => {
-    console.log('[AuthContext] signInWithEmail called. Email:', email);
+    if (!password) {
+      // Handle passwordless (magic link) if needed, or throw error
+      throw new Error("Password is required for email sign-in.");
+    }
+    
     setIsLoading(true);
     setError(null);
-    try {
-      if (!password) {
-        console.error("Password is required for email/password sign-in.");
-        const err = { name: "AuthInvalidCredentialsError", message: "Password is required." } as AuthError;
-        setError(err);
-        return { error: err };
-      }
+    
+    // Use the client-side Supabase SDK directly
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (signInError) {
-        console.error('Login error:', signInError);
-        setError(signInError);
-      }
-      return { error: signInError };
-    } finally {
-      setIsLoading(false);
+    if (error) {
+      console.error('[AuthContext] signInWithEmail: Supabase auth error:', error);
+      setError(error);
     }
+    // No need to manually set user/session, onAuthStateChange will handle it.
+    
+    setIsLoading(false);
+    return { error };
   };
 
   const signUpWithPassword = async (email: string, password: string) => {
