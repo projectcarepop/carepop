@@ -1,12 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import useSWR from 'swr';
+import { useDebounce } from '@/hooks/useDebounce';
+import { fetcher } from '@/lib/utils/fetcher';
+import { Input } from '@/components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download, Trash2 } from 'lucide-react';
-import { deleteMedicalRecord } from '@/lib/actions/admin.actions';
 import Link from 'next/link';
-import { toast } from 'sonner';
+import { PlusCircle } from 'lucide-react';
 
 interface MedicalRecord {
   id: string;
@@ -16,69 +19,82 @@ interface MedicalRecord {
   created_at: string;
 }
 
-export function MedicalRecordsList({ records, userId }: { records: MedicalRecord[], userId: string }) {
+interface MedicalRecordsListProps {
+  userId: string;
+}
 
-  const handleDownload = (recordUrl: string) => {
-    window.open(recordUrl, '_blank');
-  };
+export function MedicalRecordsList({ userId }: MedicalRecordsListProps) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
-  const handleDelete = async (recordId: string) => {
-    if (confirm('Are you sure you want to delete this medical record?')) {
-      try {
-        await deleteMedicalRecord(recordId);
-        toast.success('Record deleted successfully.');
-        // Note: Relies on revalidatePath in the server action to refresh the list.
-      } catch (error: any) {
-        toast.error(error.message || 'Failed to delete record.');
-      }
-    }
-  };
+  const apiUrl = `/api/v1/admin/users/${userId}/medical-records?search=${debouncedSearchTerm}`;
+  const { data: records, error, isLoading } = useSWR<MedicalRecord[]>(apiUrl, fetcher);
 
   return (
-    <>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-              <CardTitle>Medical Records</CardTitle>
-              <CardDescription>A list of the user&apos;s uploaded medical records.</CardDescription>
-          </div>
-          <Button asChild>
-            <Link href={`/admin/users/${userId}/upload-medical-record`}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Add New Record
-            </Link>
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {!records || records.length === 0 ? (
-            <p>This user has no medical records.</p>
-          ) : (
-            records.map((record) => (
-              <div key={record.id} className="flex items-center justify-between rounded-lg border p-4">
-                <div>
-                  <p className="font-semibold">{record.record_title}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {record.record_details || 'No description'}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Uploaded on {new Date(record.created_at).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Button variant="outline" size="sm" onClick={() => handleDownload(record.record_file_url)}>
-                    <Download className="mr-2 h-4 w-4" />
-                    View/Download
-                  </Button>
-                  <Button variant="destructive" size="sm" onClick={() => handleDelete(record.id)}>
-                     <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
-                  </Button>
-                </div>
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
-    </>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <Input
+          placeholder="Search by record title..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-sm"
+        />
+        <Button asChild>
+          <Link href={`/admin/users/${userId}/upload-medical-record`}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Upload Record
+          </Link>
+        </Button>
+      </div>
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Title</TableHead>
+              <TableHead>Date Added</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading &&
+              Array.from({ length: 3 }).map((_, index) => (
+                <TableRow key={index}>
+                  <TableCell colSpan={3}>
+                    <Skeleton className="h-4 w-full" />
+                  </TableCell>
+                </TableRow>
+              ))}
+            {error && (
+              <TableRow>
+                <TableCell colSpan={3} className="text-center text-red-500">
+                  Failed to load medical records.
+                </TableCell>
+              </TableRow>
+            )}
+            {records && records.length > 0 ? (
+              records.map((record) => (
+                <TableRow key={record.id}>
+                  <TableCell className="font-medium">{record.record_title}</TableCell>
+                  <TableCell>{new Date(record.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell>
+                    <a href={record.record_file_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                      View
+                    </a>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              !isLoading && (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-center">
+                    No medical records found.
+                  </TableCell>
+                </TableRow>
+              )
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
   );
 } 

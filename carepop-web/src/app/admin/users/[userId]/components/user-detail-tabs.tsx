@@ -14,31 +14,12 @@ interface Profile {
   // Add other profile fields as needed from your actual data structure
 }
 
-interface Appointment {
-  id: string;
-  appointment_datetime: string;
-  status: string;
-  service?: { name: string };
-  clinic?: { name: string };
-  provider?: { name: string };
-}
-
-interface MedicalRecord {
-  id: string;
-  record_title: string;
-  record_details: string | null;
-  record_file_url: string;
-  created_at: string;
-}
-
 interface UserDetailTabsProps {
   profile: Profile;
-  appointments: Appointment[];
-  medicalRecords: MedicalRecord[];
   userId: string;
 }
 
-export function UserDetailTabs({ profile, appointments, medicalRecords, userId }: UserDetailTabsProps) {
+export function UserDetailTabs({ profile, userId }: UserDetailTabsProps) {
   return (
     <Tabs defaultValue="profile">
       <TabsList className="grid w-full grid-cols-3">
@@ -50,13 +31,10 @@ export function UserDetailTabs({ profile, appointments, medicalRecords, userId }
         <ProfileForm profile={profile} userId={userId} />
       </TabsContent>
       <TabsContent value="appointments">
-        <AppointmentsList appointments={appointments} />
+        <AppointmentsList userId={userId} />
       </TabsContent>
       <TabsContent value="records">
-        <MedicalRecordsList 
-          records={medicalRecords} 
-          userId={userId} 
-        />
+        <MedicalRecordsList userId={userId} />
       </TabsContent>
     </Tabs>
   );

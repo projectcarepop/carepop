@@ -1,0 +1,2 @@
+-- Create an index on the record_title column of the user_medical_records table for faster searching.
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_user_medical_records_record_title ON public.user_medical_records (record_title); 
