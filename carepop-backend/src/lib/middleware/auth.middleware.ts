@@ -3,9 +3,18 @@ import jwt from 'jsonwebtoken';
 import { ApiError } from '@/utils/ApiError';
 import { asyncHandler } from '@/utils/asyncHandler';
 
+// Define the shape of the request object after authentication
+export interface AuthenticatedRequest extends Request {
+    user?: {
+        sub: string; // The user ID from the Supabase JWT
+        role: string; // The user role from the Supabase JWT
+        [key: string]: any;
+    };
+}
+
 // This middleware protects routes by verifying a Supabase JWT.
 // It is designed to be robust and prevent server crashes from invalid tokens.
-export const authMiddleware = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+export const authMiddleware = asyncHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const token = req.headers.authorization?.split(' ')[1]; // Using optional chaining for safety
 
     if (!token) {
@@ -21,8 +30,7 @@ export const authMiddleware = asyncHandler(async (req: Request, res: Response, n
 
         // IMPORTANT: The decoded payload from a Supabase JWT contains user info like 'sub' (user ID) and 'role'.
         // We attach this payload to the request object for later use in our controllers.
-        // @ts-ignore - We are intentionally extending the Express Request object.
-        req.user = decodedPayload;
+        req.user = decodedPayload as AuthenticatedRequest['user'];
         
         next(); // If verification is successful, proceed to the next middleware or controller.
     } catch (error) {
