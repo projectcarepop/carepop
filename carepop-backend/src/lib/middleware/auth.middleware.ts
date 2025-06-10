@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { ApiError } from '@/utils/ApiError';
+import { AppError } from '@/lib/utils/appError';
 import { asyncHandler } from '@/utils/asyncHandler';
+import { StatusCodes } from 'http-status-codes';
 
 // Define the shape of the request object after authentication
 export interface AuthenticatedRequest extends Request {
@@ -20,7 +21,7 @@ export const authMiddleware = asyncHandler(async (req: AuthenticatedRequest, res
     if (!token) {
         // If there's no token, we throw a specific, handled error.
         // This will result in a 401 response, not a 500 server crash.
-        throw new ApiError(401, 'Unauthorized: Access token is missing or malformed');
+        throw new AppError('Unauthorized: Access token is missing or malformed', StatusCodes.UNAUTHORIZED);
     }
 
     try {
@@ -37,6 +38,6 @@ export const authMiddleware = asyncHandler(async (req: AuthenticatedRequest, res
         // If jwt.verify fails (e.g., token expired, signature invalid), it throws an error.
         // We catch it here and return a standardized 401 error.
         // This prevents the entire server from crashing.
-        throw new ApiError(401, 'Unauthorized: Invalid or expired token');
+        throw new AppError('Unauthorized: Invalid or expired token', StatusCodes.UNAUTHORIZED);
     }
 }); 

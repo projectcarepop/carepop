@@ -1,5 +1,6 @@
+import { AppError } from '@/lib/utils/appError';
 import { supabase } from '@/lib/supabase/client';
-import { ApiError } from '@/utils/ApiError';
+import { StatusCodes } from 'http-status-codes';
 
 export class UserService {
   /**
@@ -9,7 +10,7 @@ export class UserService {
    */
   public async getUserProfile(userId: string) {
     if (!userId) {
-      throw new ApiError(400, 'User ID is required.');
+      throw new AppError('User ID is required.', StatusCodes.BAD_REQUEST);
     }
 
     const { data: profile, error } = await supabase
@@ -21,13 +22,13 @@ export class UserService {
     if (error) {
       console.error(`Error fetching profile for user ${userId}:`, error);
       if (error.code === 'PGRST116') {
-        throw new ApiError(404, 'Profile not found.');
+        throw new AppError('Profile not found.', StatusCodes.NOT_FOUND);
       }
-      throw new ApiError(500, 'Failed to fetch user profile.');
+      throw new AppError('Failed to fetch user profile.', StatusCodes.INTERNAL_SERVER_ERROR);
     }
 
     if (!profile) {
-      throw new ApiError(404, 'Profile not found.');
+      throw new AppError('Profile not found.', StatusCodes.NOT_FOUND);
     }
 
     return profile;

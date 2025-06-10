@@ -1,6 +1,14 @@
 import { supabase } from '@/lib/supabase/client';
-import { ApiError } from '@/utils/ApiError';
+import { AppError } from '@/lib/utils/appError';
 import { PostgrestError } from '@supabase/supabase-js';
+import { z } from 'zod';
+import { loginSchema, signUpSchema } from '@/validation/public/authValidation';
+import { UserService } from './userService';
+import { StatusCodes } from 'http-status-codes';
+
+// Infer types from Zod schemas
+type TSignUpCredentials = z.infer<typeof signUpSchema>;
+type TSignInCredentials = z.infer<typeof loginSchema>;
 
 export class AuthService {
   async signUp(
@@ -21,10 +29,10 @@ export class AuthService {
     });
 
     if (error) {
-      throw new ApiError(400, error.message);
+      throw new AppError(error.message, StatusCodes.BAD_REQUEST);
     }
     if (!data.user || !data.session) {
-        throw new ApiError(500, 'Sign up failed, user or session not returned');
+      throw new AppError('Sign up failed, user or session not returned', StatusCodes.INTERNAL_SERVER_ERROR);
     }
 
     // The handle_new_user trigger in Supabase should have created a profile.
@@ -42,10 +50,10 @@ export class AuthService {
     });
 
     if (authError) {
-      throw new ApiError(401, authError.message || 'Invalid credentials');
+      throw new AppError(authError.message || 'Invalid credentials', StatusCodes.UNAUTHORIZED);
     }
     if (!authData.user) {
-      throw new ApiError(404, 'User not found');
+      throw new AppError('User not found', StatusCodes.NOT_FOUND);
     }
 
     const userId = authData.user.id;

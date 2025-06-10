@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { AnyZodObject, ZodError } from 'zod';
-import { ApiError } from '@/utils/ApiError';
+import { AppError } from '@/lib/utils/appError';
+import { StatusCodes } from 'http-status-codes';
 
 interface ValidationSchemas {
   params?: AnyZodObject;
@@ -22,16 +23,16 @@ export const validateRequest = (schemas: ValidationSchemas) =>
       }
       next();
     } catch (error) {
-        if (error instanceof ZodError) {
-            const errorMessages = error.errors.map((issue) => ({
-                path: issue.path.join('.'),
-                message: issue.message,
-            }));
-            const apiError = new ApiError(400, 'Invalid request data');
-            (apiError as any).errors = errorMessages;
-            next(apiError);
-        } else {
-            next(new ApiError(500, 'Internal Server Error'));
-        }
+      if (error instanceof ZodError) {
+        const errorMessages = error.errors.map((e) => ({
+          field: e.path.join('.'),
+          message: e.message,
+        }));
+        const appError = new AppError('Invalid request data', StatusCodes.BAD_REQUEST);
+        (appError as any).errors = errorMessages;
+        next(appError);
+      } else {
+        next(new AppError('Internal Server Error', StatusCodes.INTERNAL_SERVER_ERROR));
+      }
     }
 }; 
