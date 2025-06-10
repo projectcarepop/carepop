@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { AppError } from '@/lib/utils/appError';
 import { asyncHandler } from '@/utils/asyncHandler';
 import { StatusCodes } from 'http-status-codes';
+import { logger } from '@/config/logger';
 
 // Define the shape of the request object after authentication
 export interface AuthenticatedRequest extends Request {
@@ -35,9 +36,13 @@ export const authMiddleware = asyncHandler(async (req: AuthenticatedRequest, res
         
         next(); // If verification is successful, proceed to the next middleware or controller.
     } catch (error) {
+        // Log the specific JWT error for easier debugging in the backend logs.
+        if (error instanceof Error) {
+            logger.warn(`[Auth] JWT Verification Failed: ${error.name} - ${error.message}`, { path: req.path });
+        }
+        
         // If jwt.verify fails (e.g., token expired, signature invalid), it throws an error.
         // We catch it here and return a standardized 401 error.
-        // This prevents the entire server from crashing.
         throw new AppError('Unauthorized: Invalid or expired token', StatusCodes.UNAUTHORIZED);
     }
 }); 
