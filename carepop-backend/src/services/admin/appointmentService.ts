@@ -1,18 +1,11 @@
 import { supabaseServiceRole } from '../../config/supabaseClient';
-import { updateAppointmentSchema } from '../../validation/admin/appointmentValidation';
+import { updateAppointmentSchema } from '../../validation/admin/appointment.admin.validation';
 import { z } from 'zod';
+import { AppError } from '../../utils/errors';
 
 const TABLE_NAME = 'appointments';
 
 type UpdateAppointmentDTO = z.infer<typeof updateAppointmentSchema>;
-
-class HttpError extends Error {
-    statusCode: number;
-    constructor(message: string, statusCode: number) {
-        super(message);
-        this.statusCode = statusCode;
-    }
-}
 
 const selectWithJoins = `
     *,
@@ -25,15 +18,15 @@ const selectWithJoins = `
 export const appointmentService = {
   getAll: async () => {
     const { data, error } = await supabaseServiceRole.from(TABLE_NAME).select(selectWithJoins);
-    if (error) { throw new HttpError('Failed to fetch appointments.', 500); }
+    if (error) { throw new AppError('Failed to fetch appointments.', 500); }
     return data;
   },
 
   getById: async (id: string) => {
     const { data, error } = await supabaseServiceRole.from(TABLE_NAME).select(selectWithJoins).eq('id', id).single();
     if (error) {
-        if (error.code === 'PGRST116') { throw new HttpError('Appointment not found.', 404); }
-        throw new HttpError('Failed to fetch appointment.', 500);
+        if (error.code === 'PGRST116') { throw new AppError('Appointment not found.', 404); }
+        throw new AppError('Failed to fetch appointment.', 500);
     }
     return data;
   },
@@ -41,8 +34,8 @@ export const appointmentService = {
   update: async (id: string, appointmentData: UpdateAppointmentDTO) => {
     const { data, error } = await supabaseServiceRole.from(TABLE_NAME).update(appointmentData).eq('id', id).select(selectWithJoins).single();
     if (error) {
-        if (error.code === 'PGRST116') { throw new HttpError('Appointment not found.', 404); }
-        throw new HttpError('Failed to update appointment.', 500);
+        if (error.code === 'PGRST116') { throw new AppError('Appointment not found.', 404); }
+        throw new AppError('Failed to update appointment.', 500);
     }
     return data;
   },

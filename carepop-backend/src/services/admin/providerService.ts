@@ -1,20 +1,13 @@
 import { supabaseServiceRole } from '../../config/supabaseClient';
-import { createProviderSchema, updateProviderSchema } from '../../validation/admin/providerValidation';
+import { createProviderBodySchema, updateProviderBodySchema } from '../../validation/admin/provider.admin.validation';
 import { z } from 'zod';
+import { AppError } from '../../utils/errors';
 
 const PROVIDERS_TABLE = 'providers';
 const USER_ROLES_TABLE = 'user_roles';
 
-type CreateProviderDTO = z.infer<typeof createProviderSchema>;
-type UpdateProviderDTO = z.infer<typeof updateProviderSchema>;
-
-class HttpError extends Error {
-    statusCode: number;
-    constructor(message: string, statusCode: number) {
-        super(message);
-        this.statusCode = statusCode;
-    }
-}
+type CreateProviderDTO = z.infer<typeof createProviderBodySchema>;
+type UpdateProviderDTO = z.infer<typeof updateProviderBodySchema>;
 
 export const providerService = {
   create: async (providerData: CreateProviderDTO) => {
@@ -28,7 +21,7 @@ export const providerService = {
 
     if (roleError) {
       console.error('Supabase error assigning provider role:', roleError);
-      throw new HttpError('Failed to assign provider role.', 500);
+      throw new AppError('Failed to assign provider role.', 500);
     }
 
     // Step 2: Create the provider profile.
@@ -42,7 +35,7 @@ export const providerService = {
       console.error('Supabase error creating provider profile:', providerError);
       // Here you might want to add logic to roll back the role assignment if creation fails.
       // For now, we'll just throw the error.
-      throw new HttpError('Failed to create provider profile.', 500);
+      throw new AppError('Failed to create provider profile.', 500);
     }
     return data;
   },
@@ -57,15 +50,15 @@ export const providerService = {
 
     const { data, error } = await query;
 
-    if (error) { throw new HttpError('Failed to fetch providers.', 500); }
+    if (error) { throw new AppError('Failed to fetch providers.', 500); }
     return data;
   },
 
   getById: async (id: string) => {
     const { data, error } = await supabaseServiceRole.from(PROVIDERS_TABLE).select('*').eq('id', id).single();
     if (error) {
-        if (error.code === 'PGRST116') { throw new HttpError('Provider not found.', 404); }
-        throw new HttpError('Failed to fetch provider.', 500);
+        if (error.code === 'PGRST116') { throw new AppError('Provider not found.', 404); }
+        throw new AppError('Failed to fetch provider.', 500);
     }
     return data;
   },
@@ -73,8 +66,8 @@ export const providerService = {
   update: async (id: string, providerData: UpdateProviderDTO) => {
     const { data, error } = await supabaseServiceRole.from(PROVIDERS_TABLE).update(providerData).eq('id', id).select().single();
     if (error) {
-        if (error.code === 'PGRST116') { throw new HttpError('Provider not found.', 404); }
-        throw new HttpError('Failed to update provider.', 500);
+        if (error.code === 'PGRST116') { throw new AppError('Provider not found.', 404); }
+        throw new AppError('Failed to update provider.', 500);
     }
     return data;
   },
@@ -83,7 +76,7 @@ export const providerService = {
   // The role might be removed or kept depending on business logic.
   delete: async (id: string) => {
     const { error } = await supabaseServiceRole.from(PROVIDERS_TABLE).delete().eq('id', id);
-    if (error) { throw new HttpError('Failed to delete provider.', 500); }
+    if (error) { throw new AppError('Failed to delete provider.', 500); }
     return { message: 'Provider profile deleted successfully.' };
   },
 }; 

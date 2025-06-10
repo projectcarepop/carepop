@@ -1,19 +1,12 @@
 import { supabaseServiceRole } from '../../config/supabaseClient';
-import { createInventoryItemSchema, updateInventoryItemSchema } from '../../validation/admin/inventoryValidation';
+import { createInventoryItemSchema, updateInventoryItemSchema } from '../../validation/admin/inventory-item.admin.validation';
 import { z } from 'zod';
+import { AppError } from '../../utils/errors';
 
 const TABLE_NAME = 'inventory_items';
 
 type CreateInventoryItemDTO = z.infer<typeof createInventoryItemSchema>;
 type UpdateInventoryItemDTO = z.infer<typeof updateInventoryItemSchema>;
-
-class HttpError extends Error {
-    statusCode: number;
-    constructor(message: string, statusCode: number) {
-        super(message);
-        this.statusCode = statusCode;
-    }
-}
 
 export const inventoryService = {
   create: async (itemData: CreateInventoryItemDTO) => {
@@ -25,7 +18,7 @@ export const inventoryService = {
 
     if (error) {
       console.error('Supabase error creating inventory item:', error);
-      throw new HttpError('Failed to create inventory item.', 500);
+      throw new AppError('Failed to create inventory item.', 500);
     }
     return data;
   },
@@ -38,7 +31,7 @@ export const inventoryService = {
     const { data, error } = await query;
     if (error) {
       console.error('Supabase error fetching inventory items:', error);
-      throw new HttpError('Failed to fetch inventory items.', 500);
+      throw new AppError('Failed to fetch inventory items.', 500);
     }
     return data;
   },
@@ -52,10 +45,10 @@ export const inventoryService = {
 
     if (error) {
         if (error.code === 'PGRST116') { // PostgREST error code for "Not Found"
-            throw new HttpError('Inventory item not found.', 404);
+            throw new AppError('Inventory item not found.', 404);
         }
         console.error(`Supabase error fetching item with id ${id}:`, error);
-        throw new HttpError('Failed to fetch inventory item.', 500);
+        throw new AppError('Failed to fetch inventory item.', 500);
     }
     return data;
   },
@@ -70,10 +63,10 @@ export const inventoryService = {
     
     if (error) {
         if (error.code === 'PGRST116') {
-            throw new HttpError('Inventory item not found.', 404);
+            throw new AppError('Inventory item not found.', 404);
         }
         console.error(`Supabase error updating item with id ${id}:`, error);
-        throw new HttpError('Failed to update inventory item.', 500);
+        throw new AppError('Failed to update inventory item.', 500);
     }
     return data;
   },
@@ -86,7 +79,7 @@ export const inventoryService = {
 
     if (error) {
       console.error(`Supabase error deleting item with id ${id}:`, error);
-      throw new HttpError('Failed to delete inventory item.', 500);
+      throw new AppError('Failed to delete inventory item.', 500);
     }
     return { message: 'Inventory item deleted successfully.' };
   },
