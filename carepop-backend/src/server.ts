@@ -3,22 +3,14 @@ import cors from 'cors';
 import logger from './utils/logger';
 import { supabaseInitializationPromise } from './config/supabaseClient';
 
-// Non-admin routes
+// Publicly accessible routes
 import authRoutes from './routes/authRoutes';
-import profileRoutes from './routes/profileRoutes';
-import directoryRoutes from './routes/directoryRoutes';
-// The old service, provider, appt, avail routes might be refactored or kept
-// depending on whether they are for non-admin users. Assuming they are for now.
-import serviceRoutes from './routes/serviceRoutes'; 
-import appointmentRoutes from './routes/appointmentRoutes';
-import availabilityRoutes from './routes/availabilityRoutes';
-import providerRoutes from './routes/providerRoutes';
 
-// NEW: Consolidated Admin Routes
+// Consolidated Admin Routes
 import adminRoutes from './routes/admin';
 
-// NEW: Global Error Handler
-import { errorHandler } from './middleware/errorHandler';
+// Global Error Handler
+import { errorMiddleware as errorHandler } from './lib/middleware/error.middleware';
 
 import { getConfig } from './config/config';
 
@@ -53,19 +45,10 @@ async function startServer() {
     await supabaseInitializationPromise;
     logger.info('Supabase clients initialized successfully by server.');
 
-    // --- Mount Non-Admin Routers ---
-    app.use('/api/auth', authRoutes);
-    app.use('/api/users', profileRoutes); // Consider renaming to /api/profiles
-    app.use('/api/v1/directory', directoryRoutes);
-    app.use('/api/v1', serviceRoutes);
-    app.use('/api/v1', providerRoutes);
-    app.use('/api/v1/appointments', appointmentRoutes);
-    app.use('/api/v1/availability', availabilityRoutes);
-    logger.info('Non-admin routes mounted.');
-    
-    // --- Mount ALL Admin Routes ---
-    app.use('/api/v1/admin', adminRoutes);
-    logger.info('All admin routes mounted under /api/v1/admin.');
+    // --- Mount Routers ---
+    app.use('/api/auth', authRoutes); // Public auth routes
+    app.use('/api/v1/admin', adminRoutes); // All protected admin routes
+    logger.info('API routes mounted.');
     
     // --- 404 Handler (for unhandled routes) ---
     app.use((req: Request, res: Response) => {

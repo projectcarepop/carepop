@@ -36,7 +36,7 @@ const ProviderSelectionStep: React.FC = () => {
       const token = sessionData.session.access_token;
       
       const queryParams = new URLSearchParams({ serviceId }).toString();
-      const res = await fetch(`/api/v1/clinics/${clinicId}/providers?${queryParams}`, {
+      const res = await fetch(`/api/v1/admin/clinics/${clinicId}/providers?${queryParams}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         }

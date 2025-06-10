@@ -74,7 +74,7 @@ const DateTimeSelectionStep: React.FC = () => {
         endDate,
       }).toString();
 
-      const res = await fetch(`/api/v1/availability/provider/${providerId}/slots?${queryParams}`);
+      const res = await fetch(`/api/v1/admin/providers/${providerId}/slots?${queryParams}`);
       if (!res.ok) {
         const errorText = res.status === 404 
           ? 'Availability data could not be found for this provider.' 

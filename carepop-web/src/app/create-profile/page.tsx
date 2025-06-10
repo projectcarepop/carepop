@@ -355,13 +355,18 @@ export default function CreateProfileWizardPage() {
         return;
       }
 
-      const response = await fetch(`${apiUrl}/api/users/profile`, {
-        method: 'PATCH',
+      // Construct the payload according to what the backend expects
+      const payload = {
+        // ...
+      };
+
+      const response = await fetch(`/api/v1/admin/users/profile`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(profileDataToSubmit),
+        body: JSON.stringify(payload),
       });
 
       const result = await response.json();

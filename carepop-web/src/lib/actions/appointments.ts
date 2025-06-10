@@ -1,236 +1,98 @@
 "use server"; // Directive to mark all exports as Server Actions
 
-import { cookies } from 'next/headers';
-import { createServerClient, type CookieOptions } from '@supabase/ssr'; // Import createServerClient
-import { 
-  // AppointmentStatus, // Removed as it's unused in this file now
-  // ServiceDetails, // Removed
-  // ClinicDetails, // Removed
-  // ProviderDetails, // Removed
-  UserAppointmentDetails 
-} from '@/lib/types/appointmentTypes'; // Import types
+import { revalidatePath } from 'next/cache';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { AppError } from '@/lib/utils/errors';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1` : 'http://localhost:8080/api/v1';
-
-// Type definitions are now in ../types/appointmentTypes.ts
-
-async function getAuthToken(): Promise<string | null> {
-  // No longer capturing cookieStore here
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        async get(name: string) {
-          // Call cookies() directly inside the method
-          const cookieStore = await cookies();
-          return cookieStore.get(name)?.value;
-        },
-        async set(name: string, value: string, options: CookieOptions) {
-          try {
-            // Call cookies() directly inside the method
-            const cookieStore = await cookies();
-            cookieStore.set(name, value, options);
-          } catch {
-            // const cookieStore = cookies(); // Removed, error variable not needed
-            // The `set` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
-          }
-        },
-        async remove(name: string, options: CookieOptions) {
-          try {
-            // Call cookies() directly inside the method
-            const cookieStore = await cookies();
-            cookieStore.set(name, '', options); // Note: Supabase examples use set with empty string for remove
-          } catch {
-            // const cookieStore = cookies(); // Removed, error variable not needed
-            // The `delete` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
-          }
-        },
-      },
-    }
-  );
-
-  try {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    if (error) {
-      console.error('[getAuthToken] Supabase getSession error:', error);
-      return null;
-    }
-    return session?.access_token || null;
-  } catch (error) {
-    console.error('[getAuthToken] Unexpected error during getSession:', error);
-    return null;
+// Helper to get the auth token
+async function getAuthToken() {
+  const supabase = await createSupabaseServerClient();
+  const { data: { session }, error } = await supabase.auth.getSession();
+  if (error || !session) {
+    throw new AppError('Authentication required.', 401);
   }
+  return session.access_token;
 }
 
-export async function getFutureAppointments(): Promise<UserAppointmentDetails[]> {
-  const token = await getAuthToken();
-  if (!token) {
-    console.error('[getFutureAppointments] No auth token found.');
-    throw new Error('Authentication required to fetch future appointments.');
-  }
-
+// Fetch Future Appointments
+export async function getFutureAppointments() {
   try {
-    const response = await fetch(`${API_BASE_URL}/appointments/me/future`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      cache: 'no-store', // Ensure fresh data for dynamic content like appointments
+    const token = await getAuthToken();
+    const response = await fetch(`/api/v1/admin/appointments?time_frame=upcoming`, {
+      headers: { 'Authorization': `Bearer ${token}` },
     });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: response.statusText }));
-      console.error(`[getFutureAppointments] API error ${response.status}:`, errorData);
-      throw new Error(`Failed to fetch future appointments: ${errorData.message || response.statusText}`);
-    }
-    const data = await response.json();
-    console.log("[getFutureAppointments] Raw data from API:", JSON.stringify(data, null, 2)); // Log the raw data
-    return data.data as UserAppointmentDetails[];
+    if (!response.ok) throw new AppError('Failed to fetch upcoming appointments');
+    return { success: true, data: await response.json() };
   } catch (error) {
-    console.error('[getFutureAppointments] Fetching error:', error);
-    if (error instanceof Error) {
-        throw error; // Re-throw original error if it's already an Error instance
-    } else {
-        throw new Error('An unexpected error occurred while fetching future appointments.');
-    }
+    console.error(error);
+    return { success: false, message: error instanceof AppError ? error.message : 'An unknown error occurred.' };
   }
 }
 
-export async function getPastAppointments(): Promise<UserAppointmentDetails[]> {
-  const token = await getAuthToken();
-  if (!token) {
-    console.error('[getPastAppointments] No auth token found.');
-    throw new Error('Authentication required to fetch past appointments.');
-    // return [];
-  }
-
+// Fetch Past Appointments
+export async function getPastAppointments() {
   try {
-    const response = await fetch(`${API_BASE_URL}/appointments/me/past`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      cache: 'no-store',
+    const token = await getAuthToken();
+    const response = await fetch(`/api/v1/admin/appointments?time_frame=past`, {
+      headers: { 'Authorization': `Bearer ${token}` },
     });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: response.statusText }));
-      console.error(`[getPastAppointments] API error ${response.status}:`, errorData);
-      throw new Error(`Failed to fetch past appointments: ${errorData.message || response.statusText}`);
-    }
-    const data = await response.json();
-    console.log("[getPastAppointments] Raw data from API:", JSON.stringify(data, null, 2)); // Log the raw data
-    return data.data as UserAppointmentDetails[];
+    if (!response.ok) throw new AppError('Failed to fetch past appointments');
+    return { success: true, data: await response.json() };
   } catch (error) {
-    console.error('[getPastAppointments] Fetching error:', error);
-     if (error instanceof Error) {
-        throw error;
-    } else {
-        throw new Error('An unexpected error occurred while fetching past appointments.');
-    }
+    console.error(error);
+    return { success: false, message: error instanceof AppError ? error.message : 'An unknown error occurred.' };
   }
 }
 
-export async function cancelAppointmentAction(
-  appointmentId: string, 
-  cancellationReason: string
-): Promise<{ success: boolean; message?: string; data?: UserAppointmentDetails }> {
-  const token = await getAuthToken();
-  if (!token) {
-    console.error('[cancelAppointmentAction] No auth token found.');
-    return { success: false, message: 'Authentication required.' };
-  }
-
+// Cancel an Appointment
+export async function cancelAppointment(appointmentId: string) {
   try {
-    const response = await fetch(`${API_BASE_URL}/appointments/${appointmentId}/cancel`, {
+    const token = await getAuthToken();
+    const response = await fetch(`/api/v1/admin/appointments/${appointmentId}`, {
       method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        cancelledBy: 'user', // Assuming cancellation is by the user from this UI
-        cancellationReason: cancellationReason
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: response.statusText }));
-      console.error(`[cancelAppointmentAction] API error ${response.status}:`, errorData);
-      return { success: false, message: errorData.message || `Failed to cancel appointment: ${response.statusText}` };
-    }
-    
-    const responseData = await response.json();
-    return { success: true, data: responseData as UserAppointmentDetails };
-
-  } catch (error) {
-    console.error('[cancelAppointmentAction] Fetching error:', error);
-    return { success: false, message: error instanceof Error ? error.message : 'An unexpected error occurred.' };
-  }
-}
-
-export async function createAppointmentAction(formData: {
-  clinicId: string;
-  serviceId: string;
-  providerId: string | null;
-  appointmentDate: string; // e.g., "YYYY-MM-DD"
-  appointmentTime: string; // e.g., "HH:MM" (backend will handle combining and timezone)
-  notes?: string;
-  // Add service_details if needed by the backend, or if it's for display on confirmation
-  // For now, assuming backend primarily needs IDs and will fetch details
-}): Promise<{ success: boolean; message?: string; data?: UserAppointmentDetails }> { // Use UserAppointmentDetails if that's the expected response
-  const token = await getAuthToken();
-  if (!token) {
-    console.error('[createAppointmentAction] No auth token found.');
-    return { success: false, message: 'Authentication required to create appointment.' };
-  }
-
-  // The backend /api/v1/appointments endpoint expects a full ISO string for appointment_time
-  // It's crucial to handle timezones correctly. Assuming dates/times are in local user timezone.
-  // The backend should store in UTC.
-  const appointmentTimestamp = new Date(`${formData.appointmentDate}T${formData.appointmentTime}:00`).toISOString();
-  // Note: If times are already UTC, adjust accordingly.
-  // If selecting time slots, ensure they are correctly converted.
-
-  try {
-    const response = await fetch(`${API_BASE_URL}/appointments`, {
-      method: 'POST',
-      headers: {
+      headers: { 
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        clinic_id: formData.clinicId,
-        service_id: formData.serviceId,
-        provider_id: formData.providerId, // Can be null if service allows it
-        appointment_time: appointmentTimestamp, // Full ISO string
-        notes: formData.notes,
-        status: 'confirmed', // Default status, adjust if backend has different logic (e.g., 'pending')
-        // patient_id will be extracted from the token by the backend
-      }),
+      body: JSON.stringify({ status: 'Cancelled' }),
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: response.statusText }));
-      console.error(`[createAppointmentAction] API error ${response.status}:`, errorData);
-      return { success: false, message: errorData.message || `Failed to create appointment: ${response.statusText}` };
+      const errorData = await response.json();
+      throw new AppError(errorData.message || 'Failed to cancel appointment', response.status);
     }
     
-    const responseData = await response.json();
-    // Assuming the backend returns the created appointment, matching UserAppointmentDetails
-    return { success: true, data: responseData as UserAppointmentDetails };
-
+    revalidatePath('/dashboard/appointments');
+    return { success: true, message: 'Appointment cancelled successfully.' };
   } catch (error) {
-    console.error('[createAppointmentAction] Fetching error:', error);
-    return { 
-      success: false, 
-      message: error instanceof Error ? error.message : 'An unexpected error occurred while creating the appointment.' 
-    };
+    console.error(error);
+    return { success: false, message: error instanceof AppError ? error.message : 'An unknown error occurred.' };
+  }
+}
+
+// Create a new Appointment (Booking)
+export async function createAppointment(payload: Record<string, unknown>) {
+  try {
+    const token = await getAuthToken();
+    const response = await fetch(`/api/v1/admin/appointments`, {
+      method: 'POST',
+      headers: { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new AppError(errorData.message || 'Failed to create appointment', response.status);
+    }
+
+    revalidatePath('/dashboard/appointments');
+    const data = await response.json();
+    return { success: true, data };
+  } catch (error) {
+    console.error(error);
+    return { success: false, message: error instanceof AppError ? error.message : 'An unknown error occurred.' };
   }
 } 

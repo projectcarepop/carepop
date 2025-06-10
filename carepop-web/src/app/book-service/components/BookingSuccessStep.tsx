@@ -32,7 +32,6 @@ const BookingSuccessStep: React.FC = () => {
   }
 
   // For date-fns, literal strings are enclosed in single quotes within the format string.
-  // eslint-disable-next-line prettier/prettier, quotes 
   const dateFormatString = "PPP 'at' p"; // Linter disable for specific date-fns requirement
 
   return (
@@ -55,7 +54,7 @@ const BookingSuccessStep: React.FC = () => {
           <p><strong>Date & Time:</strong> <span className="font-semibold">{format(parseISO(bookingConfirmation.appointment_datetime), dateFormatString)}</span></p>
         </div>
         <p className="text-muted-foreground text-sm pt-2">
-          You will receive an email confirmation shortly. Please check your spam folder if you don't see it.
+          You will receive an email confirmation shortly. Please check your spam folder if you don&apos;t see it.
         </p>
         <div className="flex flex-col sm:flex-row justify-center gap-4 pt-5">
             <Button onClick={handleBookAnother} variant="outline" size="lg">Book Another Service</Button>

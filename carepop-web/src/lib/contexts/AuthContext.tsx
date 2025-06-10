@@ -197,10 +197,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      const response = await fetch(`${apiUrl}/api/users/profile`, {
-        method: 'GET',
+      const token = sessionParam.access_token;
+      const response = await fetch(`/api/v1/admin/users/profile`, {
         headers: {
-          'Authorization': `Bearer ${sessionParam.access_token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });

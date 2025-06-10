@@ -16,6 +16,8 @@ export interface Service {
   id: string;
   name: string;
   description: string;
+  category: string; // Added for grouping
+  cost: number | string; // Added for display
   typicalDurationMinutes: number;
   requiresProviderAssignment: boolean;
   // clinicSpecificPrice?: number; // If added later

@@ -57,8 +57,8 @@ const ConfirmationStep: React.FC = () => {
     };
 
     try {
-      // API Call: POST /api/appointments (Backend Integration Guide - Section 4.1)
-      const response = await fetch('/api/v1/appointments', {
+      // API Call: POST /api/v1/admin/appointments (Backend Integration Guide - Section 4.1)
+      const response = await fetch('/api/v1/admin/appointments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

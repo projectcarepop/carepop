@@ -59,27 +59,22 @@ const exampleClinicSchema = {
 };
 
 async function getClinics(): Promise<Clinic[]> {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (!apiBaseUrl) {
-    console.error("API base URL is not configured. Please set NEXT_PUBLIC_API_BASE_URL.");
-    throw new Error("API base URL is not configured.");
-  }
-  const response = await fetch(`${apiBaseUrl}/api/v1/directory/clinics`);
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`Failed to fetch clinics: ${response.status} ${response.statusText}`, errorText);
-    throw new Error(`Failed to fetch clinics. Status: ${response.status}`);
-  }
   try {
-    const responseData = await response.json();
-    if (!responseData || !Array.isArray(responseData.data)) {
-        console.error("Fetched data is not in the expected format { data: [...] }:", responseData);
-        throw new Error("Invalid data format received from API.");
+    const response = await fetch(`/api/v1/admin/clinics`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Failed to fetch clinics:", errorText);
+      // In a real app, you might want to throw a more specific error
+      // or return a value indicating failure.
+      throw new Error(`Failed to fetch clinics: ${response.status} ${response.statusText}`);
     }
-    return responseData.data as Clinic[];
-  } catch (e) {
-    console.error("Error parsing JSON response:", e);
-    throw new Error("Failed to parse clinic data from API.");
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("An error occurred while fetching clinics:", error);
+    // Depending on requirements, re-throw or return an empty array
+    // to allow the page to render without crashing.
+    return [];
   }
 }
 
