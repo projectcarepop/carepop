@@ -11,7 +11,7 @@ import publicRoutes from './routes/public';
 import adminRoutes from './routes/admin';
 
 // Global Error Handler
-import { errorMiddleware as errorHandler } from './lib/middleware/error.middleware';
+import { errorHandler } from './lib/middleware/error.middleware';
 
 import { getConfig } from './config/config';
 

@@ -2,50 +2,45 @@
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { useState } from 'react';
 import { Service } from '@/lib/types/service';
 
 interface ServiceFilterProps {
   services: Service[];
+  selectedServices: string[];
+  onServiceChange: (serviceIds: string[]) => void;
 }
 
-interface SelectedServices {
-  [key: string]: boolean;
-}
-
-export default function ServiceFilter({ services }: ServiceFilterProps) {
-  const [selectedServices, setSelectedServices] = useState<SelectedServices>({});
+export default function ServiceFilter({ services, selectedServices, onServiceChange }: ServiceFilterProps) {
 
   const handleCheckboxChange = (serviceId: string) => {
-    setSelectedServices(prev => ({
-      ...prev,
-      [serviceId]: !prev[serviceId],
-    }));
-    // TODO: Propagate changes up to parent component or context for actual filtering
+    const newSelectedServices = selectedServices.includes(serviceId)
+      ? selectedServices.filter(id => id !== serviceId)
+      : [...selectedServices, serviceId];
+    onServiceChange(newSelectedServices);
   };
 
   // TODO: Add a "Show More/Less" for long lists
   // TODO: Consider a search/filter input for services if the list becomes very long
 
   return (
-    <div className="space-y-2">
-      <h3 className="text-base font-medium">Services Offered</h3>
-      <div className="space-y-2 max-h-60 overflow-y-auto pr-2"> {/* Added scroll for long lists */}
+    <div className="space-y-3">
+      <div className="space-y-3 max-h-64 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent">
         {services && services.length > 0 ? (
           services.map((service) => (
-            <div key={service.id} className="flex items-center space-x-2">
+            <Label 
+              key={service.id} 
+              htmlFor={`service-${service.id}`}
+              className="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-colors"
+            >
               <Checkbox 
                 id={`service-${service.id}`}
-                checked={!!selectedServices[service.id]}
+                checked={selectedServices.includes(service.id)}
                 onCheckedChange={() => handleCheckboxChange(service.id)}
               />
-              <Label 
-                htmlFor={`service-${service.id}`}
-                className="text-sm font-normal cursor-pointer hover:text-pink-600 transition-colors"
-              >
+              <span className="text-sm font-normal">
                 {service.name}
-              </Label>
-            </div>
+              </span>
+            </Label>
           ))
         ) : (
           <p className="text-sm text-gray-500">No services available to filter.</p>

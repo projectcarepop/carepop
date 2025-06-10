@@ -41,4 +41,35 @@ export const getPublicClinics = async (lat?: number, lon?: number) => {
   // Cache the generic, non-location-based list
   cacheService.set(CLINICS_CACHE_KEY, data, CACHE_TTL_SECONDS);
   return data;
+};
+
+export const getServicesForClinic = async (clinicId: string) => {
+  const cacheKey = `clinic_services_${clinicId}`;
+  const cachedServices = cacheService.get<any[]>(cacheKey);
+  if (cachedServices) {
+    return cachedServices;
+  }
+
+  const { data, error } = await supabase
+    .from('clinic_services')
+    .select(`
+      services (
+        id,
+        name,
+        description,
+        is_active
+      )
+    `)
+    .eq('clinic_id', clinicId)
+    .eq('is_offered', true);
+
+  if (error) {
+    throw new AppError(`Supabase error fetching services for clinic: ${error.message}`, 500);
+  }
+  
+  // The result from Supabase is [{ services: {...} }, { services: {...} }]. We need to flatten it.
+  const services = data.map(item => item.services).filter(Boolean);
+
+  cacheService.set(cacheKey, services, CACHE_TTL_SECONDS);
+  return services;
 }; 
