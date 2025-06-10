@@ -9,13 +9,15 @@ import { AlertTriangle } from 'lucide-react';
 import LocationSearchInput from './LocationSearchInput';
 import ServiceFilter from './ServiceFilter';
 import SearchClinicsButton from './SearchClinicsButton';
+import { Service } from '@/lib/types/service';
 
 interface ClinicFinderClientProps {
   initialClinics: Clinic[];
+  initialServices: Service[];
   initialFetchError: string | null;
 }
 
-export default function ClinicFinderClient({ initialClinics, initialFetchError }: ClinicFinderClientProps) {
+export default function ClinicFinderClient({ initialClinics, initialServices, initialFetchError }: ClinicFinderClientProps) {
   const [clinics, setClinics] = useState<Clinic[]>(initialClinics);
   const [fetchError, setFetchError] = useState<string | null>(initialFetchError);
   // isLoading is no longer managed here, as data is pre-fetched by the Server Component parent
@@ -47,7 +49,7 @@ export default function ClinicFinderClient({ initialClinics, initialFetchError }
             Search Filters
           </h2>
           <LocationSearchInput />
-          <ServiceFilter />
+          <ServiceFilter services={initialServices} />
           <div className="pt-4">
             <SearchClinicsButton />
           </div>

@@ -3,24 +3,17 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useState } from 'react';
+import { Service } from '@/lib/types/service';
 
-const MOCK_SERVICES = [
-  { id: 'general_consultation', label: 'General Consultation' },
-  { id: 'family_planning', label: 'Family Planning Counseling' },
-  { id: 'sti_testing', label: 'STI Testing & Treatment' },
-  { id: 'hiv_testing', label: 'HIV Testing & Counseling' },
-  { id: 'prenatal_care', label: 'Prenatal Checkup' },
-  { id: 'postnatal_care', label: 'Postnatal Care' },
-  { id: 'vaccinations', label: 'Vaccinations (Adult/Child)' },
-  { id: 'youth_counseling', label: 'Youth Health Counseling' },
-  { id: 'contraceptives', label: 'Contraceptive Services' },
-];
+interface ServiceFilterProps {
+  services: Service[];
+}
 
 interface SelectedServices {
   [key: string]: boolean;
 }
 
-export default function ServiceFilter() {
+export default function ServiceFilter({ services }: ServiceFilterProps) {
   const [selectedServices, setSelectedServices] = useState<SelectedServices>({});
 
   const handleCheckboxChange = (serviceId: string) => {
@@ -38,21 +31,25 @@ export default function ServiceFilter() {
     <div className="space-y-2">
       <h3 className="text-base font-medium">Services Offered</h3>
       <div className="space-y-2 max-h-60 overflow-y-auto pr-2"> {/* Added scroll for long lists */}
-        {MOCK_SERVICES.map((service) => (
-          <div key={service.id} className="flex items-center space-x-2">
-            <Checkbox 
-              id={`service-${service.id}`}
-              checked={!!selectedServices[service.id]}
-              onCheckedChange={() => handleCheckboxChange(service.id)}
-            />
-            <Label 
-              htmlFor={`service-${service.id}`}
-              className="text-sm font-normal cursor-pointer hover:text-pink-600 transition-colors"
-            >
-              {service.label}
-            </Label>
-          </div>
-        ))}
+        {services && services.length > 0 ? (
+          services.map((service) => (
+            <div key={service.id} className="flex items-center space-x-2">
+              <Checkbox 
+                id={`service-${service.id}`}
+                checked={!!selectedServices[service.id]}
+                onCheckedChange={() => handleCheckboxChange(service.id)}
+              />
+              <Label 
+                htmlFor={`service-${service.id}`}
+                className="text-sm font-normal cursor-pointer hover:text-pink-600 transition-colors"
+              >
+                {service.name}
+              </Label>
+            </div>
+          ))
+        ) : (
+          <p className="text-sm text-gray-500">No services available to filter.</p>
+        )}
       </div>
     </div>
   );

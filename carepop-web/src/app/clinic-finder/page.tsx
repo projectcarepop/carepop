@@ -9,6 +9,7 @@ import { Metadata } from 'next';
 
 import ClinicFinderClient from './components/ClinicFinderClient'; // Import the new client component
 import { Clinic } from '@/lib/types/clinic';
+import { Service } from '@/lib/types/service';
 // AlertTriangle might be used by ClinicFinderClient if fetchError is passed and handled there
 
 export const metadata: Metadata = {
@@ -58,37 +59,61 @@ const exampleClinicSchema = {
   url: 'https://www.carepop.ph/clinic/sample-clinic'
 };
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+
 async function getClinics(): Promise<Clinic[]> {
+  // Use the correct public endpoint
+  const url = `${API_BASE_URL}/api/v1/clinics`;
+  console.log(`Fetching clinics from: ${url}`);
   try {
-    const response = await fetch(`/api/v1/admin/clinics`);
+    // Use an absolute URL for server-side fetch
+    const response = await fetch(url, { cache: 'no-store' }); // Use no-store for dynamic data
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Failed to fetch clinics:", errorText);
-      // In a real app, you might want to throw a more specific error
-      // or return a value indicating failure.
       throw new Error(`Failed to fetch clinics: ${response.status} ${response.statusText}`);
     }
-    const data = await response.json();
-    return data;
+    const result = await response.json();
+    return result.data; // The API returns data in a 'data' property
   } catch (error) {
     console.error("An error occurred while fetching clinics:", error);
-    // Depending on requirements, re-throw or return an empty array
-    // to allow the page to render without crashing.
+    return [];
+  }
+}
+
+async function getServices(): Promise<Service[]> {
+  const url = `${API_BASE_URL}/api/v1/services`;
+  console.log(`Fetching services from: ${url}`);
+  try {
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Failed to fetch services:", errorText);
+      throw new Error(`Failed to fetch services: ${response.status} ${response.statusText}`);
+    }
+    const result = await response.json();
+    return result.data; // The API returns data in a 'data' property
+  } catch (error) {
+    console.error("An error occurred while fetching services:", error);
     return [];
   }
 }
 
 export default async function ClinicFinderPage() {
   let clinics: Clinic[] = [];
+  let services: Service[] = [];
   let fetchError: string | null = null;
 
   try {
-    clinics = await getClinics();
-    // console.log removed from here, ClinicFinderClient can log if needed
+    // Fetch both clinics and services in parallel
+    [clinics, services] = await Promise.all([
+      getClinics(),
+      getServices()
+    ]);
   } catch (error) {
-    console.error("Error in ClinicFinderPage (Server Component) while fetching clinics:", error);
-    fetchError = error instanceof Error ? error.message : "An unknown error occurred while loading clinic data.";
-    // clinics will remain empty
+    console.error("Error in ClinicFinderPage (Server Component) while fetching initial data:", error);
+    fetchError = error instanceof Error ? error.message : "An unknown error occurred while loading page data.";
+    // clinics and services will remain empty
   }
 
   return (
@@ -113,7 +138,11 @@ export default async function ClinicFinderPage() {
         </header>
 
         {/* Render the client component with fetched data */}
-        <ClinicFinderClient initialClinics={clinics} initialFetchError={fetchError} />
+        <ClinicFinderClient 
+          initialClinics={clinics} 
+          initialServices={services}
+          initialFetchError={fetchError} 
+        />
 
       </div>
       <footer className="mt-12 text-center text-gray-500">
