@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { supabase } from '@/config/supabaseClient';
-import { AppError } from '@/lib/utils/appError';
+import { supabase } from '@/lib/supabase/client';
+import { ApiError } from '@/utils/ApiError';
 import { StatusCodes } from 'http-status-codes';
 
 export interface AuthenticatedRequest extends Request {
@@ -15,19 +15,19 @@ export const authMiddleware = async (req: AuthenticatedRequest, res: Response, n
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return next(new AppError('No token provided, authorization denied.', StatusCodes.UNAUTHORIZED));
+    return next(new ApiError(StatusCodes.UNAUTHORIZED, 'No token provided, authorization denied.'));
   }
 
   const token = authHeader.split(' ')[1];
   if (!token) {
-    return next(new AppError('No token provided, authorization denied.', StatusCodes.UNAUTHORIZED));
+    return next(new ApiError(StatusCodes.UNAUTHORIZED, 'No token provided, authorization denied.'));
   }
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
 
     if (userError || !user) {
-      return next(new AppError('Invalid token, authorization denied.', StatusCodes.UNAUTHORIZED));
+      return next(new ApiError(StatusCodes.UNAUTHORIZED, 'Invalid token, authorization denied.'));
     }
 
     const { data: roleData, error: roleError } = await supabase
@@ -36,7 +36,7 @@ export const authMiddleware = async (req: AuthenticatedRequest, res: Response, n
       .eq('user_id', user.id);
 
     if (roleError) {
-        return next(new AppError('Could not verify user roles.', StatusCodes.INTERNAL_SERVER_ERROR));
+        return next(new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Could not verify user roles.'));
     }
 
     req.user = {
@@ -47,6 +47,6 @@ export const authMiddleware = async (req: AuthenticatedRequest, res: Response, n
     
     next();
   } catch (error) {
-    next(new AppError('Not authorized, token failed.', StatusCodes.UNAUTHORIZED));
+    next(new ApiError(StatusCodes.UNAUTHORIZED, 'Not authorized, token failed.'));
   }
 }; 
