@@ -38,7 +38,7 @@ const BookingProgressIndicator = ({
               )}
             >
               {index < currentStepIndex ? (
-                <CheckCircle2 className="h-5 w-5 md:h-6 md:h-6" />
+                <CheckCircle2 className="h-5 w-5 md:h-6" />
               ) : (
                 <span className="text-sm md:text-base font-semibold">{index + 1}</span>
               )}
