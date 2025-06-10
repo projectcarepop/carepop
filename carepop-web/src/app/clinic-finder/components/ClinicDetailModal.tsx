@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { Clinic } from "@/lib/types/clinic";
 import { Service } from "@/lib/types/service";
 import { Button } from "@/components/ui/button";
@@ -25,8 +25,16 @@ export default function ClinicDetailModal({ clinic, isOpen, onClose, allServices
     if (!clinic || !clinic.services_offered || !allServices) {
       return [];
     }
-    return allServices.filter(service => clinic.services_offered.includes(service.id));
+    return allServices.filter(service => clinic.services_offered?.includes(service.id));
   }, [clinic, allServices]);
+
+  useEffect(() => {
+    if (isOpen && clinic) {
+      console.log('ClinicDetailModal opened with clinic:', clinic);
+      console.log('All available services:', allServices);
+      console.log('Filtered services:', services);
+    }
+  }, [isOpen, clinic, allServices, services]);
 
   if (!clinic) return null;
 

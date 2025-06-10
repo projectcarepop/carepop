@@ -1,5 +1,6 @@
-import { Request, Response, NextFunction } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import { AnyZodObject, ZodError } from 'zod';
+import { ApiError } from '@/utils/ApiError';
 
 interface ValidationSchemas {
   params?: AnyZodObject;
@@ -21,10 +22,16 @@ export const validateRequest = (schemas: ValidationSchemas) =>
       }
       next();
     } catch (error) {
-      if (error instanceof ZodError) {
-        // Let the central error handler manage Zod errors
-        return next(error);
-      }
-      next(error);
+        if (error instanceof ZodError) {
+            const errorMessages = error.errors.map((issue) => ({
+                path: issue.path.join('.'),
+                message: issue.message,
+            }));
+            const apiError = new ApiError(400, 'Invalid request data');
+            (apiError as any).errors = errorMessages;
+            next(apiError);
+        } else {
+            next(new ApiError(500, 'Internal Server Error'));
+        }
     }
 }; 
