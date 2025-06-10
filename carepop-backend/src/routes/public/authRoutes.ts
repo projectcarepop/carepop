@@ -5,7 +5,7 @@ import { loginSchema, signUpSchema } from '@/validation/public/authValidation';
 
 const router = Router();
 
-router.post('/signup', validateRequest(signUpSchema), authController.signUp);
-router.post('/login', validateRequest(loginSchema), authController.login);
+router.post('/signup', validateRequest({ body: signUpSchema.shape.body }), authController.signUp);
+router.post('/login', validateRequest({ body: loginSchema.shape.body }), authController.login);
 
 export default router; 

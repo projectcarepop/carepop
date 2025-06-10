@@ -10,10 +10,6 @@ export const signUp = asyncHandler(async (req: Request, res: Response) => {
   
   const { user, session } = await authService.signUp(email, password, firstName, lastName);
 
-  if (!user || !session) {
-    throw new Error('Sign up failed to return user or session.');
-  }
-
   const responseData = {
     user: {
       id: user.id,
@@ -29,20 +25,16 @@ export const signUp = asyncHandler(async (req: Request, res: Response) => {
 
 export const login = asyncHandler(async (req: Request, res: Response) => {
   const { email, password } = req.body;
-  const { user, session } = await authService.login(email, password);
+  const { user, session, role } = await authService.login(email, password);
   
-  if (!user || !session) {
-    throw new Error('Login failed to return user or session.');
-  }
-
   const responseData = {
     user: {
         id: user.id,
         email: user.email,
-        firstName: user.user_metadata.first_name,
-        lastName: user.user_metadata.last_name,
+        full_name: user.full_name,
     },
-    session,
+    tokens: session,
+    role,
   };
 
   res.status(200).json(new ApiResponse(200, responseData, 'Login successful'));
