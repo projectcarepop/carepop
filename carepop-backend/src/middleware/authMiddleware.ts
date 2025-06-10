@@ -1,5 +1,7 @@
-import { Request, Response, NextFunction } from 'express';
-import { supabaseServiceRole } from '../config/supabaseClient';
+import { Response, NextFunction } from 'express';
+import { supabaseServiceRole } from '@/config/supabaseClient';
+import { AuthenticatedRequest } from '@/types/authenticated-request.interface';
+import { AppError } from '@/utils/errors';
 
 // Extend the Express Request interface to include our user property
 declare global {
@@ -13,26 +15,18 @@ declare global {
   }
 }
 
-class HttpError extends Error {
-  statusCode: number;
-  constructor(message: string, statusCode: number) {
-    super(message);
-    this.statusCode = statusCode;
-  }
-}
-
-export const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
+export const authMiddleware = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new HttpError('Authentication token is required.', 401);
+      throw new AppError('Authentication token is required.', 401);
     }
 
     const token = authHeader.split(' ')[1];
     const { data: { user }, error: userError } = await supabaseServiceRole.auth.getUser(token);
 
     if (userError || !user) {
-      throw new HttpError('Invalid or expired token.', 401);
+      throw new AppError('Invalid or expired token.', 401);
     }
 
     // Token is valid, now fetch user roles from the user_roles table
@@ -43,7 +37,7 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
 
     if (rolesError) {
         console.error('Error fetching user roles:', rolesError);
-        throw new HttpError('Could not verify user permissions.', 500);
+        throw new AppError('Could not verify user permissions.', 500);
     }
     
     const roles = rolesData ? rolesData.map((r: { role: string }) => r.role) : [];
@@ -58,7 +52,7 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
 };
 
 export const isAdmin = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-  if (req.user?.role !== 'admin') {
+  if (!req.user || !req.user.roles.includes('admin')) {
     return res.status(403).json({ message: 'Forbidden: Administrator access required.' });
   }
   next();

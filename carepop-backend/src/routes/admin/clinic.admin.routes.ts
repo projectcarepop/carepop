@@ -1,55 +1,60 @@
 import { Router } from 'express';
-import { AdminClinicController } from '../../controllers/admin/clinic.admin.controller';
-import { authenticateToken } from '../../middleware/authMiddleware';
-import { isAdmin } from '../../middleware/role.middleware';
+import { AdminClinicController } from '@/controllers/admin/clinic.admin.controller';
+import { authMiddleware, isAdmin } from '@/middleware/authMiddleware';
+import { validate } from '@/middleware/validate';
+import { 
+  createClinicSchema, 
+  updateClinicSchema,
+  listClinicsQuerySchema,
+  clinicIdParamSchema
+} from '@/validation/admin/clinic.admin.validation';
+import { AdminClinicService } from '@/services/admin/clinic.admin.service';
 import clinicProviderAdminRoutes from './clinicProvider.admin.routes';
 
-export const createAdminClinicRoutes = (adminClinicController: AdminClinicController): Router => {
-  const router = Router();
+const router = Router();
+const adminClinicService = new AdminClinicService(); // Instantiate the service
+const adminClinicController = new AdminClinicController(adminClinicService); // Pass the service to the controller
 
-  // POST /api/v1/admin/clinics - Create a new clinic
-  router.post(
-    '/',
-    authenticateToken,
-    isAdmin,
-    adminClinicController.createClinic
-  );
+// Apply auth middleware to all routes in this file
+router.use(authMiddleware, isAdmin);
 
-  // GET /api/v1/admin/clinics - List all clinics
-  // Query Params: page, limit, isActive, sortBy, sortOrder, searchByName
-  router.get(
-    '/',
-    authenticateToken,
-    isAdmin,
-    adminClinicController.listClinics
-  );
+// POST /api/v1/admin/clinics - Create a new clinic
+router.post(
+  '/',
+  validate({ body: createClinicSchema }),
+  adminClinicController.createClinic
+);
 
-  // GET /api/v1/admin/clinics/:clinicId - Get a specific clinic
-  router.get(
-    '/:clinicId',
-    authenticateToken,
-    isAdmin,
-    adminClinicController.getClinicById
-  );
+// GET /api/v1/admin/clinics - List all clinics
+// Query Params: page, limit, isActive, sortBy, sortOrder, searchByName
+router.get(
+  '/',
+  validate({ query: listClinicsQuerySchema }),
+  adminClinicController.listClinics
+);
 
-  // PUT /api/v1/admin/clinics/:clinicId - Update a specific clinic
-  router.put(
-    '/:clinicId',
-    authenticateToken,
-    isAdmin,
-    adminClinicController.updateClinic
-  );
+// GET /api/v1/admin/clinics/:clinicId - Get a specific clinic
+router.get(
+  '/:clinicId',
+  validate({ params: clinicIdParamSchema }),
+  adminClinicController.getClinicById
+);
 
-  // DELETE /api/v1/admin/clinics/:clinicId - Delete a specific clinic
-  router.delete(
-    '/:clinicId',
-    authenticateToken,
-    isAdmin,
-    adminClinicController.deleteClinic
-  );
+// PUT /api/v1/admin/clinics/:clinicId - Update a specific clinic
+router.put(
+  '/:clinicId',
+  validate({ params: clinicIdParamSchema, body: updateClinicSchema }),
+  adminClinicController.updateClinic
+);
 
-  // Mount provider management routes under /:clinicId/providers
-  router.use('/:clinicId/providers', clinicProviderAdminRoutes);
+// DELETE /api/v1/admin/clinics/:clinicId - Delete a specific clinic
+router.delete(
+  '/:clinicId',
+  validate({ params: clinicIdParamSchema }),
+  adminClinicController.deleteClinic
+);
 
-  return router;
-}; 
+// Mount provider management routes under /:clinicId/providers
+router.use('/:clinicId/providers', clinicProviderAdminRoutes);
+
+export default router; 

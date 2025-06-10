@@ -1,12 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
-import { AdminProviderService } from '../../services/admin/provider.admin.service';
+import { AdminProviderService } from '@/services/admin/provider.admin.service';
 import { 
   createProviderSchema,
   ListProvidersQuery,
   UpdateProviderBody,
   ProviderIdParam,
-} from '../../validation/admin/provider.admin.validation';
-import { AuthenticatedRequest } from '../../middleware/authMiddleware';
+} from '@/validation/admin/provider.admin.validation';
+import { AuthenticatedRequest } from '@/types/authenticated-request.interface';
 
 export class AdminProviderController {
   private adminProviderService: AdminProviderService;
@@ -20,7 +20,7 @@ export class AdminProviderController {
     this.deleteProvider = this.deleteProvider.bind(this);
   }
 
-  async createProvider(req: Request, res: Response, next: NextFunction) {
+  async createProvider(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const { body: providerData } = createProviderSchema.parse(req);
       const newProvider = await this.adminProviderService.createProvider(providerData);
@@ -30,7 +30,7 @@ export class AdminProviderController {
     }
   }
 
-  async listProviders(req: Request, res: Response, next: NextFunction) {
+  async listProviders(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const { query: queryParams } = req as unknown as { query: ListProvidersQuery };
       const result = await this.adminProviderService.listProviders(queryParams);
@@ -40,7 +40,7 @@ export class AdminProviderController {
     }
   }
 
-  async getProviderById(req: Request, res: Response, next: NextFunction) {
+  async getProviderById(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const { params: { providerId } } = req as unknown as { params: ProviderIdParam };
       const provider = await this.adminProviderService.getProviderById(providerId);
@@ -53,7 +53,7 @@ export class AdminProviderController {
     }
   }
 
-  async updateProvider(req: Request, res: Response, next: NextFunction) {
+  async updateProvider(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const { params: { providerId }, body: providerData } = req as unknown as { params: ProviderIdParam, body: UpdateProviderBody };
       const updatedProvider = await this.adminProviderService.updateProvider(providerId, providerData);
@@ -66,7 +66,7 @@ export class AdminProviderController {
     }
   }
 
-  async deleteProvider(req: Request, res: Response, next: NextFunction) {
+  async deleteProvider(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const { params: { providerId } } = req as unknown as { params: ProviderIdParam };
       const success = await this.adminProviderService.deleteProvider(providerId);

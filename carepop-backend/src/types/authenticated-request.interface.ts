@@ -1,5 +1,9 @@
 import { Request } from 'express';
-import { IUser } from './user.interface';
+
+export interface IUser {
+  id: string;
+  roles: string[];
+}
 
 export interface AuthenticatedRequest extends Request {
   user?: IUser;

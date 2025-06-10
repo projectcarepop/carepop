@@ -1,9 +1,15 @@
 import { Router } from 'express';
-import { AdminClinicProviderController } from '../../controllers/admin/clinicProvider.admin.controller';
-import { authenticateToken } from '../../middleware/authMiddleware';
-import { isAdmin } from '../../middleware/role.middleware';
+import { AdminClinicProviderController } from '@/controllers/admin/clinicProvider.admin.controller';
+import { authMiddleware, isAdmin } from '@/middleware/authMiddleware';
+import { validate } from '@/middleware/validate';
+import { 
+  associateProviderBodySchema, 
+  listProvidersForClinicQuerySchema,
+  clinicProviderPathParamsSchema 
+} from '@/validation/admin/clinicProvider.admin.validation';
 
-const router = Router({ mergeParams: true }); // mergeParams allows access to :clinicId from parent router if nested
+// This router will be merged with a :clinicId param, so we don't need to specify it here again.
+const router = Router({ mergeParams: true }); 
 const adminClinicProviderController = new AdminClinicProviderController();
 
 /**
@@ -48,9 +54,10 @@ const adminClinicProviderController = new AdminClinicProviderController();
  *         description: Conflict (provider already associated with the clinic).
  */
 router.post(
-  '/', // Path relative to where this router is mounted, e.g., /api/v1/admin/clinics/:clinicId/providers
-  authenticateToken,
+  '/', 
+  authMiddleware,
   isAdmin,
+  validate({ body: associateProviderBodySchema }), 
   adminClinicProviderController.associateProvider
 );
 
@@ -100,9 +107,10 @@ router.post(
  *         description: Clinic not found.
  */
 router.get(
-  '/',
-  authenticateToken,
+  '/', 
+  authMiddleware,
   isAdmin,
+  validate({ query: listProvidersForClinicQuerySchema }), 
   adminClinicProviderController.listProviders
 );
 
@@ -150,8 +158,9 @@ router.get(
  */
 router.delete(
   '/:providerId',
-  authenticateToken,
-  isAdmin,
+  authMiddleware,
+  isAdmin, 
+  validate({ params: clinicProviderPathParamsSchema }), 
   adminClinicProviderController.disassociateProvider
 );
 

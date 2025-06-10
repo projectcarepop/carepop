@@ -1,13 +1,13 @@
-import { supabaseServiceRole } from 'config/supabaseClient';
-import { HttpError } from 'utils/HttpError';
+import { supabaseServiceRole } from '@/config/supabaseClient';
+import { AppError } from '@/utils/errors';
 import { z } from 'zod';
-import { updateUserSchema } from 'validation/admin/userValidation';
+import { updateUserBodySchema } from '@/validation/admin/user.admin.validation';
 
 const TABLE_NAME = 'users_view'; // Using the view for reads
 const PROFILES_TABLE = 'profiles';
 const USER_ROLES_TABLE = 'user_roles';
 
-type UpdateUserDTO = z.infer<typeof updateUserSchema>;
+type UpdateUserDTO = z.infer<typeof updateUserBodySchema>;
 
 export const userService = {
   getAll: async (searchQuery?: string) => {
@@ -17,13 +17,13 @@ export const userService = {
       query = query.ilike('full_name', `%${searchQuery}%`);
     }
     const { data, error } = await query;
-    if (error) throw new HttpError('Failed to fetch users.', 500);
+    if (error) throw new AppError('Failed to fetch users.', 500);
     return data;
   },
 
   getById: async (id: string) => {
     const { data, error } = await supabaseServiceRole.from(TABLE_NAME).select('*').eq('id', id).single();
-     if (error) { throw new HttpError('User not found.', 404); }
+     if (error) { throw new AppError('User not found.', 404); }
      return data;
   },
 
@@ -33,7 +33,7 @@ export const userService = {
     // Update profile if there's data for it
     if (Object.keys(profileData).length > 0) {
         const { error: profileError } = await supabaseServiceRole.from(PROFILES_TABLE).update(profileData).eq('user_id', id);
-        if(profileError) { throw new HttpError('Failed to update user profile.', 500); }
+        if(profileError) { throw new AppError('Failed to update user profile.', 500); }
     }
 
     // Update roles if provided
@@ -41,11 +41,11 @@ export const userService = {
         // This is a simple but destructive way to update roles: delete all, then insert new.
         // A more advanced implementation might compare arrays to add/remove specific roles.
         const { error: deleteError } = await supabaseServiceRole.from(USER_ROLES_TABLE).delete().eq('user_id', id);
-        if(deleteError) { throw new HttpError('Failed to clear existing user roles.', 500); }
+        if(deleteError) { throw new AppError('Failed to clear existing user roles.', 500); }
 
-        const newRoles = roles.map(role => ({ user_id: id, role }));
+        const newRoles = roles.map((role: string) => ({ user_id: id, role }));
         const { error: insertError } = await supabaseServiceRole.from(USER_ROLES_TABLE).insert(newRoles);
-        if(insertError) { throw new HttpError('Failed to assign new roles to user.', 500); }
+        if(insertError) { throw new AppError('Failed to assign new roles to user.', 500); }
     }
     
     return await userService.getById(id); // Return the updated user object
@@ -62,7 +62,7 @@ export const userService = {
     }
 
     const { data, error } = await query;
-    if (error) throw new HttpError(`Failed to fetch appointments for user ${userId}.`, 500);
+    if (error) throw new AppError(`Failed to fetch appointments for user ${userId}.`, 500);
     return data;
   },
 
@@ -77,7 +77,7 @@ export const userService = {
     }
 
     const { data, error } = await query;
-    if (error) throw new HttpError(`Failed to fetch medical records for user ${userId}.`, 500);
+    if (error) throw new AppError(`Failed to fetch medical records for user ${userId}.`, 500);
     return data;
   },
 }; 

@@ -1,21 +1,18 @@
 import { Request, Response } from 'express';
-import { supplierSchemas } from 'validation/admin/supplierSchemas';
-import { supplierService } from 'services/admin/supplierService';
-import { tryCatch } from 'utils/tryCatch';
-import { sendCreated, sendSuccess } from 'utils/responseHandlers';
+import { createSupplierSchema } from '@/validation/admin/supplier.admin.validation';
+import { supplierService } from '@/services/admin/supplierService';
+import { asyncHandler } from '@/utils/asyncHandler';
+import { sendCreated, sendSuccess } from '@/utils/responseHandler';
 
 export const supplierController = {
-  createSupplier: tryCatch(async (req: Request, res: Response) => {
-    const supplierData = supplierSchemas.create.parse(req.body);
-    const newSupplier = await supplierService.create(supplierData);
+  createSupplier: asyncHandler(async (req: Request, res: Response) => {
+    const newSupplier = await supplierService.create(createSupplierSchema.parse(req.body));
     sendCreated(res, newSupplier);
   }),
 
-  getAllSuppliers: tryCatch(async (req: Request, res: Response) => {
-    const searchQuery = req.query.search as string | undefined;
-    const suppliers = await supplierService.getAll(searchQuery);
+  getSuppliers: asyncHandler(async (req: Request, res: Response) => {
+    const search = req.query.search as string | undefined;
+    const suppliers = await supplierService.getAll(search);
     sendSuccess(res, suppliers);
   }),
-
-  // ... other controller methods would follow
 }; 

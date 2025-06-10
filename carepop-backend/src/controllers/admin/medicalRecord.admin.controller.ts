@@ -1,12 +1,12 @@
 import { Response, NextFunction } from 'express';
-import { AuthenticatedRequest } from '../../middleware/authMiddleware';
-import { MedicalRecordAdminService } from '../../services/admin/medicalRecord.admin.service';
+import { AuthenticatedRequest } from '@/types/authenticated-request.interface';
+import { MedicalRecordAdminService } from '@/services/admin/medicalRecord.admin.service';
 import { 
   createRecordBodySchema,
   getRecordsParamsSchema,
   recordIdParamsSchema,
   updateRecordBodySchema
-} from '../../validation/admin/medicalRecord.admin.validation';
+} from '@/validation/admin/medicalRecord.admin.validation';
 import { StatusCodes } from 'http-status-codes';
 
 export class MedicalRecordAdminController {

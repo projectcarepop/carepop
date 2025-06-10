@@ -1,13 +1,13 @@
 import { Response, NextFunction } from 'express';
 import { StatusCodes } from 'http-status-codes';
-import { AuthenticatedRequest } from '../../middleware/authMiddleware'; // Assuming you have this for admin routes
-import { AdminClinicProviderService } from '../../services/admin/clinicProvider.admin.service';
+import { AuthenticatedRequest } from '@/types/authenticated-request.interface';
+import { AdminClinicProviderService } from '@/services/admin/clinicProvider.admin.service';
 import {
   clinicIdParamSchema,
   associateProviderBodySchema,
   listProvidersForClinicQuerySchema,
   clinicProviderPathParamsSchema
-} from '../../validation/admin/clinicProvider.admin.validation';
+} from '@/validation/admin/clinicProvider.admin.validation';
 
 export class AdminClinicProviderController {
   private clinicProviderService: AdminClinicProviderService;

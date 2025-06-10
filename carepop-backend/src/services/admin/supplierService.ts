@@ -1,18 +1,11 @@
-import { supabaseServiceRole } from '../../config/supabaseClient';
-import { createSupplierSchema } from '../../validation/admin/supplierValidation';
+import { supabaseServiceRole } from '@/config/supabaseClient';
+import { createSupplierSchema } from '@/validation/admin/supplier.admin.validation';
 import { z } from 'zod';
+import { AppError } from '@/utils/errors';
 
 const TABLE_NAME = 'suppliers';
 
 type CreateSupplierDTO = z.infer<typeof createSupplierSchema>;
-
-class HttpError extends Error {
-    statusCode: number;
-    constructor(message: string, statusCode: number) {
-        super(message);
-        this.statusCode = statusCode;
-    }
-}
 
 export const supplierService = {
   create: async (supplierData: CreateSupplierDTO) => {
@@ -24,7 +17,7 @@ export const supplierService = {
 
     if (error) {
       console.error('Supabase error creating supplier:', error);
-      throw new HttpError('Failed to create supplier.', 500);
+      throw new AppError('Failed to create supplier.', 500);
     }
     return data;
   },
@@ -37,7 +30,7 @@ export const supplierService = {
     const { data, error } = await query;
     if (error) {
       console.error('Supabase error fetching suppliers:', error);
-      throw new HttpError('Failed to fetch suppliers.', 500);
+      throw new AppError('Failed to fetch suppliers.', 500);
     }
     return data;
   },
@@ -51,7 +44,7 @@ export const supplierService = {
 
     if (error) {
       console.error('Supabase error fetching supplier:', error);
-      throw new HttpError('Failed to fetch supplier.', 500);
+      throw new AppError('Failed to fetch supplier.', 500);
     }
     return data;
   },

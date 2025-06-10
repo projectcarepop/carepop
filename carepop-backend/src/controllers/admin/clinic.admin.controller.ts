@@ -1,14 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
-import { AdminClinicService } from '../../services/admin/clinic.admin.service';
+import { AdminClinicService } from '@/services/admin/clinic.admin.service';
 import { 
   createClinicSchema, 
   clinicIdParamSchema, 
   listClinicsQuerySchema,
   updateClinicSchema
-} from '../../validation/admin/clinic.admin.validation';
+} from '@/validation/admin/clinic.admin.validation';
 import { StatusCodes } from 'http-status-codes';
-import { AuthenticatedRequest } from '../../middleware/authMiddleware';
-import { supabaseServiceRole } from '../../config/supabaseClient'; // Import the service role client
+import { AuthenticatedRequest } from '@/types/authenticated-request.interface';
+import { supabaseServiceRole } from '@/config/supabaseClient'; // Import the service role client
 
 export class AdminClinicController {
   private clinicService: AdminClinicService;

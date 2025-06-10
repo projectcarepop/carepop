@@ -1,7 +1,7 @@
-import { supabaseServiceRole } from 'config/supabaseClient';
-import { createServiceCategorySchema, updateServiceCategorySchema } from 'validation/admin/serviceCategoryValidation';
+import { supabaseServiceRole } from '@/config/supabaseClient';
+import { createServiceCategorySchema, updateServiceCategorySchema } from '@/validation/admin/service-category.admin.validation';
 import { z } from 'zod';
-import { HttpError } from 'utils/HttpError';
+import { AppError } from '@/utils/errors';
 
 const TABLE_NAME = 'service_categories';
 
@@ -11,7 +11,7 @@ type UpdateServiceCategoryDTO = z.infer<typeof updateServiceCategorySchema>;
 export const serviceCategoryService = {
   create: async (categoryData: CreateServiceCategoryDTO) => {
     const { data, error } = await supabaseServiceRole.from(TABLE_NAME).insert(categoryData).select().single();
-    if (error) { throw new HttpError('Failed to create service category.', 500); }
+    if (error) { throw new AppError('Failed to create service category.', 500); }
     return data;
   },
 
@@ -26,7 +26,7 @@ export const serviceCategoryService = {
 
     if (error) {
       console.error('Supabase error fetching service categories:', error);
-      throw new HttpError('Failed to fetch service categories.', 500);
+      throw new AppError('Failed to fetch service categories.', 500);
     }
     return data;
   },
@@ -34,8 +34,8 @@ export const serviceCategoryService = {
   getById: async (id: string) => {
     const { data, error } = await supabaseServiceRole.from(TABLE_NAME).select('*').eq('id', id).single();
     if (error) {
-        if (error.code === 'PGRST116') { throw new HttpError('Service category not found.', 404); }
-        throw new HttpError('Failed to fetch service category.', 500);
+        if (error.code === 'PGRST116') { throw new AppError('Service category not found.', 404); }
+        throw new AppError('Failed to fetch service category.', 500);
     }
     return data;
   },
@@ -43,15 +43,15 @@ export const serviceCategoryService = {
   update: async (id: string, categoryData: UpdateServiceCategoryDTO) => {
     const { data, error } = await supabaseServiceRole.from(TABLE_NAME).update(categoryData).eq('id', id).select().single();
     if (error) {
-        if (error.code === 'PGRST116') { throw new HttpError('Service category not found.', 404); }
-        throw new HttpError('Failed to update service category.', 500);
+        if (error.code === 'PGRST116') { throw new AppError('Service category not found.', 404); }
+        throw new AppError('Failed to update service category.', 500);
     }
     return data;
   },
 
   delete: async (id: string) => {
     const { error } = await supabaseServiceRole.from(TABLE_NAME).delete().eq('id', id);
-    if (error) { throw new HttpError('Failed to delete service category.', 500); }
+    if (error) { throw new AppError('Failed to delete service category.', 500); }
     return { message: 'Service category deleted successfully.' };
   },
 }; 
