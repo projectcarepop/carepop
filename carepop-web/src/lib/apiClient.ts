@@ -20,7 +20,7 @@ interface ResetPasswordData {
 }
 
 const apiClient = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api',
+    baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080',
     headers: {
         'Content-Type': 'application/json',
     },
@@ -42,9 +42,9 @@ apiClient.interceptors.request.use(config => {
 });
 
 export const api = {
-    signUp: (data: SignUpData) => apiClient.post('/public/auth/signup', data),
-    login: (data: LoginData) => apiClient.post('/public/auth/login', data),
-    loginWithGoogle: (code: string) => apiClient.post('/public/auth/login-google', { code }),
-    forgotPassword: (email: string) => apiClient.post('/public/auth/forgot-password', { email }),
-    resetPassword: (data: ResetPasswordData) => apiClient.post('/public/auth/reset-password', data),
+    signUp: (data: SignUpData) => apiClient.post('/api/v1/public/auth/signup', data),
+    login: (data: LoginData) => apiClient.post('/api/v1/public/auth/login', data),
+    loginWithGoogle: (code: string) => apiClient.post('/api/v1/public/auth/login-google', { code }),
+    forgotPassword: (email: string) => apiClient.post('/api/v1/public/auth/forgot-password', { email }),
+    resetPassword: (data: ResetPasswordData) => apiClient.post('/api/v1/public/auth/reset-password', data),
 }; 
