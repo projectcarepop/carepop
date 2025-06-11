@@ -1,32 +1,41 @@
-import { Router } from 'express';
-import clinicAdminRoutes from './clinic.admin.routes';
-import providerAdminRoutes from './provider.admin.routes';
-import userAdminRoutes from './user.admin.routes';
-import serviceAdminRoutes from './service.admin.routes';
-import serviceCategoryAdminRoutes from './service-category.admin.routes';
-import providerServiceAdminRoutes from './provider-service.admin.routes';
-import appointmentAdminRoutes from './appointment.admin.routes';
-import reportAdminRoutes from './report.admin.routes';
-import medicalRecordAdminRoutes from './medicalRecord.admin.routes';
-import dashboardAdminRoutes from './dashboard.admin.routes';
-import profileAdminRoutes from './profile.admin.routes';
-import inventoryItemAdminRoutes from './inventory-item.admin.routes';
-import supplierAdminRoutes from './supplier.admin.routes';
+import { Router, RequestHandler } from 'express';
 
-const router = Router();
+// Import modular route handlers
+import inventoryRoutes from './inventory.routes';
+import supplierRoutes from './supplier.routes';
+import clinicRoutes from './clinic.routes';
+import providerRoutes from './provider.routes';
+import serviceCategoryRoutes from './service-category.routes';
+import serviceRoutes from './service.routes';
+import userRoutes from './user.routes';
+import appointmentRoutes from './appointment.routes';
+import profileRoutes from './profile.routes';
+import medicalRecordRoutes from './medical-record.routes';
+import reportRoutes from './report.routes';
+import dashboardRoutes from './dashboard.routes';
+import { authMiddleware } from '../../lib/middleware/auth.middleware';
+import { authorize } from '../../lib/middleware/role.middleware';
+// ... import other admin routes as they are modularized
 
-router.use('/clinics', clinicAdminRoutes);
-router.use('/providers', providerAdminRoutes);
-router.use('/users', userAdminRoutes);
-router.use('/services', serviceAdminRoutes);
-router.use('/service-categories', serviceCategoryAdminRoutes);
-router.use('/provider-services', providerServiceAdminRoutes);
-router.use('/appointments', appointmentAdminRoutes);
-router.use('/reports', reportAdminRoutes);
-router.use('/medical-records', medicalRecordAdminRoutes);
-router.use('/dashboard', dashboardAdminRoutes);
-router.use('/profiles', profileAdminRoutes);
-router.use('/inventory-items', inventoryItemAdminRoutes);
-router.use('/suppliers', supplierAdminRoutes);
+const adminRouter = Router();
 
-export default router; 
+// Apply security middleware to all admin routes
+adminRouter.use(authMiddleware);
+adminRouter.use(authorize(['Admin', 'Super-Admin']));
+
+// Use modular routers
+adminRouter.use('/inventory', inventoryRoutes);
+adminRouter.use('/suppliers', supplierRoutes);
+adminRouter.use('/clinics', clinicRoutes);
+adminRouter.use('/providers', providerRoutes);
+adminRouter.use('/service-categories', serviceCategoryRoutes);
+adminRouter.use('/services', serviceRoutes);
+adminRouter.use('/users', userRoutes);
+adminRouter.use('/appointments', appointmentRoutes);
+adminRouter.use('/profiles', profileRoutes);
+adminRouter.use('/medical-records', medicalRecordRoutes);
+adminRouter.use('/reports', reportRoutes);
+adminRouter.use('/dashboard', dashboardRoutes);
+// ... and so on
+
+export default adminRouter; 

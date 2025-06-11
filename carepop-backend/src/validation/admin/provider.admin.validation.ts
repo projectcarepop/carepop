@@ -26,28 +26,28 @@ const weeklyAvailabilitySchema = z.array(z.object({
 }));
 
 // Base schema for provider data, used for both create and update
-const providerBodyBaseSchema = z.object({
-  firstName: z.string().min(1, 'First name cannot be empty.'),
-  lastName: z.string().min(1, 'Last name cannot be empty.'),
+export const providerBodyBaseSchema = z.object({
+  user_id: z.string().uuid('Invalid user ID format'),
+  first_name: z.string().min(1, 'First name cannot be empty.'),
+  last_name: z.string().min(1, 'Last name cannot be empty.'),
   email: z.string().email('Invalid email address.'),
-  phoneNumber: z.string().optional().nullable(),
-  specialization: z.string().optional().nullable(),
-  licenseNumber: z.string().optional().nullable(),
-  credentials: z.string().optional().nullable(),
-  bio: z.string().optional().nullable(),
-  isActive: z.boolean().optional(),
-  serviceIds: z.array(z.string().uuid()).optional(),
-  weeklyAvailability: weeklyAvailabilitySchema.optional(),
-  avatarUrl: z.string().url().optional().nullable(),
+  contact_number: z.string().optional().nullable(),
+  is_active: z.boolean().optional(),
+  accepting_new_patients: z.boolean().optional(),
+  sex: z.string().optional().nullable(),
+  birth_date: z.string().date().optional().nullable(),
+  avatar_url: z.string().url().optional().nullable(),
+  weekly_availability: weeklyAvailabilitySchema.optional(),
 });
 
 // Schema for creating a provider
 export const createProviderBodySchema = providerBodyBaseSchema.extend({
-  isActive: z.boolean().optional().default(true),
+  is_active: z.boolean().optional().default(true),
+  accepting_new_patients: z.boolean().optional().default(true),
 });
 
 // Schema for updating a provider (all fields are optional)
-export const updateProviderBodySchema = providerBodyBaseSchema.partial();
+export const updateProviderBodySchema = providerBodyBaseSchema.partial().omit({ user_id: true });
 
 // Schema for validating the provider ID in URL params
 export const providerIdParamSchema = z.object({

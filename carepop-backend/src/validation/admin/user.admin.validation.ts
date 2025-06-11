@@ -14,5 +14,5 @@ export const getUserParamsSchema = z.object({
 export const updateUserBodySchema = z.object({
   first_name: z.string().min(1).optional(),
   last_name: z.string().min(1).optional(),
-  role: z.string().min(1),
+  roles: z.array(z.string()).optional(),
 }); 
