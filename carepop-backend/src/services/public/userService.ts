@@ -4,33 +4,30 @@ import { StatusCodes } from 'http-status-codes';
 
 export class UserService {
   /**
-   * Fetches a user's profile by their ID.
-   * @param userId The UUID of the user.
-   * @returns The user's profile.
+   * Finds a user's profile from the public.profiles table using their auth ID.
+   * This is the CORRECT way to fetch application-specific user data.
+   * @param userId The user's UUID from the JWT ('sub' claim).
+   * @returns The user profile object or null if not found.
    */
-  public async getUserProfile(userId: string) {
+  public async findProfileById(userId: string): Promise<any | null> {
     if (!userId) {
-      throw new AppError('User ID is required.', StatusCodes.BAD_REQUEST);
+      throw new AppError('User ID must be provided to fetch a profile.', StatusCodes.BAD_REQUEST);
     }
 
-    const { data: profile, error } = await supabase
+    // We query the 'profiles' table and match the 'user_id' column with the user ID from the token.
+    const { data, error } = await supabase
       .from('profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
+      .select('*') // Select all profile data
+      .eq('user_id', userId) // Using the correct 'user_id' column from the schema
+      .single(); // Use .single() to get one object or null, not an array.
 
-    if (error) {
-      console.error(`Error fetching profile for user ${userId}:`, error);
-      if (error.code === 'PGRST116') {
-        throw new AppError('Profile not found.', StatusCodes.NOT_FOUND);
-      }
-      throw new AppError('Failed to fetch user profile.', StatusCodes.INTERNAL_SERVER_ERROR);
+    // If Supabase returns an error (but not a "no rows found" error), it's a server issue.
+    if (error && error.code !== 'PGRST116') { // PGRST116 is the code for "no rows found"
+      console.error('Supabase error fetching profile:', error);
+      throw new AppError('Failed to retrieve user profile from the database.', StatusCodes.INTERNAL_SERVER_ERROR);
     }
 
-    if (!profile) {
-      throw new AppError('Profile not found.', StatusCodes.NOT_FOUND);
-    }
-
-    return profile;
+    // `data` will be the profile object if found, or `null` if the row doesn't exist.
+    return data;
   }
 } 

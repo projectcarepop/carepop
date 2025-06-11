@@ -205,6 +205,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         },
       });
 
+      // Special handling for 404: It's not a server error, but an expected case for new users.
+      if (response.status === 404) {
+        console.log(`[AuthContext] fetchProfile: Received 404. Profile for user ${userParam.id} does not exist yet.`);
+        setProfile(null);
+        return null;
+      }
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response' }));
         console.error(`[AuthContext] fetchProfile: API error fetching profile for ${userParam.id}. Status: ${response.status}`, errorData);

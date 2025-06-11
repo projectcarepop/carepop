@@ -13,10 +13,10 @@ export const getMyProfile = asyncHandler(
     if (!userId) {
       throw new AppError('Unauthorized: No user identified from token.', StatusCodes.UNAUTHORIZED);
     }
-    const profile = await userService.getUserProfile(userId);
-    if (!profile) {
-      throw new AppError('Profile not found for the provided user ID.', StatusCodes.NOT_FOUND);
+    const userProfile = await userService.findProfileById(userId);
+    if (!userProfile) {
+      throw new AppError('User profile has not been created yet.', StatusCodes.NOT_FOUND);
     }
-    res.status(StatusCodes.OK).json({ status: 'success', data: profile });
+    res.status(StatusCodes.OK).json({ status: 'success', data: userProfile });
   }
 ); 
