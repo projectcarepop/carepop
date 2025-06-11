@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
-import ConditionalHeader from "@/components/layout/ConditionalHeader";
-import ConditionalFooter from "@/components/layout/ConditionalFooter";
-import { AuthProvider } from "@/lib/contexts/AuthContext"; // Assuming this path
+import ConditionalHeader from "../components/layout/ConditionalHeader";
+import ConditionalFooter from "../components/layout/ConditionalFooter";
+import { AuthProvider } from "../lib/contexts/AuthContext";
 import { Toaster } from 'sonner';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 const inter = Inter({
   subsets: ["latin"],
@@ -68,14 +69,16 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${spaceGrotesk.variable} ${inter.variable} h-full`}>
       <body className="flex flex-col min-h-full bg-background text-foreground antialiased">
-        <AuthProvider>
-          <ConditionalHeader />
-          <main className="flex-grow">
-            {children}
-          </main>
-          <ConditionalFooter />
-          <Toaster richColors />
-        </AuthProvider>
+        <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!}>
+          <AuthProvider>
+            <ConditionalHeader />
+            <main className="flex-grow">
+              {children}
+            </main>
+            <ConditionalFooter />
+            <Toaster richColors />
+          </AuthProvider>
+        </GoogleOAuthProvider>
       </body>
     </html>
   );

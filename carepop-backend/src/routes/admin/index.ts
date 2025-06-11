@@ -1,6 +1,4 @@
 import { Router, RequestHandler } from 'express';
-import { authMiddleware } from '@/lib/middleware/auth.middleware';
-import { authorize } from '@/lib/middleware/role.middleware';
 
 // Import modular route handlers
 import inventoryRoutes from './inventory.routes';
@@ -15,13 +13,15 @@ import profileRoutes from './profile.routes';
 import medicalRecordRoutes from './medical-record.routes';
 import reportRoutes from './report.routes';
 import dashboardRoutes from './dashboard.routes';
+import { authMiddleware } from '../../lib/middleware/auth.middleware';
+import { authorize } from '../../lib/middleware/role.middleware';
 // ... import other admin routes as they are modularized
 
 const adminRouter = Router();
 
 // Apply security middleware to all admin routes
-adminRouter.use(authMiddleware as any);
-adminRouter.use(authorize(['Admin', 'Super-Admin']) as any);
+adminRouter.use(authMiddleware);
+adminRouter.use(authorize(['Admin', 'Super-Admin']));
 
 // Use modular routers
 adminRouter.use('/inventory', inventoryRoutes);

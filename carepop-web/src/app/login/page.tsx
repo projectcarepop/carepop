@@ -2,64 +2,82 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@/lib/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react'; 
-import GoogleIcon from '@/components/ui/GoogleIcon';
-import { useSearchParams } from 'next/navigation';
+import { useAuth } from '../../lib/contexts/AuthContext';
+import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../components/ui/card';
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import GoogleIcon from '../../components/ui/GoogleIcon';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { useGoogleLogin } from '@react-oauth/google';
+import axios from 'axios';
 
 export default function LoginPage() {
-  const { signInWithEmail, isLoading, error, signInWithGoogle } = useAuth();
+  const { login, loginWithGoogle, isLoading, user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
-  const [showPassword, setShowPassword] = useState(false); // State for password visibility
+  const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   useEffect(() => {
+    // If the user is already logged in, redirect them to the dashboard.
+    if (user) {
+      router.push('/dashboard');
+    }
+  }, [user, router]);
+  
+  useEffect(() => {
     const status = searchParams.get('status');
+    const err = searchParams.get('error');
     if (status === 'email_verification_success') {
       setMessage('Email successfully verified! You can now log in.');
     } else if (status === 'password_reset_success') {
       setMessage('Password successfully reset! You can now log in with your new password.');
-    } else if (searchParams.get('error_description')) {
-      setMessage(searchParams.get('error_description') || 'An error occurred.')
+    } else if (err) {
+      setError('An error occurred during authentication. Please try again.');
     }
   }, [searchParams]);
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log('[LoginPage] handleLogin triggered. Email:', email);
-
-    // Add this guard clause
-    if (!email && !password) { // Or a more specific check if needed, e.g., !email
-      console.warn('[LoginPage] handleLogin: Called with empty email and password, likely a premature trigger. Aborting.');
-      return; 
-    }
-
+    setError('');
     setMessage('');
-    // Adapt this to the correct AuthContext method for email/password
-    const { error: signInError } = await signInWithEmail(email, password); 
-    if (signInError) {
-      console.error('Login failed:', signInError.message);
-      // Error is set in AuthContext, also setting local message for more specific feedback if needed
-      setMessage(`Login failed: ${signInError.message}`); 
-    } else {
-      console.log('[LoginPage] signInWithEmail returned success. Setting success message.');
-      setMessage('Login successful! Redirecting...');
-      // router.push('/dashboard'); // Redirect handled by AuthContext or useEffect watching user state
+    try {
+      await login({ email, password });
+      // The useEffect hook above will handle the redirect on successful login.
+    } catch (err) {
+      console.error('Login failed:', err);
+      if (axios.isAxiosError(err) && err.response) {
+        setError(err.response.data.message || 'Login failed. Please check your credentials.');
+      } else if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unknown error occurred during login.');
+      }
     }
   };
-
-  // Redirect if user is already logged in
-  // React recommends handling side effects like navigation in useEffect
-  // This will be handled by the main layout or a wrapper based on AuthContext user state.
+  
+  const handleGoogleLogin = useGoogleLogin({
+    onSuccess: (codeResponse) => {
+        loginWithGoogle(codeResponse.code).catch(err => {
+            if (axios.isAxiosError(err) && err.response) {
+                setError(err.response.data.message || 'Google login failed.');
+            } else if (err instanceof Error) {
+                setError(err.message);
+            } else {
+                setError('An unknown error occurred during Google login.');
+            }
+        });
+    },
+    flow: 'auth-code', // Important to get the authorization code
+  });
 
   return (
-    <div className="flex items-center justify-center min-h-[calc(100vh-200px)]"> {/* Adjust min-height as needed based on header/footer */} 
+    <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-center">Welcome Back!</CardTitle>
@@ -116,7 +134,7 @@ export default function LoginPage() {
                 <Link href="/forgot-password">Forgot Password?</Link>
               </Button>
             </div>
-            {error && <p className="text-sm text-destructive text-center">{error.message}</p>}
+            {error && <p className="text-sm text-destructive text-center">{error}</p>}
             {message && <p className="text-sm text-primary text-center">{message}</p>}
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? 'Logging in...' : 'Login'}
@@ -132,11 +150,7 @@ export default function LoginPage() {
               </span>
             </div>
           </div>
-          <Button variant="outline" className="w-full" onClick={async () => {
-            //setMessage('Redirecting to Google...'); // Optional: set a message
-            await signInWithGoogle();
-            // Error handling will be managed by AuthContext or page might navigate away
-          }} disabled={isLoading}>
+          <Button variant="outline" className="w-full" onClick={() => handleGoogleLogin()} disabled={isLoading}>
             <GoogleIcon className="mr-2 h-4 w-4" />
             Sign in with Google
           </Button>

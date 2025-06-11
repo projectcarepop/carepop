@@ -1,48 +1,43 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import { AppError } from '@/lib/utils/appError';
-import { asyncHandler } from '@/utils/asyncHandler';
-import { StatusCodes } from 'http-status-codes';
-import { logger } from '@/config/logger';
+import { supabase } from '../supabase/client';
 
-// Define the shape of the request object after authentication
-export interface AuthenticatedRequest extends Request {
-    user?: {
-        sub: string; // The user ID from the Supabase JWT
-        role: string; // The user role from the Supabase JWT
-        [key: string]: any;
-    };
+// Extend the Express Request type to include our user object.
+// This provides type safety for req.user in subsequent middleware and controllers.
+declare global {
+    namespace Express {
+        interface Request {
+            user?: any; // For a more robust type, define an interface for the full user object
+        }
+    }
 }
 
-// This middleware protects routes by verifying a Supabase JWT.
-// It is designed to be robust and prevent server crashes from invalid tokens.
-export const authMiddleware = asyncHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    const token = req.headers.authorization?.split(' ')[1]; // Using optional chaining for safety
-
-    if (!token) {
-        // If there's no token, we throw a specific, handled error.
-        // This will result in a 401 response, not a 500 server crash.
-        throw new AppError('Unauthorized: Access token is missing or malformed', StatusCodes.UNAUTHORIZED);
+export const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ message: 'Unauthorized: No token provided or malformed header.' });
     }
+
+    const token = authHeader.split(' ')[1];
 
     try {
-        // We verify the token using the secret from our environment variables.
-        // If the secret is missing, process.env.SUPABASE_JWT_SECRET will be undefined, and this WILL fail.
-        const decodedPayload = jwt.verify(token, process.env.SUPABASE_JWT_SECRET!);
-
-        // IMPORTANT: The decoded payload from a Supabase JWT contains user info like 'sub' (user ID) and 'role'.
-        // We attach this payload to the request object for later use in our controllers.
-        req.user = decodedPayload as AuthenticatedRequest['user'];
-        
-        next(); // If verification is successful, proceed to the next middleware or controller.
-    } catch (error) {
-        // Log the specific JWT error for easier debugging in the backend logs.
-        if (error instanceof Error) {
-            logger.warn(`[Auth] JWT Verification Failed: ${error.name} - ${error.message}`, { path: req.path });
+        const { data: { user }, error: tokenError } = await supabase.auth.getUser(token);
+        if (tokenError || !user) {
+            return res.status(401).json({ message: 'Unauthorized: Invalid or expired token.' });
         }
+
+        // Token is valid. Now, fetch the user's profile and roles using our DB function.
+        // This is more efficient than making multiple separate queries.
+        const { data: fullUser, error: dbError } = await supabase
+            .rpc('get_user_data', { user_id_param: user.id })
+            .single();
         
-        // If jwt.verify fails (e.g., token expired, signature invalid), it throws an error.
-        // We catch it here and return a standardized 401 error.
-        throw new AppError('Unauthorized: Invalid or expired token', StatusCodes.UNAUTHORIZED);
+        if (dbError || !fullUser) {
+             return res.status(404).json({ message: 'User profile not found.' });
+        }
+
+        req.user = fullUser;
+        next();
+    } catch (error: any) {
+        return res.status(401).json({ message: 'Unauthorized: An error occurred while processing the token.' });
     }
-}); 
+}; 

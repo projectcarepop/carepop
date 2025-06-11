@@ -1,51 +1,52 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useAuth } from '@/lib/contexts/AuthContext';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import { useAuth } from '../../lib/contexts/AuthContext';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import { Label } from '../../components/ui/label';
+import { Input } from '../../components/ui/input';
+import { Button } from '../../components/ui/button';
 import { Loader2, AlertTriangle, CheckCircle } from 'lucide-react';
+import axios from 'axios';
 
-const ForgotPasswordPage = () => {
-  const { sendPasswordResetEmail, isLoading: authIsLoading, error: authError } = useAuth();
+export default function ForgotPasswordPage() {
+  const { forgotPassword, isLoading } = useAuth();
   const [email, setEmail] = useState('');
-  const [formError, setFormError] = useState<string | null>(null);
-  const [formSuccess, setFormSuccess] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setFormError(null);
-    setFormSuccess(null);
-    setIsSubmitting(true);
+    setError('');
+    setSuccessMessage('');
 
     if (!email) {
-      setFormError('Please enter your email address.');
-      setIsSubmitting(false);
+      setError('Please enter your email address.');
       return;
     }
 
-    const { error } = await sendPasswordResetEmail(email);
-
-    if (error) {
-      console.error("[ForgotPasswordPage] Error sending reset email:", error);
-      setFormError(error.message || 'Failed to send password reset email. Please try again.');
-    } else {
-      setFormSuccess('If an account exists for this email, a password reset link has been sent.');
-      setEmail(''); // Clear the input field on success
+    try {
+      await forgotPassword(email);
+      setSuccessMessage('If an account with that email exists, a password reset link has been sent.');
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response) {
+        setError(err.response.data.message || 'Failed to send password reset email.');
+      } else if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unknown error occurred.');
+      }
     }
-    setIsSubmitting(false);
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 dark:bg-slate-900 p-4">
+    <div className="flex flex-col items-center justify-center min-h-screen p-4">
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-center">Forgot Password</CardTitle>
-          <CardDescription className="text-center text-slate-600 dark:text-slate-400">
-            Enter your email address below and we&apos;ll send you a link to reset your password.
+          <CardDescription className="text-center">
+            Enter your email and we&apos;ll send a link to reset your password.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -55,50 +56,43 @@ const ForgotPasswordPage = () => {
               <Input 
                 type="email" 
                 id="email-forgot" 
-                name="email" 
                 autoComplete="email" 
                 required 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="mt-1" 
-                disabled={isSubmitting || authIsLoading}
+                disabled={isLoading || !!successMessage}
               />
             </div>
 
-            {formError && (
-              <div className="text-red-600 dark:text-red-400 text-sm p-2 bg-red-100 dark:bg-red-900/20 rounded-md flex items-center">
-                <AlertTriangle className="h-4 w-4 mr-2 shrink-0" /> {formError}
-              </div>
-            )}
-            {authError && (
-              <div className="text-red-600 dark:text-red-400 text-sm p-2 bg-red-100 dark:bg-red-900/20 rounded-md flex items-center">
-                <AlertTriangle className="h-4 w-4 mr-2 shrink-0" /> {authError.message}
-              </div>
-            )}
-            {formSuccess && (
-              <div className="text-green-600 dark:text-green-400 text-sm p-2 bg-green-100 dark:bg-green-900/20 rounded-md flex items-center">
-                <CheckCircle className="h-4 w-4 mr-2 shrink-0" /> {formSuccess}
+            {error && (
+              <div className="text-destructive text-sm p-3 bg-destructive/10 rounded-md flex items-center">
+                <AlertTriangle className="h-4 w-4 mr-2 shrink-0" /> {error}
               </div>
             )}
             
-            <div>
-              <Button 
-                type="submit" 
-                className="w-full" 
-                disabled={isSubmitting || authIsLoading || !!formSuccess}
-              >
-                {(isSubmitting || authIsLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Send Password Reset Link
-              </Button>
-            </div>
+            {successMessage && (
+              <div className="text-primary text-sm p-3 bg-primary/10 rounded-md flex items-center">
+                <CheckCircle className="h-4 w-4 mr-2 shrink-0" /> {successMessage}
+              </div>
+            )}
+            
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={isLoading || !!successMessage}
+            >
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Send Reset Link
+            </Button>
           </form>
         </CardContent>
+        <CardContent className="mt-4 text-center">
+          <Button variant="link" asChild>
+            <Link href="/login">Back to Login</Link>
+          </Button>
+        </CardContent>
       </Card>
-      <footer className="mt-12 text-center text-sm text-gray-500">
-        <p>&copy; {new Date().getFullYear()} CarePop. All rights reserved.</p>
-      </footer>
     </div>
   );
-};
-
-export default ForgotPasswordPage; 
+}; 

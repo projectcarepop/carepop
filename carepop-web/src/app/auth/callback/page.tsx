@@ -1,83 +1,56 @@
 'use client';
 
-import { useEffect, Suspense, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/contexts/AuthContext';
+import { useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useAuth } from '../../../lib/contexts/AuthContext';
 
 function AuthCallbackContent() {
   const router = useRouter();
-  const { user, profile, isLoading, error, signOut } = useAuth();
-  const [isEmailVerification, setIsEmailVerification] = useState(false);
-  const [handled, setHandled] = useState(false);
+  const searchParams = useSearchParams();
+  const { loginWithGoogle, user, isLoading } = useAuth();
 
   useEffect(() => {
-    if (typeof window !== "undefined" && !isEmailVerification) {
-      const hash = window.location.hash;
-      if (hash.includes("type=signup")) {
-        console.log('Auth Callback: Detected email verification (type=signup).');
-        setIsEmailVerification(true);
-      } else if (hash.includes("type=email_change")) {
-        console.log('Auth Callback: Detected email change confirmation.');
-        setIsEmailVerification(true);
-      }
-    }
-  }, [isEmailVerification]);
+    const code = searchParams.get('code');
+    const error = searchParams.get('error');
 
-  useEffect(() => {
-    if (handled) return;
-
-    const currentUser = user;
-    const currentIsLoading = isLoading;
-
-    if (isEmailVerification && currentUser) {
-      console.log('Auth Callback: Handling email verification. Signing out and redirecting to login.');
-      setHandled(true);
-      signOut().then(() => {
-        router.push('/login?status=email_verification_success');
-      });
+    if (error) {
+      console.error('OAuth Error:', error);
+      router.push('/login?error=oauth_failed');
       return;
     }
 
-    if (!currentIsLoading) {
-      setHandled(true);
-      if (error) {
-        console.error('Auth Callback Error:', error);
-        setTimeout(() => router.push('/login'), 3000);
-      } else if (currentUser) {
-        console.log('Auth Callback: User authenticated', currentUser);
-        if (profile?.firstName) {
-          console.log('Auth Callback: Profile complete, redirecting to /dashboard');
-          router.push('/dashboard');
-        } else {
-          console.log('Auth Callback: Profile incomplete or not yet loaded, redirecting to /create-profile');
-          router.push('/create-profile');
-        }
+    if (code) {
+      loginWithGoogle(code)
+        .then(() => {
+          // The login function from the context will set the user state.
+          // We can then use another useEffect to react to the user state change.
+        })
+        .catch(err => {
+          console.error('Failed to exchange code for session:', err);
+          router.push('/login?error=token_exchange_failed');
+        });
+    }
+  }, [searchParams, router, loginWithGoogle]);
+
+  useEffect(() => {
+    if (!isLoading && user) {
+      // User is authenticated, check if their profile is complete
+      if (user.first_name && user.last_name) {
+        console.log('Auth Callback: Profile complete, redirecting to /dashboard');
+        router.push('/dashboard');
       } else {
-        console.warn('Auth Callback: No user, no error, not loading. Attempting redirect to login after delay.');
-        setTimeout(() => {
-          if (!currentUser && !currentIsLoading) {
-             console.log('Auth Callback: Still no user after delay, redirecting to login.');
-             router.push('/login');
-          }
-        }, 1500);
+        console.log('Auth Callback: Profile incomplete, redirecting to /create-profile');
+        router.push('/create-profile');
       }
     }
-  }, [user, profile, isLoading, error, router, signOut]);
+  }, [user, isLoading, router]);
 
-  if (isLoading) {
-    return <div>Verifying your email and processing session... Please wait.</div>;
-  }
-
-  if (error) {
-    return <div>Authentication error: {error.message}. You will be redirected to login.</div>;
-  }
-
-  return <div>Finalizing authentication...</div>;
+  return <div>Processing authentication...</div>;
 }
 
 export default function AuthCallbackPage() {
   return (
-    <Suspense fallback={<div>Loading authentication callback...</div>}>
+    <Suspense fallback={<div>Loading authentication...</div>}>
       <AuthCallbackContent />
     </Suspense>
   );
