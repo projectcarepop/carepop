@@ -4,7 +4,7 @@ import logger from './utils/logger';
 import { supabaseInitializationPromise } from './config/supabaseClient';
 
 // Publicly accessible routes
-import authRoutes from './routes/public/auth.routes';
+import authRoutes from './routes/public/authRoutes';
 import publicRoutes from './routes/public';
 
 // Consolidated Admin Routes
