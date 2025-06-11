@@ -1,0 +1,145 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "CarePoP API",
+    "version": "1.0.0",
+    "description": "API for the CarePoP platform, serving native mobile and web applications."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local development server"
+    },
+    {
+      "url": "https://carepop-backend-staging-XXXX.a.run.app",
+      "description": "Staging server on GCP Cloud Run (replace XXXX)"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "BookAppointmentRequest": {
+        "type": "object",
+        "required": ["clinicId", "serviceId", "appointment_time"],
+        "properties": {
+          "clinicId": { "type": "string", "format": "uuid" },
+          "serviceId": { "type": "string", "format": "uuid" },
+          "providerId": { "type": "string", "format": "uuid" },
+          "appointment_time": { "type": "string", "format": "date-time" },
+          "notes": { "type": "string", "maxLength": 1000 }
+        }
+      },
+      "CancelAppointmentRequestBody": {
+        "type": "object",
+        "required": ["cancelledBy", "cancellationReason"],
+        "properties": {
+          "cancelledBy": {
+            "type": "string",
+            "enum": ["user", "clinic"]
+          },
+          "cancellationReason": { "type": "string", "minLength": 1, "maxLength": 500 }
+        }
+      },
+      "Appointment": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "user_id": { "type": "string", "format": "uuid" },
+          "clinic_id": { "type": "string", "format": "uuid" },
+          "service_id": { "type": "string", "format": "uuid" },
+          "provider_id": { "type": "string", "format": "uuid", "nullable": true },
+          "appointment_time": { "type": "string", "format": "date-time" },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "confirmed", "cancelled_user", "cancelled_clinic", "completed", "no_show"]
+          },
+          "notes": { "type": "string", "nullable": true },
+          "cancellation_reason": { "type": "string", "nullable": true },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" },
+          "details": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "message": { "type": "string" },
+                "path": { "type": "array", "items": { "type": "string" } }
+              }
+            },
+            "nullable": true
+          }
+        }
+      },
+      "ServiceDetails": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "description": { "type": "string", "nullable": true }
+        },
+        "required": ["id", "name"]
+      },
+      "ClinicDetails": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "address_line1": { "type": "string", "nullable": true },
+          "city": { "type": "string", "nullable": true }
+        },
+        "required": ["id", "name"]
+      },
+      "ProviderDetails": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "full_name": { "type": "string" },
+          "specialty": { "type": "string", "nullable": true }
+        },
+        "required": ["id", "full_name"]
+      },
+      "UserAppointmentDetails": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "user_id": { "type": "string", "format": "uuid" },
+          "appointment_time": { "type": "string", "format": "date-time" },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "confirmed", "cancelled_user", "cancelled_clinic", "completed", "no_show"]
+          },
+          "notes": { "type": "string", "nullable": true },
+          "cancellation_reason": { "type": "string", "nullable": true },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" },
+          "service": { "$ref": "#/components/schemas/ServiceDetails" },
+          "clinic": { "$ref": "#/components/schemas/ClinicDetails" },
+          "provider": { "$ref": "#/components/schemas/ProviderDetails", "nullable": true }
+        },
+        "required": [
+          "id", 
+          "user_id", 
+          "appointment_time", 
+          "status", 
+          "created_at", 
+          "updated_at", 
+          "service", 
+          "clinic"
+        ]
+      }
+    }
+  },
+  "paths": {}
+} 

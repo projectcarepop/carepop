@@ -1,0 +1,72 @@
+import { NextFunction, Request, Response } from 'express';
+import { StatusCodes } from 'http-status-codes';
+import { SupplierAdminService } from '../../services/admin/supplier.admin.service';
+import { createSupplierSchema, updateSupplierSchema } from '../../validation/admin/supplier.admin.validation';
+
+export class SupplierAdminController {
+  constructor(private supplierService: SupplierAdminService) {}
+
+  async getAllSuppliers(req: Request, res: Response, next: NextFunction) {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const search = req.query.search as string | undefined;
+
+      const { data, total } = await this.supplierService.getAllSuppliers({ page, limit, search });
+
+      res.status(StatusCodes.OK).json({ 
+        success: true, 
+        data,
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
+        totalItems: total
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getSupplierById(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const supplier = await this.supplierService.getSupplierById(id);
+      if (!supplier) {
+        return res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Supplier not found' });
+      }
+      res.status(StatusCodes.OK).json({ success: true, data: supplier });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async createSupplier(req: Request, res: Response, next: NextFunction) {
+    try {
+      const validatedBody = createSupplierSchema.parse(req.body);
+      const newSupplier = await this.supplierService.createSupplier(validatedBody);
+      res.status(StatusCodes.CREATED).json({ success: true, data: newSupplier });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateSupplier(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const validatedBody = updateSupplierSchema.parse(req.body);
+      await this.supplierService.updateSupplier(id, validatedBody);
+      res.status(StatusCodes.OK).json({ success: true, message: 'Supplier updated successfully.' });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteSupplier(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const result = await this.supplierService.deleteSupplier(id);
+      res.status(StatusCodes.OK).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+} 

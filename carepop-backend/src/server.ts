@@ -4,7 +4,7 @@ import logger from './utils/logger';
 import { supabaseInitializationPromise } from './config/supabaseClient';
 
 // Publicly accessible routes
-import authRoutes from './routes/authRoutes';
+import authRoutes from './routes/public/auth.routes';
 import publicRoutes from './routes/public';
 
 // Consolidated Admin Routes
@@ -47,7 +47,7 @@ async function startServer() {
     logger.info('Supabase clients initialized successfully by server.');
 
     // --- Mount Routers ---
-    app.use('/api/auth', authRoutes); // Public auth routes
+    app.use('/api/v1/auth', authRoutes); // Public auth routes
     app.use('/api/v1', publicRoutes); // All public data routes
     app.use('/api/v1/admin', adminRoutes); // All protected admin routes
     logger.info('API routes mounted.');
