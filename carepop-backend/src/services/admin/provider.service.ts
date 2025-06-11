@@ -39,8 +39,9 @@ export class ProviderAdminService {
       .select('*', { count: 'exact' });
 
     if (search) {
-      // Use the 'full_name' computed column for searching
-      query = query.ilike('full_name', `%${search}%`);
+      // Search across multiple relevant fields for providers
+      const searchQuery = `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`;
+      query = query.or(searchQuery);
     }
 
     const offset = (page - 1) * limit;
