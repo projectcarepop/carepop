@@ -1,4 +1,5 @@
 import axios from 'axios';
+import Cookies from 'js-cookie';
 
 // Basic types to satisfy the linter and improve safety.
 // For a fully shared setup, consider a shared types package.
@@ -28,15 +29,16 @@ const apiClient = axios.create({
 
 apiClient.interceptors.request.use(config => {
     try {
-        const sessionString = localStorage.getItem('session');
+        const sessionString = Cookies.get('session');
         if (sessionString) {
-            const session = JSON.parse(sessionString);
-            if (session?.access_token) {
-                config.headers.Authorization = `Bearer ${session.access_token}`;
+            const sessionData = JSON.parse(sessionString);
+            // The access token is nested inside the 'session' object
+            if (sessionData?.session?.access_token) {
+                config.headers.Authorization = `Bearer ${sessionData.session.access_token}`;
             }
         }
     } catch (e) {
-        console.error("Could not parse session from localStorage", e);
+        console.error("Could not parse session from cookie:", e);
     }
     return config;
 });

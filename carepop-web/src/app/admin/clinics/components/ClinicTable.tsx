@@ -108,8 +108,10 @@ export function ClinicTable() {
   );
 
   React.useEffect(() => {
-    if (result) {
-      const mappedData = result.data.map((c: RawClinicData) => ({
+    if (result && result.data) {
+      // The actual array is in result.data.data
+      const clinicsArray = result.data.data || [];
+      const mappedData = clinicsArray.map((c: RawClinicData) => ({
         id: c.id,
         name: c.name,
         fullAddress: c.full_address,
@@ -121,7 +123,10 @@ export function ClinicTable() {
         updatedAt: c.updated_at,
       }));
       setData(mappedData);
-      setTotalPages(result.meta.totalPages);
+      // The pagination metadata is in result.data.meta
+      if (result.data.meta) {
+        setTotalPages(result.data.meta.totalPages);
+      }
     }
   }, [result]);
   

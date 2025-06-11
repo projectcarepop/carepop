@@ -34,9 +34,18 @@ export default function AdminAppointmentsPage() {
         if (!response.ok) throw new Error("Failed to fetch clinics");
 
         const result = await response.json();
-        setClinics(result.data);
-        if (result.data.length > 0) {
-            setSelectedClinicId(result.data[0].id);
+
+        // The API returns a paginated object like { data: { data: [...] } }
+        const clinicsArray = result?.data?.data;
+
+        if (Array.isArray(clinicsArray)) {
+          setClinics(clinicsArray);
+          if (clinicsArray.length > 0) {
+              setSelectedClinicId(clinicsArray[0].id);
+          }
+        } else {
+          console.error("API did not return a valid array of clinics:", result);
+          setClinics([]); // Set to an empty array to prevent crash
         }
       } catch (error) {
         console.error("Error fetching clinics:", error);

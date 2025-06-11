@@ -67,7 +67,9 @@ export function ServiceManager({ form }: ServiceManagerProps) {
     );
 
     useEffect(() => {
-        if (categoriesData) setCategories(categoriesData.data);
+        if (categoriesData && Array.isArray(categoriesData.data?.data)) {
+            setCategories(categoriesData.data.data);
+        }
     }, [categoriesData]);
 
     // Fetch services
