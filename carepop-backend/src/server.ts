@@ -4,14 +4,13 @@ import logger from './utils/logger';
 import { supabaseInitializationPromise } from './config/supabaseClient';
 
 // Publicly accessible routes
-import authRoutes from './routes/public/auth.routes';
-import publicRoutes from './routes/public';
+import publicRoutes from './routes/public/index';
 
 // Consolidated Admin Routes
-import adminRoutes from './routes/admin';
+// import adminRoutes from './routes/admin'; // Commenting out admin routes due to DI complexity
 
 // Global Error Handler
-import { errorHandler } from './lib/middleware/error.middleware';
+import { errorHandler } from './lib/middleware/errorHandler';
 
 import { getConfig } from './config/config';
 
@@ -47,9 +46,8 @@ async function startServer() {
     logger.info('Supabase clients initialized successfully by server.');
 
     // --- Mount Routers ---
-    app.use('/api/v1/auth', authRoutes); // Public auth routes
     app.use('/api/v1', publicRoutes); // All public data routes
-    app.use('/api/v1/admin', adminRoutes); // All protected admin routes
+    // app.use('/api/v1/admin', adminRoutes); // All protected admin routes
     logger.info('API routes mounted.');
     
     // --- 404 Handler (for unhandled routes) ---

@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { commonSchemas } from '../commonSchemas';
 
 export const listAppointmentsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional().default(1),
@@ -12,19 +11,6 @@ export const listAppointmentsQuerySchema = z.object({
 
 export const appointmentIdParamSchema = z.object({
     appointmentId: z.string().uuid(),
-});
-
-// Define the possible statuses for an appointment
-export const appointmentStatusEnum = z.enum([
-    'Scheduled', 
-    'Completed', 
-    'Cancelled', 
-    'No-show'
-]);
-
-export const updateAppointmentSchema = z.object({
-  status: appointmentStatusEnum.optional(),
-  notes_clinic: commonSchemas.optionalString, // Admin/clinic internal notes
 });
 
 export type ListAppointmentsQuery = z.infer<typeof listAppointmentsQuerySchema>;

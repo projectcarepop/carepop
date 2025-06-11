@@ -1,13 +1,21 @@
 import { Router } from 'express';
-import clinicRoutes from './clinic.routes';
-import serviceRoutes from './service.routes';
-import authRoutes from './auth.routes';
+import authRoutes from '../authRoutes';
+import directoryRoutes from '../directoryRoutes';
+import serviceRoutes from '../serviceRoutes';
+import providerRoutes from '../providerRoutes';
+import availabilityRoutes from '../availabilityRoutes';
+import profileRoutes from '../profileRoutes';
+import appointmentRoutes from '../appointmentRoutes';
+
+const router = Router();
+
+router.use('/auth', authRoutes);
+router.use('/directory', directoryRoutes);
+router.use('/services', serviceRoutes);
+router.use('/providers', providerRoutes);
+router.use('/availability', availabilityRoutes);
+router.use('/profiles', profileRoutes);
+router.use('/appointments', appointmentRoutes);
 
 
-const publicRouter = Router();
-
-publicRouter.use('/auth', authRoutes);
-publicRouter.use('/clinics', clinicRoutes);
-publicRouter.use('/services', serviceRoutes);
-
-export default publicRouter; 
+export default router; 

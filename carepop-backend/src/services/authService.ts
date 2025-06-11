@@ -1,7 +1,5 @@
 import { supabase, supabaseServiceRole } from '../config/supabaseClient';
 import { AuthError, User, Session } from '@supabase/supabase-js';
-import { AppError } from '../utils/errors';
-import { StatusCodes } from 'http-status-codes';
 
 // Placeholder for user registration logic
 // We'll add Supabase interaction here later
@@ -12,13 +10,13 @@ import { StatusCodes } from 'http-status-codes';
 //   password: string;
 // }
 
-export const registerUserService = async (userData: any): Promise<{user: User}> => {
+export const registerUserService = async (userData: any): Promise<{ success: boolean; user?: User | null; message?: string; error?: AuthError | null }> => {
   console.log('Attempting to register user with email:', userData?.email);
 
   // Basic Input Validation
   if (!userData?.email || !userData?.password) {
     console.error('Registration Error: Missing email or password');
-    throw new AppError('Email and password are required.', StatusCodes.BAD_REQUEST);
+    throw new Error('Email and password are required.'); // Throwing a generic error, could be more specific
   }
 
   const { email, password } = userData;
@@ -39,12 +37,12 @@ export const registerUserService = async (userData: any): Promise<{user: User}> 
 
   if (signUpError) {
     console.error('Supabase SignUp Error:', signUpError.message);
-    throw new AppError(signUpError.message, signUpError.status || StatusCodes.INTERNAL_SERVER_ERROR);
+    return { success: false, error: signUpError, message: signUpError.message };
   }
 
   if (!signUpData.user) {
     console.error('Supabase SignUp Error: No user data returned despite no error.');
-    throw new AppError('User registration failed for an unknown reason.', StatusCodes.INTERNAL_SERVER_ERROR);
+    return { success: false, message: 'User registration failed for an unknown reason.' };
   }
 
   // --- Create Profile Entry --- 
@@ -72,31 +70,31 @@ export const registerUserService = async (userData: any): Promise<{user: User}> 
       // Log the error but potentially still return success for user creation
       // Alternatively, could attempt to delete the auth user for atomicity (complex)
       console.error('Failed to create profile after signup:', profileError.message);
-      // For now, we will throw an error, as a user without a profile might be a problem.
-      throw new AppError('User registered, but profile creation failed. Please contact support.', StatusCodes.INTERNAL_SERVER_ERROR);
+      // Consider returning a partial success message or specific error state
+      return { success: true, user: signUpData.user, message: 'User registered, but profile creation failed. Please contact support.' };
     }
 
     console.log('User profile created successfully for:', signUpData.user.id);
 
   } catch (profileCatchError: any) {
       console.error('Unexpected error creating profile:', profileCatchError.message);
-      if (profileCatchError instanceof AppError) throw profileCatchError;
-      throw new AppError('User registered, but an unexpected error occurred during profile creation. Contact support.', StatusCodes.INTERNAL_SERVER_ERROR);
+      // Decide on return value - user exists but profile failed
+      return { success: true, user: signUpData.user, message: 'User registered, profile creation error. Contact support.' };
   }
   // --- End Profile Entry --- 
 
   console.log('User registered successfully:', signUpData.user.id);
-  return { user: signUpData.user };
+  return { success: true, user: signUpData.user, message: 'User registered successfully. Please check your email for verification.' };
 };
 
 // Login User Service
-export const loginUserService = async (loginData: any): Promise<{ user: User, session: Session }> => {
+export const loginUserService = async (loginData: any): Promise<{ success: boolean; user?: User | null; session?: Session | null; message?: string; error?: AuthError | null }> => {
   console.log('Attempting login for email:', loginData?.email);
 
   // Basic Input Validation
   if (!loginData?.email || !loginData?.password) {
     console.error('Login Error: Missing email or password');
-    throw new AppError('Email and password are required.', StatusCodes.BAD_REQUEST);
+    throw new Error('Email and password are required.');
   }
 
   const { email, password } = loginData;
@@ -110,19 +108,16 @@ export const loginUserService = async (loginData: any): Promise<{ user: User, se
   if (error) {
     console.error('Supabase SignIn Error:', error.message);
     // Common errors: Invalid login credentials
-    if (error.message === 'Invalid login credentials') {
-        throw new AppError('Invalid email or password.', StatusCodes.UNAUTHORIZED);
-    }
-    throw new AppError(error.message, error.status || StatusCodes.INTERNAL_SERVER_ERROR);
+    return { success: false, error: error, message: error.message };
   }
 
   if (!data.session || !data.user) {
      console.error('Supabase SignIn Error: No session/user data returned despite no error.');
      // Handle unlikely case
-     throw new AppError('Login failed for an unknown reason.', StatusCodes.INTERNAL_SERVER_ERROR);
+     return { success: false, message: 'Login failed for an unknown reason.' };
   }
 
   console.log('User logged in successfully:', data.user.id);
   // Return user and session info (session contains the JWT access_token)
-  return { user: data.user, session: data.session };
+  return { success: true, user: data.user, session: data.session, message: 'User logged in successfully.' };
 }; 
