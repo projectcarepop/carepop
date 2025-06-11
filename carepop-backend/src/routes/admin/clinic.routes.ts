@@ -29,6 +29,6 @@ router.route('/:id')
   .delete(validateRequest({ params: clinicIdParamSchema }), deleteClinic);
 
 // Nested routes for providers within a clinic
-router.use('/:clinicId/providers', clinicProviderRoutes);
+router.use('/:id/providers', clinicProviderRoutes);
 
 export default router; 

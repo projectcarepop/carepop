@@ -104,18 +104,19 @@ export class ClinicAdminService {
       .from(this.tableName)
       .update(updateDto)
       .eq('id', id)
-      .select();
+      .select()
+      .single();
 
-    if (error) this.handleError(error, 'update');
-    
-    // If the update was successful and we found a record, return the first one.
-    // Since we match by primary key, there should only be one.
-    if (data && data.length > 0) {
-        return data[0];
+    if (error) {
+      // If the error is "No rows found", it means the ID didn't match.
+      if (error.code === 'PGRST116') {
+        return null; 
+      }
+      this.handleError(error, 'update');
     }
-
-    // If no record was updated (e.g., wrong ID), return null.
-    return null;
+    
+    // If we get here, data should be the updated clinic object.
+    return data;
   }
 
   async remove(id: string): Promise<void> {

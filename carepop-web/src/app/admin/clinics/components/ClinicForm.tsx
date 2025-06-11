@@ -24,10 +24,13 @@ import { ServiceManager } from '../../providers/components/ServiceManager';
 import { clinicFormSchema, ClinicFormValues } from './clinicForm-types';
 import { ProviderFormValues } from '../../providers/components/providerForm-types';
 
+export type { ClinicFormValues }; // Use 'export type' for type re-exports
+
 interface ClinicFormProps {
   initialData?: Partial<ClinicFormValues> & { id?: string; servicesOffered?: string[] };
   onSubmitSuccess?: () => void;
   mode: 'create' | 'edit';
+  clinicId?: string; // Add clinicId to the props
 }
 
 // API payload structure (snake_case, matching backend Zod schema & DB)
@@ -51,7 +54,7 @@ interface ClinicApiPayload {
   is_active: boolean;
 }
 
-export function ClinicForm({ initialData, onSubmitSuccess, mode }: ClinicFormProps) {
+export function ClinicForm({ initialData, onSubmitSuccess, mode, clinicId }: ClinicFormProps) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const router = useRouter();
   const { toast } = useToast();
@@ -112,11 +115,11 @@ export function ClinicForm({ initialData, onSubmitSuccess, mode }: ClinicFormPro
 
       const endpoint = mode === 'create' 
         ? '/api/v1/admin/clinics' 
-        : `/api/v1/admin/clinics/${initialData?.id}`;
+        : `/api/v1/admin/clinics/${clinicId}`;
       
       const method = mode === 'create' ? 'POST' : 'PUT';
 
-      if (mode === 'edit' && !initialData?.id) {
+      if (mode === 'edit' && !clinicId) {
         throw new Error("Clinic ID is missing for editing.");
       }
 
