@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import * as authController from '@/controllers/public/authController';
+import { registerUser, loginUser } from '@/controllers/public/auth.controller';
 import { validateRequest } from '@/lib/middleware/validate.middleware';
-import { loginSchema, signUpSchema } from '@/validation/public/authValidation';
+import { registerUserSchema, loginUserSchema } from '@/validation/auth.validation';
 
 const router = Router();
 
-router.post('/signup', validateRequest({ body: signUpSchema.shape.body }), authController.signUp);
-router.post('/login', validateRequest({ body: loginSchema.shape.body }), authController.login);
+router.post('/register', validateRequest({ body: registerUserSchema }), registerUser);
+router.post('/login', validateRequest({ body: loginUserSchema }), loginUser);
 
 export default router; 
