@@ -26,6 +26,7 @@ interface AuthContextType {
     session: Session | null;
     login: (data: LoginData) => Promise<void>;
     signUp: (data: SignUpData) => Promise<{ data: { message: string } }>;
+    loginWithGoogle: (code: string) => Promise<void>;
     forgotPassword: (email: string) => Promise<{ data: { message: string } }>;
     resetPassword: (data: ResetPasswordData) => Promise<{ data: { message: string } }>;
     logout: () => void;
@@ -91,6 +92,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await handleAuth(api.login(data));
     };
 
+    const loginWithGoogle = async (code: string) => {
+        await handleAuth(api.loginWithGoogle(code));
+    };
+
     const signUp = async (data: SignUpData) => {
         return await api.signUp(data);
     };
@@ -109,7 +114,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, session, login, signUp, forgotPassword, resetPassword, logout, loading }}>
+        <AuthContext.Provider value={{ user, session, login, signUp, loginWithGoogle, forgotPassword, resetPassword, logout, loading }}>
             {children}
         </AuthContext.Provider>
     );

@@ -31,7 +31,7 @@ const getFullUser = async (userId: string) => {
 
 export const authService = {
     signUp: async (input: SignUpInput) => {
-        const { email, password, firstName, lastName } = input;
+        const { email, password } = input;
 
         const { data: authData, error: authError } = await supabase.auth.admin.createUser({
             email,
@@ -46,7 +46,7 @@ export const authService = {
 
         const { error: profileError } = await supabase
             .from('profiles')
-            .insert({ user_id: userId, first_name: firstName, last_name: lastName, email });
+            .insert({ user_id: userId, first_name: '', last_name: '', email });
 
         if (profileError) {
             // If profile creation fails, we should delete the auth user to prevent orphaned users.

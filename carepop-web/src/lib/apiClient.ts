@@ -6,8 +6,6 @@ import Cookies from 'js-cookie';
 interface SignUpData {
     email: string;
     password: string;
-    firstName: string;
-    lastName: string;
 }
 
 interface LoginData {

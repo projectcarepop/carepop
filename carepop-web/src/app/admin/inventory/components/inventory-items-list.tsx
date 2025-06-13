@@ -56,7 +56,7 @@ export function InventoryItemsList() {
     if (debouncedSearchTerm) {
       params.append('search', debouncedSearchTerm);
     }
-    return `/api/v1/admin/inventory-items?${params.toString()}`;
+    return `/api/v1/admin/inventory?${params.toString()}`;
   }, [pagination, debouncedSearchTerm]);
 
   const { data: result, error: swrError, isLoading, mutate } = useSWR(
@@ -77,7 +77,7 @@ export function InventoryItemsList() {
     try {
       if (!token) throw new AppError("Not authenticated", {} as Response);
       
-      const response = await fetch(`/api/v1/admin/inventory-items/${id}`, {
+      const response = await fetch(`/api/v1/admin/inventory/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` },
       });
@@ -182,7 +182,7 @@ export function InventoryItemsList() {
             ))}
           </TableHeader>
           <TableBody>
-             {isLoading ? (
+            {isLoading ? (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center">Loading...</TableCell>
               </TableRow>
@@ -190,15 +190,23 @@ export function InventoryItemsList() {
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center text-destructive">{swrError.message}</TableCell>
               </TableRow>
-            ) : table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id}>
-                 {row.getVisibleCells().map(cell => (
-                  <TableCell key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
+            ) : table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow key={row.id}>
+                  {row.getVisibleCells().map(cell => (
+                    <TableCell key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  No results found.
+                </TableCell>
               </TableRow>
-            ))}
+            )}
           </TableBody>
         </Table>
       </div>

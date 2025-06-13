@@ -17,15 +17,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Mail, Lock, Eye, EyeOff, User as UserIcon } from 'lucide-react'; // Icons
+import { Lock, Eye, EyeOff } from 'lucide-react'; // Icons
 import GoogleIcon from '../../components/ui/GoogleIcon'; // Added GoogleIcon import
 import { useGoogleLogin } from '@react-oauth/google';
 import axios from 'axios';
 
 export default function RegisterPage() {
   // const router = useRouter(); // Removed unused constant
-  const { signUp, loginWithGoogle, isLoading } = useAuth();
-  const [formData, setFormData] = useState({ firstName: '', lastName: '', email: '', password: '' });
+  const { signUp, loginWithGoogle, loading } = useAuth();
+  const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -53,7 +53,7 @@ export default function RegisterPage() {
 
   const handleGoogleLogin = useGoogleLogin({
     onSuccess: (codeResponse) => {
-        loginWithGoogle(codeResponse.code).catch(err => {
+        loginWithGoogle(codeResponse.code).catch((err: unknown) => {
             if (axios.isAxiosError(err) && err.response) {
                 setError(err.response.data.message || 'Google login failed.');
             } else if (err instanceof Error) {
@@ -75,16 +75,6 @@ export default function RegisterPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleRegister} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">First Name</Label>
-                <Input id="firstName" placeholder="Juan" required onChange={handleInputChange} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name</Label>
-                <Input id="lastName" placeholder="Dela Cruz" required onChange={handleInputChange} />
-              </div>
-            </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input id="email" type="email" placeholder="you@example.com" required onChange={handleInputChange} />
@@ -114,8 +104,8 @@ export default function RegisterPage() {
               </div>
             </div>
             {error && <p className="text-sm text-destructive text-center">{error}</p>}
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Registering...' : 'Create Account'}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Registering...' : 'Create Account'}
             </Button>
           </form>
           <div className="relative my-6">
@@ -128,7 +118,7 @@ export default function RegisterPage() {
               </span>
             </div>
           </div>
-          <Button variant="outline" className="w-full" onClick={() => handleGoogleLogin()} disabled={isLoading}>
+          <Button variant="outline" className="w-full" onClick={() => handleGoogleLogin()} disabled={loading}>
             <GoogleIcon className="mr-2 h-4 w-4" />
             Sign up with Google
           </Button>

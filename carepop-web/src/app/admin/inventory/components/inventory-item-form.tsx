@@ -83,7 +83,7 @@ export function InventoryItemForm({ itemId }: InventoryItemFormProps) {
 
       // Fetch item if editing
       if (itemId) {
-        const itemRes = await fetch(`/api/v1/admin/inventory-items/${itemId}`, { headers });
+        const itemRes = await fetch(`/api/v1/admin/inventory/${itemId}`, { headers });
         if (itemRes.ok) {
           const itemData = await itemRes.json();
           form.reset(itemData.data);
@@ -105,7 +105,7 @@ export function InventoryItemForm({ itemId }: InventoryItemFormProps) {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
-      const url = itemId ? `/api/v1/admin/inventory-items/${itemId}` : '/api/v1/admin/inventory-items';
+      const url = itemId ? `/api/v1/admin/inventory/${itemId}` : '/api/v1/admin/inventory';
       const method = itemId ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
