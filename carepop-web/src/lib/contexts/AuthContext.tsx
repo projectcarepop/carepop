@@ -1,11 +1,10 @@
 'use client';
 
 import React, { createContext, useState, useEffect, ReactNode, useContext } from 'react';
-import { Session } from '@supabase/supabase-js';
-import Cookies from 'js-cookie';
+import { Session, User } from '@supabase/supabase-js';
+import { createSupabaseBrowserClient } from '../supabase/client';
 import { api } from '../apiClient';
-import { SignUpData, LoginData, ResetPasswordData } from '../types/authActionTypes';
-import { isAxiosError } from 'axios';
+import { LoginData, ResetPasswordData, SignUpData } from '../types/authActionTypes';
 
 // More specific user profile type
 interface UserProfile {
@@ -13,12 +12,6 @@ interface UserProfile {
     email?: string;
     roles: string[];
     [key: string]: unknown; // Allow other profile properties
-}
-
-// Data shape returned from our backend login
-interface AuthResponseData {
-    session: Session;
-    user: UserProfile;
 }
 
 interface AuthContextType {
@@ -29,71 +22,57 @@ interface AuthContextType {
     loginWithGoogle: (code: string) => Promise<void>;
     forgotPassword: (email: string) => Promise<{ data: { message: string } }>;
     resetPassword: (data: ResetPasswordData) => Promise<{ data: { message: string } }>;
-    logout: () => void;
+    logout: () => Promise<void>;
     loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
+    const supabase = createSupabaseBrowserClient();
     const [user, setUser] = useState<UserProfile | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
 
-    const storeSession = (sessionData: AuthResponseData) => {
-        // Store in a cookie that the middleware can read.
-        // The cookie will expire in 7 days.
-        Cookies.set('session', JSON.stringify(sessionData), { expires: 7, path: '/' });
-        setUser(sessionData.user);
-        setSession(sessionData.session);
-    };
-
-    const clearSession = () => {
-        Cookies.remove('session', { path: '/' });
-        setUser(null);
-        setSession(null);
-    };
-
-    useEffect(() => {
-        const checkUserSession = () => {
-            try {
-                const sessionString = Cookies.get('session');
-                if (sessionString) {
-                    const storedSession: AuthResponseData = JSON.parse(sessionString);
-                    setUser(storedSession.user);
-                    setSession(storedSession.session);
-                }
-            } catch (e) {
-                console.error('Failed to load session from cookie:', e);
-                clearSession();
-            } finally {
-                setLoading(false);
-            }
-        };
-        checkUserSession();
-    }, []);
-
-    const handleAuth = async (authPromise: Promise<{ data: AuthResponseData }>) => {
+    const getProfile = async (user: User) => {
         try {
-            const { data } = await authPromise;
-            storeSession(data);
+            const { data: profile } = await api.getProfile(user.id);
+            return profile;
         } catch (error) {
-            if (isAxiosError(error)) {
-                console.error('Auth error:', error.response?.data?.message || error.message);
-            } else {
-                console.error('Auth error:', (error as Error).message);
-            }
-            clearSession();
-            throw error;
+            console.error("Failed to fetch user profile:", error);
+            return null;
         }
     };
 
+    useEffect(() => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            async (event, session) => {
+                setLoading(true);
+                if (session && session.user) {
+                    const profile = await getProfile(session.user);
+                    setUser(profile);
+                    setSession(session);
+                } else {
+                    setUser(null);
+                    setSession(null);
+                }
+                setLoading(false);
+            }
+        );
+
+        return () => {
+            subscription.unsubscribe();
+        };
+    }, [supabase]);
+
     const login = async (data: LoginData) => {
-        await handleAuth(api.login(data));
+        const { error } = await supabase.auth.signInWithPassword(data);
+        if (error) throw error;
     };
 
     const loginWithGoogle = async (code: string) => {
-        await handleAuth(api.loginWithGoogle(code));
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) throw error;
     };
 
     const signUp = async (data: SignUpData) => {
@@ -108,9 +87,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return await api.resetPassword(data);
     };
     
-    const logout = () => {
-        // Here you might want to call a backend endpoint to invalidate the token
-        clearSession();
+    const logout = async () => {
+        await supabase.auth.signOut();
     };
 
     return (

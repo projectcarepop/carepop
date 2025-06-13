@@ -1,33 +1,10 @@
 import { supabase } from '../../lib/supabase/client';
 import { z } from 'zod';
 import type { signUpSchema, resetPasswordSchema } from '../../validation/public/auth.validation';
+import { userService } from './user.service';
 
 type SignUpInput = z.infer<typeof signUpSchema>['body'];
 type ResetPasswordInput = z.infer<typeof resetPasswordSchema>['body'];
-
-// Helper to get user profile and roles
-const getFullUser = async (userId: string) => {
-    const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-    if (profileError) throw profileError;
-
-    const { data: roles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('roles(name)')
-        .eq('user_id', userId);
-
-    if (rolesError) throw rolesError;
-
-    // The roles query returns an array of objects like [{ roles: { name: 'User' } }]
-    // We flatten this into a simple array of strings: ['User']
-    const roleNames = roles?.map(r => (r.roles as any).name) || [];
-
-    return { ...profile, roles: roleNames };
-};
 
 export const authService = {
     signUp: async (input: SignUpInput) => {
@@ -78,7 +55,7 @@ export const authService = {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error || !data.user) throw new Error(error?.message || 'Login failed.');
 
-        const user = await getFullUser(data.user.id);
+        const user = await userService.getProfileById(data.user.id);
         return { session: data.session, user };
     },
 
@@ -86,26 +63,20 @@ export const authService = {
         const { data, error } = await supabase.auth.exchangeCodeForSession(code);
         if (error || !data.user) throw new Error(error?.message || 'Google login failed.');
         
-        const { data: profile } = await supabase.from('profiles').select('id').eq('user_id', data.user.id).single();
+        const user = await userService.getProfileById(data.user.id);
         
-        if (!profile) {
-            const { id, email, user_metadata } = data.user;
-            await supabase.from('profiles').insert({ 
-                user_id: id, 
-                email, 
-                first_name: user_metadata.given_name || 'Google',
-                last_name: user_metadata.family_name || 'User',
+        // If the user profile is minimal (just created), we might want to populate it
+        // from Google's data. This part can be enhanced later.
+        if (!user.first_name && !user.last_name) {
+             const { user_metadata } = data.user;
+             await supabase.from('profiles').update({
+                first_name: user_metadata.given_name || '',
+                last_name: user_metadata.family_name || '',
                 avatar_url: user_metadata.avatar_url,
-            });
-
-            const { data: roleData } = await supabase.from('roles').select('id').eq('name', 'User').single();
-            if (roleData) {
-                await supabase.from('user_roles').insert({ user_id: id, role_id: roleData.id });
-            }
+             }).eq('user_id', data.user.id);
         }
-        
-        const user = await getFullUser(data.user.id);
-        return { session: data.session, user };
+
+        return { session: data.session, user: await userService.getProfileById(data.user.id) };
     },
 
     forgotPassword: async (email: string) => {

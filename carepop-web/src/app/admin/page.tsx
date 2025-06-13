@@ -10,6 +10,8 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 export default function AdminPage() {
     const { user, loading } = useAuth();
 
+    console.log('Current user state in AdminPage:', user);
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-screen">

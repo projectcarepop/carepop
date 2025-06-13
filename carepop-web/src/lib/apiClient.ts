@@ -47,4 +47,5 @@ export const api = {
     loginWithGoogle: (code: string) => apiClient.post('/api/v1/public/auth/login-google', { code }),
     forgotPassword: (email: string) => apiClient.post('/api/v1/public/auth/forgot-password', { email }),
     resetPassword: (data: ResetPasswordData) => apiClient.post('/api/v1/public/auth/reset-password', data),
+    getProfile: (userId: string) => apiClient.get(`/api/v1/public/users/${userId}/profile`),
 }; 
