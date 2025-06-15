@@ -77,7 +77,7 @@ async function fetchClinicById(id: string, token: string): Promise<InitialClinic
     contactEmail: clinicData.contact_email,
     websiteUrl: clinicData.website_url,
     operatingHours: clinicData.operating_hours,
-    servicesOffered: clinicData.services_offered,
+    servicesOffered: clinicData.services_offered ?? [],
     fpopChapterAffiliation: clinicData.fpop_chapter_affiliation,
     additionalNotes: clinicData.additional_notes,
     isActive: clinicData.is_active !== undefined ? clinicData.is_active : true,

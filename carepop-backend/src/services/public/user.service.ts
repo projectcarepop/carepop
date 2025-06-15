@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase/client';
+import { AppError } from '@/lib/utils/appError';
 
 const getFullUser = async (userId: string) => {
     const { data: profile, error: profileError } = await supabase
@@ -7,16 +8,20 @@ const getFullUser = async (userId: string) => {
         .eq('user_id', userId)
         .single();
 
-    if (profileError) throw new Error('User profile not found.');
+    if (profileError || !profile) {
+        throw new AppError('User profile not found.', 404);
+    }
 
     const { data: roles, error: rolesError } = await supabase
         .from('user_roles')
-        .select('roles(name)')
+        .select('role')
         .eq('user_id', userId);
 
-    if (rolesError) throw rolesError;
-
-    const roleNames = roles?.map(r => (r.roles as any).name) || [];
+    if (rolesError) {
+        console.error('Error fetching user roles:', rolesError);
+    }
+    
+    const roleNames = roles?.map(r => r.role) || [];
 
     return { ...profile, roles: roleNames };
 };
@@ -24,6 +29,10 @@ const getFullUser = async (userId: string) => {
 
 export const userService = {
     getProfileById: async (userId: string) => {
-        return await getFullUser(userId);
+        const user = await getFullUser(userId);
+        if (!user) {
+            throw new AppError('User profile not found.', 404);
+        }
+        return user;
     },
 }; 
