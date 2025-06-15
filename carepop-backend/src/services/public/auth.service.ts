@@ -3,8 +3,8 @@ import { z } from 'zod';
 import type { signUpSchema, resetPasswordSchema } from '../../validation/public/auth.validation';
 import { userService } from './user.service';
 
-type SignUpInput = z.infer<typeof signUpSchema>['body'];
-type ResetPasswordInput = z.infer<typeof resetPasswordSchema>['body'];
+type SignUpInput = z.infer<typeof signUpSchema>;
+type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
 export const authService = {
     signUp: async (input: SignUpInput) => {
