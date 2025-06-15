@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, FormEvent, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth, Profile } from '@/lib/contexts/AuthContext'; // Assuming Profile is exported
+import { useAuth } from '@/lib/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -18,13 +18,30 @@ interface StepConfig {
   title: string;
   subtitle: string;
   icon: React.ElementType;
-  fields: (keyof Profile)[]; // Fields for this step
-  requiredFields?: (keyof FormProfile)[]; // Optional: Fields required for this step
+  fields: (keyof FormProfile)[];
+  requiredFields?: (keyof FormProfile)[];
   label: string;
 }
 
-// Define profile fields as used in the form, matching the Profile interface
-type FormProfile = Omit<Profile, 'user_id' | 'age' | 'username' | 'avatar_url'>;
+// Form data can be a partial UserProfile, but we expect strings from the form
+type FormProfile = {
+  first_name?: string;
+  middle_initial?: string;
+  last_name?: string;
+  date_of_birth?: string;
+  gender_identity?: string;
+  pronouns?: string;
+  assigned_sex_at_birth?: string;
+  civil_status?: string;
+  religion?: string;
+  occupation?: string;
+  street?: string;
+  province_code?: string;
+  city_municipality_code?: string;
+  barangay_code?: string;
+  contact_no?: string;
+  philhealth_no?: string;
+};
 
 // Define AddressSelectItem type
 interface AddressSelectItem {
@@ -47,44 +64,44 @@ const stepsConfig: StepConfig[] = [
     title: "Personal Details",
     subtitle: "Let's start with some basic information about you.",
     icon: UserCircle,
-    fields: ['firstName', 'middleInitial', 'lastName', 'dateOfBirth', 'contactNo'],
-    requiredFields: ['firstName', 'lastName', 'dateOfBirth', 'contactNo'],
+    fields: ['first_name', 'middle_initial', 'last_name', 'date_of_birth', 'contact_no'],
+    requiredFields: ['first_name', 'last_name', 'date_of_birth', 'contact_no'],
     label: "Personal Details"
   },
   {
     title: "Gender Identity",
     subtitle: "Help us understand you better.",
     icon: HeartPulse,
-    fields: ['genderIdentity', 'pronouns', 'assignedSexAtBirth', 'civilStatus', 'religion'],
-    requiredFields: ['genderIdentity', 'pronouns', 'assignedSexAtBirth', 'civilStatus'], // religion can be optional
+    fields: ['gender_identity', 'pronouns', 'assigned_sex_at_birth', 'civil_status', 'religion'],
+    requiredFields: ['gender_identity', 'pronouns', 'assigned_sex_at_birth', 'civil_status'],
     label: "Gender Identity"
   },
   {
     title: "Professional & Health ID",
     subtitle: "A little more about your professional life and health coverage.",
     icon: Building,
-    fields: ['occupation', 'philhealthNo'],
-    requiredFields: ['occupation'], // philhealthNo can be optional
+    fields: ['occupation', 'philhealth_no'],
+    requiredFields: ['occupation'],
     label: "Professional & Health ID"
   },
   {
     title: "Your Address",
     subtitle: "Where can we reach you or send information?",
     icon: Map,
-    fields: ['provinceCode', 'cityMunicipalityCode', 'barangayCode', 'street'],
-    requiredFields: ['provinceCode', 'cityMunicipalityCode', 'barangayCode', 'street'],
+    fields: ['province_code', 'city_municipality_code', 'barangay_code', 'street'],
+    requiredFields: ['province_code', 'city_municipality_code', 'barangay_code', 'street'],
     label: "Your Address"
   }
 ];
 
 export default function CreateProfileWizardPage() {
-  const { user, session, profile: initialProfile, fetchProfile, isLoading: authLoading, error: authError } = useAuth();
+  const { user, session, loading } = useAuth();
   const router = useRouter();
 
-  const [currentStep, setCurrentStep] = useState(0); // 0-indexed
+  const [currentStep, setCurrentStep] = useState(0);
 
-  const [formData, setFormData] = useState<Partial<FormProfile>>({});
-  const [stepErrors, setStepErrors] = useState<Record<string, string>>({}); // For inline field errors
+  const [formData, setFormData] = useState<FormProfile>({});
+  const [stepErrors, setStepErrors] = useState<Record<string, string>>({});
 
   // Address Info - API Data Lists
   const [provincesList, setProvincesList] = useState<AddressSelectItem[]>([]);
@@ -97,45 +114,46 @@ export default function CreateProfileWizardPage() {
   const [barangaysLoading, setBarangaysLoading] = useState(false);
   const [addressApiError, setAddressApiError] = useState<string | null>(null);
 
-  const [pageLoading, setPageLoading] = useState(false); // For form submission
+  const [pageLoading, setPageLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!loading && !user) {
       router.replace('/login');
     }
-    if (initialProfile) {
+    if (user) {
+      // Explicitly map known profile fields to the form state
       setFormData({
-        firstName: initialProfile.firstName || '',
-        middleInitial: initialProfile.middleInitial || '',
-        lastName: initialProfile.lastName || '',
-        dateOfBirth: initialProfile.dateOfBirth || '',
-        genderIdentity: initialProfile.genderIdentity || '',
-        pronouns: initialProfile.pronouns || '',
-        assignedSexAtBirth: initialProfile.assignedSexAtBirth || '',
-        civilStatus: initialProfile.civilStatus || '',
-        religion: initialProfile.religion || '',
-        occupation: initialProfile.occupation || '',
-        street: initialProfile.street || '',
-        provinceCode: initialProfile.provinceCode || '',
-        cityMunicipalityCode: initialProfile.cityMunicipalityCode || '',
-        barangayCode: initialProfile.barangayCode || '',
-        contactNo: initialProfile.contactNo || '',
-        philhealthNo: initialProfile.philhealthNo || '',
+        first_name: String(user.first_name || ''),
+        middle_initial: String(user.middle_initial || ''),
+        last_name: String(user.last_name || ''),
+        date_of_birth: String(user.date_of_birth || ''),
+        gender_identity: String(user.gender_identity || ''),
+        pronouns: String(user.pronouns || ''),
+        assigned_sex_at_birth: String(user.assigned_sex_at_birth || ''),
+        civil_status: String(user.civil_status || ''),
+        religion: String(user.religion || ''),
+        occupation: String(user.occupation || ''),
+        street: String(user.street || ''),
+        province_code: String(user.province_code || ''),
+        city_municipality_code: String(user.city_municipality_code || ''),
+        barangay_code: String(user.barangay_code || ''),
+        contact_no: String(user.contact_no || ''),
+        philhealth_no: String(user.philhealth_no || ''),
       });
-      // Trigger address dropdown loads if codes are present
-      if (initialProfile.provinceCode) {
-        // This will trigger the useEffect for cities/municipalities
+
+      if (user.province_code) {
+        // This will trigger address dropdowns
       }
     }
-  }, [user, authLoading, router, initialProfile]);
+  }, [user, loading, router]);
   
-    useEffect(() => {
-      if (authError) {
-          console.warn("AuthContext has an error:", authError);
-      }
-    }, [authError]);
+  useEffect(() => {
+    if (error) {
+        console.warn("AuthContext has an error:", error);
+    }
+  }, [error]);
 
   // Fetch all provinces on mount
   useEffect(() => {
@@ -160,7 +178,7 @@ export default function CreateProfileWizardPage() {
 
   // Load and filter cities/municipalities when provinceCode changes from formData
   useEffect(() => {
-    const currentProvinceCode = formData.provinceCode;
+    const currentProvinceCode = formData.province_code;
     if (currentProvinceCode) {
       const loadAndFilterCitiesMunicipalities = async () => {
         console.log('[Debug] loadAndFilterCitiesMunicipalities: START for provinceCode:', currentProvinceCode); // DEBUG LOG
@@ -208,14 +226,14 @@ export default function CreateProfileWizardPage() {
       setBarangaysList([]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.provinceCode]);
+  }, [formData.province_code]);
 
   // Load and filter barangays when cityMunicipalityCode changes from formData
   const loadAndFilterBarangays = useCallback(async (cityCode: string | undefined) => {
     if (!cityCode) {
       setBarangaysList([]);
       // Reset barangayCode in formData if city is cleared
-      setFormData(prev => ({ ...prev, barangayCode: '' })); 
+      setFormData(prev => ({ ...prev, barangay_code: '' })); 
       return;
     }
     console.log('[Debug] loadAndFilterBarangays: START for city_code:', cityCode);
@@ -272,16 +290,16 @@ export default function CreateProfileWizardPage() {
 
   // useEffect to call loadAndFilterBarangays when formData.cityMunicipalityCode changes
   useEffect(() => {
-    const currentCityCode = formData.cityMunicipalityCode;
+    const currentCityCode = formData.city_municipality_code;
     if (currentCityCode) {
       loadAndFilterBarangays(currentCityCode);
     } else {
       // Clear barangays if city/municipality is not selected
       setBarangaysList([]);
-      setFormData(prev => ({ ...prev, barangayCode: '' }));
+      setFormData(prev => ({ ...prev, barangay_code: '' }));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.cityMunicipalityCode, loadAndFilterBarangays]);
+  }, [formData.city_municipality_code, loadAndFilterBarangays]);
 
   const handleInputChange = (field: keyof FormProfile, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -293,12 +311,12 @@ export default function CreateProfileWizardPage() {
       }));
     }
 
-    if (field === 'provinceCode') {
+    if (field === 'province_code') {
         // Reset dependent fields when province changes
-        setFormData(prev => ({ ...prev, cityMunicipalityCode: '', barangayCode: '' }));
-    } else if (field === 'cityMunicipalityCode') {
+        setFormData(prev => ({ ...prev, city_municipality_code: '', barangay_code: '' }));
+    } else if (field === 'city_municipality_code') {
         // Reset barangay when city/municipality changes
-        setFormData(prev => ({ ...prev, barangayCode: '' }));
+        setFormData(prev => ({ ...prev, barangay_code: '' }));
     }
   };
 
@@ -324,49 +342,45 @@ export default function CreateProfileWizardPage() {
     e.preventDefault();
     if (!user || !session) {
       setError("You must be logged in to update your profile.");
-      setPageLoading(false);
       return;
     }
 
     setPageLoading(true);
     setError(null);
-    setSuccess(null);
 
-    const profileDataToSubmit: Partial<Profile> = { ...formData };
-
-    if (formData.dateOfBirth) {
-      const age = calculateAge(formData.dateOfBirth);
-      if (age !== null) {
-        profileDataToSubmit.age = age;
-      }
+    const age = calculateAge(formData.date_of_birth);
+    if (age === null) {
+      setError("Invalid date of birth.");
+      setPageLoading(false);
+      return;
     }
-    
-    console.log('[CreateProfilePage] handleSubmit: profileDataToSubmit:', JSON.stringify(profileDataToSubmit, null, 2)); // Log data being sent
+
+    const payload = { ...formData, age };
 
     try {
-      const response = await fetch(`/api/v1/public/profile`, {
+      const response = await fetch(`/api/v1/public/users/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify(profileDataToSubmit),
+        body: JSON.stringify(payload),
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        console.error("Profile update failed. Status:", response.status, "Result (stringified):", JSON.stringify(result));
+        console.error("Profile update failed. Status:", response.status, "Result:", result);
         throw new Error(result.message || `Failed to update profile. Status: ${response.status}`);
       }
-
+      
       setSuccess('Profile updated successfully!');
-      if (fetchProfile && user && session) {
-        await fetchProfile(user, session);
-      }
-      router.push('/dashboard');
+      setTimeout(() => {
+        router.push('/dashboard');
+        router.refresh();
+      }, 1000);
+
     } catch (err) {
-      console.error('Error submitting profile:', err);
       const error = err as Error;
       setError(error.message || 'An unexpected error occurred.');
     } finally {
@@ -415,11 +429,11 @@ export default function CreateProfileWizardPage() {
     }
   };
   
-  if (authLoading && !initialProfile) {
+  if (loading || !user) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-lg">Loading your profile...</p>
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Loading your profile...</span>
       </div>
     );
   }
@@ -432,13 +446,13 @@ export default function CreateProfileWizardPage() {
     return step.fields.map((fieldKey) => {
       const field = fieldKey as keyof FormProfile; // Type assertion
       switch (field) {
-        case 'firstName':
-        case 'lastName':
+        case 'first_name':
+        case 'last_name':
         case 'street':
         case 'religion':
         case 'occupation':
-        case 'contactNo':
-        case 'philhealthNo':
+        case 'contact_no':
+        case 'philhealth_no':
           return (
             <div key={field} className="space-y-1.5">
               <Label htmlFor={field} className="text-sm font-medium">
@@ -452,7 +466,7 @@ export default function CreateProfileWizardPage() {
               {stepErrors[field] && <p className="text-xs text-red-500 mt-1">{stepErrors[field]}</p>}
             </div>
           );
-        case 'dateOfBirth':
+        case 'date_of_birth':
           return (
             <div key={field} className="space-y-1.5">
               <Label htmlFor={field} className="text-sm font-medium">Date of Birth</Label>
@@ -465,21 +479,21 @@ export default function CreateProfileWizardPage() {
               {stepErrors[field] && <p className="text-xs text-red-500 mt-1">{stepErrors[field]}</p>}
             </div>
           );
-        case 'genderIdentity':
+        case 'gender_identity':
         case 'pronouns':
-        case 'assignedSexAtBirth':
-        case 'civilStatus':
+        case 'assigned_sex_at_birth':
+        case 'civil_status':
           const optionsMap = {
-            genderIdentity: ["Woman", "Man", "Transgender Woman", "Transgender Man", "Non-binary", "Genderqueer", "Prefer to self-describe", "Prefer not to say"],
+            gender_identity: ["Woman", "Man", "Transgender Woman", "Transgender Man", "Non-binary", "Genderqueer", "Prefer to self-describe", "Prefer not to say"],
             pronouns: ["She/Her", "He/Him", "They/Them", "Ze/Hir", "Prefer to self-describe", "Prefer not to say"],
-            assignedSexAtBirth: ["Female", "Male", "Intersex", "Prefer not to say"],
-            civilStatus: ["Single", "Married", "Widowed", "Separated", "Divorced", "Domestic Partnership"],
+            assigned_sex_at_birth: ["Female", "Male", "Intersex", "Prefer not to say"],
+            civil_status: ["Single", "Married", "Widowed", "Separated", "Divorced", "Domestic Partnership"],
           };
           const labelMap = {
-            genderIdentity: "Gender Identity",
+            gender_identity: "Gender Identity",
             pronouns: "Pronouns",
-            assignedSexAtBirth: "Assigned Sex at Birth",
-            civilStatus: "Civil Status",
+            assigned_sex_at_birth: "Assigned Sex at Birth",
+            civil_status: "Civil Status",
           }
           return (
             <div key={field} className="space-y-1.5">
@@ -493,13 +507,13 @@ export default function CreateProfileWizardPage() {
               {stepErrors[field] && <p className="text-xs text-red-500 mt-1">{stepErrors[field]}</p>}
             </div>
           );
-        case 'provinceCode':
-        case 'cityMunicipalityCode':
-        case 'barangayCode':
-          const list = field === 'provinceCode' ? provincesList : field === 'cityMunicipalityCode' ? citiesMunicipalitiesList : barangaysList;
-          const isLoading = field === 'provinceCode' ? provincesLoading : field === 'cityMunicipalityCode' ? citiesMunicipalitiesLoading : barangaysLoading;
-          const placeholderText = field === 'provinceCode' ? 'Select Province' : field === 'cityMunicipalityCode' ? 'Select City/Municipality' : 'Select Barangay';
-          const labelText = field === 'provinceCode' ? 'Province' : field === 'cityMunicipalityCode' ? 'City/Municipality' : 'Barangay';
+        case 'province_code':
+        case 'city_municipality_code':
+        case 'barangay_code':
+          const list = field === 'province_code' ? provincesList : field === 'city_municipality_code' ? citiesMunicipalitiesList : barangaysList;
+          const isLoading = field === 'province_code' ? provincesLoading : field === 'city_municipality_code' ? citiesMunicipalitiesLoading : barangaysLoading;
+          const placeholderText = field === 'province_code' ? 'Select Province' : field === 'city_municipality_code' ? 'Select City/Municipality' : 'Select Barangay';
+          const labelText = field === 'province_code' ? 'Province' : field === 'city_municipality_code' ? 'City/Municipality' : 'Barangay';
 
           // Check for duplicate values
           if (list && list.length > 0) {
@@ -529,12 +543,12 @@ export default function CreateProfileWizardPage() {
                 placeholder={isLoading ? "Loading..." : placeholderText}
                 searchPlaceholder={`Search ${labelText.toLowerCase()}...`}
                 emptyStateMessage={`No ${labelText.toLowerCase()} found.`}
-                disabled={isLoading || (field === 'cityMunicipalityCode' && !formData.provinceCode) || (field === 'barangayCode' && !formData.cityMunicipalityCode)}
+                disabled={isLoading || (field === 'city_municipality_code' && !formData.province_code) || (field === 'barangay_code' && !formData.city_municipality_code)}
               />
               {stepErrors[field] && <p className="text-xs text-red-500 mt-1">{stepErrors[field]}</p>}
             </div>
           );
-        case 'middleInitial':
+        case 'middle_initial':
           return (
             <div key={field} className="space-y-1.5">
               <Label htmlFor={field}>Middle Initial</Label>

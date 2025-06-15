@@ -2,6 +2,10 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import logger from './utils/logger';
 import { supabaseInitializationPromise } from './config/supabaseClient';
+import morgan from 'morgan';
+import helmet from 'helmet';
+import { errorHandler } from './lib/middleware/error.middleware';
+import { getConfig } from './config/config';
 
 // Publicly accessible routes
 import authRoutes from './routes/public/auth.routes';
@@ -11,13 +15,37 @@ import publicRoutes from './routes/public';
 import adminRoutes from './routes/admin';
 
 // Global Error Handler
-import { errorHandler } from './lib/middleware/error.middleware';
-
-import { getConfig } from './config/config';
-
+import { AppError } from './lib/utils/appError';
 
 const app: Express = express();
 const config = getConfig();
+
+// --- Pre-router Middleware ---
+app.use(helmet());
+
+// Configure CORS
+const allowedOrigins = [
+    'http://localhost:3000', 
+    'http://localhost:3001', 
+    process.env.FRONTEND_URL || ''
+].filter(Boolean);
+
+const corsOptions: cors.CorsOptions = {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+        // allow requests with no origin (like mobile apps or curl requests)
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true,
+};
+app.use(cors(corsOptions));
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(morgan('dev'));
 
 // --- Health Check ---
 app.get('/health', (req: Request, res: Response) => {
@@ -25,16 +53,6 @@ app.get('/health', (req: Request, res: Response) => {
 });
 
 // --- Core Middleware ---
-const corsOptions = {
-  origin: '*', 
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-};
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 app.use((req: Request, res: Response, next: NextFunction) => {
   logger.info(`Incoming Request: ${req.method} ${req.path}`);
   next();

@@ -17,7 +17,7 @@ export const authService = {
             email,
             password,
             options: {
-                emailRedirectTo: `http://localhost:3001/auth/email-confirmed`,
+                emailRedirectTo: `http://localhost:3000/auth/email-confirmed`,
             }
         });
 

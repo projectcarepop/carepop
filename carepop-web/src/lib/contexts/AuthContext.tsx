@@ -7,7 +7,7 @@ import { api } from '../apiClient';
 import { LoginData, ResetPasswordData, SignUpData } from '../types/authActionTypes';
 
 // More specific user profile type
-interface UserProfile {
+export interface UserProfile {
     id: string;
     email?: string;
     roles: string[];
