@@ -164,7 +164,7 @@ export default function EditClinicPage() {
         <h1 className="text-3xl font-bold">Edit Clinic</h1>
         {initialData.name && <span className="text-xl text-muted-foreground">({initialData.name})</span>}
       </div>
-      <ClinicForm initialData={initialData} onSubmitSuccess={handleSuccess} mode="edit" clinicId={clinicId} />
+      <ClinicForm initialData={{...initialData, servicesOffered: initialData.servicesOffered ?? []}} onSubmitSuccess={handleSuccess} mode="edit" clinicId={clinicId} />
     </div>
   );
 } 
