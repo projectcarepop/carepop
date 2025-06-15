@@ -13,7 +13,7 @@ export const authService = {
         const { data: authData, error: authError } = await supabase.auth.admin.createUser({
             email,
             password,
-            email_confirm: true, // Set to true to require email verification
+            email_confirm: false, // TEMPORARY DEBUGGING: Set to false to isolate email sending issues
         });
 
         if (authError) throw new Error(authError.message);
