@@ -22,7 +22,7 @@ interface AuthContextType {
     loginWithGoogle: (code: string) => Promise<void>;
     forgotPassword: (email: string) => Promise<{ data: { message: string } }>;
     resetPassword: (data: ResetPasswordData) => Promise<{ data: { message: string } }>;
-    logout: () => Promise<void>;
+    signOut: () => Promise<void>;
     loading: boolean;
 }
 
@@ -87,12 +87,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return await api.resetPassword(data);
     };
     
-    const logout = async () => {
+    const signOut = async () => {
         await supabase.auth.signOut();
     };
 
     return (
-        <AuthContext.Provider value={{ user, session, login, signUp, loginWithGoogle, forgotPassword, resetPassword, logout, loading }}>
+        <AuthContext.Provider value={{ user, session, login, signUp, loginWithGoogle, forgotPassword, resetPassword, signOut, loading }}>
             {children}
         </AuthContext.Provider>
     );

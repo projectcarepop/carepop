@@ -31,19 +31,14 @@ export const authService = {
             throw new Error(profileError.message);
         }
         
-        const { data: roleData, error: roleError } = await supabase
-            .from('roles')
-            .select('id')
-            .eq('name', 'User')
-            .single();
-
-        if (roleError || !roleData) throw roleError || new Error('Default "User" role not found.');
-
+        // Correctly insert the default role for the new user.
+        // The `user_roles` table expects a user_id and a text role.
         const { error: userRoleError } = await supabase
             .from('user_roles')
-            .insert({ user_id: userId, role_id: roleData.id });
+            .insert({ user_id: userId, role: 'User' });
 
         if (userRoleError) {
+             // If role assignment fails, delete the auth user to prevent orphaned users.
              await supabase.auth.admin.deleteUser(userId);
              throw new Error(userRoleError.message);
         }
