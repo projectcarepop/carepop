@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { supabase } from '../supabase/client';
+import { supabase } from '../supabase/public-client';
+import { AppError } from '../utils/appError';
 
 // Extend the Express Request type to include our user object.
 // This provides type safety for req.user in subsequent middleware and controllers.
