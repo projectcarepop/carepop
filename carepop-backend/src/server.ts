@@ -47,7 +47,8 @@ async function startServer() {
     logger.info('Supabase clients initialized successfully by server.');
 
     // --- Mount Routers ---
-    app.use('/api/v1/public', publicRoutes); // All public data routes
+    app.use('/api/v1/public/auth', authRoutes); // Mount auth routes
+    app.use('/api/v1/public', publicRoutes); // All other public data routes
     app.use('/api/v1/admin', adminRoutes); // All protected admin routes
     logger.info('API routes mounted.');
     

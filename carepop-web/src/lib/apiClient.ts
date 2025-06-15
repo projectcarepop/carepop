@@ -42,7 +42,16 @@ apiClient.interceptors.request.use(config => {
 });
 
 export const api = {
-    signUp: (data: SignUpData) => apiClient.post('/api/v1/public/auth/signup', data),
+    signUp: async (data: SignUpData) => {
+        try {
+            return await apiClient.post('/api/v1/public/auth/signup', data);
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                console.error("Signup Error Response from Backend:", error.response?.data);
+            }
+            throw error;
+        }
+    },
     login: (data: LoginData) => apiClient.post('/api/v1/public/auth/login', data),
     loginWithGoogle: (code: string) => apiClient.post('/api/v1/public/auth/login-google', { code }),
     forgotPassword: (email: string) => apiClient.post('/api/v1/public/auth/forgot-password', { email }),
