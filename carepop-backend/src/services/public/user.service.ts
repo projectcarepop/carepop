@@ -1,4 +1,4 @@
-import { supabase } from '../../lib/supabase/client';
+import { supabase } from '../../lib/supabase/public-client';
 import { AppError } from '@/lib/utils/appError';
 
 const getFullUser = async (userId: string) => {
@@ -21,7 +21,7 @@ const getFullUser = async (userId: string) => {
         console.error('Error fetching user roles:', rolesError);
     }
     
-    const roleNames = roles?.map(r => r.role) || [];
+    const roleNames = roles?.map((r: { role: string }) => r.role) || [];
 
     return { ...profile, roles: roleNames };
 };
