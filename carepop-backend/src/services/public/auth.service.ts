@@ -16,6 +16,9 @@ export const authService = {
         const { data: authData, error: authError } = await supabase.auth.signUp({
             email,
             password,
+            options: {
+                emailRedirectTo: `http://localhost:3001/auth/email-confirmed`,
+            }
         });
 
         if (authError) {

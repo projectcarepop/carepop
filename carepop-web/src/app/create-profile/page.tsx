@@ -322,8 +322,8 @@ export default function CreateProfileWizardPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!user || !session?.access_token) {
-      setError('User not authenticated or session expired. Please log in.');
+    if (!user || !session) {
+      setError("You must be logged in to update your profile.");
       setPageLoading(false);
       return;
     }
@@ -344,35 +344,19 @@ export default function CreateProfileWizardPage() {
     console.log('[CreateProfilePage] handleSubmit: profileDataToSubmit:', JSON.stringify(profileDataToSubmit, null, 2)); // Log data being sent
 
     try {
-      const token = session.access_token;
-
-      const apiUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL;
-      
-      if (!apiUrl) {
-        console.error("Backend API URL is not configured. Please set NEXT_PUBLIC_BACKEND_API_URL.");
-        setError("Application configuration error: Backend URL missing.");
-        setPageLoading(false);
-        return;
-      }
-
-      // Construct the payload according to what the backend expects
-      const payload = {
-        // ...
-      };
-
-      const response = await fetch(`/api/v1/admin/users/profile`, {
-        method: 'POST',
+      const response = await fetch(`/api/v1/public/profile`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(profileDataToSubmit),
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        console.error("Profile update failed. Status:", response.status, "Result (stringified):", JSON.stringify(result, null, 2));
+        console.error("Profile update failed. Status:", response.status, "Result (stringified):", JSON.stringify(result));
         throw new Error(result.message || `Failed to update profile. Status: ${response.status}`);
       }
 
