@@ -78,7 +78,7 @@ export const authService = {
 
     forgotPassword: async (email: string) => {
         const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-            redirectTo: 'http://localhost:3000/auth/update-password',
+            redirectTo: 'https://www.carepop.com/auth/update-password',
         });
         if (error) throw new Error(error.message);
         return { message: 'Password reset email sent.' };

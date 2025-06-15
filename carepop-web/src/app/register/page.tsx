@@ -48,7 +48,11 @@ export default function RegisterPage() {
       setShowSuccessModal(true);
     } catch (err) {
         if (axios.isAxiosError(err) && err.response) {
-            setError(err.response.data.message || 'Registration failed. Please try again.');
+            if (err.response.data?.message?.includes('already been registered')) {
+                setError('This email address is already in use. Please log in or use a different email.');
+            } else {
+                setError(err.response.data.message || 'Registration failed. Please try again.');
+            }
         } else if (err instanceof Error) {
             setError(err.message);
         } else {
