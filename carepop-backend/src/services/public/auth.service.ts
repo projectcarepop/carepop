@@ -35,7 +35,7 @@ export const authService = {
         // The `user_roles` table expects a user_id and a text role.
         const { error: userRoleError } = await supabaseAdmin
             .from('user_roles')
-            .insert({ user_id: userId, role: 'User' });
+            .insert({ user_id: userId, role: 'user' });
 
         if (userRoleError) {
              // If role assignment fails, delete the auth user to prevent orphaned users.
