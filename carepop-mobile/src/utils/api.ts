@@ -13,11 +13,28 @@ const getHeaders = async () => {
 };
 
 const api = {
-    get: async (endpoint: string) => {
+    get: async (endpoint: string, params?: Record<string, any>) => {
         const headers = await getHeaders();
-        const response = await fetch(`${API_URL}${endpoint}`, {
+        const url = new URL(`${API_URL}${endpoint}`);
+        if (params) {
+            Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
+        }
+        const response = await fetch(url.toString(), {
             method: 'GET',
             headers,
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'API request failed');
+        }
+        return response.json();
+    },
+    post: async (endpoint: string, body: any) => {
+        const headers = await getHeaders();
+        const response = await fetch(`${API_URL}${endpoint}`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(body),
         });
         if (!response.ok) {
             const error = await response.json();
@@ -37,6 +54,27 @@ const api = {
             throw new Error(error.message || 'API request failed');
         }
         return response.json();
+    },
+    delete: async (endpoint: string) => {
+        const headers = await getHeaders();
+        const response = await fetch(`${API_URL}${endpoint}`, {
+            method: 'DELETE',
+            headers,
+        });
+        if (!response.ok) {
+            // DELETE may not return a body, so handle that case
+            if (response.headers.get('content-type')?.includes('application/json')) {
+                const error = await response.json();
+                throw new Error(error.message || 'API request failed');
+            } else {
+                 throw new Error(`API request failed with status ${response.status}`);
+            }
+        }
+        // DELETE might not have a body, so return a success indicator or the body if it exists
+        if (response.headers.get('content-type')?.includes('application/json')) {
+            return response.json();
+        }
+        return { success: true };
     }
 };
 

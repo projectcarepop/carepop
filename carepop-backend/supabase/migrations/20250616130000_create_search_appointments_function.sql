@@ -5,8 +5,8 @@ CREATE OR REPLACE FUNCTION search_appointments(
     p_clinic_id UUID DEFAULT NULL,
     p_provider_id UUID DEFAULT NULL,
     p_status TEXT DEFAULT NULL,
-    p_date_range_start TIMESTAMPTZ DEFAULT NULL,
-    p_date_range_end TIMESTAMPTZ DEFAULT NULL
+    p_start_date TIMESTAMPTZ DEFAULT NULL,
+    p_end_date TIMESTAMPTZ DEFAULT NULL
 )
 RETURNS TABLE (
     id UUID,
@@ -48,9 +48,9 @@ BEGIN
         uv.last_name AS user_last_name,
         uv.email AS user_email,
         s.name AS service_name,
-        s.cost as service_cost,
-        c.name as clinic_name,
-        p.full_name as provider_full_name
+        s.cost AS service_cost,
+        c.name AS clinic_name,
+        p.full_name AS provider_full_name
     FROM
         public.appointments a
     LEFT JOIN
@@ -65,8 +65,8 @@ BEGIN
         (p_clinic_id IS NULL OR a.clinic_id = p_clinic_id) AND
         (p_provider_id IS NULL OR a.provider_id = p_provider_id) AND
         (p_status IS NULL OR a.status::text = p_status) AND
-        (p_date_range_start IS NULL OR a.appointment_datetime >= p_date_range_start) AND
-        (p_date_range_end IS NULL OR a.appointment_datetime <= p_date_range_end) AND
+        (p_start_date IS NULL OR a.appointment_datetime >= p_start_date) AND
+        (p_end_date IS NULL OR a.appointment_datetime <= p_end_date) AND
         (
             search_term IS NULL OR
             search_term = '' OR

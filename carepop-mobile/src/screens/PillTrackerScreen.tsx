@@ -1,163 +1,251 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, Alert } from 'react-native';
-import { theme } from '../components'; // Corrected theme import
-import { Card, Button, Checkbox } from '../components'; // Import necessary components
-import { MaterialIcons } from '@expo/vector-icons';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, Alert, ActivityIndicator, Pressable } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
+import { Swipeable } from 'react-native-gesture-handler';
 
-// Placeholder data
-const dummyMedications = [
-  { id: 'm1', name: 'Metformin 500mg', time: '8:00 AM', taken: false },
-  { id: 'm2', name: 'Lisinopril 10mg', time: '8:00 AM', taken: true },
-  { id: 'm3', name: 'Vitamin D 1000IU', time: '12:00 PM', taken: false },
-  { id: 'm4', name: 'Metformin 500mg', time: '8:00 PM', taken: false },
-];
+import { theme, Card, Button } from '../components';
+import { getMedications, getMedicationLogs, logMedication, deactivateMedication } from '../data/api/medication';
+import { Medication } from '../types/medication';
+import { HealthBuddyStackParamList } from '../navigation/AppNavigator';
 
-type Medication = typeof dummyMedications[0];
+type PillTrackerNavigationProp = NativeStackNavigationProp<HealthBuddyStackParamList, 'PillTrackerScreen'>;
 
-export function PillTrackerScreen({ navigation }: any) {
-  // State to manage medication taken status (use dummy data for now)
-  const [meds, setMeds] = useState(dummyMedications);
+type MedicationWithLog = Medication & { takenToday: boolean };
 
-  const toggleTaken = (id: string) => {
-    setMeds(currentMeds => 
-      currentMeds.map(med => 
-        med.id === id ? { ...med, taken: !med.taken } : med
-      )
-    );
-    // TODO: Add API call to update status in backend
-  };
-
-  const renderMedicationItem = ({ item }: { item: Medication }) => (
-    <View style={styles.medItemContainer}>
-        <Checkbox 
-            checked={item.taken} 
-            onChange={() => toggleTaken(item.id)} 
-            label={``} // Label handled by Text components
-        />
-        <View style={styles.medTextContainer}>
-            <Text style={styles.medName}>{item.name}</Text>
-            <Text style={styles.medTime}>Due: {item.time}</Text>
-        </View>
-        {/* Optional: Add reminder/snooze button? */}
-    </View>
-  );
-
-  // Component for the header content
-  const ListHeader = () => (
-    <Text style={styles.subtitle}>Today&apos;s Schedule</Text>
-  );
-
-  // Component for the footer content
-  const ListFooter = () => (
-    <View style={styles.footerContainer}>
-      <Button 
-        title="Add New Medication" 
-        onPress={() => navigation.navigate('AddMedication')} // Ensure 'AddMedication' matches route name
-        style={styles.actionButton}
-      />
-      <Button 
-        title="View Full Schedule / History" 
-        onPress={() => { Alert.alert("Coming Soon!", "This feature is under development."); /* TODO: Navigate to history screen */ }}
-        variant="secondary"
-        styleType="outline"
-        style={styles.actionButton}
-      />
-    </View>
-  );
-
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      {/* Remove ScrollView */}
-      {/* Use FlatList as the main container */}
-      <FlatList
-        style={styles.container} // Apply container styles to FlatList
-        contentContainerStyle={styles.contentContainer} // Add padding if needed inside the list
-        data={meds}
-        renderItem={renderMedicationItem}
-        keyExtractor={item => item.id}
-        ListHeaderComponent={ListHeader}
-        ListFooterComponent={ListFooter}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.placeholderText}>No medications scheduled for today.</Text>
-            {/* Render footer even when list is empty */}
-            <ListFooter /> 
-          </View>
+export function PillTrackerScreen() {
+    const navigation = useNavigation<PillTrackerNavigationProp>();
+    const [medications, setMedications] = useState<MedicationWithLog[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    
+    const fetchData = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            const [meds, logs] = await Promise.all([
+                getMedications(),
+                getMedicationLogs(today)
+            ]);
+            
+            const loggedIds = new Set(logs.map(log => log.medication_id));
+            
+            const combinedMeds = meds.map(med => ({
+                ...med,
+                takenToday: loggedIds.has(med.id),
+            }));
+            
+            setMedications(combinedMeds);
+        } catch (error) {
+            // Error is already alerted in the api function
+        } finally {
+            setIsLoading(false);
         }
-        ItemSeparatorComponent={() => <View style={styles.separator} />} // Add separator if Card styling is removed/changed
-      />
-    </SafeAreaView>
-  );
+    }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            fetchData();
+        }, [fetchData])
+    );
+
+    const handleLogMedication = async (medId: string) => {
+        const success = await logMedication(medId);
+        if (success) {
+            setMedications(prevMeds =>
+                prevMeds.map(med =>
+                    med.id === medId ? { ...med, takenToday: true } : med
+                )
+            );
+            Alert.alert('Success', 'Medication logged!');
+        }
+    };
+
+    const handleDeleteMedication = async (medId: string) => {
+        Alert.alert(
+            "Deactivate Medication",
+            "Are you sure you want to deactivate this medication? This cannot be undone.",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Deactivate",
+                    style: "destructive",
+                    onPress: async () => {
+                        const success = await deactivateMedication(medId);
+                        if (success) {
+                            fetchData(); // Refresh the list
+                            Alert.alert('Success', 'Medication has been deactivated.');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const renderRightActions = (medId: string) => {
+        return (
+            <TouchableOpacity
+                onPress={() => handleDeleteMedication(medId)}
+                style={styles.deleteButton}>
+                <Ionicons name="trash-outline" size={24} color={theme.colors.white} />
+            </TouchableOpacity>
+        );
+    };
+
+    const renderMedicationItem = ({ item }: { item: MedicationWithLog }) => (
+        <Swipeable renderRightActions={() => renderRightActions(item.id)}>
+            <Card style={styles.medCard}>
+                <View style={styles.medInfo}>
+                    <Text style={styles.medName}>{item.name}</Text>
+                    {item.dosage && <Text style={styles.medDosage}>{item.dosage}</Text>}
+                </View>
+                <Pressable
+                    style={[styles.statusButton, item.takenToday ? styles.takenButton : styles.toTakeButton]}
+                    onPress={() => !item.takenToday && handleLogMedication(item.id)}
+                    disabled={item.takenToday}
+                >
+                    <Ionicons 
+                        name={item.takenToday ? "checkmark-circle" : "ellipse-outline"}
+                        size={24}
+                        color={item.takenToday ? theme.colors.white : theme.colors.primary}
+                    />
+                    <Text style={[styles.statusText, item.takenToday && styles.takenText]}>
+                        {item.takenToday ? 'Taken' : 'Take'}
+                    </Text>
+                </Pressable>
+            </Card>
+        </Swipeable>
+    );
+
+    if (isLoading) {
+        return (
+            <SafeAreaView style={styles.safeArea}>
+                <ActivityIndicator style={{ marginTop: 20 }} size="large" color={theme.colors.primary} />
+            </SafeAreaView>
+        );
+    }
+
+    return (
+        <SafeAreaView style={styles.safeArea}>
+            <View style={styles.header}>
+                <Text style={styles.screenTitle}>Pill Tracker</Text>
+                <Button
+                    title="Add Med"
+                    onPress={() => navigation.navigate('AddMedicationScreen')}
+                    variant="primary"
+                    styleType="solid"
+                    icon={<Ionicons name="add" size={20} color={theme.colors.white} />}
+                />
+            </View>
+            
+            {medications.length > 0 ? (
+                <FlatList
+                    data={medications}
+                    renderItem={renderMedicationItem}
+                    keyExtractor={(item) => item.id}
+                    contentContainerStyle={styles.listContainer}
+                />
+            ) : (
+                <View style={styles.emptyContainer}>
+                    <Ionicons name="file-tray-outline" size={64} color={theme.colors.border} />
+                    <Text style={styles.emptyText}>No medications added yet.</Text>
+                    <Text style={styles.emptySubText}>Press "Add Med" to get started.</Text>
+                </View>
+            )}
+        </SafeAreaView>
+    );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  container: { // Style for the FlatList itself
-    flex: 1,
-  },
-  contentContainer: { // Style for the content *inside* the FlatList
-    paddingBottom: theme.spacing.lg, // Ensure space at the bottom
-  },
-  subtitle: {
-    fontSize: theme.typography.subheading,
-    fontWeight: '600', // Semibold
-    color: theme.colors.text,
-    marginLeft: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
-    marginTop: theme.spacing.md, // Add margin top since it's now the header
-  },
-  medItemContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.md, 
-    backgroundColor: theme.colors.card, // Use card background if needed
-    marginHorizontal: theme.spacing.md, // Keep horizontal margin like the card
-    marginBottom: theme.spacing.sm, // Add space between items
-    borderRadius: theme.borderRadius.md, // Add border radius if mimicking card
-    elevation: 1, // Optional: add shadow like card
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
-  },
-  medTextContainer: {
-    marginLeft: theme.spacing.sm,
-    flex: 1, // Allow text to wrap
-  },
-  medName: {
-    fontSize: theme.typography.body,
-    fontWeight: '500',
-    color: theme.colors.text,
-  },
-  medTime: {
-    fontSize: theme.typography.caption,
-    color: theme.colors.textMuted,
-  },
-  placeholderText: {
-    fontSize: theme.typography.body,
-    color: theme.colors.textMuted,
-    textAlign: 'center',
-    padding: theme.spacing.md,
-  },
-  actionButton: {
-      marginHorizontal: theme.spacing.md,
-      marginBottom: theme.spacing.md, // Adjust spacing
-  },
-  footerContainer: { // Container for footer buttons
-    marginTop: theme.spacing.lg, // Add space above buttons
-  },
-  emptyContainer: { // Container for empty state + footer
-    flex: 1, // Take available space if needed
-    alignItems: 'center', // Center empty text
-    paddingTop: theme.spacing.xl, // Add some padding top
-  },
-  separator: { // Optional: if you want lines between items without the card
-    height: 1,
-    backgroundColor: theme.colors.border,
-    marginHorizontal: theme.spacing.md,
-  }
+    safeArea: {
+        flex: 1,
+        backgroundColor: theme.colors.background,
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.colors.border,
+    },
+    screenTitle: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: theme.colors.text,
+    },
+    listContainer: {
+        paddingHorizontal: 20,
+        paddingTop: 10,
+    },
+    medCard: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10,
+        padding: 15,
+    },
+    medInfo: {
+        flex: 1,
+    },
+    medName: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: theme.colors.text,
+    },
+    medDosage: {
+        fontSize: 14,
+        color: theme.colors.textMuted,
+        marginTop: 2,
+    },
+    statusButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 20,
+    },
+    toTakeButton: {
+        borderWidth: 1,
+        borderColor: theme.colors.primary,
+    },
+    takenButton: {
+        backgroundColor: theme.colors.primary,
+    },
+    statusText: {
+        marginLeft: 8,
+        fontSize: 14,
+        fontWeight: '500',
+        color: theme.colors.primary,
+    },
+    takenText: {
+        color: theme.colors.white,
+    },
+    deleteButton: {
+        backgroundColor: theme.colors.danger,
+        justifyContent: 'center',
+        alignItems: 'center',
+        width: 75,
+        height: '90%',
+        borderRadius: theme.roundness,
+    },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    emptyText: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: theme.colors.text,
+        marginTop: 10,
+    },
+    emptySubText: {
+        fontSize: 14,
+        color: theme.colors.textMuted,
+        marginTop: 5,
+        textAlign: 'center',
+    },
 }); 

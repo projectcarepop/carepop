@@ -40,9 +40,13 @@ BEGIN
     JOIN
         public.users_view uv ON p.user_id = uv.id
     WHERE
-        search_term IS NULL OR
-        search_term = '' OR
-        uv.full_name ILIKE '%' || search_term || '%' OR
-        uv.email ILIKE '%' || search_term || '%';
+        (
+            search_term IS NULL OR
+            search_term = '' OR
+            p.full_name ILIKE '%' || search_term || '%' OR
+            p.specialty ILIKE '%' || search_term || '%' OR
+            uv.first_name ILIKE '%' || search_term || '%' OR
+            uv.last_name ILIKE '%' || search_term || '%'
+        );
 END;
 $$ LANGUAGE plpgsql; 
