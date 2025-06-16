@@ -31,10 +31,13 @@ export class ProviderAdminService {
     return data;
   }
   
-  async findAll(options: { page: number, limit: number, search?: string, sortBy: string, sortOrder: 'asc' | 'desc' }) {
-    const { page, limit, search, sortBy, sortOrder } = options;
+  async findAll(options: { page: number, limit: number, search?: string, clinicId?: string, sortBy: string, sortOrder: 'asc' | 'desc' }) {
+    const { page, limit, search, clinicId, sortBy, sortOrder } = options;
     
-    const rpcParams = { search_term: search };
+    const rpcParams = { 
+      search_term: search,
+      p_clinic_id: clinicId 
+    };
 
     // Get the total count for pagination metadata
     const { count, error: countError } = await supabase

@@ -53,16 +53,14 @@ export class AppointmentAdminService {
   }
   
   async findAll(options: any) {
-    const { page = 1, limit = 10, search, clinic_id, provider_id, status, date_range_start, date_range_end, sortBy = 'appointment_datetime', sortOrder = 'desc' } = options;
+    const { page = 1, limit = 10, search, clinicId, providerId, status, startDate, endDate, sortBy = 'appointment_datetime', sortOrder = 'desc' } = options;
 
-    const rpcParams = {
-        search_term: search,
-        p_clinic_id: clinic_id,
-        p_provider_id: provider_id,
-        p_status: status,
-        p_date_range_start: date_range_start,
-        p_date_range_end: date_range_end
-    };
+    const rpcParams: { [key: string]: any } = { search_term: search };
+    if (clinicId) rpcParams.p_clinic_id = clinicId;
+    if (providerId) rpcParams.p_provider_id = providerId;
+    if (status) rpcParams.p_status = status;
+    if (startDate) rpcParams.p_start_date = startDate;
+    if (endDate) rpcParams.p_end_date = endDate;
 
     // First, get the total count without pagination for metadata
     const { count, error: countError } = await supabase

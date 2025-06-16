@@ -24,6 +24,7 @@ export const listProvidersQuerySchema = z.object({
     page: z.preprocess((val) => Number(val), z.number().int().min(1)).optional().default(1),
     limit: z.preprocess((val) => Number(val), z.number().int().min(1)).optional().default(10),
     search: z.string().optional(),
+    clinicId: z.string().uuid().optional(),
     sortBy: z.string().optional().default('last_name'),
     sortOrder: z.enum(['asc', 'desc']).optional().default('asc'),
 }); 

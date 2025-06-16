@@ -56,10 +56,11 @@ export class InventoryAdminService {
   }) {
     const { page = 1, limit = 10, search, clinic_id, supplier_id, stock_level_threshold, sortBy = 'name', sortOrder = 'asc' } = options;
     
-    const rpcParams = {
-        search_term: search, p_clinic_id: clinic_id,
-        p_supplier_id: supplier_id, p_stock_level_threshold: stock_level_threshold
-    };
+    // Dynamically build the RPC parameters to avoid ambiguity
+    const rpcParams: { [key: string]: any } = { search_term: search };
+    if (clinic_id) rpcParams.p_clinic_id = clinic_id;
+    if (supplier_id) rpcParams.p_supplier_id = supplier_id;
+    if (stock_level_threshold !== undefined) rpcParams.p_stock_level_threshold = stock_level_threshold;
 
     const { count, error: countError } = await supabase
       .rpc('search_inventory_items', rpcParams, { count: 'exact' });
