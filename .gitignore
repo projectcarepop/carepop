@@ -5,3 +5,11 @@ context/
 
 .cursor/
 .cursor\rules
+
+.expo
+
+# Terraform temporary files and providers
+.terraform/
+terraform.tfstate
+terraform.tfstate.backup
+.terraform.lock.hcl
