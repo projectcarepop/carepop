@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { supabase } from '../supabase/public-client';
+import { serviceSupabase } from '../supabase/service-client'; // Corrected import path
 import { AppError } from '../utils/appError';
 
 // Extend the Express Request type to include our user object.
@@ -21,13 +22,14 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
     const token = authHeader.split(' ')[1];
 
     try {
+        // Still use the public client to validate the token initially.
         const { data: { user }, error: tokenError } = await supabase.auth.getUser(token);
         if (tokenError || !user) {
             return res.status(401).json({ message: 'Unauthorized: Invalid or expired token.' });
         }
 
-        // Step 1: Fetch the user's profile data from the 'profiles' table.
-        const { data: profile, error: profileError } = await supabase
+        // Step 1: Fetch profile using the SERVICE client to bypass RLS.
+        const { data: profile, error: profileError } = await serviceSupabase
             .from('profiles')
             .select('*')
             .eq('user_id', user.id)
@@ -38,8 +40,8 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
             return res.status(404).json({ message: 'User profile not found.' });
         }
 
-        // Step 2: Fetch the user's roles from the 'user_roles' table.
-        const { data: roles, error: rolesError } = await supabase
+        // Step 2: Fetch roles using the SERVICE client to bypass RLS.
+        const { data: roles, error: rolesError } = await serviceSupabase
             .from('user_roles')
             .select('role')
             .eq('user_id', user.id);
@@ -52,7 +54,7 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
         // Step 3: Combine profile and roles into a single user object for the request.
         req.user = {
             ...profile,
-            roles: roles ? roles.map(r => r.role) : [],
+            roles: roles ? roles.map((r: { role: string }) => r.role) : [],
         };
         
         next();
