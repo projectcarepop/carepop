@@ -18,7 +18,14 @@ RETURNS TABLE (
     notes_user TEXT,
     notes_clinic TEXT,
     created_at TIMESTAMPTZ,
-    updated_at TIMESTAMPTZ
+    updated_at TIMESTAMPTZ,
+    user_first_name TEXT,
+    user_last_name TEXT,
+    user_email TEXT,
+    service_name TEXT,
+    service_cost NUMERIC,
+    clinic_name TEXT,
+    provider_full_name TEXT
 ) AS $$
 BEGIN
     RETURN QUERY
@@ -34,11 +41,24 @@ BEGIN
         a.notes_user,
         a.notes_clinic,
         a.created_at,
-        a.updated_at
+        a.updated_at,
+        uv.first_name AS user_first_name,
+        uv.last_name AS user_last_name,
+        uv.email AS user_email,
+        s.name AS service_name,
+        s.cost as service_cost,
+        c.name as clinic_name,
+        p.full_name as provider_full_name
     FROM
         public.appointments a
     LEFT JOIN
         public.users_view uv ON a.user_id = uv.id
+    LEFT JOIN
+        public.services s ON a.service_id = s.id
+    LEFT JOIN
+        public.clinics c ON a.clinic_id = c.id
+    LEFT JOIN
+        public.providers p ON a.provider_id = p.id
     WHERE
         (p_clinic_id IS NULL OR a.clinic_id = p_clinic_id) AND
         (p_provider_id IS NULL OR a.provider_id = p_provider_id) AND

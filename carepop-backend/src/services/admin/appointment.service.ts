@@ -9,6 +9,19 @@ type Appointment = Database['public']['Tables']['appointments']['Row'];
 type CreateAppointmentDto = Database['public']['Tables']['appointments']['Insert'];
 type UpdateAppointmentDto = Database['public']['Tables']['appointments']['Update'];
 
+type AppointmentRpcResponse = {
+  id: string;
+  appointment_datetime: string;
+  status: string;
+  user_first_name: string;
+  user_last_name: string;
+  user_email: string;
+  service_name: string;
+  service_cost: number;
+  clinic_name: string;
+  provider_full_name: string;
+};
+
 const APPOINTMENT_SELECT_QUERY = `
     *,
     user:users_view(*),
@@ -62,16 +75,38 @@ export class AppointmentAdminService {
     const offset = (page - 1) * limit;
 
     // Then, fetch the paginated and joined data
-    const { data, error } = await supabase
+    const { data: rpcData, error } = await supabase
         .rpc('search_appointments', rpcParams)
-        .select(APPOINTMENT_SELECT_QUERY)
         .order(sortBy, { ascending: sortOrder === 'asc' })
         .range(offset, offset + limit - 1);
         
     if (error) this.handleError(error, 'findAll (data)');
+
+    const data = rpcData as AppointmentRpcResponse[] | null;
+
+    const formattedData = data?.map(a => ({
+      id: a.id,
+      appointment_datetime: a.appointment_datetime,
+      status: a.status,
+      user: {
+        first_name: a.user_first_name,
+        last_name: a.user_last_name,
+        email: a.user_email
+      },
+      service: {
+        name: a.service_name,
+        cost: a.service_cost
+      },
+      clinic: {
+        name: a.clinic_name
+      },
+      provider: {
+        full_name: a.provider_full_name
+      }
+    })) || [];
     
     return {
-      data: data || [],
+      data: formattedData,
       meta: { totalItems, itemsPerPage: limit, currentPage: page, totalPages },
     };
   }

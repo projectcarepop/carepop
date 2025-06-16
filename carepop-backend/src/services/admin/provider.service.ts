@@ -34,26 +34,26 @@ export class ProviderAdminService {
   async findAll(options: { page: number, limit: number, search?: string, sortBy: string, sortOrder: 'asc' | 'desc' }) {
     const { page, limit, search, sortBy, sortOrder } = options;
     
-    let query = supabase
-      .from(this.tableName)
-      .select('*', { count: 'exact' });
+    const rpcParams = { search_term: search };
 
-    if (search) {
-      // Search across multiple relevant fields for providers
-      const searchQuery = `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`;
-      query = query.or(searchQuery);
-    }
+    // Get the total count for pagination metadata
+    const { count, error: countError } = await supabase
+        .rpc('search_providers', rpcParams, { count: 'exact' });
 
-    const offset = (page - 1) * limit;
-    query = query.range(offset, offset + limit - 1)
-                 .order(sortBy, { ascending: sortOrder === 'asc' });
+    if (countError) this.handleError(countError, 'findAll (count)');
 
-    const { data, error, count } = await query;
-    if (error) this.handleError(error, 'findAll');
-    
     const totalItems = count ?? 0;
     const totalPages = Math.ceil(totalItems / limit);
+    const offset = (page - 1) * limit;
 
+    // Fetch the paginated data using the RPC
+    const { data, error } = await supabase
+      .rpc('search_providers', rpcParams)
+      .order(sortBy, { ascending: sortOrder === 'asc' })
+      .range(offset, offset + limit - 1);
+
+    if (error) this.handleError(error, 'findAll');
+    
     return {
       data: data || [],
       meta: { totalItems, itemsPerPage: limit, currentPage: page, totalPages },
