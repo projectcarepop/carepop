@@ -1,12 +1,13 @@
 import { createClient } from '@/utils/supabase/server';
 import { UserDetailTabs } from './components/user-detail-tabs';
 import { notFound } from 'next/navigation';
+import { NextPage } from 'next';
 
 interface Props {
   params: { userId: string };
 }
 
-export default async function UserDetailPage({ params }: Props) {
+const UserDetailPage: NextPage<Props> = async ({ params }) => {
   const supabase = createClient();
   
   // Fetch the basic user profile to ensure the user exists and for the profile tab
@@ -29,4 +30,6 @@ export default async function UserDetailPage({ params }: Props) {
       <UserDetailTabs profile={profile} userId={params.userId} />
     </div>
   );
-} 
+};
+
+export default UserDetailPage; 
