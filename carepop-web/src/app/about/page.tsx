@@ -1,155 +1,210 @@
 'use client'; // Can be a server component if no client-side interactivity needed
 
 import React from 'react';
-import { Users, Target, Eye, ShieldCheck, Heart, Sparkles, CheckSquare, Award, Phone, Mail, MapPin, Printer, ArrowRight } from 'lucide-react';
+import { Award, Heart, Sparkles, Users, ShieldCheck, Handshake } from 'lucide-react';
 import Link from 'next/link'; // For potential "Learn More" buttons
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import Image from "next/image";
+import Autoplay from "embla-carousel-autoplay"
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselDots,
+} from "@/components/ui/carousel"
+
+const values = [
+  {
+    icon: <Heart />,
+    title: "Unwavering Respect",
+    description: "We treat every individual with dignity, honoring their identity, choices, and journey. Our platform is a safe space built on trust and confidentiality.",
+  },
+  {
+    icon: <Award />,
+    title: "Quality Without Compromise",
+    description: "We are committed to the highest standards of care, partnering with vetted providers and building technology that is reliable, secure, and effective.",
+  },
+  {
+    icon: <Users />,
+    title: "Healthcare for All",
+    description: "We believe quality healthcare is a fundamental right. Our mission is to break down barriers and ensure access for every Filipino, especially the underserved.",
+  },
+  {
+    icon: <ShieldCheck />,
+    title: "Privacy & Security",
+    description: "Your confidentiality is paramount. We protect your data with robust security measures and a commitment to privacy.",
+  },
+  {
+    icon: <Handshake />,
+    title: "Community & Volunteerism",
+    description: "We are powered by a collective of advocates and volunteers dedicated to supporting our shared mission of accessible healthcare.",
+  },
+  {
+    icon: <Sparkles />,
+    title: "Empowering Journeys",
+    description: "We empower you with the tools and information to take control of your health. Your well-being is our ultimate measure of success.",
+  },
+];
 
 const AboutPage = () => {
-  const carepopAppInfo = {
-    superTitle: "Meet CarePop",
-    title: "Healthcare, Reimagined for You.",
-    introduction: 
-      "CarePop is your dedicated digital partner for accessible and compassionate healthcare in the Philippines. We connect you with vital services, focusing on sexual and reproductive health, through an intuitive and supportive platform.",
-    features: [
-      { icon: Users, title: "Find Providers", description: "Easily locate trusted clinics and healthcare professionals." },
-      { icon: Target, title: "Book Appointments", description: "Schedule your consultations and services seamlessly online." },
-      { icon: Eye, title: "Manage Health", description: "Securely maintain your health profile and history." },
-    ],
-    missionStatement: "Our mission is to empower your health journey with user-friendly technology and a commitment to inclusive care."
-  };
-
-  const fpopInfo = {
-    partnerTitle: "Our Esteemed Partner",
-    name: "Family Planning Organization of the Philippines (FPOP)",
-    introduction: 
-      "FPOP is a cornerstone of sexual and reproductive health services in the Philippines, dedicated to providing quality care, especially for the poor and underserved.",
-    mission: 
-      "FPOP champions sexual and reproductive health and rights (SRHR) through advocacy and comprehensive service provision, committed to eradicating HIV/AIDS and ensuring a life free from ill health, unwanted pregnancy, and discrimination.",
-    vision: 
-      "They envision a world where every individual has access to SRH information and services, and sexuality is recognized as a natural and fundamental human right.",
-    principles: [
-      { icon: Sparkles, text: "Excellence: Striving to go beyond and do more." },
-      { icon: ShieldCheck, text: "Accountability: Responsible for actions and decisions." },
-      { icon: Heart, text: "Passion: Dedicated to advocacy and service delivery." },
-      { icon: Users, text: "Diversity: Inclusive access to SRHR for all Filipinos." },
-      { icon: CheckSquare, text: "Social Inclusion: Leaving no one behind in achieving quality of life." },
-      { icon: Award, text: "Volunteerism: Advancing the mission through dedicated activists." }
-    ],
-    contact: [
-        { icon: Phone, label: "Telephone", value: "(632) 722 6466", href: "tel:+6327226466" },
-        { icon: Mail, label: "Email", value: "fpop1969@yahoo.com", href: "mailto:fpop1969@yahoo.com" },
-        { icon: Printer, label: "Telefax", value: "(632) 721 7101" },
-        { icon: MapPin, label: "Main Office", value: "#298 15th Ave, Cubao, Quezon City", href: "https://maps.google.com/?q=FPOP,+298+15th+Avenue,+Barangay+Silangan,+Cubao,+Quezon+City,+Metro+Manila,+Philippines" },
-    ],
-    dataSource: "FPOP content sourced from fpop1969.org"
-  };
-
   return (
-    <div className="bg-background text-foreground min-h-screen">
-      {/* Section 1: About CarePop App */}
-      <section className="py-16 md:py-24 bg-gradient-to-br from-pink-50 via-rose-50 to-red-50 dark:from-pink-900/30 dark:via-rose-900/30 dark:to-red-900/30">
-        <div className="container mx-auto px-6 text-center">
-          <p className="text-base font-semibold uppercase tracking-wider text-gray-700 dark:text-pink-400 mb-2">
-            {carepopAppInfo.superTitle}
-          </p>
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white mb-6 font-space-grotesk leading-tight">
-            {carepopAppInfo.title}
-          </h1>
-          <p className="max-w-2xl mx-auto text-lg text-gray-700 dark:text-gray-300 mb-10 font-inter">
-            {carepopAppInfo.introduction}
-          </p>
-          <div className="grid md:grid-cols-3 gap-8 mb-12 max-w-4xl mx-auto">
-            {carepopAppInfo.features.map((feature, index) => (
-              <div key={index} className="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300">
-                <feature.icon className="h-10 w-10 text-pink-500 dark:text-pink-400 mb-4 mx-auto" />
-                <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-2 font-space-grotesk">{feature.title}</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 font-inter">{feature.description}</p>
-              </div>
-            ))}
+    <>
+      {/* Hero Section */}
+      <section className="w-full py-16 md:py-20 lg:py-24 bg-muted">
+        <div className="container mx-auto px-4 md:px-6">
+          <div className="flex flex-col items-center space-y-4 text-center">
+            <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none font-space-grotesk text-primary">
+              About CarePoP
+            </h1>
+            <p className="max-w-[800px] text-muted-foreground md:text-xl font-inter">
+              We are dedicated to revolutionizing healthcare in the Philippines by providing a safe, inclusive, and accessible platform for everyone.
+            </p>
           </div>
-           <p className="text-lg italic text-gray-700 dark:text-gray-300 max-w-2xl mx-auto font-inter">
-            {carepopAppInfo.missionStatement}
-          </p>
         </div>
       </section>
 
-      {/* Section 2: FPOP Introduction */}
-      <section className="py-16 md:py-24 bg-white dark:bg-gray-900">
-        <div className="container mx-auto px-6 grid md:grid-cols-2 gap-12 items-center">
-          <div className="order-2 md:order-1">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-pink-600 dark:text-pink-400 mb-1">
-              {fpopInfo.partnerTitle}
-            </h2>
-            <h3 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-6 font-space-grotesk leading-tight">
-              {fpopInfo.name}
-            </h3>
-            <p className="text-gray-700 dark:text-gray-300 mb-4 font-inter leading-relaxed">
-              {fpopInfo.introduction}
-            </p>
-            <div className="space-y-6 text-gray-700 dark:text-gray-300 font-inter leading-relaxed">
-                <div>
-                    <h4 className="font-semibold text-gray-800 dark:text-white mb-1">Mission:</h4>
-                    <p>{fpopInfo.mission}</p>
+      {/* Our Story Section */}
+      <section className="w-full py-16 md:py-20 lg:py-24">
+        <div className="container mx-auto px-4 md:px-6">
+          <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 xl:gap-16">
+            <div className="flex flex-col justify-center space-y-6">
+                <div className="space-y-2">
+                    <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl font-space-grotesk">Our Story: A Partnership for Health</h2>
                 </div>
-                <div>
-                    <h4 className="font-semibold text-gray-800 dark:text-white mb-1">Vision:</h4>
-                    <p>{fpopInfo.vision}</p>
+                <div className="space-y-4 text-muted-foreground font-inter">
+                    <p>
+                        CarePoP was born from a collaboration with the Family Planning Organization of the Philippines (FPOP), the country&apos;s leading provider of sexual and reproductive health services. We saw a critical need to bridge the gap between healthcare providers and the communities that need them most, especially the underserved and marginalized.
+                    </p>
+                    <p>
+                        Manual workflows, stigma, and lack of access to affirming providers create significant barriers to care. CarePoP is our answer: a modern, user-friendly digital platform designed to empower individuals on their health journey.
+                    </p>
+                </div>
+            </div>
+            <Image
+              src="/CAREPOP-TEAM.jpg"
+              width={600}
+              height={400}
+              alt="The CarePoP Team"
+              className="mx-auto aspect-[3/2] overflow-hidden rounded-xl object-cover object-center"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* FPOP Partner Section */}
+      <section className="w-full py-16 md:py-20 lg:py-24 bg-muted">
+        <div className="container mx-auto px-4 md:px-6">
+          <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 xl:gap-16">
+            <Image
+              src="/FPOP-NCR.png"
+              width={600}
+              height={400}
+              alt="The logo of FPOP NCR Chapter"
+              className="mx-auto aspect-video overflow-hidden rounded-xl object-contain"
+              style={{ height: 'auto' }}
+            />
+            <div className="flex flex-col justify-center space-y-6">
+                <div className="space-y-2">
+                    <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl font-space-grotesk text-primary">Our Partner in Care</h2>
+                    <h3 className="text-2xl font-semibold tracking-tight font-space-grotesk">Family Planning Organization of the Philippines (FPOP)</h3>
+                </div>
+                <div className="space-y-4 text-muted-foreground font-inter">
+                    <p>
+                        Our work is made possible through our deep partnership with FPOP, a cornerstone of sexual and reproductive health and rights (SRHR) in the Philippines.
+                    </p>
+                    <p>
+                        For decades, FPOP has been a champion for accessible care, advocating for policies and providing vital services to countless communities. We are proud to build on their legacy by bringing their mission into the digital age.
+                    </p>
                 </div>
             </div>
           </div>
-          <div className="order-1 md:order-2 flex items-center justify-center">
-            {/* Placeholder for FPOP Image/Visual */}
-            <div className="w-full h-80 md:h-96 bg-gray-100 dark:bg-gray-800 rounded-xl shadow-lg flex items-center justify-center">
-              <Users className="h-32 w-32 text-gray-300 dark:text-gray-700" />
-            </div>
-          </div>
+        </div>
+      </section>
+
+      {/* Mission and Vision Section */}
+      <section className="w-full py-16 md:py-20 lg:py-24 bg-primary text-primary-foreground">
+        <div className="container mx-auto px-4 md:px-6">
+          <Carousel
+            plugins={[ Autoplay({ delay: 5000, stopOnInteraction: false }) ]}
+            className="w-full"
+            opts={{
+              align: "start",
+              loop: true,
+            }}
+          >
+            <CarouselContent>
+              <CarouselItem>
+                <div className="space-y-4 text-center px-12">
+                  <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl font-space-grotesk">Our Mission</h2>
+                  <p className="font-inter max-w-3xl mx-auto">
+                    To empower every Filipino&apos;s health journey with user-friendly technology and an unwavering commitment to inclusive, compassionate, and accessible care. We champion sexual and reproductive health and rights (SRHR) for all.
+                  </p>
+                </div>
+              </CarouselItem>
+              <CarouselItem>
+                <div className="space-y-4 text-center px-12">
+                  <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl font-space-grotesk">Our Vision</h2>
+                  <p className="font-inter max-w-3xl mx-auto">
+                    We envision a Philippines where every individual has seamless access to the health information and services they need, and where sexuality is embraced as a natural and fundamental human right, free from stigma and discrimination.
+                  </p>
+                </div>
+              </CarouselItem>
+            </CarouselContent>
+            <CarouselDots />
+          </Carousel>
         </div>
       </section>
       
-      {/* Section 3: FPOP Principles */}
-      <section className="py-16 md:py-24 bg-gray-50 dark:bg-gray-900/50">
-        <div className="container mx-auto px-6">
-          <h2 className="text-3xl font-bold text-center text-gray-900 dark:text-white mb-12 font-space-grotesk">
-            FPOP&apos;s Guiding Principles
-          </h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {fpopInfo.principles.map((principle, index) => (
-              <div key={index} className="flex items-start p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300">
-                <principle.icon className="h-8 w-8 text-pink-500 dark:text-pink-400 mr-4 flex-shrink-0 mt-1" />
-                <div>
-                  <p className="text-gray-700 dark:text-gray-300 font-inter leading-relaxed">{principle.text}</p>
+      {/* Our Values Section */}
+      <section id="values" className="w-full py-16 md:py-20 lg:py-24">
+        <div className="container mx-auto px-4 md:px-6">
+          <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
+            <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl font-space-grotesk">Our Guiding Principles</h2>
+            <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed font-inter">
+              These values, inherited from our partners at FPOP, are the bedrock of our platform and our promise to you.
+            </p>
+          </div>
+          <div className="mx-auto grid max-w-5xl items-start gap-8 sm:grid-cols-2 md:gap-10 lg:grid-cols-3">
+            {values.map((value) => (
+               <Card key={value.title} className="flex flex-col items-center justify-start text-center p-6 transition-all duration-300 ease-in-out hover:shadow-lg hover:scale-105 bg-transparent border-0 shadow-none">
+                <div className="mb-4 rounded-full bg-primary/10 p-4">
+                  {React.cloneElement(value.icon, { className: "w-10 h-10 text-primary" })}
                 </div>
-              </div>
+                <CardHeader className="p-0 mb-2">
+                  <CardTitle className="font-space-grotesk text-lg">{value.title}</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <p className="text-muted-foreground font-inter text-sm">{value.description}</p>
+                </CardContent>
+              </Card>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Optional Call to Action (Engage)*/}
-      <section className="py-16 md:py-24 bg-gray-800 dark:bg-gray-950 text-white">
-        <div className="container mx-auto px-6 text-center">
-            <h2 className="text-3xl md:text-4xl font-bold mb-6 font-space-grotesk">
-                Engage with CarePop
-            </h2>
-            <p className="max-w-xl mx-auto text-lg text-gray-300 mb-8 font-inter">
-                Ready to take control of your health? Download the CarePop app or explore our services.
-            </p>
-            <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
-                <Link href="/download-app" passHref>
-                    <button className="w-full sm:w-auto bg-pink-600 hover:bg-pink-700 text-white font-semibold py-3 px-8 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 ease-in-out flex items-center justify-center text-lg">
-                        Download App
-                        <ArrowRight className="ml-2 h-5 w-5" />
-                    </button>
-                </Link>
-                <Link href="/book-service" passHref>
-                     <button className="w-full sm:w-auto bg-transparent hover:bg-pink-500/10 border-2 border-pink-500 text-pink-500 font-semibold py-3 px-8 rounded-lg shadow-sm hover:shadow-md transition-all duration-300 ease-in-out flex items-center justify-center text-lg">
-                        Explore Services
-                    </button>
-                </Link>
-            </div>
-        </div>
+      {/* CTA Section */}
+      <section className="w-full py-16 md:py-20 lg:py-24 bg-muted">
+          <div className="container mx-auto flex flex-col items-center justify-center gap-4 text-center px-4 md:px-6">
+              <div className="space-y-4">
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl font-space-grotesk">
+                    Ready to Take Control of Your Health?
+                </h2>
+                <p className="mx-auto max-w-[700px] text-muted-foreground md:text-xl">
+                    Join CarePoP today. Register on the web or download our mobile app to get started.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-4 mt-4">
+                  <Link href="/register">
+                  <Button size="lg">Create an Account</Button>
+                  </Link>
+                  <Link href="/download-app">
+                  <Button size="lg" variant="secondary">Download the App</Button>
+                  </Link>
+              </div>
+          </div>
       </section>
-    </div>
+    </>
   );
 };
 

@@ -72,4 +72,47 @@ export const getServicesForClinic = async (clinicId: string) => {
 
   cacheService.set(cacheKey, services, CACHE_TTL_SECONDS);
   return services;
+};
+
+export const getProvidersForServiceInClinic = async (clinicId: string, serviceId: string) => {
+    const cacheKey = `clinic_${clinicId}_service_${serviceId}_providers`;
+    const cachedData = cacheService.get<any[]>(cacheKey);
+    if (cachedData) {
+        return cachedData;
+    }
+
+    // This query finds all providers who are:
+    // 1. Linked to the specified clinic_id.
+    // 2. Are themselves marked as active.
+    // 3. Are linked to the specified service_id through the 'provider_services' join table.
+    const { data, error } = await supabase
+        .from('clinic_providers')
+        .select(`
+            providers (
+                id,
+                full_name,
+                specialty,
+                photo_url,
+                is_accepting_new_patients
+            )
+        `)
+        .eq('clinic_id', clinicId)
+        .eq('providers.is_active', true) // Ensure the provider themself is active
+        .not('providers', 'is', null) // Ensure the join worked and we don't have empty provider records
+        .filter('providers.provider_services.service_id', 'eq', serviceId); // This is a conceptual filter on a join, actual implementation might vary
+    
+    // The above filter might not work directly as written. A stored procedure is a much better way to handle this join logic.
+    // Let's call an RPC function `get_providers_for_service_in_clinic` instead for robustness.
+
+    const { data: rpcData, error: rpcError } = await supabase.rpc('get_providers_for_service_in_clinic', {
+        p_clinic_id: clinicId,
+        p_service_id: serviceId
+    });
+
+    if (rpcError) {
+        throw new AppError(`Supabase RPC error fetching providers: ${rpcError.message}`, 500);
+    }
+    
+    cacheService.set(cacheKey, rpcData, CACHE_TTL_SECONDS);
+    return rpcData;
 }; 

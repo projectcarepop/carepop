@@ -126,28 +126,13 @@ export default async function ClinicFinderPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(exampleClinicSchema) }}
       />
-
-      <div className="container mx-auto p-4 space-y-8">
-        <header className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-4xl">
-            Find a Clinic
-          </h1>
-          <p className="mt-2 text-lg leading-8 text-gray-600 dark:text-gray-300">
-            Search for FPOP clinics and other healthcare providers. Filter by services and location.
-          </p>
-        </header>
-
-        {/* Render the client component with fetched data */}
-        <ClinicFinderClient 
-          initialClinics={clinics} 
-          initialServices={services}
-          initialFetchError={fetchError} 
-        />
-
-      </div>
-      <footer className="mt-12 text-center text-gray-500">
-        <p>&copy; {new Date().getFullYear()} CarePop. All rights reserved.</p>
-      </footer>
+      
+      {/* The ClinicFinderClient now controls the entire page layout below the header */}
+      <ClinicFinderClient 
+        initialClinics={clinics} 
+        initialServices={services}
+        initialFetchError={fetchError} 
+      />
     </>
   );
 } 

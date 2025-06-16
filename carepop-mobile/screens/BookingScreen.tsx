@@ -7,7 +7,7 @@ import { TabView, SceneMap, TabBar } from 'react-native-tab-view';
 import { Appointment, getUpcomingAppointments, getPastAppointments } from '../src/utils/api';
 // Import only the component, not the type from the card file
 import { AppointmentCard } from '../src/components/appointments/AppointmentCard';
-import { theme } from '../src/components';
+import { theme } from '../src/components'; 
 
 const AppointmentsList: FC<{ type: 'upcoming' | 'past' }> = ({ type }) => {
     const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -43,7 +43,7 @@ const AppointmentsList: FC<{ type: 'upcoming' | 'past' }> = ({ type }) => {
         return <ActivityIndicator size="large" style={styles.spinner} color={theme.colors.primary} />;
     }
 
-    return (
+  return (
         <FlatList
             data={appointments}
             keyExtractor={(item) => item.id}
@@ -58,7 +58,7 @@ const AppointmentsList: FC<{ type: 'upcoming' | 'past' }> = ({ type }) => {
 const NoAppointments: FC<{ message: string }> = ({ message }) => (
     <View style={styles.centered}>
         <Text style={styles.noAppointmentsText}>{message}</Text>
-    </View>
+      </View>
 );
 
 const renderScene = SceneMap({
@@ -90,7 +90,7 @@ export const BookingScreen: FC = () => {
                 />
             )}
         />
-    );
+  );
 };
 
 const styles = StyleSheet.create({
@@ -99,15 +99,15 @@ const styles = StyleSheet.create({
     },
     listContent: {
         padding: theme.spacing.md,
-    },
+  },
     centered: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
         padding: theme.spacing.lg,
-    },
+  },
     noAppointmentsText: {
         fontSize: 16,
-        color: theme.colors.textMuted,
-    },
+    color: theme.colors.textMuted,
+  },
 }); 

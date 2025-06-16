@@ -7,39 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { Loader2, Info, MapPin, Clock, Phone, Search, ListFilter } from 'lucide-react';
+import { Loader2, Info, MapPin, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from '@/lib/contexts/AuthContext';
-
-// Helper function to parse and format operating hours
-const formatOperatingHours = (hoursString?: string): string[] => {
-  if (!hoursString) return [];
-  try {
-    const hoursObject = JSON.parse(hoursString);
-    const formatted: string[] = [];
-    const order = ['Mon-Fri', 'Sat', 'Sun'];
-    order.forEach(day => {
-      if (hoursObject[day]) {
-        formatted.push(`${day}: ${hoursObject[day]}`);
-      }
-    });
-    for (const key in hoursObject) {
-      if (key !== 'notes' && !order.includes(key) && hoursObject[key]) {
-        formatted.push(`${key}: ${hoursObject[key]}`);
-      }
-    }
-    if (hoursObject.notes) {
-      formatted.push(`Notes: ${hoursObject.notes}`);
-    }
-    return formatted;
-  } catch (error) {
-    console.error("Error parsing operating hours:", error);
-    return [hoursString.length > 100 ? hoursString.substring(0, 97) + '...' : hoursString];
-  }
-};
 
 const ClinicServiceSelectionStep: React.FC = () => {
   const { state, dispatch } = useBookingContext();
@@ -55,8 +26,10 @@ const ClinicServiceSelectionStep: React.FC = () => {
 
   const [serviceSearchTerm, setServiceSearchTerm] = useState('');
   const [allServiceCategories, setAllServiceCategories] = useState<string[]>([]);
-  const [selectedServiceCategories, setSelectedServiceCategories] = useState<string[]>([]);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
   
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+
   const fetchClinics = async () => {
     if (!session) {
       dispatch({ type: 'SET_CLINICS_ERROR', payload: 'You must be logged in to view clinics.' });
@@ -64,7 +37,7 @@ const ClinicServiceSelectionStep: React.FC = () => {
     }
     dispatch({ type: 'SET_CLINICS_LOADING', payload: true });
     try {
-      const res = await fetch(`/api/v1/public/clinics`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/public/clinics`, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`
         }
@@ -77,7 +50,8 @@ const ClinicServiceSelectionStep: React.FC = () => {
           : `An unexpected error occurred (Code: ${res.status}).`;
         throw new Error(errorText);
       }
-      const data: Clinic[] = await res.json();
+      const result = await res.json();
+      const data: Clinic[] = result.data;
       dispatch({ type: 'SET_CLINICS_SUCCESS', payload: data });
     } catch (error) {
       console.error("Error fetching clinics:", error);
@@ -92,7 +66,7 @@ const ClinicServiceSelectionStep: React.FC = () => {
     }
     dispatch({ type: 'SET_SERVICES_FOR_CLINIC_LOADING', payload: true });
     try {
-      const res = await fetch(`/api/v1/public/clinics/${clinicId}/services`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/public/clinics/${clinicId}/services`, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`
         }
@@ -101,7 +75,8 @@ const ClinicServiceSelectionStep: React.FC = () => {
         const errorText = res.status === 404 ? `Services for this clinic could not be found.` : `An unexpected error occurred (Code: ${res.status}).`;
         throw new Error(errorText);
       }
-      const services: Service[] = await res.json();
+      const result = await res.json();
+      const services: Service[] = result.data;
 
       const groupedServices = services.reduce((acc, service) => {
         const category = service.category || 'Uncategorized';
@@ -126,9 +101,12 @@ const ClinicServiceSelectionStep: React.FC = () => {
 
   useEffect(() => {
     if (servicesForClinic && servicesForClinic.length > 0) {
-      const categories = Array.from(new Set(servicesForClinic.map(sg => sg.category)));
+      const categories = ['All Services', ...Array.from(new Set(servicesForClinic.map(sg => sg.category)))];
       setAllServiceCategories(categories);
-      setSelectedServiceCategories(categories);
+      setActiveCategory('All Services'); // Default to showing all
+    } else {
+      setAllServiceCategories([]);
+      setActiveCategory(null);
     }
   }, [servicesForClinic]);
 
@@ -148,23 +126,21 @@ const ClinicServiceSelectionStep: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClinic, session]);
 
-  const handleCategoryChange = (category: string) => {
-    setSelectedServiceCategories(prev => 
-      prev.includes(category) 
-        ? prev.filter(c => c !== category) 
-        : [...prev, category]
-    );
+  const handleCategoryClick = (category: string) => {
+    setActiveCategory(category);
   };
 
   const filteredServices = useMemo(() => {
     let servicesToFilter = servicesForClinic;
 
-    if (selectedServiceCategories.length > 0 && selectedServiceCategories.length < allServiceCategories.length) {
-      servicesToFilter = servicesForClinic.filter(categoryGroup => 
-        selectedServiceCategories.includes(categoryGroup.category)
-      );
+    // Filter by active category
+    if (activeCategory && activeCategory !== 'All Services') {
+        servicesToFilter = servicesForClinic.filter(categoryGroup => 
+            categoryGroup.category === activeCategory
+        );
     }
 
+    // Filter by search term
     if (!serviceSearchTerm) {
       return servicesToFilter;
     }
@@ -180,7 +156,7 @@ const ClinicServiceSelectionStep: React.FC = () => {
         ),
       }))
       .filter(categoryGroup => categoryGroup.services.length > 0);
-  }, [servicesForClinic, serviceSearchTerm, selectedServiceCategories, allServiceCategories.length]);
+  }, [servicesForClinic, serviceSearchTerm, activeCategory]);
 
   const handleClinicSelect = (clinicId: string) => {
     const clinic = clinics.find(c => c.id === clinicId);
@@ -233,51 +209,47 @@ const ClinicServiceSelectionStep: React.FC = () => {
           )}
 
           {!isLoading.clinics && !errors.clinics && clinics.length > 0 && (
-            <div className="grid grid-cols-1 gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {clinics.map((clinic) => (
-                <Card 
+                <div 
                   key={clinic.id} 
                   onClick={() => handleClinicSelect(clinic.id)}
                   className={cn(
-                    "cursor-pointer transition-all duration-150 ease-in-out hover:shadow-md focus-within:ring-1 focus-within:ring-primary focus-within:ring-offset-1",
-                    selectedClinic?.id === clinic.id ? "ring-1 ring-primary shadow-md border-primary" : "border-border"
+                    "cursor-pointer transition-all duration-150 ease-in-out hover:shadow-md focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 rounded-lg border",
+                    selectedClinic?.id === clinic.id ? "ring-2 ring-primary shadow-lg border-primary" : "border-border hover:border-gray-300 dark:hover:border-gray-700"
                   )}
                   tabIndex={0}
                   onKeyDown={(e) => e.key === 'Enter' || e.key === ' ' ? handleClinicSelect(clinic.id) : null}
                 >
-                  <CardContent className="p-3">
-                    <h4 className="text-md font-medium text-primary truncate">{clinic.name}</h4>
-                    <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
-                      <div className="flex items-start">
-                        <MapPin className="h-3 w-3 mr-1.5 mt-0.5 shrink-0" /> 
-                        <span className="text-xs">{clinic.address}</span>
-                      </div>
-                      {clinic.contactPhone && (
-                        <div className="flex items-center">
-                          <Phone className="h-3 w-3 mr-1.5 shrink-0" /> 
-                          <span className="text-xs">{clinic.contactPhone}</span>
-                        </div>
-                      )}
-                      {clinic.operatingHours && formatOperatingHours(clinic.operatingHours).map((line, index) => (
-                        <div key={index} className="flex items-center">
-                          {index === 0 && <Clock className="h-3 w-3 mr-1.5 shrink-0" />}
-                          {index !== 0 && <div className="w-3 mr-1.5 shrink-0" />}
-                          <span className="text-xs">{line}</span>
-                        </div>
-                      ))}
+                  <div className="p-3">
+                    <h4 className="text-sm font-semibold text-primary truncate">{clinic.name}</h4>
+                    <div className="text-xs text-muted-foreground flex items-center mt-1">
+                      <MapPin size={12} className="mr-1.5 flex-shrink-0" />
+                      <span className="truncate">{clinic.address || 'Address not available'}</span>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               ))}
             </div>
           )}
         </div>
 
         {selectedClinic && (
-          <div className="space-y-4">
-            <h3 className="flex items-center text-md font-medium text-gray-700 mb-2">
-              Select a Service at {selectedClinic.name}
-            </h3>
+          <div className="space-y-4 pt-4 border-t">
+            <div className="flex justify-between items-center">
+                <h3 className="flex items-center text-md font-medium text-gray-700">
+                Select a Service at {selectedClinic.name}
+                </h3>
+                <div className="relative w-full max-w-xs">
+                    <Input
+                        placeholder="Search for a service..."
+                        value={serviceSearchTerm}
+                        onChange={(e) => setServiceSearchTerm(e.target.value)}
+                        className="pl-10"
+                    />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                </div>
+            </div>
             
             {isLoading.servicesForClinic && <div className="flex items-center space-x-2 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /> <span>Loading services...</span></div>}
 
@@ -287,104 +259,88 @@ const ClinicServiceSelectionStep: React.FC = () => {
                 <AlertTitle>Error Loading Services</AlertTitle>
                 <AlertDescription className="flex items-center justify-between">
                   {errors.servicesForClinic}
-                   <Button onClick={() => fetchServicesForClinic(selectedClinic.id)} variant="secondary" size="sm" className="ml-4">
-                     {isLoading.servicesForClinic && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                     Try Again
-                   </Button>
+                  <Button onClick={() => fetchServicesForClinic(selectedClinic.id)} variant="secondary" size="sm" className="ml-4">
+                    {isLoading.servicesForClinic && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Try Again
+                  </Button>
                 </AlertDescription>
               </Alert>
             )}
 
-            {!isLoading.servicesForClinic && !errors.servicesForClinic && servicesForClinic.length === 0 && (
-              <Alert variant="default" className="mt-2">
-                <Info className="h-5 w-5 mr-2"/>
-                <AlertTitle>No Services Available</AlertTitle>
-                <AlertDescription>This clinic currently has no services available for online booking. Please select another clinic.</AlertDescription>
-              </Alert>
-            )}
-
             {!isLoading.servicesForClinic && !errors.servicesForClinic && servicesForClinic.length > 0 && (
-              <div className="flex flex-col md:flex-row gap-6">
-                {allServiceCategories.length > 1 && (
-                  <div className="w-full md:w-1/4 space-y-3 pb-4">
-                    <h4 className="flex items-center text-sm text-gray-600 pt-2">
-                      <ListFilter className="mr-2 h-4 w-4" />
-                      Filter by Category
-                    </h4>
-                    <div className="border-b mt-2 mb-3"></div>
-                    <ScrollArea className="max-h-48 md:max-h-64 pr-1">
-                      <div className="space-y-2 pr-2">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                {/* Left Panel: Service Categories */}
+                <div className="md:col-span-1">
+                  <h4 className="text-sm font-semibold mb-3 text-muted-foreground">Categories</h4>
+                  <ScrollArea className="h-72 pr-4">
+                    <div className="flex flex-col space-y-1">
                       {allServiceCategories.map(category => (
-                        <div key={category} className="flex items-center space-x-2">
-                          <Checkbox 
-                            id={`category-${category}`}
-                            checked={selectedServiceCategories.includes(category)}
-                            onCheckedChange={() => handleCategoryChange(category)}
-                          />
-                          <Label htmlFor={`category-${category}`} className="text-sm font-normal cursor-pointer hover:text-primary">
-                            {category}
-                          </Label>
-                        </div>
+                        <Button
+                          key={category}
+                          variant={activeCategory === category ? 'secondary' : 'ghost'}
+                          className="w-full justify-start"
+                          onClick={() => handleCategoryClick(category)}
+                        >
+                          {category}
+                        </Button>
                       ))}
-                      </div>
-                    </ScrollArea>
-                  </div>
-                )}
-
-                <div className="w-full md:w-3/4 flex flex-col">
-                  <div className="relative mb-3"> 
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type="text"
-                      placeholder="Search services..."
-                      value={serviceSearchTerm}
-                      onChange={(e) => setServiceSearchTerm(e.target.value)}
-                      className="pl-8 w-full"
-                    />
-                  </div>
-                  
-                  {filteredServices.length === 0 && (
-                    <div className="text-center text-sm text-muted-foreground p-4">
-                        <p>No services match your search.</p>
-                        {serviceSearchTerm && <Button variant="link" size="sm" onClick={() => setServiceSearchTerm('')}>Clear search</Button>}
                     </div>
-                  )}
-                  
-                  {filteredServices.length > 0 && (
-                    <ScrollArea className="flex-1 min-h-0 max-h-72 w-full border rounded-md">
-                      <div className="p-2 space-y-2">
-                        {filteredServices.map(categoryGroup => (
-                           <div key={categoryGroup.category}>
-                            {allServiceCategories.length > 1 && <h4 className="text-sm font-semibold tracking-tight text-muted-foreground px-2 py-1.5">{categoryGroup.category}</h4>}
-                            <div className="grid grid-cols-1 gap-1.5">
-                              {categoryGroup.services.map((service) => (
+                  </ScrollArea>
+                </div>
+
+                {/* Right Panel: Services List */}
+                <div className="md:col-span-3">
+                   <ScrollArea className="h-72 pr-4">
+                      {filteredServices.length > 0 ? (
+                        filteredServices.map((group) => (
+                          <div key={group.category} className="mb-4">
+                            {activeCategory === 'All Services' && (
+                               <h4 className="text-sm font-semibold mb-2 text-primary">{group.category}</h4>
+                            )}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                              {group.services.map(service => (
                                 <div 
-                                    key={service.id}
-                                    onClick={() => handleServiceSelect(service)}
-                                    onKeyDown={(e) => e.key === 'Enter' || e.key === ' ' ? handleServiceSelect(service) : null}
-                                    className={cn(
-                                        "flex justify-between items-center p-2 rounded-md cursor-pointer transition-colors hover:bg-muted focus-within:bg-muted focus-within:outline-none",
-                                        selectedService?.id === service.id && "bg-muted ring-1 ring-primary"
-                                    )}
-                                    tabIndex={0}
+                                  key={service.id}
+                                  onClick={() => handleServiceSelect(service)}
+                                  className={cn(
+                                    "p-3 cursor-pointer transition-all duration-150 ease-in-out hover:shadow-md focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 rounded-lg border",
+                                    selectedService?.id === service.id ? "ring-2 ring-primary shadow-lg border-primary" : "border-border hover:border-gray-300 dark:hover:border-gray-700"
+                                  )}
+                                  tabIndex={0}
+                                  onKeyDown={(e) => e.key === 'Enter' || e.key === ' ' ? handleServiceSelect(service) : null}
                                 >
+                                  <div className="flex justify-between items-start">
                                     <div className="flex-1">
-                                        <p className="text-sm font-medium">{service.name}</p>
-                                        {service.description && <p className="text-xs text-muted-foreground">{service.description}</p>}
+                                      <h5 className="text-sm font-semibold text-gray-800">{service.name}</h5>
+                                      {service.description && <p className="text-xs text-muted-foreground mt-1">{service.description}</p>}
                                     </div>
-                                    <div className="text-sm font-semibold ml-4">
-                                        {service.cost ? `₱${Number(service.cost).toFixed(2)}` : 'Free'}
-                                    </div>
+                                    <p className="text-sm font-medium text-primary ml-4 whitespace-nowrap">
+                                      ₱{Number(service.cost).toFixed(2)}
+                                    </p>
+                                  </div>
                                 </div>
                               ))}
                             </div>
-                           </div>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  )}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center text-muted-foreground py-10">
+                           <Search className="mx-auto h-10 w-10 mb-4 text-gray-300" />
+                          <h4 className="font-semibold">No Services Found</h4>
+                          <p className="text-sm">Try adjusting your search or selecting a different category.</p>
+                        </div>
+                      )}
+                  </ScrollArea>
                 </div>
               </div>
+            )}
+
+            {!isLoading.servicesForClinic && !errors.servicesForClinic && servicesForClinic.length === 0 && selectedClinic && (
+              <Alert variant="default" className="mt-2">
+                <Info className="h-5 w-5 mr-2"/>
+                <AlertTitle>No Services Available</AlertTitle>
+                <AlertDescription>This clinic does not currently have any services listed.</AlertDescription>
+              </Alert>
             )}
           </div>
         )}

@@ -3,6 +3,18 @@ import type { NextConfig } from "next";
 const BACKEND_API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080'; // Default to 8080 if not set
 
 const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'placehold.co',
+      },
+      {
+        protocol: 'https',
+        hostname: 'avatars.dicebear.com',
+      },
+    ],
+  },
   /* config options here */
   async rewrites() {
     return [

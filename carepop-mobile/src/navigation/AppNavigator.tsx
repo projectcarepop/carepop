@@ -26,7 +26,6 @@ import { RegisterScreen } from '../../screens/RegisterScreen';
 import { ForgotPasswordScreen } from '../../screens/ForgotPasswordScreen';
 import { EditProfileScreen } from '../screens/EditProfileScreen';
 import { ClinicFinderScreen } from '../screens/ClinicFinderScreen';
-import ClinicFinderMapScreen from '../screens/ClinicFinderMapScreen';
 import { AboutUsScreen } from '../screens/AboutUsScreen';
 
 // Import new booking flow screens
@@ -64,8 +63,7 @@ export type MyProfileStackParamList = {
 
 export type ClinicFinderStackParamList = {
   ClinicFinderMain: undefined;
-  ClinicFinderMap: undefined;
-  // Potentially ClinicDetails: { clinicId: string } later
+  // ClinicFinderMap: undefined; // No longer exists
 };
 
 export type AboutUsStackParamList = {
@@ -195,12 +193,11 @@ function ClinicFinderStack() {
         // Hide header on initial screen of the stack
         options={{ headerShown: false }}
       />
-      <ClinicFinderStackNav.Screen
+      {/* <ClinicFinderStackNav.Screen
         name="ClinicFinderMap"
         component={ClinicFinderMapScreen}
         options={{ headerShown: false }}
-      />
-      {/* Add Clinic Detail Screen later */}
+      /> */}
     </ClinicFinderStackNav.Navigator>
   );
 }

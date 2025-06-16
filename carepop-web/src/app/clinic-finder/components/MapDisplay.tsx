@@ -11,6 +11,8 @@ import { DirectionsService, DirectionsRenderer, GoogleMap, useJsApiLoader } from
 import { Clinic } from '@/lib/types/clinic';
 import { Loader2 } from 'lucide-react';
 
+const GOOGLE_MAPS_LIBRARIES: ("geometry" | "places")[] = ["geometry", "places"];
+
 const DEFAULT_CENTER = { lat: 14.5995, lng: 120.9842 }; // Metro Manila
 const DEFAULT_ZOOM = 11;
 const LOCATION_ZOOM = 14;
@@ -66,7 +68,7 @@ export default function MapDisplay({ clinics, userLocation, routeDestination, on
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: apiKey || "",
-    libraries: ["geometry", "places"],
+    libraries: GOOGLE_MAPS_LIBRARIES,
   });
   
   const [center, setCenter] = useState(DEFAULT_CENTER);

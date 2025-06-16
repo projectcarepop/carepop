@@ -7,16 +7,23 @@ import DynamicMapLoader from './DynamicMapLoader';
 import ClinicDetailModal from './ClinicDetailModal';
 import SlidingPanel, { PanelState } from './SlidingPanel';
 import { Clinic } from '@/lib/types/clinic';
-import { Loader2, SlidersHorizontal, ArrowLeft, Search, LocateFixed } from 'lucide-react';
+import { Loader2, SlidersHorizontal, ArrowLeft, LocateFixed } from 'lucide-react';
 import LocationSearchInput from './LocationSearchInput';
 import ServiceFilter from './ServiceFilter';
 import { Service } from '@/lib/types/service';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import useMediaQuery from '@/hooks/use-media-query';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 type ActiveView = 'list' | 'filters';
 
@@ -39,6 +46,7 @@ export default function ClinicFinderClient({ initialClinics, initialServices, in
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [highlightedClinic, setHighlightedClinic] = useState<string | null>(null);
   const [routeDestination, setRouteDestination] = useState<Clinic | null>(null);
+  const [clinicSearchQuery, setClinicSearchQuery] = useState('');
   
   // Mobile-specific state
   const [panelState, setPanelState] = useState<PanelState>('collapsed');
@@ -53,11 +61,18 @@ export default function ClinicFinderClient({ initialClinics, initialServices, in
     }
   }, [error]);
 
-  const filteredClinics = clinics.filter(clinic => {
+  const serviceFilteredClinics = clinics.filter(clinic => {
     return selectedServices.length === 0 || 
            selectedServices.every(serviceId => 
              (clinic.services_offered || []).includes(serviceId)
            );
+  });
+
+  const finalFilteredClinics = serviceFilteredClinics.filter(clinic => {
+    const query = clinicSearchQuery.toLowerCase();
+    const nameMatch = clinic.name.toLowerCase().includes(query);
+    const addressMatch = clinic.full_address?.toLowerCase().includes(query) || false;
+    return nameMatch || addressMatch;
   });
 
   const fetchClinicsByLocation = async ({ lat, lon }: { lat: number; lon: number }, radius: number) => {
@@ -71,7 +86,7 @@ export default function ClinicFinderClient({ initialClinics, initialServices, in
     }
 
     try {
-      const url = `${API_BASE_URL}/api/v1/clinics?latitude=${lat}&longitude=${lon}&radius=${radius * 1000}`;
+      const url = `${API_BASE_URL}/api/v1/public/clinics?latitude=${lat}&longitude=${lon}&radius=${radius * 1000}`;
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch clinics');
       const data = await response.json();
@@ -150,33 +165,60 @@ export default function ClinicFinderClient({ initialClinics, initialServices, in
         <h2 className="text-2xl font-bold">Filters</h2>
       </div>
       
-      <div className="flex-grow space-y-6 overflow-y-auto pr-2 scrollbar-thin">
-        <Card className="border-none shadow-none">
-            <CardHeader><CardTitle>Search & Location</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-                <LocationSearchInput onLocationSelect={(loc) => fetchClinicsByLocation(loc, searchRadius)} />
-                 <Button variant="outline" onClick={handleGetCurrentLocation} className="w-full">
-                    <LocateFixed size={16} className="mr-2"/> Use My Current Location
-                 </Button>
-                <div>
-                    <Label htmlFor="radius-slider-mobile">Search Radius: {searchRadius} km</Label>
-                    <Slider id="radius-slider-mobile" min={1} max={50} step={1} value={[searchRadius]} onValueChange={(v: number[]) => setSearchRadius(v[0])} disabled={!userLocation} />
-                </div>
-            </CardContent>
-        </Card>
-        <Card className="border-none shadow-none">
-          <CardHeader className="flex flex-row items-center justify-between py-2">
-            <CardTitle>Services Offered</CardTitle>
-            <Button variant="link" size="sm" onClick={handleClearFilters} className="text-pink-600 hover:text-pink-700 p-0 h-auto">Clear</Button>
-          </CardHeader>
-          <CardContent>
+      <div className="flex-grow space-y-8 overflow-y-auto pr-2 scrollbar-thin py-4">
+        {/* Step 1: Location */}
+        <div className="space-y-4">
+            <h3 className="font-semibold text-lg">Step 1: Set Location</h3>
+            <div>
+                <Label htmlFor="location-search-mobile" className="sr-only">Enter a city or address</Label>
+                <LocationSearchInput inputId="location-search-mobile" onLocationSelect={(loc) => fetchClinicsByLocation(loc, searchRadius)} />
+            </div>
+            <div className="relative">
+                <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+                <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or</span></div>
+            </div>
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button variant="outline" onClick={handleGetCurrentLocation} className="w-full">
+                            <LocateFixed size={16} className="mr-2"/> Use My Current Location
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Uses your browser&apos;s location. You may need to grant permission.</p></TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+        </div>
+
+        {/* Step 2: Radius */}
+        <div className="space-y-4">
+            <h3 className="font-semibold text-lg">Step 2: Adjust Radius</h3>
+            <Label htmlFor="radius-slider-mobile" className="text-sm">Search Radius: {searchRadius} km</Label>
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger className="w-full">
+                        <div className="mt-1">
+                            <Slider id="radius-slider-mobile" min={1} max={50} step={1} value={[searchRadius]} onValueChange={(v: number[]) => setSearchRadius(v[0])} disabled={!userLocation} />
+                        </div>
+                    </TooltipTrigger>
+                    {!userLocation && (
+                        <TooltipContent><p>Set a location in Step 1 to enable.</p></TooltipContent>
+                    )}
+                </Tooltip>
+            </TooltipProvider>
+        </div>
+        
+        {/* Step 3: Services */}
+        <div className="space-y-4">
+            <div className="flex flex-row items-center justify-between">
+                <h3 className="font-semibold text-lg">Step 3: Filter Services</h3>
+                <Button variant="link" size="sm" onClick={handleClearFilters} className="text-pink-600 hover:text-pink-700 p-0 h-auto">Clear</Button>
+            </div>
             <ServiceFilter services={initialServices} selectedServices={selectedServices} onServiceChange={setSelectedServices} />
-          </CardContent>
-        </Card>
+        </div>
       </div>
 
       <div className="flex-shrink-0 py-4 border-t">
-        <Button onClick={handleApplyFilters} className="w-full bg-pink-600 hover:bg-pink-700">Show {filteredClinics.length} Results</Button>
+        <Button onClick={handleApplyFilters} className="w-full bg-pink-600 hover:bg-pink-700">Show {finalFilteredClinics.length} Results</Button>
       </div>
     </motion.div>
   );
@@ -193,13 +235,13 @@ export default function ClinicFinderClient({ initialClinics, initialServices, in
             <SlidersHorizontal size={16} className="mr-2" /> Filters & Search
           </Button>
       </div>
-      <h2 className="text-xl font-semibold mb-2 flex-shrink-0">{isLoading ? "Finding clinics..." : `${filteredClinics.length} Clinics Found`}</h2>
+      <h2 className="text-xl font-semibold mb-2 flex-shrink-0">{isLoading ? "Finding clinics..." : `${finalFilteredClinics.length} Clinics Found`}</h2>
       <div className="flex-grow overflow-y-auto pr-2 scrollbar-thin">
         {isLoading ? (
           <div className="flex items-center justify-center h-full"><Loader2 size={32} className="animate-spin text-pink-500"/></div>
         ) : (
           <ClinicList 
-            clinics={filteredClinics} 
+            clinics={finalFilteredClinics} 
             onViewDetails={handleViewDetailsClick}
             onShowRoute={handleShowRoute}
             highlightedClinic={highlightedClinic}
@@ -210,103 +252,135 @@ export default function ClinicFinderClient({ initialClinics, initialServices, in
     </motion.div>
   );
 
-  const renderMobileCollapsedView = () => (
-    <div 
-        className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400 cursor-pointer"
-        onClick={() => setPanelState('partial')}
-    >
-        <Search size={20} className="mr-2"/>
-        <span className="font-medium">Search for clinics</span>
-    </div>
-  );
-  
-  const renderDesktopSidebar = () => {
-      return (
-        <div className="w-[420px] h-screen flex-shrink-0 bg-white dark:bg-gray-950 flex flex-col border-r border-gray-200 dark:border-gray-800">
-            <div className="flex-shrink-0 p-4 border-b border-gray-200 dark:border-gray-800">
-                <h1 className="text-2xl font-bold">Find a Clinic</h1>
-            </div>
-            <div className="p-4 space-y-4 flex-shrink-0">
-                 <LocationSearchInput onLocationSelect={(loc) => fetchClinicsByLocation(loc, searchRadius)} />
-                 <Button variant="outline" onClick={handleGetCurrentLocation} className="w-full">
-                     <LocateFixed size={16} className="mr-2" /> Use My Current Location
-                 </Button>
-            </div>
-            <div className="flex-grow p-4 space-y-4 overflow-y-auto scrollbar-thin">
-                <div className="space-y-2">
-                    <Label htmlFor="radius-slider-desktop">Search Radius: {searchRadius} km</Label>
-                    <Slider id="radius-slider-desktop" min={1} max={50} step={1} value={[searchRadius]} onValueChange={(v: number[]) => setSearchRadius(v[0])} disabled={!userLocation} />
-                </div>
-                <div>
-                    <div className="flex justify-between items-center mb-2">
-                        <Label>Services Offered</Label>
-                        <Button variant="link" size="sm" onClick={handleClearFilters} className="text-pink-600 hover:text-pink-700 p-0 h-auto">Clear</Button>
-                    </div>
-                    <ServiceFilter services={initialServices} selectedServices={selectedServices} onServiceChange={setSelectedServices} />
-                </div>
-                <Button onClick={handleApplyFilters} className="w-full bg-pink-600 hover:bg-pink-700">Update Search</Button>
-
-                <h2 className="text-xl font-semibold pt-4 border-t">{isLoading ? "Finding clinics..." : `${filteredClinics.length} Clinics Found`}</h2>
-                {isLoading ? (
-                <div className="flex items-center justify-center h-32"><Loader2 size={32} className="animate-spin text-pink-500"/></div>
-                ) : (
-                <ClinicList 
-                    clinics={filteredClinics} 
-                    onViewDetails={handleViewDetailsClick}
-                    onShowRoute={handleShowRoute}
-                    highlightedClinic={highlightedClinic}
-                    onHighlightChange={setHighlightedClinic}
-                />
-                )}
-            </div>
-        </div>
-      )
-  }
-
-  if (isDesktop) {
-    return (
-        <div className="h-screen w-full flex">
-            {renderDesktopSidebar()}
-            <div className="flex-grow h-screen relative">
-                <DynamicMapLoader 
-                    clinics={filteredClinics} 
-                    userLocation={userLocation}
-                    routeDestination={routeDestination}
-                    highlightedClinic={highlightedClinic}
-                    onHighlightChange={setHighlightedClinic}
-                    panelState={'collapsed'}
-                />
-            </div>
-            <ClinicDetailModal clinic={selectedClinic} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} allServices={initialServices} />
-        </div>
-    );
-  }
-
-  // Mobile View
   return (
-    <>
-      <div className="h-screen w-full relative overflow-hidden">
-        <DynamicMapLoader 
-          clinics={filteredClinics} 
-          userLocation={userLocation}
-          routeDestination={routeDestination}
-          highlightedClinic={highlightedClinic}
-          onHighlightChange={setHighlightedClinic}
-          panelState={panelState}
-        />
-        
-        <SlidingPanel 
-            panelState={panelState} 
-            setPanelState={setPanelState}
-        >
-            <AnimatePresence mode="wait">
-                {panelState !== 'collapsed' && (activeView === 'list' ? renderMobileListView() : renderMobileFiltersView())}
-            </AnimatePresence>
-            {panelState === 'collapsed' && renderMobileCollapsedView()}
-        </SlidingPanel>
-      </div>
-      
-      <ClinicDetailModal clinic={selectedClinic} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} allServices={initialServices} />
-    </>
+    <div className="w-full h-full">
+        {isDesktop ? (
+            <div className="grid grid-cols-12 gap-x-6 h-full">
+                {/* Left Panel: Filters & Results */}
+                <div className="col-span-12 lg:col-span-5 xl:col-span-4 h-full flex flex-col">
+                    <Card className="w-full h-full flex flex-col overflow-hidden">
+                        {/* Filters Section */}
+                        <div className="p-4 pb-3 lg:p-6 lg:pb-4 space-y-6 flex-shrink-0 border-b">
+                            <div className="space-y-3">
+                                <h3 className="font-semibold">Step 1: Set Your Location</h3>
+                                <LocationSearchInput inputId="location-search-desktop" onLocationSelect={(loc) => fetchClinicsByLocation(loc, searchRadius)} />
+                                <div className="relative">
+                                    <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+                                    <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-muted-foreground dark:bg-gray-950">Or</span></div>
+                                </div>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button variant="outline" onClick={handleGetCurrentLocation} className="w-full">
+                                                <LocateFixed size={16} className="mr-2" /> Use My Current Location
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                        <p>Uses your browser&apos;s location to find clinics near you. You may need to grant permission.</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                            </div>
+                            <div className="space-y-4">
+                                <h3 className="font-semibold">Step 2: Adjust Search Radius</h3>
+                                <Label htmlFor="radius-slider-desktop" className="text-sm font-medium">Search Radius: {searchRadius} km</Label>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger className="w-full">
+                                            <div className="mt-1">
+                                                <Slider id="radius-slider-desktop" min={1} max={50} step={1} value={[searchRadius]} onValueChange={(v: number[]) => setSearchRadius(v[0])} disabled={!userLocation} />
+                                            </div>
+                                        </TooltipTrigger>
+                                        {!userLocation && (
+                                            <TooltipContent>
+                                                <p>Set a location in Step 1 to enable the radius slider.</p>
+                                            </TooltipContent>
+                                        )}
+                                    </Tooltip>
+                                </TooltipProvider>
+                            </div>
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="font-semibold">Step 3: Filter by Service</h3>
+                                    <Button variant="link" size="sm" onClick={handleClearFilters} className="text-pink-600 hover:text-pink-700 p-0 h-auto">Clear</Button>
+                                </div>
+                                <ServiceFilter services={initialServices} selectedServices={selectedServices} onServiceChange={setSelectedServices} />
+                            </div>
+                            <Button onClick={handleApplyFilters} className="w-full bg-pink-600 hover:bg-pink-700">Update Search</Button>
+                        </div>
+                        {/* Results Section */}
+                        <div className="flex-1 px-4 pt-3 lg:px-6 lg:pt-4 flex flex-col space-y-4">
+                            <h2 className="text-xl font-semibold flex-shrink-0">{isLoading ? "Finding clinics..." : `${finalFilteredClinics.length} Clinics Found`}</h2>
+                            
+                            <Input 
+                                type="text"
+                                placeholder="Search by name or address..."
+                                value={clinicSearchQuery}
+                                onChange={(e) => setClinicSearchQuery(e.target.value)}
+                                className="h-9"
+                            />
+
+                            {isLoading ? (
+                                <div className="flex-1 flex items-center justify-center"><Loader2 size={32} className="animate-spin text-pink-500"/></div>
+                            ) : (
+                                <div className="overflow-y-auto scrollbar-thin h-64">
+                                    <ClinicList 
+                                        clinics={finalFilteredClinics} 
+                                        onViewDetails={handleViewDetailsClick}
+                                        onShowRoute={handleShowRoute}
+                                        highlightedClinic={highlightedClinic}
+                                        onHighlightChange={setHighlightedClinic}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </Card>
+                </div>
+                {/* Right Panel: Map */}
+                <div className="col-span-12 lg:col-span-7 xl:col-span-8 h-full">
+                     <DynamicMapLoader 
+                        clinics={finalFilteredClinics} 
+                        userLocation={userLocation}
+                        routeDestination={routeDestination}
+                        highlightedClinic={highlightedClinic}
+                        onHighlightChange={setHighlightedClinic}
+                        panelState={'collapsed'}
+                    />
+                </div>
+            </div>
+        ) : (
+            <div className="relative h-full overflow-hidden">
+                <div className="w-full h-full">
+                    <DynamicMapLoader 
+                        clinics={finalFilteredClinics} 
+                        userLocation={userLocation}
+                        routeDestination={routeDestination}
+                        highlightedClinic={highlightedClinic}
+                        onHighlightChange={setHighlightedClinic}
+                        panelState={panelState}
+                    />
+                </div>
+                <SlidingPanel 
+                    panelState={panelState} 
+                    setPanelState={setPanelState}
+                >
+                    <AnimatePresence mode="wait">
+                        {activeView === 'list' ? renderMobileListView() : renderMobileFiltersView()}
+                    </AnimatePresence>
+                </SlidingPanel>
+            </div>
+        )}
+
+        <AnimatePresence>
+            {isModalOpen && selectedClinic && (
+                <ClinicDetailModal
+                    clinic={selectedClinic}
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    allServices={initialServices}
+                />
+            )}
+        </AnimatePresence>
+    </div>
   );
 } 

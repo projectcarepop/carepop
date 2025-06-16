@@ -6,10 +6,11 @@ import { Button } from '@/components/ui/button';
 
 interface LocationSearchInputProps {
   onLocationSelect: (location: { lat: number; lon: number }) => void;
+  inputId?: string;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export default function LocationSearchInput({ onLocationSelect }: LocationSearchInputProps) {
+export default function LocationSearchInput({ onLocationSelect, inputId }: LocationSearchInputProps) {
   const [query, setQuery] = useState('');
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -26,6 +27,7 @@ export default function LocationSearchInput({ onLocationSelect }: LocationSearch
   return (
     <form onSubmit={handleSearch} className="flex gap-2">
       <Input
+        id={inputId}
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}

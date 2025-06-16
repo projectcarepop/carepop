@@ -16,7 +16,7 @@ interface ClinicListItemProps {
 export default function ClinicListItem({ clinic, onViewDetails, onShowRoute, isHighlighted }: ClinicListItemProps) {
   return (
     <Card className={cn(
-      "p-4 transition-all duration-200 ease-in-out",
+      "p-3 transition-all duration-200 ease-in-out",
       isHighlighted ? "border-pink-500 shadow-lg" : "border-transparent"
     )}>
       <div className="flex justify-between items-start mb-2">
