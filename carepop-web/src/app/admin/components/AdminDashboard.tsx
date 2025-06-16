@@ -6,6 +6,7 @@ import Link from "next/link";
 import { getDashboardStats } from "@/lib/actions/dashboard.admin.actions";
 import PendingAppointments from './PendingAppointments';
 import { cn } from '@/lib/utils';
+import { UserProfile } from '@/lib/contexts/AuthContext';
 
 // Helper component for statistics cards
 type StatCardProps = {
@@ -91,13 +92,13 @@ async function Stats() {
 }
      
 // Main page component
-export default function AdminDashboard() {
+export default function AdminDashboard({ adminUser }: { adminUser: UserProfile | null }) {
     return (
         <div className="flex flex-col gap-6">
              <div>
-                <h1 className="text-2xl font-semibold tracking-tight">Admin Dashboard</h1>
+                <h1 className="text-2xl font-semibold tracking-tight">Welcome, {adminUser?.first_name || 'Admin'}!</h1>
                 <p className="text-muted-foreground mt-1">
-                    Welcome to the Admin Dashboard. This is your central hub for managing the carepop platform. From here, you can manage services, oversee providers, view user information (with appropriate permissions), manage inventory, and generate reports to ensure the smooth operation and impact of our healthcare services.
+                    This is your central hub for managing the carepop platform. From here, you can manage services, oversee providers, view user information (with appropriate permissions), manage inventory, and generate reports to ensure the smooth operation and impact of our healthcare services.
                 </p>
             </div>
             <Suspense fallback={<p className="text-muted-foreground">Loading dashboard stats...</p>}>

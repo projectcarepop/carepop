@@ -2,55 +2,69 @@
 
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, ReactNode } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Loader2, UserCircle, Edit3, AlertCircle } from 'lucide-react';
+import { 
+  Loader2, UserCircle, Edit3, AlertCircle, HeartPulse, MapPin, Users
+} from 'lucide-react';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 
-// Define AddressSelectItem and Barangay types (can be moved to a shared types file later)
-// interface AddressSelectItem { // Removed as it's not used on this page
-// value: string;
-// label: string;
-// }
+// Reusable Section Header Component
+const SectionHeader = ({ icon: Icon, title, description }: { icon: React.ElementType, title: string, description: string }) => (
+    <div className="flex items-center gap-4">
+        <div className="p-3 bg-primary/10 rounded-lg flex items-center justify-center">
+            <Icon className="h-6 w-6 text-primary" />
+        </div>
+        <div>
+            <CardTitle className="text-xl">{title}</CardTitle>
+            <CardDescription>{description}</CardDescription>
+        </div>
+    </div>
+);
 
-interface Barangay {
-  brgy_code: string;
-  brgy_name: string;
-  city_code: string;
-  province_code: string;
-  // Add other fields if necessary from your JSON structure, e.g., region_code
+// Data Point Display Component
+const InfoField = ({ label, value }: { label: string; value: ReactNode }) => (
+    <div>
+        <Label className="text-sm font-medium text-gray-500">{label}</Label>
+        <p className="font-sans text-base font-semibold text-gray-800 dark:text-gray-200 mt-1">
+            {value ?? <span className="text-sm font-normal italic text-gray-500">Not set</span>}
+        </p>
+    </div>
+);
+
+// PSGC Interface Definitions
+interface PsgcItem {
+    [key: string]: string;
 }
-interface CityMunicipality {
-    city_code: string;
-    city_name: string;
-    province_code: string;
-    // Add other fields if necessary
-}
-interface Province {
-    province_code: string;
-    province_name: string;
-    // Add other fields if necessary
-}
+interface Barangay extends PsgcItem { brgy_code: string; brgy_name: string; }
+interface CityMunicipality extends PsgcItem { city_code: string; city_name: string; }
+interface Province extends PsgcItem { province_code: string; province_name: string; }
 
 export default function DashboardPage() {
-  const { user, profile, isLoading: authLoading } = useAuth();
+  const { user, loading: authLoading, fetchProfile } = useAuth();
   const router = useRouter();
 
-  // State for PSGC data
+  // State management
+  const [isRefetching, setIsRefetching] = useState(false);
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [citiesMunicipalities, setCitiesMunicipalities] = useState<CityMunicipality[]>([]);
   const [barangays, setBarangays] = useState<Barangay[]>([]);
   const [psgcLoading, setPsgcLoading] = useState(true);
 
+  // Authentication and initial profile fetch logic
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login');
+    } else if (user && (!user.first_name || !user.last_name) && fetchProfile) {
+      setIsRefetching(true);
+      fetchProfile().finally(() => setIsRefetching(false));
     }
-  }, [authLoading, user, router]);
-
-  // Fetch PSGC data on mount
+  }, [authLoading, user, router, fetchProfile]);
+  
+  // PSGC data fetching
   useEffect(() => {
     const fetchPsgcData = async () => {
       try {
@@ -60,21 +74,12 @@ export default function DashboardPage() {
           fetch('/data/psgc/cities-municipalities.json'),
           fetch('/data/psgc/barangays.json'),
         ]);
-
-        if (!provRes.ok || !cityMunRes.ok || !bgyRes.ok) {
-          console.error('Failed to fetch PSGC data');
-          // Handle error appropriately, maybe set an error state
-          return;
-        }
-
         const provData = await provRes.json();
         const cityMunData = await cityMunRes.json();
         const bgyData = await bgyRes.json();
-
         setProvinces(Array.isArray(provData) ? provData : []);
         setCitiesMunicipalities(Array.isArray(cityMunData) ? cityMunData : []);
         setBarangays(Array.isArray(bgyData) ? bgyData : []);
-
       } catch (error) {
         console.error('Error fetching PSGC data:', error);
       } finally {
@@ -84,23 +89,21 @@ export default function DashboardPage() {
     fetchPsgcData();
   }, []);
 
-  // Helper functions to get names from codes
-  const getProvinceName = (code?: string) => {
-    if (!code) return 'N/A';
-    return provinces.find(p => p.province_code === code)?.province_name || code;
+  // Helper functions
+  const getPsgcName = (code: string | null | undefined, collection: PsgcItem[], codeField: string, nameField: string) => {
+    if (!code) return null;
+    return collection.find(item => item[codeField] === code)?.[nameField] || code;
+  };
+  const getProvinceName = (code?: string | null) => getPsgcName(code, provinces, 'province_code', 'province_name');
+  const getCityName = (code?: string | null) => getPsgcName(code, citiesMunicipalities, 'city_code', 'city_name');
+  const getBarangayName = (code?: string | null) => getPsgcName(code, barangays, 'brgy_code', 'brgy_name');
+  const formatDate = (dateString?: string | null) => {
+    if (!dateString) return null;
+    return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
-  const getCityMunicipalityName = (code?: string) => {
-    if (!code) return 'N/A';
-    return citiesMunicipalities.find(c => c.city_code === code)?.city_name || code;
-  };
-
-  const getBarangayName = (code?: string) => {
-    if (!code) return 'N/A';
-    return barangays.find(b => b.brgy_code === code)?.brgy_name || code;
-  };
-
-  if (authLoading || psgcLoading) {
+  // Loading and Access Denied states
+  if (authLoading || psgcLoading || isRefetching) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
@@ -128,147 +131,126 @@ export default function DashboardPage() {
     );
   }
 
-  const profileComplete = profile && profile.firstName && profile.lastName && profile.dateOfBirth;
+  const profileComplete = user && user.first_name && user.last_name && user.date_of_birth;
 
   return (
-    <div className="container mx-auto py-8 px-4 space-y-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-primary">
-            Welcome, {profile?.firstName || user.email?.split('@')[0] || 'User'}!
-          </h1>
-          <p className="text-muted-foreground">This is your personal dashboard.</p>
+    <div className="bg-gray-50 dark:bg-gray-900 min-h-screen font-sans">
+      <main className="container mx-auto py-10 px-4 space-y-8">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-200">
+              Welcome, {user?.first_name || 'User'}!
+            </h1>
+            <p className="text-gray-500 dark:text-gray-400">Here is your personal dashboard.</p>
+          </div>
         </div>
-      </div>
 
-      {!profileComplete && (
-        <Card className="bg-yellow-50 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700">
-          <CardHeader className="flex flex-row items-center space-x-3">
-            <AlertCircle className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
-            <div>
-                <CardTitle className="text-yellow-800 dark:text-yellow-300">Complete Your Profile</CardTitle>
-                <CardDescription className="text-yellow-700 dark:text-yellow-500">
-                Some of your essential profile details are missing.
-                </CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-yellow-700 dark:text-yellow-500 mb-4">
-              Please complete your profile to get the most out of CarePoP.
-            </p>
-            <Button asChild variant="default" className="bg-yellow-500 hover:bg-yellow-600 text-white">
-              <Link href="/create-profile">
-                <UserCircle className="mr-2 h-4 w-4" /> Go to Profile Setup
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <Card className="shadow-lg lg:col-span-2">
-          <CardHeader className="flex flex-row justify-between items-center">
-            <CardTitle className="text-2xl">Your Profile</CardTitle>
-            <Button asChild variant="outline">
-              <Link href="/create-profile">
-                <Edit3 className="mr-2 h-4 w-4" /> Edit Profile
-              </Link>
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-6 pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-              <div>
-                <Label htmlFor="email" className="text-sm font-medium text-muted-foreground">Email Address</Label>
-                <p id="email" className="text-lg">{user.email}</p>
-              </div>
-              <div>
-                <Label htmlFor="firstName" className="text-sm font-medium text-muted-foreground">First Name</Label>
-                <p id="firstName" className="text-lg">{profile?.firstName || <span className='text-muted-foreground italic'>Not set</span>}</p>
-              </div>
-              <div>
-                <Label htmlFor="lastName" className="text-sm font-medium text-muted-foreground">Last Name</Label>
-                <p id="lastName" className="text-lg">{profile?.lastName || <span className='text-muted-foreground italic'>Not set</span>}</p>
-              </div>
-              <div>
-                <Label htmlFor="middleInitial" className="text-sm font-medium text-muted-foreground">Middle Initial</Label>
-                <p id="middleInitial" className="text-lg">{profile?.middleInitial || <span className='text-muted-foreground italic'>Not set</span>}</p>
-              </div>
-              <div>
-                <Label htmlFor="dob" className="text-sm font-medium text-muted-foreground">Date of Birth</Label>
-                <p id="dob" className="text-lg">{profile?.dateOfBirth ? new Date(profile.dateOfBirth + 'T00:00:00').toLocaleDateString() : <span className='text-muted-foreground italic'>Not set</span>}</p>
-              </div>
-               <div>
-                <Label htmlFor="age" className="text-sm font-medium text-muted-foreground">Age</Label>
-                <p id="age" className="text-lg">{profile?.age !== undefined && profile.age !== null ? profile.age : <span className='text-muted-foreground italic'>Not set</span>}</p>
-              </div>
-              <div>
-                <Label htmlFor="genderIdentity" className="text-sm font-medium text-muted-foreground">Gender Identity</Label>
-                <p id="genderIdentity" className="text-lg">{profile?.genderIdentity || <span className='text-muted-foreground italic'>Not set</span>}</p>
-              </div>
-              <div>
-                <Label htmlFor="pronouns" className="text-sm font-medium text-muted-foreground">Pronouns</Label>
-                <p id="pronouns" className="text-lg">{profile?.pronouns || <span className='text-muted-foreground italic'>Not set</span>}</p>
-              </div>
-              <div>
-                <Label htmlFor="assignedSexAtBirth" className="text-sm font-medium text-muted-foreground">Assigned Sex at Birth</Label>
-                <p id="assignedSexAtBirth" className="text-lg">{profile?.assignedSexAtBirth || <span className='text-muted-foreground italic'>Not set</span>}</p>
-              </div>
-              <div>
-                <Label htmlFor="civilStatus" className="text-sm font-medium text-muted-foreground">Civil Status</Label>
-                <p id="civilStatus" className="text-lg">{profile?.civilStatus || <span className='text-muted-foreground italic'>Not set</span>}</p>
-              </div>
-              <div>
-                <Label htmlFor="religion" className="text-sm font-medium text-muted-foreground">Religion</Label>
-                <p id="religion" className="text-lg">{profile?.religion || <span className='text-muted-foreground italic'>Not set</span>}</p>
-              </div>
-              <div>
-                <Label htmlFor="occupation" className="text-sm font-medium text-muted-foreground">Occupation</Label>
-                <p id="occupation" className="text-lg">{profile?.occupation || <span className='text-muted-foreground italic'>Not set</span>}</p>
-              </div>
-               <div>
-                <Label htmlFor="contactNo" className="text-sm font-medium text-muted-foreground">Contact Number</Label>
-                <p id="contactNo" className="text-lg">{profile?.contactNo || <span className='text-muted-foreground italic'>Not set</span>}</p>
-              </div>
-              <div>
-                <Label htmlFor="philhealthNo" className="text-sm font-medium text-muted-foreground">PhilHealth No.</Label>
-                <p id="philhealthNo" className="text-lg">{profile?.philhealthNo || <span className='text-muted-foreground italic'>Not set</span>}</p>
-              </div>
-              <div>
-                  <Label htmlFor="address" className="text-sm font-medium text-muted-foreground">Address</Label>
-                  <p id="address" className="text-lg">
-                      {profile?.street || 'N/A'}, {getBarangayName(profile?.barangayCode)}, 
-                      {getCityMunicipalityName(profile?.cityMunicipalityCode)}, {getProvinceName(profile?.provinceCode)}
-                  </p>
-              </div>
-            </div>
-            
-            {profile?.avatar_url && (
-              <div className="mt-4">
-                <Label className="text-sm font-medium text-muted-foreground">Avatar</Label>
-                <img src={profile.avatar_url} alt="User avatar" className="w-24 h-24 rounded-full mt-2 border-2 border-primary/50" />
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        
-        <div className="space-y-8">
-            <Card className="shadow-lg">
-                <CardHeader>
-                    <CardTitle className="text-2xl">Appointments</CardTitle>
-                    <CardDescription>
-                        View your upcoming and past appointments.
-                    </CardDescription>
+        {/* Incomplete Profile Alert */}
+        {!profileComplete && (
+            <Card className="bg-yellow-50 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700">
+                <CardHeader className="flex flex-row items-center space-x-3">
+                    <AlertCircle className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+                    <div>
+                        <CardTitle className="text-yellow-800 dark:text-yellow-300">Complete Your Profile</CardTitle>
+                        <CardDescription className="text-yellow-700 dark:text-yellow-500">
+                        Some essential details are missing. Please update your profile.
+                        </CardDescription>
+                    </div>
                 </CardHeader>
-                <CardContent>
-                    <Button asChild className="w-full">
-                        <Link href="/dashboard/appointments">
-                            Go to My Appointments
-                        </Link>
-                    </Button>
-                </CardContent>
             </Card>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+          {/* Left Column: Unified Profile Card */}
+          <div className="lg:col-span-2 space-y-8">
+            <Card className="shadow-sm border">
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle className="text-xl font-semibold">Your Profile</CardTitle>
+                  <Button asChild>
+                    <Link href="/create-profile">
+                      <Edit3 className="mr-2 h-4 w-4" /> Edit Profile
+                    </Link>
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Personal & Contact Section */}
+                <div className="space-y-6">
+                  <SectionHeader 
+                    icon={UserCircle} 
+                    title="Personal & Contact" 
+                    description="Your basic identification and contact details."
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                    <InfoField label="First Name" value={user.first_name} />
+                    <InfoField label="Last Name" value={user.last_name} />
+                    <InfoField label="Middle Initial" value={user.middle_initial} />
+                    <InfoField label="Email Address" value={user.email} />
+                    <InfoField label="Contact Number" value={user.contact_no} />
+                    <InfoField label="PhilHealth No." value={user.philhealth_no} />
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Demographics Section */}
+                <div className="space-y-6">
+                  <SectionHeader 
+                    icon={Users} 
+                    title="Demographics" 
+                    description="Details about your personal background."
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                    <InfoField label="Date of Birth" value={formatDate(user.date_of_birth)} />
+                    <InfoField label="Age" value={user.age} />
+                    <InfoField label="Gender Identity" value={user.gender_identity} />
+                    <InfoField label="Pronouns" value={user.pronouns} />
+                    <InfoField label="Civil Status" value={user.civil_status} />
+                    <InfoField label="Occupation" value={user.occupation} />
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Address Section */}
+                <div className="space-y-6">
+                  <SectionHeader 
+                    icon={MapPin} 
+                    title="Address" 
+                    description="Your primary residential address."
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                    <InfoField label="Street Address" value={user.street} />
+                    <InfoField label="Barangay" value={getBarangayName(user.barangay_code)} />
+                    <InfoField label="City / Municipality" value={getCityName(user.city_municipality_code)} />
+                    <InfoField label="Province" value={getProvinceName(user.province_code)} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          
+          {/* Right Column: Side Cards */}
+          <div className="space-y-8">
+            <Card className="shadow-sm border">
+              <CardHeader>
+                <SectionHeader 
+                  icon={HeartPulse} 
+                  title="Appointments" 
+                  description="View your upcoming and past appointments."
+                />
+              </CardHeader>
+              <CardContent>
+                <Button asChild className="w-full">
+                  <Link href="/dashboard/appointments">Go to My Appointments</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 } 

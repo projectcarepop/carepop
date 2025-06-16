@@ -36,4 +36,16 @@ export const updateUserRoles = asyncHandler(async (req: Request, res: Response) 
     }
     
     sendSuccess(res, updatedUser);
+});
+
+export const getMyProfile = asyncHandler(async (req: Request, res: Response) => {
+  const user = (req as any).user;
+  if (!user || !user.id) {
+    throw new AppError('Authenticated user not found', StatusCodes.UNAUTHORIZED);
+  }
+  const fullProfile = await userService.findOne(user.id);
+  if (!fullProfile) {
+    throw new AppError('User profile not found', StatusCodes.NOT_FOUND);
+  }
+  sendSuccess(res, fullProfile);
 }); 

@@ -8,15 +8,35 @@ import { LoginData, ResetPasswordData, SignUpData } from '../types/authActionTyp
 
 // More specific user profile type
 export interface UserProfile {
-    id: string;
-    email?: string;
-    roles: string[];
-    [key: string]: unknown; // Allow other profile properties
+    id: string; // from users table
+    email?: string; // from users table
+    roles: string[]; // from user_roles table
+    
+    // Properties from profiles table (snake_case)
+    first_name?: string | null;
+    last_name?: string | null;
+    middle_initial?: string | null;
+    avatar_url?: string | null;
+    date_of_birth?: string | null;
+    age?: number | null;
+    gender_identity?: string | null;
+    pronouns?: string | null;
+    assigned_sex_at_birth?: string | null;
+    civil_status?: string | null;
+    religion?: string | null;
+    occupation?: string | null;
+    contact_no?: string | null;
+    philhealth_no?: string | null;
+    street?: string | null;
+    barangay_code?: string | null;
+    city_municipality_code?: string | null;
+    province_code?: string | null;
 }
 
 interface AuthContextType {
     user: UserProfile | null;
     session: Session | null;
+    fetchProfile: () => Promise<void>;
     login: (data: LoginData) => Promise<void>;
     signUp: (data: SignUpData) => Promise<{ data: { message: string } }>;
     loginWithGoogle: (code: string) => Promise<void>;
@@ -41,6 +61,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } catch (error) {
             console.error("Failed to fetch user profile:", error);
             return null;
+        }
+    };
+
+    const fetchProfile = async () => {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser) {
+            const profile = await getProfile(authUser);
+            setUser(profile);
         }
     };
 
@@ -92,7 +120,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, session, login, signUp, loginWithGoogle, forgotPassword, resetPassword, signOut, loading }}>
+        <AuthContext.Provider value={{ user, session, login, signUp, loginWithGoogle, forgotPassword, resetPassword, signOut, loading, fetchProfile }}>
             {children}
         </AuthContext.Provider>
     );

@@ -1,705 +1,356 @@
 'use client';
 
-import React, { useState, useEffect, FormEvent, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/AuthContext';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
+import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Progress } from "@/components/ui/progress"; // For step indication
-import { User as UserIcon, AlertTriangle, CheckCircle, Loader2, ArrowLeft, ArrowRight, Building, Map, UserCircle, HeartPulse } from 'lucide-react';
-import { motion, AnimatePresence } from "framer-motion";
+import { UserCircle, AlertTriangle, CheckCircle, Loader2, Users, MapPin, ChevronLeft, ChevronRight, Briefcase, HeartPulse } from 'lucide-react';
+import { Combobox } from "@/components/ui/combobox";
+import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { Combobox } from "@/components/ui/combobox"; // Added Combobox import
+import { z } from 'zod';
+import { useForm, FieldName } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { motion, AnimatePresence } from 'framer-motion';
+import DatePicker from '@/components/date-picker';
+
+// Schema for form validation using Zod
+const profileFormSchema = z.object({
+  // Step 1: Personal Details
+  first_name: z.string().min(1, 'First name is required'),
+  last_name: z.string().min(1, 'Last name is required'),
+  middle_initial: z.string().max(2, 'Max 2 characters').optional().nullable(),
+  date_of_birth: z.date({ required_error: 'Date of birth is required' }),
+  contact_no: z.string().min(10, 'Must be a valid contact number').optional().nullable(),
+  
+  // Step 2: Demographics
+  gender_identity: z.string().min(1, 'Gender identity is required'),
+  pronouns: z.string().min(1, 'Pronouns are required'),
+  assigned_sex_at_birth: z.string().min(1, 'This field is required'),
+  civil_status: z.string().min(1, 'Civil status is required'),
+  religion: z.string().optional().nullable(),
+
+  // Step 3: Professional & Health
+  occupation: z.string().min(1, 'Occupation is required'),
+  philhealth_no: z.string().optional().nullable(),
+  
+  // Step 4: Address
+  street: z.string().min(1, 'Street address is required'),
+  province_code: z.string().min(1, 'Province is required'),
+  city_municipality_code: z.string().min(1, 'City/Municipality is required'),
+  barangay_code: z.string().min(1, 'Barangay is required'),
+});
+
+type ProfileFormValues = z.infer<typeof profileFormSchema>;
+
+type StepName = "Personal Details" | "Demographics" | "Professional & Health" | "Address";
 
 interface StepConfig {
-  title: string;
-  subtitle: string;
+  name: StepName;
   icon: React.ElementType;
-  fields: (keyof FormProfile)[];
-  requiredFields?: (keyof FormProfile)[];
-  label: string;
-}
-
-// Form data can be a partial UserProfile, but we expect strings from the form
-type FormProfile = {
-  first_name?: string;
-  middle_initial?: string;
-  last_name?: string;
-  date_of_birth?: string;
-  gender_identity?: string;
-  pronouns?: string;
-  assigned_sex_at_birth?: string;
-  civil_status?: string;
-  religion?: string;
-  occupation?: string;
-  street?: string;
-  province_code?: string;
-  city_municipality_code?: string;
-  barangay_code?: string;
-  contact_no?: string;
-  philhealth_no?: string;
-};
-
-// Define AddressSelectItem type
-interface AddressSelectItem {
-  value: string;
-  label: string;
-}
-
-// Define Barangay type based on observed data structure
-interface Barangay {
-  brgy_code: string;
-  brgy_name: string;
-  city_code: string;
-  province_code: string;
-  region_code: string; // Assuming this is also present or might be useful
-  // Add other fields if necessary based on barangays.json structure
+  description: string;
+  fields: FieldName<ProfileFormValues>[];
 }
 
 const stepsConfig: StepConfig[] = [
-  {
-    title: "Personal Details",
-    subtitle: "Let's start with some basic information about you.",
-    icon: UserCircle,
-    fields: ['first_name', 'middle_initial', 'last_name', 'date_of_birth', 'contact_no'],
-    requiredFields: ['first_name', 'last_name', 'date_of_birth', 'contact_no'],
-    label: "Personal Details"
-  },
-  {
-    title: "Gender Identity",
-    subtitle: "Help us understand you better.",
-    icon: HeartPulse,
-    fields: ['gender_identity', 'pronouns', 'assigned_sex_at_birth', 'civil_status', 'religion'],
-    requiredFields: ['gender_identity', 'pronouns', 'assigned_sex_at_birth', 'civil_status'],
-    label: "Gender Identity"
-  },
-  {
-    title: "Professional & Health ID",
-    subtitle: "A little more about your professional life and health coverage.",
-    icon: Building,
-    fields: ['occupation', 'philhealth_no'],
-    requiredFields: ['occupation'],
-    label: "Professional & Health ID"
-  },
-  {
-    title: "Your Address",
-    subtitle: "Where can we reach you or send information?",
-    icon: Map,
-    fields: ['province_code', 'city_municipality_code', 'barangay_code', 'street'],
-    requiredFields: ['province_code', 'city_municipality_code', 'barangay_code', 'street'],
-    label: "Your Address"
-  }
+  { name: 'Personal Details', icon: UserCircle, description: "Basic information about you.", fields: ['first_name', 'last_name', 'middle_initial', 'date_of_birth', 'contact_no'] },
+  { name: 'Demographics', icon: Users, description: "Help us understand you better.", fields: ['gender_identity', 'pronouns', 'assigned_sex_at_birth', 'civil_status', 'religion'] },
+  { name: 'Professional & Health', icon: Briefcase, description: "Your professional life & health coverage.", fields: ['occupation', 'philhealth_no'] },
+  { name: 'Address', icon: MapPin, description: "Where can we reach you?", fields: ['street', 'province_code', 'city_municipality_code', 'barangay_code'] },
 ];
 
-export default function CreateProfileWizardPage() {
-  const { user, session, loading } = useAuth();
-  const router = useRouter();
+interface Barangay { brgy_code: string; brgy_name: string; city_code: string; }
+interface CityMunicipality { city_code: string; city_name: string; province_code: string; }
+interface Province { province_code: string; province_name: string; }
 
-  const [currentStep, setCurrentStep] = useState(0);
+export default function CreateProfilePage() {
+    const { user, session, loading: authLoading, fetchProfile } = useAuth();
+    const router = useRouter();
 
-  const [formData, setFormData] = useState<FormProfile>({});
-  const [stepErrors, setStepErrors] = useState<Record<string, string>>({});
+    const [currentStep, setCurrentStep] = useState(0);
+    const [direction, setDirection] = useState(1);
 
-  // Address Info - API Data Lists
-  const [provincesList, setProvincesList] = useState<AddressSelectItem[]>([]);
-  const [citiesMunicipalitiesList, setCitiesMunicipalitiesList] = useState<AddressSelectItem[]>([]);
-  const [barangaysList, setBarangaysList] = useState<AddressSelectItem[]>([]);
-
-  // Address Info - API Loading States
-  const [provincesLoading, setProvincesLoading] = useState(false);
-  const [citiesMunicipalitiesLoading, setCitiesMunicipalitiesLoading] = useState(false);
-  const [barangaysLoading, setBarangaysLoading] = useState(false);
-  const [addressApiError, setAddressApiError] = useState<string | null>(null);
-
-  const [pageLoading, setPageLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!loading && !user) {
-      router.replace('/login');
-    }
-    if (user) {
-      // Explicitly map known profile fields to the form state
-      setFormData({
-        first_name: String(user.first_name || ''),
-        middle_initial: String(user.middle_initial || ''),
-        last_name: String(user.last_name || ''),
-        date_of_birth: String(user.date_of_birth || ''),
-        gender_identity: String(user.gender_identity || ''),
-        pronouns: String(user.pronouns || ''),
-        assigned_sex_at_birth: String(user.assigned_sex_at_birth || ''),
-        civil_status: String(user.civil_status || ''),
-        religion: String(user.religion || ''),
-        occupation: String(user.occupation || ''),
-        street: String(user.street || ''),
-        province_code: String(user.province_code || ''),
-        city_municipality_code: String(user.city_municipality_code || ''),
-        barangay_code: String(user.barangay_code || ''),
-        contact_no: String(user.contact_no || ''),
-        philhealth_no: String(user.philhealth_no || ''),
-      });
-
-      if (user.province_code) {
-        // This will trigger address dropdowns
-      }
-    }
-  }, [user, loading, router]);
-  
-  useEffect(() => {
-    if (error) {
-        console.warn("AuthContext has an error:", error);
-    }
-  }, [error]);
-
-  // Fetch all provinces on mount
-  useEffect(() => {
-    const fetchProvinces = async () => {
-      setProvincesLoading(true);
-      setAddressApiError(null);
-      try {
-        const response = await fetch('/data/psgc/provinces.json'); // Use local public file
-        if (!response.ok) throw new Error(`Failed to load provinces.json: ${response.status} ${response.statusText}`);
-        const data = await response.json();
-        setProvincesList(Array.isArray(data) ? data.map((p: { province_code: string; province_name: string; }) => ({ value: p.province_code, label: p.province_name || '' })).sort((a,b) => a.label.localeCompare(b.label)) : []);
-      } catch (err) {
-        console.error("Failed to fetch local provinces.json:", err);
-        const fetchError = err as { message?: string };
-        setAddressApiError(`Failed to load provinces: ${fetchError.message}`);
-        setProvincesList([]);
-      }
-      setProvincesLoading(false);
-    };
-    fetchProvinces();
-  }, []);
-
-  // Load and filter cities/municipalities when provinceCode changes from formData
-  useEffect(() => {
-    const currentProvinceCode = formData.province_code;
-    if (currentProvinceCode) {
-      const loadAndFilterCitiesMunicipalities = async () => {
-        console.log('[Debug] loadAndFilterCitiesMunicipalities: START for provinceCode:', currentProvinceCode); // DEBUG LOG
-        setCitiesMunicipalitiesLoading(true);
-        setAddressApiError(null);
-        setCitiesMunicipalitiesList([]); // Clear previous list
-        try {
-          const response = await fetch('/data/psgc/cities-municipalities.json'); // Use local public file
-          console.log('[Debug] loadAndFilterCitiesMunicipalities: Fetch response status:', response.status, response.statusText); // DEBUG LOG
-          if (!response.ok) throw new Error(`Failed to load cities-municipalities.json: ${response.status} ${response.statusText}`);
-          const allCitiesMunicipalities = await response.json();
-          console.log('[Debug] loadAndFilterCitiesMunicipalities: Raw data after response.json():', allCitiesMunicipalities); // DEBUG LOG
-          console.log('[Debug] loadAndFilterCitiesMunicipalities: Is raw data an array?', Array.isArray(allCitiesMunicipalities)); // DEBUG LOG
-          
-          if (Array.isArray(allCitiesMunicipalities)) {
-            const filtered = allCitiesMunicipalities
-              .filter((item: { province_code: string; }) => {
-                // console.log('[Debug] Filtering city/mun item:', item, 'against provinceCode:', currentProvinceCode); // Optional: very verbose log
-                return item.province_code === currentProvinceCode;
-              });
-            console.log('[Debug] loadAndFilterCitiesMunicipalities: Filtered list before map:', filtered); // DEBUG LOG
-            
-            const mappedList = filtered.map((item: { city_code: string; city_name: string; }) => {
-                // console.log('City/Mun Item:', item); // Keep this if needed for individual item structure
-                return { value: item.city_code, label: item.city_name || '' };
-              })
-              .sort((a,b) => a.label.localeCompare(b.label));
-            setCitiesMunicipalitiesList(mappedList);
-          } else {
-            setCitiesMunicipalitiesList([]);
-            console.error('[Debug] loadAndFilterCitiesMunicipalities: Data is not an array!'); // DEBUG LOG
-            throw new Error('Cities/Municipalities data is not an array');
-          }
-        } catch (err) {
-          console.error("Failed to load/filter local cities-municipalities.json:", err);
-          const fetchError = err as { message?: string };
-          setAddressApiError(`Failed to load cities/municipalities: ${fetchError.message}`);
-          setCitiesMunicipalitiesList([]);
-        }
-        setCitiesMunicipalitiesLoading(false);
-      };
-      loadAndFilterCitiesMunicipalities();
-    } else {
-      setCitiesMunicipalitiesList([]);
-      setBarangaysList([]);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.province_code]);
-
-  // Load and filter barangays when cityMunicipalityCode changes from formData
-  const loadAndFilterBarangays = useCallback(async (cityCode: string | undefined) => {
-    if (!cityCode) {
-      setBarangaysList([]);
-      // Reset barangayCode in formData if city is cleared
-      setFormData(prev => ({ ...prev, barangay_code: '' })); 
-      return;
-    }
-    console.log('[Debug] loadAndFilterBarangays: START for city_code:', cityCode);
-    setBarangaysLoading(true);
-    setAddressApiError(null);
-    try {
-      // Corrected fetch path to local JSON file
-      const response = await fetch('/data/psgc/barangays.json'); 
-      if (!response.ok) {
-        console.error('[Debug] loadAndFilterBarangays: Fetch error! Status:', response.status);
-        setAddressApiError(`Failed to load barangays: ${response.statusText}`);
-        setBarangaysList([]);
-        setBarangaysLoading(false); // Ensure loading is set to false on error
-        return;
-      }
-      const rawData: Barangay[] = await response.json();
-      console.log('[Debug] loadAndFilterBarangays: Raw data length:', rawData.length);
-      console.log('[Debug] loadAndFilterBarangays: First 5 items of raw data:', rawData.slice(0, 5));
-      console.log('[Debug] loadAndFilterBarangays: Is raw data an array?', Array.isArray(rawData));
-
-      const targetCodeExists = rawData.some(item => item.city_code === cityCode);
-      console.log(`[Debug] loadAndFilterBarangays: Does city_code '${cityCode}' exist in rawData? ${targetCodeExists}`);
-      
-      if (!targetCodeExists && cityCode) {
-        const provinceCodePrefix = cityCode.substring(0, 4); 
-        const barangaysInProvince = rawData.filter(item => item.province_code === provinceCodePrefix);
-        if (barangaysInProvince.length > 0) {
-          const uniqueCityCodesInProvince = new Set(
-            barangaysInProvince.map(item => item.city_code)
-          );
-          console.log(`[Debug] loadAndFilterBarangays: Sample of unique city_codes in barangay data for province ${provinceCodePrefix}:`, Array.from(uniqueCityCodesInProvince).slice(0, 20));
-        } else {
-          console.log(`[Debug] loadAndFilterBarangays: No barangays found in rawData with province_code ${provinceCodePrefix}. Cannot show sample city_codes.`);
-        }
-      }
-
-      const filtered = rawData.filter((item: Barangay) => item.city_code === cityCode);
-      console.log('[Debug] loadAndFilterBarangays: Filtered list before map:', filtered);
-      
-      const mappedList = filtered
-        .map((item: Barangay) => ({ value: item.brgy_code, label: item.brgy_name || '' }))
-        .sort((a, b) => a.label.localeCompare(b.label));
-      
-      setBarangaysList(mappedList);
-
-    } catch (err) {
-      console.error("Failed to load/filter local barangays.json:", err);
-      const fetchError = err as { message?: string };
-      setAddressApiError(`Failed to load barangays: ${fetchError.message}`);
-      setBarangaysList([]);
-    }
-    setBarangaysLoading(false);
-  }, []); // Empty dependency array for useCallback as it doesn't depend on external state/props not listed
-
-  // useEffect to call loadAndFilterBarangays when formData.cityMunicipalityCode changes
-  useEffect(() => {
-    const currentCityCode = formData.city_municipality_code;
-    if (currentCityCode) {
-      loadAndFilterBarangays(currentCityCode);
-    } else {
-      // Clear barangays if city/municipality is not selected
-      setBarangaysList([]);
-      setFormData(prev => ({ ...prev, barangay_code: '' }));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.city_municipality_code, loadAndFilterBarangays]);
-
-  const handleInputChange = (field: keyof FormProfile, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error for this field when user types
-    if (stepErrors[field]) {
-      setStepErrors(prev => ({
-        ...prev,
-        [field]: ''
-      }));
-    }
-
-    if (field === 'province_code') {
-        // Reset dependent fields when province changes
-        setFormData(prev => ({ ...prev, city_municipality_code: '', barangay_code: '' }));
-    } else if (field === 'city_municipality_code') {
-        // Reset barangay when city/municipality changes
-        setFormData(prev => ({ ...prev, barangay_code: '' }));
-    }
-  };
-
-  const calculateAge = (dob: string | undefined): number | null => {
-    if (!dob) return null;
-    try {
-      const birthDate = new Date(dob);
-      if (isNaN(birthDate.getTime())) return null; 
-      const today = new Date();
-      let age = today.getFullYear() - birthDate.getFullYear();
-      const m = today.getMonth() - birthDate.getMonth();
-      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
-      }
-      return age >= 0 ? age : null;
-    } catch (e) {
-      console.error("Error calculating age:", e);
-      return null;
-    }
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!user || !session) {
-      setError("You must be logged in to update your profile.");
-      return;
-    }
-
-    setPageLoading(true);
-    setError(null);
-
-    const age = calculateAge(formData.date_of_birth);
-    if (age === null) {
-      setError("Invalid date of birth.");
-      setPageLoading(false);
-      return;
-    }
-
-    const payload = { ...formData, age };
-
-    try {
-      const response = await fetch(`/api/v1/public/users/profile`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
+    const form = useForm<ProfileFormValues>({
+        resolver: zodResolver(profileFormSchema),
+        defaultValues: {
+            first_name: '', last_name: '', middle_initial: '', contact_no: '',
+            date_of_birth: undefined,
+            gender_identity: '', pronouns: '', assigned_sex_at_birth: '', civil_status: '', religion: '',
+            occupation: '', philhealth_no: '',
+            street: '', province_code: '', city_municipality_code: '', barangay_code: '',
         },
-        body: JSON.stringify(payload),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        console.error("Profile update failed. Status:", response.status, "Result:", result);
-        throw new Error(result.message || `Failed to update profile. Status: ${response.status}`);
-      }
-      
-      setSuccess('Profile updated successfully!');
-      setTimeout(() => {
-        router.push('/dashboard');
-        router.refresh();
-      }, 1000);
-
-    } catch (err) {
-      const error = err as Error;
-      setError(error.message || 'An unexpected error occurred.');
-    } finally {
-      setPageLoading(false);
-    }
-  };
-
-  const nextStep = () => {
-    const currentStepConfig = stepsConfig[currentStep];
-    const required = currentStepConfig.requiredFields || [];
-    let hasErrors = false;
-    const newErrors: Record<string, string> = {};
-
-    required.forEach(field => {
-      if (!formData[field] || String(formData[field]).trim() === '') {
-        newErrors[field] = 'This field is required.';
-        hasErrors = true;
-      }
     });
 
-    // Clear previous errors for non-failing fields in this step before setting new ones
-    const currentStepFields = currentStepConfig.fields;
-    const updatedStepErrors = { ...stepErrors };
-    currentStepFields.forEach(f => {
-      if (!newErrors[f]) { // If not a new error for this field
-        delete updatedStepErrors[f]; // Remove any old error for this field
-      }
-    });
+    const [provinces, setProvinces] = useState<Province[]>([]);
+    const [cities, setCities] = useState<CityMunicipality[]>([]);
+    const [barangays, setBarangays] = useState<Barangay[]>([]);
+    const [psgcLoading, setPsgcLoading] = useState({ provinces: false, cities: false, barangays: false });
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [success, setSuccess] = useState<string | null>(null);
 
-    setStepErrors({...updatedStepErrors, ...newErrors});
+    useEffect(() => {
+        if (user) {
+            form.reset({
+                first_name: user.first_name || '', last_name: user.last_name || '', middle_initial: user.middle_initial || '',
+                date_of_birth: user.date_of_birth ? new Date(user.date_of_birth) : undefined,
+                contact_no: user.contact_no || '',
+                gender_identity: user.gender_identity || '', pronouns: user.pronouns || '',
+                assigned_sex_at_birth: user.assigned_sex_at_birth || '', civil_status: user.civil_status || '',
+                religion: user.religion || '', occupation: user.occupation || '', philhealth_no: user.philhealth_no || '',
+                street: user.street || '', province_code: user.province_code || '',
+                city_municipality_code: user.city_municipality_code || '', barangay_code: user.barangay_code || '',
+            });
+        }
+    }, [user, form]);
 
-    if (hasErrors) {
-      return; // Stop if there are validation errors
-    }
+    useEffect(() => {
+        const fetchProvinces = async () => {
+            setPsgcLoading(prev => ({ ...prev, provinces: true }));
+            try {
+                const res = await fetch('/data/psgc/provinces.json');
+                setProvinces(await res.json());
+            } catch (err) { console.error("Failed to fetch provinces:", err); }
+             finally { setPsgcLoading(prev => ({ ...prev, provinces: false })); }
+        };
+        fetchProvinces();
+    }, []);
 
-    if (currentStep < stepsConfig.length - 1) {
-      setCurrentStep(currentStep + 1);
-    } else {
-      console.log("Final step reached, form ready for submission.");
-    }
-  };
+    const selectedProvince = form.watch('province_code');
+    const selectedCity = form.watch('city_municipality_code');
 
-  const prevStep = () => {
-    if (currentStep > 0) {
-      setCurrentStep(prev => prev - 1);
-    }
-  };
-  
-  if (loading || !user) {
+    useEffect(() => {
+        if (!selectedProvince) return;
+        const fetchCities = async () => {
+            setPsgcLoading(prev => ({ ...prev, cities: true, barangays: false }));
+            form.setValue('city_municipality_code', ''); form.setValue('barangay_code', '');
+            setCities([]); setBarangays([]);
+            try {
+                const res = await fetch('/data/psgc/cities-municipalities.json');
+                const allCities = await res.json();
+                setCities(allCities.filter((c: CityMunicipality) => c.province_code === selectedProvince));
+            } catch (err) { console.error("Failed to fetch cities:", err); }
+            finally { setPsgcLoading(prev => ({ ...prev, cities: false })); }
+        };
+        fetchCities();
+    }, [selectedProvince, form]);
+
+    useEffect(() => {
+        if (!selectedCity) return;
+        const fetchBarangays = async () => {
+            setPsgcLoading(prev => ({ ...prev, barangays: true }));
+            form.setValue('barangay_code', ''); setBarangays([]);
+            try {
+                const res = await fetch('/data/psgc/barangays.json');
+                const allBarangays = await res.json();
+                setBarangays(allBarangays.filter((b: Barangay) => b.city_code === selectedCity));
+            } catch (err) { console.error("Failed to fetch barangays:", err); }
+            finally { setPsgcLoading(prev => ({ ...prev, barangays: false })); }
+        };
+        fetchBarangays();
+    }, [selectedCity, form]);
+
+    const provinceOptions = useMemo(() => provinces.map(p => ({ value: p.province_code, label: p.province_name })), [provinces]);
+    const cityOptions = useMemo(() => cities.map(c => ({ value: c.city_code, label: c.city_name })), [cities]);
+    const barangayOptions = useMemo(() => barangays.map(b => ({ value: b.brgy_code, label: b.brgy_name })), [barangays]);
+
+    const onSubmit = async (values: ProfileFormValues) => {
+        if (!session) { setError("You must be logged in."); return; }
+        setIsSubmitting(true); setError(null); setSuccess(null);
+        try {
+            const response = await fetch('/api/v1/public/users/profile', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                body: JSON.stringify({ ...values, date_of_birth: format(values.date_of_birth, 'yyyy-MM-dd') }),
+            });
+            if (!response.ok) throw new Error((await response.json()).message || "An unknown error occurred.");
+            setSuccess("Profile updated! Redirecting...");
+            await fetchProfile();
+            setTimeout(() => router.push('/dashboard'), 1500);
+        } catch (err) { setError((err as Error).message);
+        } finally { setIsSubmitting(false); }
+    };
+    
+    const nextStep = async () => {
+        const fields = stepsConfig[currentStep].fields;
+        const output = await form.trigger(fields as FieldName<ProfileFormValues>[], { shouldFocus: true });
+        if (!output) return;
+        if (currentStep < stepsConfig.length - 1) { setDirection(1); setCurrentStep(s => s + 1); }
+    };
+
+    const prevStep = () => {
+        if (currentStep > 0) { setDirection(-1); setCurrentStep(s => s - 1); }
+    };
+
+    const variants = {
+        enter: (direction: number) => ({ x: direction > 0 ? 400 : -400, opacity: 0 }),
+        center: { zIndex: 1, x: 0, opacity: 1 },
+        exit: (direction: number) => ({ zIndex: 0, x: direction < 0 ? 400 : -400, opacity: 0 }),
+    };
+
+    if (authLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+
     return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <Loader2 className="h-8 w-8 animate-spin" />
-        <span className="ml-2">Loading your profile...</span>
-      </div>
-    );
-  }
-
-
-  const renderCurrentStepFields = () => {
-    const step = stepsConfig[currentStep];
-    if (!step) return null;
-
-    return step.fields.map((fieldKey) => {
-      const field = fieldKey as keyof FormProfile; // Type assertion
-      switch (field) {
-        case 'first_name':
-        case 'last_name':
-        case 'street':
-        case 'religion':
-        case 'occupation':
-        case 'contact_no':
-        case 'philhealth_no':
-          return (
-            <div key={field} className="space-y-1.5">
-              <Label htmlFor={field} className="text-sm font-medium">
-                {field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
-              </Label>
-              <Input
-                id={field}
-                value={formData[field] || ''}
-                onChange={(e) => handleInputChange(field, e.target.value)}
-              />
-              {stepErrors[field] && <p className="text-xs text-red-500 mt-1">{stepErrors[field]}</p>}
-            </div>
-          );
-        case 'date_of_birth':
-          return (
-            <div key={field} className="space-y-1.5">
-              <Label htmlFor={field} className="text-sm font-medium">Date of Birth</Label>
-              <Input
-                id={field}
-                type="date"
-                value={formData[field] || ''}
-                onChange={(e) => handleInputChange(field, e.target.value)}
-              />
-              {stepErrors[field] && <p className="text-xs text-red-500 mt-1">{stepErrors[field]}</p>}
-            </div>
-          );
-        case 'gender_identity':
-        case 'pronouns':
-        case 'assigned_sex_at_birth':
-        case 'civil_status':
-          const optionsMap = {
-            gender_identity: ["Woman", "Man", "Transgender Woman", "Transgender Man", "Non-binary", "Genderqueer", "Prefer to self-describe", "Prefer not to say"],
-            pronouns: ["She/Her", "He/Him", "They/Them", "Ze/Hir", "Prefer to self-describe", "Prefer not to say"],
-            assigned_sex_at_birth: ["Female", "Male", "Intersex", "Prefer not to say"],
-            civil_status: ["Single", "Married", "Widowed", "Separated", "Divorced", "Domestic Partnership"],
-          };
-          const labelMap = {
-            gender_identity: "Gender Identity",
-            pronouns: "Pronouns",
-            assigned_sex_at_birth: "Assigned Sex at Birth",
-            civil_status: "Civil Status",
-          }
-          return (
-            <div key={field} className="space-y-1.5">
-              <Label htmlFor={field} className="text-sm font-medium">{labelMap[field]}</Label>
-              <Select value={formData[field] || ''} onValueChange={(value) => handleInputChange(field, value)}>
-                <SelectTrigger id={field}><SelectValue placeholder={`Select ${labelMap[field].toLowerCase()}`} /></SelectTrigger>
-                <SelectContent>
-                  {(optionsMap[field] || []).map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              {stepErrors[field] && <p className="text-xs text-red-500 mt-1">{stepErrors[field]}</p>}
-            </div>
-          );
-        case 'province_code':
-        case 'city_municipality_code':
-        case 'barangay_code':
-          const list = field === 'province_code' ? provincesList : field === 'city_municipality_code' ? citiesMunicipalitiesList : barangaysList;
-          const isLoading = field === 'province_code' ? provincesLoading : field === 'city_municipality_code' ? citiesMunicipalitiesLoading : barangaysLoading;
-          const placeholderText = field === 'province_code' ? 'Select Province' : field === 'city_municipality_code' ? 'Select City/Municipality' : 'Select Barangay';
-          const labelText = field === 'province_code' ? 'Province' : field === 'city_municipality_code' ? 'City/Municipality' : 'Barangay';
-
-          // Check for duplicate values
-          if (list && list.length > 0) {
-            const valueCounts = list.reduce((acc, item) => {
-              acc[item.value] = (acc[item.value] || 0) + 1;
-              return acc;
-            }, {} as Record<string, number>);
-
-            const duplicates: Record<string, number> = {};
-            for (const code in valueCounts) {
-              if (valueCounts[code] > 1) {
-                duplicates[code] = valueCounts[code];
-              }
-            }
-            if (Object.keys(duplicates).length > 0) {
-              console.warn(`Duplicate values found in list for ${field}:`, duplicates);
-            }
-          }
-
-          return (
-            <div key={field} className="space-y-1.5">
-              <Label htmlFor={field} className="text-sm font-medium">{labelText}</Label>
-              <Combobox
-                options={list}
-                value={formData[field] || ''}
-                onChange={(value) => handleInputChange(field, value)}
-                placeholder={isLoading ? "Loading..." : placeholderText}
-                searchPlaceholder={`Search ${labelText.toLowerCase()}...`}
-                emptyStateMessage={`No ${labelText.toLowerCase()} found.`}
-                disabled={isLoading || (field === 'city_municipality_code' && !formData.province_code) || (field === 'barangay_code' && !formData.city_municipality_code)}
-              />
-              {stepErrors[field] && <p className="text-xs text-red-500 mt-1">{stepErrors[field]}</p>}
-            </div>
-          );
-        case 'middle_initial':
-          return (
-            <div key={field} className="space-y-1.5">
-              <Label htmlFor={field}>Middle Initial</Label>
-              <Input
-                id={field}
-                type="text"
-                value={formData[field] || ''}
-                onChange={(e) => handleInputChange(field, e.target.value)}
-                maxLength={2}
-                placeholder="e.g., D"
-              />
-            </div>
-          );
-        default:
-          return null;
-      }
-    });
-  };
-
-  return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-slate-50 dark:bg-slate-900">
-      {/* Left Sidebar */}
-      <div className="w-full md:w-1/3 lg:w-1/4 bg-slate-100 dark:bg-slate-800 p-6 md:p-10 flex flex-col justify-center border-r border-slate-200 dark:border-slate-700">
-        <div className="space-y-8">
-          <div>
-            <UserIcon className="h-12 w-12 text-primary mb-4" />
-            <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100">Complete Your Profile</h1>
-            <p className="text-slate-600 dark:text-slate-400 mt-2">
-              Please provide some details to personalize your experience.
-            </p>
-          </div>
-          <div className="space-y-1">
-            <Progress value={(currentStep + 1) / stepsConfig.length * 100} className="w-full h-2" />
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Step {currentStep + 1} of {stepsConfig.length}: {stepsConfig[currentStep].title}
-            </p>
-          </div>
-          <div className="space-y-6">
-            {stepsConfig.map((step, index) => {
-              const IconComponent = step.icon;
-              return (
-                <div
-                  key={index}
-                  className={cn(
-                    "flex items-center gap-4 p-3 rounded-lg transition-all duration-300 cursor-pointer",
-                    currentStep === index ? "bg-primary/10 dark:bg-primary/20 shadow-sm border-l-4 border-primary" : 
-                    currentStep > index ? "opacity-60 hover:bg-slate-200/50 dark:hover:bg-slate-700/50" : 
-                                         "opacity-80 hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
-                  )}
-                  onClick={() => {
-                     // Allow navigation to previous, completed steps
-                     if (index < currentStep) setCurrentStep(index);
-                  }}
-                >
-                  <div
-                    className={cn(
-                      "flex items-center justify-center w-10 h-10 rounded-full text-sm font-medium shrink-0",
-                      currentStep === index ? "bg-primary text-primary-foreground" :
-                      currentStep > index ? "bg-green-500 text-white" :
-                                           "bg-slate-300 dark:bg-slate-600 text-slate-700 dark:text-slate-300"
-                    )}
-                  >
-                    {currentStep > index ? <CheckCircle className="h-5 w-5" /> : <IconComponent className="h-5 w-5" />}
-                  </div>
-                  <div>
-                    <h3 className={cn(
-                        "font-semibold",
-                        currentStep === index ? "text-primary dark:text-sky-300" : "text-slate-700 dark:text-slate-300"
-                    )}>{step.title}</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">{step.subtitle}</p>
-                  </div>
+         <div className="min-h-screen bg-gray-100 dark:bg-slate-900 flex justify-center md:items-center p-4 sm:p-6">
+            <main className="w-full max-w-6xl mx-auto flex flex-col md:flex-row bg-white dark:bg-slate-800 rounded-2xl shadow-xl overflow-hidden my-8 md:my-0">
+                {/* Left Panel: Stepper */}
+                <div className="w-full md:w-2/5 bg-gray-50 dark:bg-slate-900/50 p-6 md:p-8 lg:p-12 flex flex-col justify-center">
+                    <div className="space-y-6">
+                        <div>
+                            <HeartPulse className="h-8 w-8 text-primary mb-3" />
+                            <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Complete Your Profile</h1>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 mb-6">
+                                Please provide these details to personalize your experience.
+                            </p>
+                        </div>
+                        <div className="space-y-1">
+                            <div className="relative h-1 w-full bg-gray-200 dark:bg-gray-700 rounded-full">
+                                <motion.div 
+                                    className="absolute top-0 left-0 h-1 bg-primary rounded-full"
+                                    animate={{ width: `${((currentStep) / (stepsConfig.length -1)) * 100}%` }}
+                                    transition={{ ease: "easeInOut", duration: 0.5 }}
+                                />
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                Step {currentStep + 1} of {stepsConfig.length}: <span className="font-medium text-gray-700 dark:text-gray-300">{stepsConfig[currentStep].name}</span>
+                            </p>
+                        </div>
+                        <div className="space-y-1">
+                            {stepsConfig.map((step, index) => {
+                                const isActive = currentStep === index;
+                                const isCompleted = currentStep > index;
+                                return (
+                                    <div key={step.name} className={cn(
+                                        "flex items-center p-4 rounded-lg transition-all border-l-4",
+                                        isActive ? "border-primary bg-primary/10" : "border-transparent",
+                                        isCompleted ? "opacity-60" : ""
+                                    )}>
+                                        <div className={cn(
+                                            "flex items-center justify-center w-10 h-10 rounded-full mr-4 shrink-0",
+                                            isActive ? "bg-primary text-primary-foreground" : 
+                                            isCompleted ? "bg-green-500 text-white" : 
+                                            "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                                        )}>
+                                        {isCompleted ? <CheckCircle className="w-5 h-5" /> : <step.icon className="w-5 h-5" />}
+                                        </div>
+                                        <div>
+                                            <h3 className={cn(
+                                                "font-semibold text-base",
+                                                isActive ? "text-primary" : "text-gray-800 dark:text-gray-200"
+                                            )}>{step.name}</h3>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">{step.description}</p>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
                 </div>
-              );
-            })}
-          </div>
+
+                {/* Right Panel: Form */}
+                <div className="w-full md:w-3/5 p-6 md:p-8 lg:p-12 font-sans">
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col justify-between h-full">
+                            <div> {/* Wrapper for header and form content */}
+                                <CardHeader className="p-0 mb-6">
+                                    <CardTitle className="text-2xl font-bold">{stepsConfig[currentStep].name}</CardTitle>
+                                    <CardDescription className="text-base text-gray-500">{stepsConfig[currentStep].description}</CardDescription>
+                                </CardHeader>
+
+                                <AnimatePresence mode="wait">
+                                    <motion.div
+                                        key={currentStep}
+                                        custom={direction}
+                                        variants={variants}
+                                        initial="enter"
+                                        animate="center"
+                                        exit="exit"
+                                        transition={{
+                                            x: { type: "spring", stiffness: 300, damping: 30 },
+                                            opacity: { duration: 0.2 },
+                                        }}
+                                    >
+                                        <div className="space-y-6">
+                                            {currentStep === 0 && (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
+                                                    <FormField control={form.control} name="first_name" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                                    <FormField control={form.control} name="last_name" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                                    <FormField control={form.control} name="middle_initial" render={({ field }) => ( <FormItem><FormLabel>Middle Initial</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem> )} />
+                                                    <FormField
+                                                      control={form.control}
+                                                      name="date_of_birth"
+                                                      render={({ field }) => (
+                                                        <FormItem className="flex flex-col">
+                                                          <FormLabel>Date of Birth</FormLabel>
+                                                          <FormControl>
+                                                            <DatePicker
+                                                              value={field.value}
+                                                              onChange={field.onChange}
+                                                              />
+                                                          </FormControl>
+                                                          <FormMessage />
+                                                        </FormItem>
+                                                      )}
+                                                    />
+                                                    <FormField control={form.control} name="contact_no" render={({ field }) => ( <FormItem><FormLabel>Contact Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem> )} />
+                                                </div>
+                                            )}
+                                            {currentStep === 1 && (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
+                                                    <FormField control={form.control} name="gender_identity" render={({ field }) => ( <FormItem><FormLabel>Gender Identity</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="Male">Male</SelectItem><SelectItem value="Female">Female</SelectItem><SelectItem value="Transgender">Transgender</SelectItem><SelectItem value="Non-binary/Non-conforming">Non-binary/Non-conforming</SelectItem><SelectItem value="Prefer not to say">Prefer not to say</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
+                                                    <FormField control={form.control} name="pronouns" render={({ field }) => ( <FormItem><FormLabel>Pronouns</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="He/Him">He/Him</SelectItem><SelectItem value="She/Her">She/Her</SelectItem><SelectItem value="They/Them">They/Them</SelectItem><SelectItem value="Ze/Hir">Ze/Hir</SelectItem><SelectItem value="Prefer not to say">Prefer not to say</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
+                                                    <FormField control={form.control} name="assigned_sex_at_birth" render={({ field }) => ( <FormItem><FormLabel>Assigned Sex at Birth</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="Male">Male</SelectItem><SelectItem value="Female">Female</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
+                                                    <FormField control={form.control} name="civil_status" render={({ field }) => ( <FormItem><FormLabel>Civil Status</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="Single">Single</SelectItem><SelectItem value="Married">Married</SelectItem><SelectItem value="Widowed">Widowed</SelectItem><SelectItem value="Separated">Separated</SelectItem><SelectItem value="Divorced">Divorced</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
+                                                    <FormField control={form.control} name="religion" render={({ field }) => ( <FormItem><FormLabel>Religion (Optional)</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem> )} />
+                                                </div>
+                                            )}
+                                            {currentStep === 2 && (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
+                                                    <FormField control={form.control} name="occupation" render={({ field }) => ( <FormItem><FormLabel>Occupation</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                                    <FormField control={form.control} name="philhealth_no" render={({ field }) => ( <FormItem><FormLabel>PhilHealth No. (Optional)</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem> )} />
+                                                </div>
+                                            )}
+                                            {currentStep === 3 && (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
+                                                    <FormField control={form.control} name="province_code" render={({ field }) => (<FormItem><FormLabel>Province</FormLabel><FormControl><Combobox options={provinceOptions} value={field.value} onChange={field.onChange} placeholder="Select province..." isLoading={psgcLoading.provinces} /></FormControl><FormMessage /></FormItem>)} />
+                                                    <FormField control={form.control} name="city_municipality_code" render={({ field }) => (<FormItem><FormLabel>City / Municipality</FormLabel><FormControl><Combobox options={cityOptions} value={field.value} onChange={field.onChange} placeholder="Select city/municipality..." disabled={!selectedProvince} isLoading={psgcLoading.cities} /></FormControl><FormMessage /></FormItem>)} />
+                                                    <FormField control={form.control} name="barangay_code" render={({ field }) => (<FormItem><FormLabel>Barangay</FormLabel><FormControl><Combobox options={barangayOptions} value={field.value} onChange={field.onChange} placeholder="Select barangay..." disabled={!selectedCity} isLoading={psgcLoading.barangays} /></FormControl><FormMessage /></FormItem>)} />
+                                                    <FormField control={form.control} name="street" render={({ field }) => (<FormItem className="md:col-span-2"><FormLabel>Street Address & Unit No.</FormLabel><FormControl><Input {...field} placeholder="e.g., 123 Rizal Street, Unit 5" /></FormControl><FormMessage /></FormItem>)} />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                </AnimatePresence>
+                            </div>
+
+                            <div className="mt-8 pt-6 border-t dark:border-slate-700">
+                                {error && <div className="mb-4 flex items-center justify-center gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive"><AlertTriangle className="h-4 w-4" /> {error}</div>}
+                                {success && <div className="mb-4 flex items-center justify-center gap-2 rounded-md bg-green-500/10 p-3 text-sm text-green-600"><CheckCircle className="h-4 w-4" /> {success}</div>}
+                                <div className="flex justify-between">
+                                    <Button type="button" onClick={prevStep} variant="outline" disabled={currentStep === 0 || isSubmitting}>
+                                        <ChevronLeft className="mr-2 h-4 w-4" /> Previous
+                                    </Button>
+
+                                    {currentStep < stepsConfig.length - 1 ? (
+                                        <Button type="button" onClick={nextStep} disabled={isSubmitting}>
+                                            Next <ChevronRight className="ml-2 h-4 w-4" />
+                                        </Button>
+                                    ) : (
+                                        <Button type="submit" disabled={isSubmitting}>
+                                            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                            Submit Profile
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+                        </form>
+                    </Form>
+                </div>
+            </main>
         </div>
-      </div>
-
-      {/* Right Form Area */}
-      <div className="w-full md:w-2/3 lg:w-3/4 p-6 md:p-10 flex items-center justify-center">
-        <Card className="w-full max-w-2xl shadow-xl bg-white dark:bg-slate-800/50">
-          <CardHeader>
-            <CardTitle className="text-2xl font-semibold text-slate-800 dark:text-slate-100">
-              {stepsConfig[currentStep].title}
-            </CardTitle>
-            <CardDescription className="text-slate-600 dark:text-slate-400">
-              {stepsConfig[currentStep].subtitle}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={currentStep}
-                  initial={{ opacity: 0, x: 30 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -30 }}
-                  transition={{ duration: 0.3 }}
-                  className="space-y-4 md:space-y-6"
-                >
-                  {renderCurrentStepFields()}
-                </motion.div>
-              </AnimatePresence>
-              
-              {addressApiError && (
-                <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-300 rounded-md flex items-center">
-                  <AlertTriangle className="h-5 w-5 mr-2 shrink-0" />
-                  <p className="text-sm">{addressApiError}</p>
-                </div>
-              )}
-
-            </form>
-          </CardContent>
-          <CardFooter className="flex flex-col sm:flex-row justify-between items-center pt-6 border-t border-slate-200 dark:border-slate-700">
-             <div className="w-full sm:w-auto mb-4 sm:mb-0">
-                {error && (
-                <div className="text-red-600 dark:text-red-400 text-sm p-2 bg-red-100 dark:bg-red-900/20 rounded-md flex items-center">
-                    <AlertTriangle className="h-4 w-4 mr-2 shrink-0" /> {error}
-                </div>
-                )}
-                {success && (
-                <div className="text-green-600 dark:text-green-400 text-sm p-2 bg-green-100 dark:bg-green-900/20 rounded-md flex items-center">
-                    <CheckCircle className="h-4 w-4 mr-2 shrink-0" /> {success}
-                </div>
-                )}
-            </div>
-            <div className="flex gap-3 w-full sm:w-auto">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={prevStep}
-                disabled={currentStep === 0 || pageLoading}
-                className="w-full sm:w-auto"
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Previous
-              </Button>
-              <Button
-                type="button"
-                onClick={currentStep === stepsConfig.length - 1 ? handleSubmit : nextStep}
-                disabled={pageLoading}
-                className="w-full sm:w-auto"
-              >
-                {pageLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {currentStep === stepsConfig.length - 1 ? 'Submit Profile' : 'Next'}
-                {currentStep < stepsConfig.length - 1 && !pageLoading ? <ArrowRight className="ml-2 h-4 w-4" /> : null}
-              </Button>
-            </div>
-          </CardFooter>
-        </Card>
-      </div>
-    </div>
-  );
+    );
 } 

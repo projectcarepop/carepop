@@ -2,7 +2,8 @@ import { Router } from 'express';
 import {
   getUsers,
   getUserById,
-  updateUserRoles
+  updateUserRoles,
+  getMyProfile
 } from '@/controllers/admin/user.controller';
 import { validateRequest } from '@/lib/middleware/validate.middleware';
 import {
@@ -12,6 +13,8 @@ import {
 } from '@/validation/admin/user.validation';
 
 const router = Router();
+
+router.get('/me', getMyProfile);
 
 router.route('/')
   .get(validateRequest({ query: listUsersQuerySchema }), getUsers);

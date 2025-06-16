@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronsUpDown } from "lucide-react"
+import { Check, ChevronsUpDown, Loader2 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -27,6 +27,7 @@ interface ComboboxProps {
   searchPlaceholder?: string;
   emptyStateMessage?: string;
   disabled?: boolean;
+  isLoading?: boolean;
 }
 
 export function Combobox({
@@ -37,8 +38,11 @@ export function Combobox({
   searchPlaceholder = "Search...",
   emptyStateMessage = "No option found.",
   disabled = false,
+  isLoading = false,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
+
+  const displayLabel = options.find((option) => option.value === value)?.label;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -48,26 +52,32 @@ export function Combobox({
           role="combobox"
           aria-expanded={open}
           className="w-full justify-between"
-          disabled={disabled}
+          disabled={disabled || isLoading}
         >
-          {value
-            ? options.find((option) => option.value === value)?.label
-            : placeholder}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <span className="truncate">
+            {isLoading ? "Loading..." : (displayLabel || placeholder)}
+          </span>
+          {isLoading ? (
+             <Loader2 className="ml-2 h-4 w-4 shrink-0 animate-spin opacity-50" />
+          ) : (
+             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          )}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
-            <CommandEmpty>{emptyStateMessage}</CommandEmpty>
+            <CommandEmpty>
+              {isLoading ? "Loading..." : emptyStateMessage}
+            </CommandEmpty>
             <CommandGroup>
-              {options.map((option) => (
+              {!isLoading && options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={option.value}
-                  onSelect={(currentValue: string) => {
-                    onChange(currentValue === value ? "" : currentValue)
+                  value={option.label}
+                  onSelect={() => {
+                    onChange(option.value === value ? "" : option.value)
                     setOpen(false)
                   }}
                 >

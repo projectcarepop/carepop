@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2, Info, MapPin, Clock, Phone, Search, ListFilter } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useAuth } from '@/lib/contexts/AuthContext';
 
 // Helper function to parse and format operating hours
 const formatOperatingHours = (hoursString?: string): string[] => {
@@ -42,6 +43,7 @@ const formatOperatingHours = (hoursString?: string): string[] => {
 
 const ClinicServiceSelectionStep: React.FC = () => {
   const { state, dispatch } = useBookingContext();
+  const { session } = useAuth();
   const { 
     selectedClinic, 
     selectedService,
@@ -56,11 +58,23 @@ const ClinicServiceSelectionStep: React.FC = () => {
   const [selectedServiceCategories, setSelectedServiceCategories] = useState<string[]>([]);
   
   const fetchClinics = async () => {
+    if (!session) {
+      dispatch({ type: 'SET_CLINICS_ERROR', payload: 'You must be logged in to view clinics.' });
+      return;
+    }
     dispatch({ type: 'SET_CLINICS_LOADING', payload: true });
     try {
-      const res = await fetch(`/api/v1/admin/clinics`);
+      const res = await fetch(`/api/v1/public/clinics`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
       if (!res.ok) {
-        const errorText = res.status === 404 ? 'The clinics directory could not be found.' : `An unexpected error occurred (Code: ${res.status}).`;
+        const errorText = res.status === 401 
+          ? 'You are not authorized to view this page.'
+          : res.status === 404 
+          ? 'The clinics directory could not be found.' 
+          : `An unexpected error occurred (Code: ${res.status}).`;
         throw new Error(errorText);
       }
       const data: Clinic[] = await res.json();
@@ -72,9 +86,17 @@ const ClinicServiceSelectionStep: React.FC = () => {
   };
 
   const fetchServicesForClinic = async (clinicId: string) => {
+    if (!session) {
+      dispatch({ type: 'SET_SERVICES_FOR_CLINIC_ERROR', payload: 'You must be logged in to view services.' });
+      return;
+    }
     dispatch({ type: 'SET_SERVICES_FOR_CLINIC_LOADING', payload: true });
     try {
-      const res = await fetch(`/api/v1/admin/clinics/${clinicId}/services`);
+      const res = await fetch(`/api/v1/public/clinics/${clinicId}/services`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
       if (!res.ok) {
         const errorText = res.status === 404 ? `Services for this clinic could not be found.` : `An unexpected error occurred (Code: ${res.status}).`;
         throw new Error(errorText);
@@ -111,18 +133,20 @@ const ClinicServiceSelectionStep: React.FC = () => {
   }, [servicesForClinic]);
 
   useEffect(() => {
-    fetchClinics();
+    if (session) {
+      fetchClinics();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [session]);
 
   useEffect(() => {
-    if (selectedClinic?.id) {
+    if (selectedClinic?.id && session) {
       fetchServicesForClinic(selectedClinic.id);
     } else {
       dispatch({ type: 'SET_SERVICES_FOR_CLINIC_SUCCESS', payload: [] });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedClinic]);
+  }, [selectedClinic, session]);
 
   const handleCategoryChange = (category: string) => {
     setSelectedServiceCategories(prev => 
