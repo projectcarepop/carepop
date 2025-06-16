@@ -28,7 +28,7 @@ export function UserDetailTabs({ profile, userId }: UserDetailTabsProps) {
         <TabsTrigger value="records">Medical Records</TabsTrigger>
       </TabsList>
       <TabsContent value="profile">
-        <ProfileForm profile={profile} userId={userId} />
+        <ProfileForm profile={profile} />
       </TabsContent>
       <TabsContent value="appointments">
         <AppointmentsList userId={userId} />

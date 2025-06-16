@@ -42,6 +42,12 @@ import { useToast } from '@/components/ui/use-toast';
 import { AppError, fetcher } from '@/lib/utils';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
 
+interface OperatingHour {
+  day: string;
+  open: string;
+  close: string;
+}
+
 // Frontend data structure (camelCase)
 export interface Clinic {
   id: string;
@@ -50,19 +56,31 @@ export interface Clinic {
   locality?: string | null;
   region?: string | null;
   contactPhone?: string | null;
+  operatingHours?: OperatingHour[] | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
 // Type for the raw clinic data from the API
-interface RawClinicData {
+export interface BackendClinicData {
   id: string;
   name: string;
   full_address?: string | null;
+  street_address?: string | null;
   locality?: string | null;
   region?: string | null;
+  postal_code?: string | null;
+  country_code?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   contact_phone?: string | null;
+  contact_email?: string | null;
+  website_url?: string | null;
+  operating_hours?: OperatingHour[] | null;
+  services_offered?: string[] | null;
+  fpop_chapter_affiliation?: string | null;
+  additional_notes?: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -111,13 +129,14 @@ export function ClinicTable() {
     if (result && result.data) {
       // The actual array is in result.data.data
       const clinicsArray = result.data.data || [];
-      const mappedData = clinicsArray.map((c: RawClinicData) => ({
+      const mappedData = clinicsArray.map((c: BackendClinicData) => ({
         id: c.id,
         name: c.name,
         fullAddress: c.full_address,
         locality: c.locality,
         region: c.region,
         contactPhone: c.contact_phone,
+        operatingHours: c.operating_hours,
         isActive: c.is_active,
         createdAt: c.created_at,
         updatedAt: c.updated_at,

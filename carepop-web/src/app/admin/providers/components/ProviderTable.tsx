@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import useSWR from 'swr';
 import { useDebounce } from 'use-debounce';
 import { Button } from "@/components/ui/button";
@@ -69,7 +69,7 @@ export function ProviderTable() {
         }
     }, [result]);
 
-    const handleDelete = async (providerId: string) => {
+    const handleDelete = useCallback(async (providerId: string) => {
         if (!confirm('Are you sure you want to delete this provider? This action cannot be undone.')) return;
 
         try {
@@ -98,7 +98,7 @@ export function ProviderTable() {
                 variant: 'destructive',
             });
         }
-    };
+    }, [token, toast, mutate]);
 
     const columns = useMemo<ColumnDef<IProvider>[]>(() => [
         {

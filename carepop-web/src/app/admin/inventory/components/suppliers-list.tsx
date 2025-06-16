@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import useSWR from 'swr';
 import { useDebounce } from 'use-debounce';
 import { Button } from "@/components/ui/button";
@@ -67,7 +67,7 @@ export function SuppliersList() {
     }
   }, [result]);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     if (!confirm('Are you sure you want to delete this supplier? This action cannot be undone.')) return;
     
     try {
@@ -92,7 +92,7 @@ export function SuppliersList() {
         variant: "destructive"
       });
     }
-  };
+  }, [token, toast, mutate]);
   
   const columns = useMemo<ColumnDef<ISupplier>[]>(() => [
     { accessorKey: 'name', header: 'Name' },

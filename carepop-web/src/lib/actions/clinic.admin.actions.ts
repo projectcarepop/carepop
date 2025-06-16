@@ -3,7 +3,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { Clinic, BackendClinicData } from '@/app/admin/clinics/components/ClinicTable';
-import { Database } from '../types/supabase';
+import { Database } from '@/types/supabase';
 
 export async function getClinicsForAdmin(): Promise<Clinic[]> {
   const cookieStore = await cookies();
@@ -19,14 +19,14 @@ export async function getClinicsForAdmin(): Promise<Clinic[]> {
         set(name: string, value: string, options: CookieOptions) {
           try {
             cookieStore.set({ name, value, ...options });
-          } catch (e) {
+          } catch {
             // The `set` method was called from a Server Component.
           }
         },
         remove(name: string, options: CookieOptions) {
           try {
             cookieStore.set({ name, value: '', ...options });
-          } catch (e) {
+          } catch {
             // The `delete` method was called from a Server Component.
           }
         },

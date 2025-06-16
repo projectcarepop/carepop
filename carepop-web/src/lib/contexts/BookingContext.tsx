@@ -127,8 +127,6 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
     case 'RESET_BOOKING_STATE':
       return initialState;
     default:
-      // Add a type check for exhaustive switch, though with string literals for types it's less critical
-      const __: never = action; 
       return state;
   }
 }

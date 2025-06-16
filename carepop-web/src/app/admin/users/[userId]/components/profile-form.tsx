@@ -13,7 +13,7 @@ interface UserProfile {
   // Add other profile fields as needed
 }
 
-export function ProfileForm({ profile, userId }: { profile: UserProfile, userId: string }) {
+export function ProfileForm({ profile }: { profile: UserProfile }) {
   const [formData, setFormData] = useState({
     first_name: profile.first_name || '',
     last_name: profile.last_name || '',

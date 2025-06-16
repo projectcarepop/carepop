@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import useSWR from 'swr';
 import { useDebounce } from 'use-debounce';
 import { Button } from "@/components/ui/button";
@@ -71,7 +71,7 @@ export function InventoryItemsList() {
     }
   }, [result]);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     if (!confirm('Are you sure you want to delete this item? This action cannot be undone.')) return;
     
     try {
@@ -99,7 +99,7 @@ export function InventoryItemsList() {
         variant: 'destructive',
       });
     }
-  };
+  }, [token, toast, mutate]);
 
   const columns = useMemo<ColumnDef<IInventoryItem>[]>(() => [
     { accessorKey: 'item_name', header: 'Item Name' },

@@ -146,7 +146,7 @@ export function ServiceManager({ form }: ServiceManagerProps) {
             return acc;
         }, {} as Record<string, boolean>);
         setRowSelection(initialSelection);
-    }, []);
+    }, [form]);
 
     useEffect(() => {
         const selectedIds = Object.keys(rowSelection).filter(key => rowSelection[key]);
