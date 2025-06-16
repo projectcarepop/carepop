@@ -428,7 +428,7 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
 
     try {
       const response = await fetch(apiUrl, {
-        method: 'PATCH',
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,

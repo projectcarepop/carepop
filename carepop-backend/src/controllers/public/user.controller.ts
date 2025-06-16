@@ -17,7 +17,7 @@ export const userController = {
     updateMyProfile: async (req: Request, res: Response, next: NextFunction) => {
         try {
             // The user's ID is attached to the request by the auth middleware
-            const userId = (req as any).user.id;
+            const userId = (req as any).user.user_id;
             if (!userId) {
                 throw new AppError('Authentication error: User ID not found in token.', 401);
             }

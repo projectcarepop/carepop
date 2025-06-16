@@ -22,13 +22,13 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
     const token = authHeader.split(' ')[1];
 
     try {
-        // Still use the public client to validate the token initially.
         const { data: { user }, error: tokenError } = await supabase.auth.getUser(token);
+
         if (tokenError || !user) {
-            return res.status(401).json({ message: 'Unauthorized: Invalid or expired token.' });
+            console.error('Auth token validation error:', tokenError);
+            return res.status(401).json({ message: 'Unauthorized: Invalid or expired token.', details: tokenError?.message });
         }
 
-        // Step 1: Fetch profile using the SERVICE client to bypass RLS.
         const { data: profile, error: profileError } = await serviceSupabase
             .from('profiles')
             .select('*')
@@ -36,22 +36,20 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
             .single();
 
         if (profileError || !profile) {
-            console.error('Profile fetch error:', profileError);
-            return res.status(404).json({ message: 'User profile not found.' });
+            console.error(`Profile fetch error for user ${user.id}:`, profileError);
+            return res.status(404).json({ message: `User profile not found for user ID: ${user.id}`, details: profileError?.message });
         }
 
-        // Step 2: Fetch roles using the SERVICE client to bypass RLS.
         const { data: roles, error: rolesError } = await serviceSupabase
             .from('user_roles')
             .select('role')
             .eq('user_id', user.id);
 
         if (rolesError) {
-            console.error('Roles fetch error:', rolesError);
-            return res.status(500).json({ message: 'Failed to fetch user roles.' });
+            console.error(`Roles fetch error for user ${user.id}:`, rolesError);
+            return res.status(500).json({ message: 'Failed to fetch user roles.', details: rolesError?.message });
         }
 
-        // Step 3: Combine profile and roles into a single user object for the request.
         req.user = {
             ...profile,
             roles: roles ? roles.map((r: { role: string }) => r.role) : [],
@@ -59,6 +57,7 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
         
         next();
     } catch (error: any) {
-        return res.status(401).json({ message: 'Unauthorized: An error occurred while processing the token.' });
+        console.error('Unhandled error in auth middleware:', error);
+        return res.status(500).json({ message: 'Internal Server Error in authentication middleware.' });
     }
 }; 
