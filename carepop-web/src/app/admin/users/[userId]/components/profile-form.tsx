@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 interface UserProfile {
   first_name: string | null;
   last_name: string | null;
-  role: string;
+  role: string | null;
   // Add other profile fields as needed
 }
 

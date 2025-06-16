@@ -8,9 +8,12 @@ import { AppointmentsList } from './appointments-list';
 // Define the interfaces for the props
 interface Profile {
   id: string;
-  first_name: string;
-  last_name: string;
-  role: string;
+  full_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  phone: string | null;
+  role: string | null;
   // Add other profile fields as needed from your actual data structure
 }
 
