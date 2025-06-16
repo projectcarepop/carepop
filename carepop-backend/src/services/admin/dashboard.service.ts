@@ -5,9 +5,11 @@ import logger from '@/utils/logger';
 import { supabaseServiceRole } from '@/config/supabaseClient';
 import { StatusCodes } from 'http-status-codes';
 
-const supabase: SupabaseClient<Database> = supabaseServiceRole;
-
 export const getDashboardStats = async () => {
+  if (!supabaseServiceRole) {
+    throw new AppError('Supabase service client not initialized.', StatusCodes.INTERNAL_SERVER_ERROR);
+  }
+  
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -24,14 +26,14 @@ export const getDashboardStats = async () => {
       inventoryAlerts,
       pendingAppointmentsList
     ] = await Promise.all([
-      supabase.from('clinics').select('id', { count: 'exact', head: true }),
-      supabase.from('providers').select('id', { count: 'exact', head: true }),
-      supabase.from('services').select('id', { count: 'exact', head: true }),
-      supabase.from('appointments').select('id', { count: 'exact', head: true }).gte('appointment_datetime', today.toISOString()).lt('appointment_datetime', tomorrow.toISOString()).eq('status', 'confirmed'),
-      supabase.from('appointments').select('id', { count: 'exact', head: true }).eq('status', 'pending_confirmation'),
-      supabase.from('appointments').select('id', { count: 'exact', head: true }).gte('appointment_datetime', today.toISOString()),
-      supabase.from('inventory_items').select('id', { count: 'exact', head: true }).lte('quantity_on_hand', 0),
-      supabase.from('appointments').select(`
+      supabaseServiceRole.from('clinics').select('id', { count: 'exact', head: true }),
+      supabaseServiceRole.from('providers').select('id', { count: 'exact', head: true }),
+      supabaseServiceRole.from('services').select('id', { count: 'exact', head: true }),
+      supabaseServiceRole.from('appointments').select('id', { count: 'exact', head: true }).gte('appointment_datetime', today.toISOString()).lt('appointment_datetime', tomorrow.toISOString()).eq('status', 'confirmed'),
+      supabaseServiceRole.from('appointments').select('id', { count: 'exact', head: true }).eq('status', 'pending_confirmation'),
+      supabaseServiceRole.from('appointments').select('id', { count: 'exact', head: true }).gte('appointment_datetime', today.toISOString()),
+      supabaseServiceRole.from('inventory_items').select('id', { count: 'exact', head: true }).lte('quantity_on_hand', 0),
+      supabaseServiceRole.from('appointments').select(`
         id, 
         created_at, 
         status,
@@ -69,7 +71,11 @@ export const getDashboardStats = async () => {
 };
 
 export const grantAdminRole = async (userId: string) => {
-  const { error } = await supabase
+  if (!supabaseServiceRole) {
+    throw new AppError('Supabase service client not initialized.', StatusCodes.INTERNAL_SERVER_ERROR);
+  }
+
+  const { error } = await supabaseServiceRole
     .from('user_roles')
     .upsert({ user_id: userId, role: 'Admin' }, { onConflict: 'user_id' });
 

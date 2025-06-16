@@ -4,15 +4,8 @@ import { Card, Text, useTheme } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 
-// Define a type for the appointment data for type safety
-export type Appointment = {
-  id: string;
-  appointment_datetime: string;
-  status: 'confirmed' | 'pending_confirmation' | 'cancelled' | 'completed' | 'no_show';
-  service: { name: string; };
-  clinic: { name: string; address_line_1: string; };
-  provider: { first_name: string; last_name: string; };
-};
+// Import the canonical Appointment type
+import { Appointment } from '../../utils/api';
 
 interface AppointmentCardProps {
   appointment: Appointment;
@@ -35,7 +28,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, o
     <Card style={styles.card} onPress={onPress}>
       <Card.Content>
         <View style={styles.header}>
-          <Text variant="titleMedium" style={styles.serviceName}>{appointment.service.name}</Text>
+          <Text variant="titleMedium" style={styles.serviceName}>{appointment.services.name}</Text>
           <View style={[styles.statusBadge, { backgroundColor: detail.color }]}>
             <Ionicons name={detail.icon as any} size={14} color="#fff" />
             <Text style={styles.statusText}>{detail.text}</Text>
@@ -56,12 +49,12 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, o
         <View style={styles.separator} />
         <View style={styles.infoRow}>
           <Ionicons name="location-outline" size={16} color={theme.colors.onSurfaceVariant} />
-          <Text variant="bodyMedium" style={styles.infoText}>{appointment.clinic.name}</Text>
+          <Text variant="bodyMedium" style={styles.infoText}>{appointment.clinics.name}</Text>
         </View>
         <View style={styles.infoRow}>
           <Ionicons name="person-outline" size={16} color={theme.colors.onSurfaceVariant} />
           <Text variant="bodyMedium" style={styles.infoText}>
-            {`Dr. ${appointment.provider.first_name} ${appointment.provider.last_name}`}
+            {`Dr. ${appointment.providers.first_name} ${appointment.providers.last_name}`}
           </Text>
         </View>
       </Card.Content>
