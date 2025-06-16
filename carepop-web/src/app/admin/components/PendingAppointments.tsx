@@ -47,7 +47,7 @@ export default function PendingAppointments({ appointments }: { appointments: Ap
             </CardHeader>
             <CardContent className="space-y-4">
                 {appointments.map(app => (
-                    <div key={app.id} className="flex items-center justify-between p-3 bg-zinc-50 rounded-lg shadow-sm dark:bg-zinc-800">
+                    <div key={app.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 bg-zinc-50 rounded-lg shadow-sm dark:bg-zinc-800 gap-4">
                         <div className="flex flex-col">
                            <p className="font-semibold text-zinc-800 dark:text-zinc-200">
                              {app.patients?.fullName ?? 'Unknown Patient'}
@@ -56,7 +56,7 @@ export default function PendingAppointments({ appointments }: { appointments: Ap
                              {app.services?.name ?? 'Unknown Service'}
                            </p>
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                             <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 dark:text-amber-400 dark:border-amber-400/20 dark:bg-amber-900/30">
                                 <Clock className="mr-1 h-3 w-3" />
                                 {formatDistanceToNow(new Date(app.created_at), { addSuffix: true })}
