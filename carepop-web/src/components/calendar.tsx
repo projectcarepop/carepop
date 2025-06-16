@@ -223,18 +223,22 @@ function Calendar({
             {...props}
           />
         ),
-        MonthGrid: ({ className, children, ...props }) => (
-          <MonthGrid
-            children={children}
-            className={className}
-            displayYears={displayYears}
-            startMonth={startMonth}
-            endMonth={endMonth}
-            navView={navView}
-            setNavView={setNavView}
-            {...props}
-          />
-        ),
+        MonthGrid: ({ className, children, ...props }) => {
+          if (navView === "years") {
+            return (
+              <YearGrid
+                className={className}
+                displayYears={displayYears}
+                startMonth={startMonth}
+                endMonth={endMonth}
+                navView={navView}
+                setNavView={setNavView}
+                {...props}
+              />
+            )
+          }
+          return <table className={cn("w-full border-collapse space-y-1", className)} {...props}>{children}</table>
+        },
         ...components,
       }}
       numberOfMonths={columnsDisplayed}
@@ -276,7 +280,7 @@ function Nav({
     } else {
       onPrevClick?.(previousMonth as Date)
     }
-  }, [displayYears.from, displayYears.to, navView, onPrevClick, previousMonth, setDisplayYears])
+  }, [navView, onPrevClick, previousMonth, setDisplayYears])
 
   const handleNextClick = React.useCallback(() => {
     if (navView === "years") {
@@ -287,7 +291,7 @@ function Nav({
     } else {
       onNextClick?.(nextMonth as Date)
     }
-  }, [displayYears.from, displayYears.to, navView, onNextClick, nextMonth, setDisplayYears])
+  }, [navView, onNextClick, nextMonth, setDisplayYears])
 
   const prevDisabled = React.useMemo(() => {
     if (navView === "days") {
@@ -305,7 +309,7 @@ function Nav({
           endMonth
         ) > 0)
     )
-  }, [displayYears.from, displayYears.to, navView, startMonth, endMonth, previousMonth])
+  }, [displayYears.from, navView, startMonth, endMonth, previousMonth])
 
   const nextDisabled = React.useMemo(() => {
     if (navView === "years") {
@@ -323,7 +327,7 @@ function Nav({
       )
     }
     return !nextMonth
-  }, [displayYears.from, displayYears.to, navView, startMonth, endMonth, nextMonth])
+  }, [displayYears.to, navView, startMonth, endMonth, nextMonth])
 
   return (
     <nav className={cn("flex items-center", className)}>
@@ -390,40 +394,6 @@ function CaptionLabel({
         : displayYears.from + " - " + displayYears.to}
     </Button>
   )
-}
-
-function MonthGrid({
-  className,
-  children,
-  displayYears,
-  startMonth,
-  endMonth,
-  navView,
-  setNavView,
-  ...props
-}: {
-  className?: string
-  children: React.ReactNode
-  displayYears: { from: number; to: number }
-  startMonth?: Date
-  endMonth?: Date
-  navView: NavView
-  setNavView: React.Dispatch<React.SetStateAction<NavView>>
-} & React.TableHTMLAttributes<HTMLTableElement>) {
-  if (navView === "years") {
-    return (
-      <YearGrid
-        className={className}
-        displayYears={displayYears}
-        startMonth={startMonth}
-        endMonth={endMonth}
-        navView={navView}
-        setNavView={setNavView}
-        {...props}
-      />
-    )
-  }
-  return <table className={className} {...props}>{children}</table>
 }
 
 function YearGrid({
