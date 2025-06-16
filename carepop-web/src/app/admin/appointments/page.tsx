@@ -31,7 +31,10 @@ export default function AdminAppointmentsPage() {
         const response = await fetch(`${backendUrl}/api/v1/admin/clinics`, {
             headers: { 'Authorization': `Bearer ${sessionData.session.access_token}` }
         });
-        if (!response.ok) throw new Error("Failed to fetch clinics");
+        if (!response.ok) {
+            const errorBody = await response.json().catch(() => ({ message: response.statusText }));
+            throw new Error(`Failed to fetch clinics: ${response.status} ${response.statusText} - ${errorBody.message}`);
+        }
 
         const result = await response.json();
 

@@ -118,8 +118,9 @@ export const getUserProfile = async (userId: string): Promise<Profile | null> =>
       return null;
     }
 
-    console.log(`[getUserProfile] Fetching from backend: ${backendApiUrl}/api/users/profile`);
-    const response = await fetch(`${backendApiUrl}/api/users/profile`, {
+    const endpointUrl = `${backendApiUrl}/api/v1/public/users/${userId}/profile`;
+    console.log(`[getUserProfile] Fetching from backend: ${endpointUrl}`);
+    const response = await fetch(endpointUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

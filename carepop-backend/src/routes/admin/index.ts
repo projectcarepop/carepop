@@ -21,7 +21,7 @@ const adminRouter = Router();
 
 // Apply security middleware to all admin routes
 adminRouter.use(authMiddleware);
-adminRouter.use(authorize(['Admin', 'Super-Admin']));
+adminRouter.use(authorize(['admin', 'super-admin']));
 
 // Use modular routers
 adminRouter.use('/inventory', inventoryRoutes);

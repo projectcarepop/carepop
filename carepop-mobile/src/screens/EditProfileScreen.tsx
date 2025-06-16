@@ -414,9 +414,14 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
       }
     });
 
-    // Retrieve backend API URL from Expo constants, default to your machine's IP if not found
-    const backendBaseUrl = Constants.expoConfig?.extra?.backendApiUrl || 'http://192.168.254.107:8080'; // Using your provided IP
-    const apiUrl = `${backendBaseUrl}/api/users/profile`;
+    // Retrieve backend API URL from Expo constants correctly
+    const backendBaseUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL;
+    if (!backendBaseUrl) {
+      Alert.alert('Configuration Error', 'Backend API URL is not configured.');
+      setIsSaving(false);
+      return;
+    }
+    const apiUrl = `${backendBaseUrl}/api/v1/public/users/profile`;
 
     console.log(`[EditProfileScreen] Attempting to update profile via API: ${apiUrl}`);
     console.log(`[EditProfileScreen] Payload:`, JSON.stringify(updatesPayload));

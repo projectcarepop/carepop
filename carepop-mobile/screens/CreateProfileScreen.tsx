@@ -10,6 +10,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack'; // A
 import { RootStackParamList } from '../src/navigation/AppNavigator'; // Corrected path
 import { z } from 'zod'; // Import Zod
 import { Ionicons } from '@expo/vector-icons'; // Added Ionicons
+import Constants from 'expo-constants'; // Added Constants
 
 // Import local JSON data with explicit typing
 import provinceJson from '../src/data/province.json';
@@ -335,16 +336,15 @@ export const CreateProfileScreen: React.FC = () => {
       }, {});
 
 
-      // TODO: Replace with actual API call structure from your project
-      // Assuming Constants.expoConfig.extra.backendApiUrl is set up
-      const backendApiUrl = process.env.EXPO_PUBLIC_BACKEND_API_URL; // Example using Expo env var
+      // Correctly get the backend API URL using the Constants module
+      const backendApiUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL;
       if (!backendApiUrl) {
           Alert.alert("Configuration Error", "Backend API URL is not configured.");
           setIsLoading(false);
           return;
       }
       
-      const response = await fetch(`${backendApiUrl}/api/users/profile`, {
+      const response = await fetch(`${backendApiUrl}/api/v1/public/users/profile`, {
           method: 'PATCH',
           headers: {
               'Content-Type': 'application/json',
