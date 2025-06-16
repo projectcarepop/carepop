@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast"; // Corrected import path
-import { cancelAppointmentAction } from "@/lib/actions/appointments";
+import { cancelAppointment } from "@/lib/actions/appointments";
 import { useRouter } from 'next/navigation'; // For re-fetching data or redirecting
 
 interface CancelAppointmentModalProps {
@@ -48,7 +48,7 @@ export default function CancelAppointmentModal({
     }
 
     startTransition(async () => {
-      const result = await cancelAppointmentAction(appointmentId, reason);
+      const result = await cancelAppointment(appointmentId);
       if (result.success) {
         toast({
           title: "Appointment Cancelled",
