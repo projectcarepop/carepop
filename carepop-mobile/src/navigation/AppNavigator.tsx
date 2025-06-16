@@ -105,8 +105,9 @@ export type HealthBuddyStackParamList = {
   PillTrackerScreen: undefined;
   MensTrackerScreen: undefined;
   LogBloodPressureScreen: undefined;
-  // Add other health-buddy related screens here, e.g., AddMedicationScreen
   AddMedicationScreen: undefined; 
+  LogPeriodScreen: undefined;
+  LogSymptomsScreen: undefined;
 };
 
 

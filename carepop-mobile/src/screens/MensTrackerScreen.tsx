@@ -1,101 +1,163 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, Alert, TouchableOpacity } from 'react-native';
-import { theme } from '../components';
-import { Card, Button } from '../components'; // Import Card and Button
+import React, { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, ActivityIndicator } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Calendar, CalendarProps } from 'react-native-calendars';
 import { Ionicons } from '@expo/vector-icons';
+import { theme, Button } from '../components';
+import { getCyclesApi, getSymptomsApi } from '../data/api/menstrual';
+import { Cycle, SymptomLog } from '../types/menstrual';
+import { HealthBuddyStackParamList } from '../navigation/AppNavigator';
 
-// Placeholder screen for Menstrual Cycle Tracking
-export function MensTrackerScreen({ navigation }: any) {
-  // TODO: Add state for cycle data, predictions, symptoms etc.
-  const [lastPeriodStart, setLastPeriodStart] = useState('2024-09-10'); // Example state
-  const [cycleLength, setCycleLength] = useState(28); // Example state
+type MensTrackerNavigationProp = NativeStackNavigationProp<HealthBuddyStackParamList, 'MensTrackerScreen'>;
 
-  const handleLogPeriod = () => {
-    // TODO: Implement logic to log period start/end date
-    navigation.navigate('LogPeriod'); // Navigate to LogPeriodScreen
-  };
+// --- Helper Functions ---
+const getDaysBetween = (startDate: string, endDate: string) => {
+    const dates = [];
+    let currentDate = new Date(startDate);
+    const end = new Date(endDate);
+    while (currentDate <= end) {
+        dates.push(new Date(currentDate).toISOString().split('T')[0]);
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+    return dates;
+};
 
-  const handleLogSymptoms = () => {
-    // TODO: Implement logic to log symptoms for a specific day
-    navigation.navigate('LogSymptoms'); // Navigate to LogSymptomsScreen
-  };
+export function MensTrackerScreen() {
+    const navigation = useNavigation<MensTrackerNavigationProp>();
+    const [cycles, setCycles] = useState<Cycle[]>([]);
+    const [symptoms, setSymptoms] = useState<SymptomLog[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [markedDates, setMarkedDates] = useState<CalendarProps['markedDates']>({});
 
-  const calculatePrediction = () => {
-    // Basic placeholder prediction logic
-    if (lastPeriodStart && cycleLength) {
-        const startDate = new Date(lastPeriodStart);
-        startDate.setDate(startDate.getDate() + cycleLength);
-        return startDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-    } 
-    return 'N/A';
-  };
+    useFocusEffect(
+        React.useCallback(() => {
+            const fetchData = async () => {
+                setIsLoading(true);
+                try {
+                    const [fetchedCycles, fetchedSymptoms] = await Promise.all([
+                        getCyclesApi(),
+                        getSymptomsApi('2024-01-01', new Date().toISOString().split('T')[0])
+                    ]);
+                    setCycles(fetchedCycles);
+                    setSymptoms(fetchedSymptoms);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+            fetchData();
+        }, [])
+    );
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container}>
-        <Card style={styles.card}>
-          <Text style={styles.sectionTitle}>Current Cycle</Text>
-          <Text style={styles.infoText}>Last Period Started: {lastPeriodStart || 'Not logged'}</Text>
-          <Text style={styles.infoText}>Average Cycle Length: {cycleLength || 'N/A'} days</Text>
-          <Text style={styles.predictionText}>Predicted Next Period: {calculatePrediction()}</Text>
-          {/* TODO: Add more detailed cycle view (e.g., current day, fertile window) */}
-        </Card>
+    useMemo(() => {
+        const markings: CalendarProps['markedDates'] = {};
+        cycles.forEach(cycle => {
+            const periodDays = getDaysBetween(cycle.start_date, cycle.end_date || cycle.start_date);
+            periodDays.forEach((day, index) => {
+                markings[day] = {
+                    ...markings[day],
+                    startingDay: index === 0,
+                    endingDay: index === periodDays.length - 1,
+                    color: theme.colors.primary,
+                    textColor: theme.colors.background,
+                };
+            });
+        });
+        symptoms.forEach(log => {
+            markings[log.log_date] = { 
+                ...markings[log.log_date], 
+                marked: true, 
+                dotColor: theme.colors.secondary 
+            };
+        });
+        setMarkedDates(markings);
+    }, [cycles, symptoms]);
+    
+    const currentCycle = cycles.find(c => c.end_date === null);
+    const cycleDay = currentCycle ? getDaysBetween(currentCycle.start_date, new Date().toISOString().split('T')[0]).length : 0;
 
-        <Card style={styles.card}>
-           <Text style={styles.sectionTitle}>Log Information</Text>
-           <Button title="Log Period Start/End" onPress={handleLogPeriod} style={styles.actionButton} />
-           <Button title="Log Symptoms / Notes" onPress={handleLogSymptoms} style={styles.actionButton} />
-        </Card>
-        
-        <Button 
-            title="View Calendar" 
-            onPress={() => { /* Navigate to calendar view */ }}
-            variant="secondary"
-            styleType="outline"
-            style={styles.calendarButton}
-        />
+    if (isLoading) {
+        return <SafeAreaView style={styles.safeArea}><ActivityIndicator size="large" color={theme.colors.primary} /></SafeAreaView>;
+    }
 
-      </ScrollView>
-    </SafeAreaView>
-  );
+    return (
+        <SafeAreaView style={styles.safeArea}>
+            <ScrollView contentContainerStyle={styles.container}>
+                <Text style={styles.screenTitle}>Menstrual Tracker</Text>
+                
+                <Calendar
+                    markingType={'period'}
+                    markedDates={markedDates}
+                    theme={{
+                        calendarBackground: theme.colors.background,
+                        textSectionTitleColor: theme.colors.textMuted,
+                        dayTextColor: theme.colors.text,
+                        todayTextColor: theme.colors.primary,
+                        selectedDayBackgroundColor: theme.colors.primary,
+                        selectedDayTextColor: theme.colors.background,
+                        arrowColor: theme.colors.primary,
+                        monthTextColor: theme.colors.secondary,
+                        textMonthFontWeight: 'bold',
+                    }}
+                />
+
+                <View style={styles.infoCard}>
+                    <Ionicons name="water-outline" size={32} color={theme.colors.primary} />
+                    <View style={styles.infoTextContainer}>
+                         {currentCycle ? (
+                            <>
+                                <Text style={styles.infoTitle}>Day {cycleDay} of your cycle</Text>
+                                <Text style={styles.infoSubtitle}>Period started on {new Date(currentCycle.start_date).toLocaleDateString()}</Text>
+                            </>
+                         ) : (
+                             <Text style={styles.infoTitle}>No active cycle</Text>
+                         )}
+                    </View>
+                </View>
+
+                <View style={styles.actionsContainer}>
+                    <Button
+                        title="Log Period"
+                        onPress={() => navigation.navigate('LogPeriodScreen')}
+                        variant="primary"
+                        styleType="solid"
+                        style={styles.actionButton}
+                    />
+                    <Button
+                        title="Log Symptoms"
+                        onPress={() => navigation.navigate('LogSymptomsScreen')}
+                        variant="secondary"
+                        styleType="outline"
+                        style={styles.actionButton}
+                    />
+                </View>
+            </ScrollView>
+        </SafeAreaView>
+    );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  container: {
-    flex: 1,
-    paddingTop: theme.spacing.md, // Add padding top if needed
-  },
-  card: {
-    marginHorizontal: theme.spacing.md,
-    marginBottom: theme.spacing.lg,
-    padding: theme.spacing.md,
-  },
-  sectionTitle: {
-    fontSize: theme.typography.subheading,
-    fontWeight: 'bold',
-    color: theme.colors.text,
-    marginBottom: theme.spacing.md,
-  },
-  infoText: {
-    fontSize: theme.typography.body,
-    color: theme.colors.textMuted,
-    marginBottom: theme.spacing.sm,
-  },
-  predictionText: {
-    fontSize: theme.typography.body,
-    fontWeight: 'bold',
-    color: theme.colors.primary, // Highlight prediction
-    marginTop: theme.spacing.sm,
-  },
-  actionButton: {
-      marginBottom: theme.spacing.md, // Space between log buttons
-  },
-  calendarButton: {
-      marginHorizontal: theme.spacing.md,
-      marginBottom: theme.spacing.lg,
-  }
+    safeArea: { flex: 1, backgroundColor: theme.colors.background },
+    container: { padding: 20 },
+    screenTitle: { fontSize: 24, fontWeight: 'bold', color: theme.colors.text, marginBottom: 20, textAlign: 'center' },
+    infoCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: theme.colors.primaryMuted,
+        borderRadius: theme.borderRadius.md,
+        padding: 15,
+        marginTop: 20,
+    },
+    infoTextContainer: { marginLeft: 15 },
+    infoTitle: { fontSize: 18, fontWeight: '600', color: theme.colors.primaryDark },
+    infoSubtitle: { fontSize: 14, color: theme.colors.primaryDark, marginTop: 2 },
+    actionsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        marginTop: 20,
+    },
+    actionButton: {
+        flex: 1,
+        marginHorizontal: 10,
+    }
 }); 

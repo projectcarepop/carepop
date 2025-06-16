@@ -6,9 +6,10 @@ import appointmentRoutes from './appointment.routes';
 import userRoutes from './user.routes';
 import healthBuddyRoutes from './health-buddy.routes';
 import medicationRoutes from './medication.routes';
+import menstrualRoutes from './menstrual.routes';
 import navigationRoutes from './navigation.public.routes';
 import medicalRecordRoutes from './medicalRecord.public.routes';
-import { healthRoutes } from './health.routes';
+import healthRoutes from './health.routes';
 
 const router = Router();
 
@@ -19,8 +20,9 @@ router.use('/appointments', appointmentRoutes);
 router.use('/users', userRoutes);
 router.use('/health-buddy', healthBuddyRoutes);
 router.use('/medications', medicationRoutes);
+router.use('/menstrual', menstrualRoutes);
 router.use('/navigation', navigationRoutes);
 router.use('/medical-records', medicalRecordRoutes);
 router.use('/health-entries', healthRoutes);
 
-export { router as publicRoutes }; 
+export default router; 

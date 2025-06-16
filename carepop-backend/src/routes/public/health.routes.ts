@@ -13,4 +13,4 @@ router.post('/', healthController.createEntry);
 // GET /api/v1/public/health-entries?type=MOOD
 router.get('/', healthController.getEntries);
 
-export const healthRoutes = router; 
+export default router; 

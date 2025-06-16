@@ -7,12 +7,9 @@ import helmet from 'helmet';
 import { errorHandler } from './lib/middleware/error.middleware';
 import { getConfig } from './config/config';
 
-// Publicly accessible routes
-import authRoutes from './routes/public/auth.routes';
+// Import route handlers
 import publicRoutes from './routes/public';
-
-// Consolidated Admin Routes
-import adminRoutes from './routes/admin';
+import { adminRoutes } from './routes/admin';
 
 // Global Error Handler
 import { AppError } from './lib/utils/appError';
@@ -65,9 +62,8 @@ async function startServer() {
     logger.info('Supabase clients initialized successfully by server.');
 
     // --- Mount Routers ---
-    app.use('/api/v1/public/auth', authRoutes); // Mount auth routes
-    app.use('/api/v1/public', publicRoutes); // All other public data routes
-    app.use('/api/v1/admin', adminRoutes); // All protected admin routes
+    app.use('/api/v1/public', publicRoutes); // Mount all public routes
+    app.use('/api/v1/admin', adminRoutes); // Mount all protected admin routes
     logger.info('API routes mounted.');
     
     // --- 404 Handler (for unhandled routes) ---

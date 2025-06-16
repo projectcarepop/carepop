@@ -1,92 +1,129 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, Alert, TouchableOpacity } from 'react-native';
-import { theme } from '../components';
-import { Card, Button, TextInput } from '../components'; // Assuming TextInput is used for dates initially
-import { MaterialIcons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { Button, Card } from '../components';
+import { theme } from '../components/theme';
+import { getCyclesApi, startNewCycleApi, endCycleApi } from '../data/api/menstrual';
+import { Cycle } from '../types/menstrual';
 
-export function LogPeriodScreen({ navigation }: any) {
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState(''); // Optional
+export function LogPeriodScreen() {
+    const navigation = useNavigation();
+    const [currentCycle, setCurrentCycle] = useState<Cycle | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isUpdating, setIsUpdating] = useState(false);
 
-  // TODO: Replace TextInput with a proper Date Picker component
+    useFocusEffect(
+        React.useCallback(() => {
+            const fetchCurrentCycle = async () => {
+                setIsLoading(true);
+                const cycles = await getCyclesApi();
+                const activeCycle = cycles.find(c => c.end_date === null) || null;
+                setCurrentCycle(activeCycle);
+                setIsLoading(false);
+            };
+            fetchCurrentCycle();
+        }, [])
+    );
 
-  const handleSave = () => {
-    if (!startDate) {
-        Alert.alert('Error', 'Please enter at least the start date.');
-        return;
-    }
-    // TODO: Add validation and API call
-    console.log('Saving Period Log:', { startDate, endDate });
-    Alert.alert('Success', 'Period Logged (Placeholder)');
-    navigation.goBack();
-  };
+    const handleStartPeriod = async () => {
+        setIsUpdating(true);
+        const today = new Date().toISOString().split('T')[0];
+        const newCycle = await startNewCycleApi(today);
+        if (newCycle) {
+            Alert.alert('Success', 'Your new period has been logged.');
+            navigation.goBack();
+        }
+        setIsUpdating(false);
+    };
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container}>
-        <Text style={styles.title}>Log Period Dates</Text>
+    const handleEndPeriod = async () => {
+        if (!currentCycle) return;
+        setIsUpdating(true);
+        const today = new Date().toISOString().split('T')[0];
+        const updatedCycle = await endCycleApi(currentCycle.id, today);
+        if (updatedCycle) {
+            Alert.alert('Success', 'Your period end date has been logged.');
+            navigation.goBack();
+        }
+        setIsUpdating(false);
+    };
 
-        <Card style={styles.card}>
-          <TextInput
-            label="Start Date"
-            value={startDate}
-            onChangeText={setStartDate}
-            placeholder="YYYY-MM-DD"
-            keyboardType="numeric" // Basic suggestion
-            style={styles.input}
-          />
-          <TextInput
-            label="End Date (Optional)"
-            value={endDate}
-            onChangeText={setEndDate}
-            placeholder="YYYY-MM-DD"
-            keyboardType="numeric"
-            style={styles.input}
-          />
-          <Text style={styles.infoText}>Use YYYY-MM-DD format for now. A date picker will be added later.</Text>
-        </Card>
+    const renderContent = () => {
+        if (isLoading) {
+            return <ActivityIndicator size="large" color={theme.colors.primary} />;
+        }
 
-        <Button 
-            title="Save Dates" 
-            onPress={handleSave} 
-            style={styles.saveButton}
-        />
-      </ScrollView>
-    </SafeAreaView>
-  );
+        if (currentCycle) {
+            return (
+                <Card style={styles.card}>
+                    <Text style={styles.cardTitle}>Your period is ongoing.</Text>
+                    <Text style={styles.cardSubtitle}>Started on {new Date(currentCycle.start_date).toLocaleDateString()}</Text>
+                    <Button
+                        title={isUpdating ? 'Saving...' : 'Log Period End Today'}
+                        onPress={handleEndPeriod}
+                        disabled={isUpdating}
+                        variant="primary"
+                        styleType="solid"
+                        style={styles.button}
+                    />
+                </Card>
+            );
+        }
+
+        return (
+            <Card style={styles.card}>
+                <Text style={styles.cardTitle}>Did your period start today?</Text>
+                <Text style={styles.cardSubtitle}>This will start a new cycle log.</Text>
+                <Button
+                    title={isUpdating ? 'Saving...' : 'Log Period Start Today'}
+                    onPress={handleStartPeriod}
+                    disabled={isUpdating}
+                    variant="primary"
+                    styleType="solid"
+                    style={styles.button}
+                />
+            </Card>
+        );
+    };
+
+    return (
+        <SafeAreaView style={styles.safeArea}>
+            <View style={styles.container}>
+                <Text style={styles.screenTitle}>Log Your Period</Text>
+                {renderContent()}
+            </View>
+        </SafeAreaView>
+    );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  container: {
-    flex: 1,
-    paddingVertical: theme.spacing.md,
-  },
-  title: {
-    fontSize: theme.typography.heading,
-    fontWeight: 'bold',
-    color: theme.colors.primary,
-    textAlign: 'center',
-    marginBottom: theme.spacing.lg,
-  },
-  card: {
-    marginHorizontal: theme.spacing.md,
-    marginBottom: theme.spacing.lg,
-    padding: theme.spacing.md,
-  },
-  input: {
-    marginBottom: theme.spacing.md,
-  },
-  infoText: {
-      fontSize: theme.typography.caption,
-      color: theme.colors.textMuted,
-      textAlign: 'center',
-      marginTop: theme.spacing.sm,
-  },
-  saveButton: {
-    marginHorizontal: theme.spacing.md,
-  }
+    safeArea: { flex: 1, backgroundColor: theme.colors.background },
+    container: { flex: 1, justifyContent: 'center', padding: 20 },
+    screenTitle: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: theme.colors.text,
+        textAlign: 'center',
+        marginBottom: 30,
+    },
+    card: {
+        padding: 20,
+        alignItems: 'center',
+    },
+    cardTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: theme.colors.text,
+        textAlign: 'center',
+    },
+    cardSubtitle: {
+        fontSize: 14,
+        color: theme.colors.textMuted,
+        textAlign: 'center',
+        marginTop: 5,
+        marginBottom: 20,
+    },
+    button: {
+        width: '100%',
+    }
 }); 

@@ -36,4 +36,4 @@ adminRouter.use('/reports', reportRoutes);
 adminRouter.use('/dashboard', dashboardRoutes);
 adminRouter.use('/medical-records', medicalRecordAdminRoutes);
 
-export default adminRouter; 
+export { adminRouter as adminRoutes }; 
