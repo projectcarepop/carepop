@@ -1,3 +1,5 @@
+DROP FUNCTION IF EXISTS public.search_providers(TEXT, UUID);
+
 CREATE OR REPLACE FUNCTION search_providers(
     search_term TEXT DEFAULT NULL,
     p_clinic_id UUID DEFAULT NULL
@@ -5,7 +7,6 @@ CREATE OR REPLACE FUNCTION search_providers(
 RETURNS TABLE (
     id UUID,
     user_id UUID,
-    license_number TEXT,
     specialty TEXT,
     is_active BOOLEAN,
     accepting_new_patients BOOLEAN,
@@ -23,7 +24,6 @@ BEGIN
     SELECT
         p.id,
         p.user_id,
-        p.license_number,
         p.specialty,
         p.is_active,
         p.accepting_new_patients,
@@ -43,9 +43,10 @@ BEGIN
         (
             search_term IS NULL OR
             search_term = '' OR
-            p.full_name ILIKE '%' || search_term || '%' OR
+            uv.full_name ILIKE '%' || search_term || '%' OR
             uv.first_name ILIKE '%' || search_term || '%' OR
-            uv.last_name ILIKE '%' || search_term || '%'
+            uv.last_name ILIKE '%' || search_term || '%' OR
+            p.specialty ILIKE '%' || search_term || '%'
         );
 END;
 $$ LANGUAGE plpgsql; 

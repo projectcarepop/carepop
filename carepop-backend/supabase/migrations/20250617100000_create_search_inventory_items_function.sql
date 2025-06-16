@@ -1,3 +1,7 @@
+-- Drop existing functions to avoid ambiguity
+DROP FUNCTION IF EXISTS public.search_inventory_items(TEXT, UUID, UUID, INT);
+DROP FUNCTION IF EXISTS public.search_inventory_items(TEXT, UUID, UUID, UUID, INT);
+
 -- Function to search inventory items with joins and filtering
 CREATE OR REPLACE FUNCTION search_inventory_items(
     search_term TEXT DEFAULT NULL,

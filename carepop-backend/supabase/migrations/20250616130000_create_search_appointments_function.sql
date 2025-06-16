@@ -1,5 +1,8 @@
 DROP FUNCTION IF EXISTS search_appointments(text,uuid);
 DROP FUNCTION IF EXISTS search_appointments(text,uuid,uuid,text,timestamptz,timestamptz);
+-- Drop a few other potential signatures to be safe
+DROP FUNCTION IF EXISTS public.search_appointments(search_term text, p_clinic_id uuid);
+DROP FUNCTION IF EXISTS public.search_appointments(search_term text, p_clinic_id uuid, p_provider_id uuid, p_status text, p_start_date timestamptz, p_end_date timestamptz);
 
 CREATE OR REPLACE FUNCTION search_appointments(
     search_term TEXT DEFAULT NULL,
@@ -51,7 +54,7 @@ BEGIN
         s.name AS service_name,
         s.cost AS service_cost,
         c.name AS clinic_name,
-        p.full_name AS provider_full_name
+        pv.full_name AS provider_full_name
     FROM
         public.appointments a
     LEFT JOIN
@@ -62,6 +65,8 @@ BEGIN
         public.clinics c ON a.clinic_id = c.id
     LEFT JOIN
         public.providers p ON a.provider_id = p.id
+    LEFT JOIN
+        public.users_view pv ON p.user_id = pv.id
     WHERE
         (p_clinic_id IS NULL OR a.clinic_id = p_clinic_id) AND
         (p_provider_id IS NULL OR a.provider_id = p_provider_id) AND
@@ -71,9 +76,11 @@ BEGIN
         (
             search_term IS NULL OR
             search_term = '' OR
-            uv.first_name ILIKE '%' || search_term || '%' OR
-            uv.last_name ILIKE '%' || search_term || '%' OR
-            uv.email ILIKE '%' || search_term || '%'
+            uv.full_name ILIKE '%' || search_term || '%' OR
+            uv.email ILIKE '%' || search_term || '%' OR
+            s.name ILIKE '%' || search_term || '%' OR
+            c.name ILIKE '%' || search_term || '%' OR
+            pv.full_name ILIKE '%' || search_term || '%'
         );
 END;
 $$ LANGUAGE plpgsql; 
