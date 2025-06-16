@@ -12,6 +12,8 @@ import { Clinic } from '@/lib/types/clinic';
 import { Service } from '@/lib/types/service';
 // AlertTriangle might be used by ClinicFinderClient if fetchError is passed and handled there
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Find a Clinic - CarePoP',
   description: 'Search for FPOP clinics and other healthcare providers near you. Filter by services and location to find the care you need.',

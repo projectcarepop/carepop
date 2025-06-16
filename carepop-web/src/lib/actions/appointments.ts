@@ -1,98 +1,77 @@
 "use server"; // Directive to mark all exports as Server Actions
 
 import { revalidatePath } from 'next/cache';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { AppError } from '@/lib/utils/errors';
-
-// Helper to get the auth token
-async function getAuthToken() {
-  const supabase = await createSupabaseServerClient();
-  const { data: { session }, error } = await supabase.auth.getSession();
-  if (error || !session) {
-    throw new AppError('Authentication required.', 401);
-  }
-  return session.access_token;
-}
+import { createClient } from '@/utils/supabase/server';
+import { UserAppointmentDetails } from "@/lib/types/appointmentTypes";
 
 // Fetch Future Appointments
 export async function getFutureAppointments() {
-  try {
-    const token = await getAuthToken();
-    const response = await fetch(`/api/v1/admin/appointments?time_frame=upcoming`, {
-      headers: { 'Authorization': `Bearer ${token}` },
-    });
-    if (!response.ok) throw new AppError('Failed to fetch upcoming appointments');
-    return { success: true, data: await response.json() };
-  } catch (error) {
-    console.error(error);
-    return { success: false, message: error instanceof AppError ? error.message : 'An unknown error occurred.' };
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, message: "Authentication required.", data: [] };
   }
+
+  const { data, error } = await supabase
+    .from('user_appointments_details')
+    .select('*')
+    .eq('user_id', user.id)
+    .gt('schedule', new Date().toISOString())
+    .order('schedule', { ascending: true });
+
+  if (error) {
+    console.error("Error fetching upcoming appointments:", error);
+    return { success: false, message: "Failed to load upcoming appointments.", data: [] };
+  }
+  
+  return { success: true, data: data as UserAppointmentDetails[] };
 }
 
 // Fetch Past Appointments
 export async function getPastAppointments() {
-  try {
-    const token = await getAuthToken();
-    const response = await fetch(`/api/v1/admin/appointments?time_frame=past`, {
-      headers: { 'Authorization': `Bearer ${token}` },
-    });
-    if (!response.ok) throw new AppError('Failed to fetch past appointments');
-    return { success: true, data: await response.json() };
-  } catch (error) {
-    console.error(error);
-    return { success: false, message: error instanceof AppError ? error.message : 'An unknown error occurred.' };
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, message: "Authentication required.", data: [] };
   }
+
+  const { data, error } = await supabase
+    .from('user_appointments_details')
+    .select('*')
+    .eq('user_id', user.id)
+    .lte('schedule', new Date().toISOString())
+    .order('schedule', { ascending: false });
+
+  if (error) {
+    console.error("Error fetching past appointments:", error);
+    return { success: false, message: "Failed to load past appointments.", data: [] };
+  }
+  
+  return { success: true, data: data as UserAppointmentDetails[] };
 }
 
 // Cancel an Appointment
 export async function cancelAppointment(appointmentId: string) {
-  try {
-    const token = await getAuthToken();
-    const response = await fetch(`/api/v1/admin/appointments/${appointmentId}`, {
-      method: 'PATCH',
-      headers: { 
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ status: 'Cancelled' }),
-    });
+  const supabase = createClient();
+   const { data: { user } } = await supabase.auth.getUser();
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new AppError(errorData.message || 'Failed to cancel appointment', response.status);
-    }
-    
-    revalidatePath('/dashboard/appointments');
-    return { success: true, message: 'Appointment cancelled successfully.' };
-  } catch (error) {
-    console.error(error);
-    return { success: false, message: error instanceof AppError ? error.message : 'An unknown error occurred.' };
+  if (!user) {
+    return { success: false, message: "Authentication required." };
   }
-}
 
-// Create a new Appointment (Booking)
-export async function createAppointment(payload: Record<string, unknown>) {
-  try {
-    const token = await getAuthToken();
-    const response = await fetch(`/api/v1/admin/appointments`, {
-      method: 'POST',
-      headers: { 
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new AppError(errorData.message || 'Failed to create appointment', response.status);
-    }
-
-    revalidatePath('/dashboard/appointments');
-    const data = await response.json();
-    return { success: true, data };
-  } catch (error) {
-    console.error(error);
-    return { success: false, message: error instanceof AppError ? error.message : 'An unknown error occurred.' };
+  const { error } = await supabase
+    .from('appointments')
+    .update({ status: 'Cancelled' })
+    .eq('id', appointmentId)
+    .eq('user_id', user.id);
+  
+  if (error) {
+    console.error('Error cancelling appointment:', error);
+    return { success: false, message: 'Failed to cancel appointment.' };
   }
+  
+  revalidatePath('/dashboard/appointments');
+  return { success: true, message: 'Appointment cancelled successfully.' };
 } 

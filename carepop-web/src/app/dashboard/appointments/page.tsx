@@ -2,32 +2,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   getFutureAppointments,
   getPastAppointments,
-  UserAppointmentDetails
 } from "@/lib/actions/appointments";
 import AppointmentCard from "@/components/appointments/AppointmentCard";
 
 // TODO: Create AppointmentCard component
 // import AppointmentCard from "@/components/appointments/AppointmentCard";
 
+export const dynamic = 'force-dynamic';
+
 export default async function MyAppointmentsPage() {
-  let upcomingAppointments: UserAppointmentDetails[] = [];
-  let pastAppointments: UserAppointmentDetails[] = [];
-  let upcomingError: string | null = null;
-  let pastError: string | null = null;
+  const futureAppointmentsResult = await getFutureAppointments();
+  const pastAppointmentsResult = await getPastAppointments();
 
-  try {
-    upcomingAppointments = await getFutureAppointments();
-  } catch (error) {
-    console.error("Error fetching upcoming appointments:", error);
-    upcomingError = error instanceof Error ? error.message : "Failed to load upcoming appointments.";
-  }
+  const upcomingAppointments = futureAppointmentsResult.success ? futureAppointmentsResult.data : [];
+  const pastAppointments = pastAppointmentsResult.success ? pastAppointmentsResult.data : [];
 
-  try {
-    pastAppointments = await getPastAppointments();
-  } catch (error) {
-    console.error("Error fetching past appointments:", error);
-    pastError = error instanceof Error ? error.message : "Failed to load past appointments.";
-  }
+  const upcomingError = futureAppointmentsResult.success ? null : futureAppointmentsResult.message;
+  const pastError = pastAppointmentsResult.success ? null : pastAppointmentsResult.message;
 
   return (
     <div className="container mx-auto py-10">
