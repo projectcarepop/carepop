@@ -62,50 +62,22 @@ export class AppointmentAdminService {
     if (startDate) rpcParams.p_start_date = startDate;
     if (endDate) rpcParams.p_end_date = endDate;
 
-    // First, get the total count without pagination for metadata
-    const { count, error: countError } = await supabase
-        .rpc('search_appointments', rpcParams, { count: 'exact' });
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
 
-    if (countError) this.handleError(countError, 'findAll (count)');
+    // The RPC function now returns total_count, so we make one call.
+    const { data, error: queryError } = await supabase
+      .rpc('search_appointments', rpcParams)
+      .range(from, to)
+      .order(sortBy, { ascending: sortOrder === 'desc' ? false : true });
 
-    const totalItems = count ?? 0;
-    const totalPages = Math.ceil(totalItems / limit);
-    const offset = (page - 1) * limit;
+    if (queryError) this.handleError(queryError, 'findAll (query)');
 
-    // Then, fetch the paginated and joined data
-    const { data: rpcData, error } = await supabase
-        .rpc('search_appointments', rpcParams)
-        .order(sortBy, { ascending: sortOrder === 'asc' })
-        .range(offset, offset + limit - 1);
-        
-    if (error) this.handleError(error, 'findAll (data)');
-
-    const data = rpcData as AppointmentRpcResponse[] | null;
-
-    const formattedData = data?.map(a => ({
-      id: a.id,
-      appointment_datetime: a.appointment_datetime,
-      status: a.status,
-      user: {
-        first_name: a.user_first_name,
-        last_name: a.user_last_name,
-        email: a.user_email
-      },
-      service: {
-        name: a.service_name,
-        cost: a.service_cost
-      },
-      clinic: {
-        name: a.clinic_name
-      },
-      provider: {
-        full_name: a.provider_full_name
-      }
-    })) || [];
+    const count = data?.[0]?.total_count ?? 0;
     
     return {
-      data: formattedData,
-      meta: { totalItems, itemsPerPage: limit, currentPage: page, totalPages },
+      data,
+      count
     };
   }
 

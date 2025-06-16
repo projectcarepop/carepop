@@ -31,7 +31,8 @@ RETURNS TABLE (
     service_name TEXT,
     service_cost NUMERIC,
     clinic_name TEXT,
-    provider_full_name TEXT
+    provider_full_name TEXT,
+    total_count BIGINT
 ) AS $$
 BEGIN
     RETURN QUERY
@@ -54,7 +55,8 @@ BEGIN
         s.name AS service_name,
         s.cost AS service_cost,
         c.name AS clinic_name,
-        pv.full_name AS provider_full_name
+        (pv.first_name || ' ' || pv.last_name) AS provider_full_name,
+        COUNT(*) OVER() as total_count
     FROM
         public.appointments a
     LEFT JOIN
@@ -76,11 +78,11 @@ BEGIN
         (
             search_term IS NULL OR
             search_term = '' OR
-            uv.full_name ILIKE '%' || search_term || '%' OR
+            (uv.first_name || ' ' || uv.last_name) ILIKE '%' || search_term || '%' OR
             uv.email ILIKE '%' || search_term || '%' OR
             s.name ILIKE '%' || search_term || '%' OR
             c.name ILIKE '%' || search_term || '%' OR
-            pv.full_name ILIKE '%' || search_term || '%'
+            (pv.first_name || ' ' || pv.last_name) ILIKE '%' || search_term || '%'
         );
 END;
 $$ LANGUAGE plpgsql; 

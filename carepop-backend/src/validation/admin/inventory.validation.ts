@@ -25,9 +25,8 @@ export const listInventoryQuerySchema = z.object({
   page: z.preprocess((val) => Number(val), z.number().int().min(1)).optional().default(1),
   limit: z.preprocess((val) => Number(val), z.number().int().min(1)).optional().default(10),
   search: z.string().optional(),
-  clinic_id: z.string().uuid().optional(),
   supplier_id: z.string().uuid().optional(),
   stock_level_threshold: z.preprocess((val) => Number(val), z.number().int().min(0)).optional(),
-  sortBy: z.string().optional().default('created_at'),
+  sortBy: z.string().optional().default('item_name'),
   sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
 }); 

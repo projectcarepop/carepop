@@ -50,15 +50,15 @@ export class InventoryAdminService {
   }
   
   async findAll(options: {
-    page?: number; limit?: number; search?: string; clinic_id?: string;
-    supplier_id?: string; stock_level_threshold?: number;
+    page?: number; limit?: number; search?: string; 
+    supplier_id?: string; 
+    stock_level_threshold?: number; 
     sortBy?: string; sortOrder?: 'asc' | 'desc';
   }) {
-    const { page = 1, limit = 10, search, clinic_id, supplier_id, stock_level_threshold, sortBy = 'name', sortOrder = 'asc' } = options;
+    const { page = 1, limit = 10, search, supplier_id, stock_level_threshold, sortBy = 'item_name', sortOrder = 'asc' } = options;
     
     // Dynamically build the RPC parameters to avoid ambiguity
     const rpcParams: { [key: string]: any } = { search_term: search };
-    if (clinic_id) rpcParams.p_clinic_id = clinic_id;
     if (supplier_id) rpcParams.p_supplier_id = supplier_id;
     if (stock_level_threshold !== undefined) rpcParams.p_stock_level_threshold = stock_level_threshold;
 

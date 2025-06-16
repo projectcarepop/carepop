@@ -39,27 +39,22 @@ export class ProviderAdminService {
       p_clinic_id: clinicId 
     };
 
-    // Get the total count for pagination metadata
-    const { count, error: countError } = await supabase
-        .rpc('search_providers', rpcParams, { count: 'exact' });
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
 
-    if (countError) this.handleError(countError, 'findAll (count)');
-
-    const totalItems = count ?? 0;
-    const totalPages = Math.ceil(totalItems / limit);
-    const offset = (page - 1) * limit;
-
-    // Fetch the paginated data using the RPC
-    const { data, error } = await supabase
+    // The RPC function now returns total_count, so we make one call.
+    const { data, error: queryError } = await supabase
       .rpc('search_providers', rpcParams)
-      .order(sortBy, { ascending: sortOrder === 'asc' })
-      .range(offset, offset + limit - 1);
+      .range(from, to)
+      .order(sortBy, { ascending: sortOrder === 'desc' ? false : true });
 
-    if (error) this.handleError(error, 'findAll');
+    if (queryError) this.handleError(queryError, 'findAll (query)');
+    
+    const count = data?.[0]?.total_count ?? 0;
     
     return {
-      data: data || [],
-      meta: { totalItems, itemsPerPage: limit, currentPage: page, totalPages },
+      data,
+      count
     };
   }
 
