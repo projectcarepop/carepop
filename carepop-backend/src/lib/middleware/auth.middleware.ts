@@ -26,17 +26,35 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
             return res.status(401).json({ message: 'Unauthorized: Invalid or expired token.' });
         }
 
-        // Token is valid. Now, fetch the user's profile and roles using our DB function.
-        // This is more efficient than making multiple separate queries.
-        const { data: fullUser, error: dbError } = await supabase
-            .rpc('get_user_data', { user_id_param: user.id })
+        // Step 1: Fetch the user's profile data from the 'profiles' table.
+        const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
             .single();
-        
-        if (dbError || !fullUser) {
-             return res.status(404).json({ message: 'User profile not found.' });
+
+        if (profileError || !profile) {
+            console.error('Profile fetch error:', profileError);
+            return res.status(404).json({ message: 'User profile not found.' });
         }
 
-        req.user = fullUser;
+        // Step 2: Fetch the user's roles from the 'user_roles' table.
+        const { data: roles, error: rolesError } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user.id);
+
+        if (rolesError) {
+            console.error('Roles fetch error:', rolesError);
+            return res.status(500).json({ message: 'Failed to fetch user roles.' });
+        }
+
+        // Step 3: Combine profile and roles into a single user object for the request.
+        req.user = {
+            ...profile,
+            roles: roles ? roles.map(r => r.role) : [],
+        };
+        
         next();
     } catch (error: any) {
         return res.status(401).json({ message: 'Unauthorized: An error occurred while processing the token.' });
