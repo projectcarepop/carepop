@@ -14,14 +14,19 @@ import {
 
 const router = Router();
 
-router.get('/me', getMyProfile);
-
+// List all users
 router.route('/')
   .get(validateRequest({ query: listUsersQuerySchema }), getUsers);
 
+// Get the current authenticated user's profile
+// This MUST be before the /:id route to avoid 'me' being treated as an ID
+router.get('/me', getMyProfile);
+
+// Get a specific user by ID
 router.route('/:id')
   .get(validateRequest({ params: userIdParamSchema }), getUserById);
   
+// Update a specific user's roles
 router.route('/:id/roles')
     .put(validateRequest({ params: userIdParamSchema, body: updateUserRolesSchema }), updateUserRoles);
 
