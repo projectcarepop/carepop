@@ -3,20 +3,21 @@
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogClose,
-} from "@/components/ui/dialog";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast"; // Corrected import path
+import { useToast } from "@/hooks/use-toast";
 import { cancelAppointment } from "@/lib/actions/appointments";
-import { useRouter } from 'next/navigation'; // For re-fetching data or redirecting
+import { useRouter } from 'next/navigation';
 
 interface CancelAppointmentModalProps {
   appointmentId: string;
@@ -73,23 +74,23 @@ export default function CancelAppointmentModal({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Cancel Appointment</DialogTitle>
-          <DialogDescription>
+    <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
+      <AlertDialogTrigger asChild>{children}</AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Cancel Appointment</AlertDialogTitle>
+          <AlertDialogDescription>
             Are you sure you want to cancel your appointment for &quot;{appointmentName}&quot;? 
-            Please provide a reason below.
-          </DialogDescription>
-        </DialogHeader>
+            This action cannot be undone. Please provide a reason below.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="cancellationReason" className="text-right">
+            <Label htmlFor="cancellationReason-modal" className="text-right">
               Reason
             </Label>
             <Input
-              id="cancellationReason"
+              id="cancellationReason-modal"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               className="col-span-3"
@@ -98,15 +99,13 @@ export default function CancelAppointmentModal({
             />
           </div>
         </div>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline" disabled={isPending}>Keep Appointment</Button>
-          </DialogClose>
-          <Button type="submit" onClick={handleSubmit} disabled={isPending || !reason.trim()}>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isPending}>Keep Appointment</AlertDialogCancel>
+          <AlertDialogAction onClick={handleSubmit} disabled={isPending || !reason.trim()}>
             {isPending ? "Cancelling..." : "Confirm Cancellation"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 } 
