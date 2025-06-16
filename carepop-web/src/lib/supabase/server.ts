@@ -8,11 +8,13 @@ export const createSupabaseServerClient = () => {
     {
       cookies: {
         get: async (name: string) => {
-          return (await cookies().get(name)?.value) || null;
+          const cookieStore = await cookies()
+          return cookieStore.get(name)?.value
         },
         set: async (name: string, value: string, options: CookieOptions) => {
           try {
-            await cookies().set(name, value, options);
+            const cookieStore = await cookies()
+            cookieStore.set(name, value, options)
           } catch {
             // The `set` method was called from a Server Component.
             // This can be ignored if you have middleware refreshing
@@ -21,7 +23,8 @@ export const createSupabaseServerClient = () => {
         },
         remove: async (name: string, options: CookieOptions) => {
           try {
-            await cookies().set(name, '', options);
+            const cookieStore = await cookies()
+            cookieStore.set(name, '', options)
           } catch {
             // The `delete` method was called from a Server Component.
             // This can be ignored if you have middleware refreshing

@@ -1,10 +1,10 @@
 -- Function to search inventory items with joins and filtering
 CREATE OR REPLACE FUNCTION search_inventory_items(
-    search_term TEXT,
-    p_clinic_id UUID,
-    p_category_id UUID,
-    p_supplier_id UUID,
-    p_stock_level_threshold INT
+    search_term TEXT DEFAULT NULL,
+    p_clinic_id UUID DEFAULT NULL,
+    p_category_id UUID DEFAULT NULL,
+    p_supplier_id UUID DEFAULT NULL,
+    p_stock_level_threshold INT DEFAULT NULL
 )
 RETURNS TABLE (
     id UUID,

@@ -12,7 +12,8 @@ interface Clinic {
   id: string;
   name: string;
   address: string;
-  // Add other relevant fields, e.g., city, operating_hours
+  city: string; // Assuming city and province are available
+  province: string;
 }
 
 type ClinicSelectionNavigationProp = NavigationProp<AppointmentStackParamList, 'ClinicSelection'>;
@@ -51,7 +52,6 @@ export const ClinicSelectionScreen = () => {
         throw new Error(data.message || 'Failed to fetch clinics.');
       }
       
-      // Corrected to match the backend response { data: [...] }
       setClinics(data.data || []);
     } catch (e: any) {
       setError(e.message || 'An unexpected error occurred.');
@@ -72,55 +72,55 @@ export const ClinicSelectionScreen = () => {
   };
 
   const renderClinicItem = ({ item }: { item: Clinic }) => (
-    <TouchableOpacity onPress={() => handleSelectClinic(item)} style={styles.clinicButton}>
-        <View style={styles.clinicIconContainer}>
-            <Ionicons name="business-outline" size={32} color={theme.colors.primary} />
-        </View>
-        <View style={styles.clinicTextContainer}>
-            <Text style={styles.clinicName}>{item.name}</Text>
-            <Text style={styles.clinicAddress} numberOfLines={2}>{item.address}</Text>
-        </View>
-        <Ionicons name="chevron-forward-outline" size={24} color={theme.colors.textMuted} />
+    <TouchableOpacity onPress={() => handleSelectClinic(item)} style={styles.clinicCard}>
+      <View style={styles.cardIconContainer}>
+        <Ionicons name="business-outline" size={32} color={theme.colors.primary} />
+      </View>
+      <View style={styles.cardTextContainer}>
+        <Text style={styles.cardTitle}>{item.name}</Text>
+        <Text style={styles.cardSubtitle} numberOfLines={2}>{item.address}</Text>
+        <Text style={styles.cardLocation}>{`${item.city}, ${item.province}`}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={24} color={theme.colors.textMuted} />
     </TouchableOpacity>
   );
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.centeredContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.loadingText}>Loading Clinics...</Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.centeredContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={styles.loadingText}>Loading Clinics...</Text>
+      </View>
     );
   }
 
   if (error) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.centeredContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.centeredContainer}>
+        <Ionicons name="alert-circle-outline" size={48} color={theme.colors.destructive} />
+        <Text style={styles.errorTextTitle}>Something went wrong</Text>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
     );
   }
 
   return (
     <SafeAreaView style={styles.safeArea}>
-        <FlatList
-          data={clinics}
-          renderItem={renderClinicItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContainer}
-          ListHeaderComponent={
-            <Text style={styles.title}>Select a Clinic</Text>
-          }
-          ListEmptyComponent={
-            <View style={styles.centeredContainer}>
-                <Text style={styles.placeholderText}>No clinics are available at this time.</Text>
-            </View>
-          }
-        />
+      <FlatList
+        data={clinics}
+        renderItem={renderClinicItem}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContainer}
+        ListHeaderComponent={
+          <Text style={styles.screenTitle}>Find a Clinic</Text>
+        }
+        ListEmptyComponent={
+          <View style={styles.centeredContainer}>
+            <Ionicons name="search-outline" size={48} color={theme.colors.textMuted} />
+            <Text style={styles.placeholderText}>No clinics are available at this time.</Text>
+          </View>
+        }
+      />
     </SafeAreaView>
   );
 };
@@ -131,63 +131,80 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   listContainer: {
-    padding: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.sm, // Less padding at top since title is here
+    paddingBottom: theme.spacing.xl,
   },
   centeredContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: theme.spacing.md,
+    padding: theme.spacing.xl,
+    marginTop: 50, // To push it down a bit
   },
-  title: {
-    fontSize: 28,
+  screenTitle: {
+    fontSize: theme.typography.heading,
     fontWeight: 'bold',
     color: theme.colors.text,
     marginBottom: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.xs, // Align with dashboard's welcome text
   },
   placeholderText: {
     fontSize: theme.typography.body,
     color: theme.colors.textMuted,
     textAlign: 'center',
-    marginTop: 50,
+    marginTop: theme.spacing.md,
   },
   loadingText: {
     marginTop: theme.spacing.md,
     fontSize: 16,
     color: theme.colors.textMuted,
   },
+  errorTextTitle: {
+    fontSize: theme.typography.subheading,
+    fontWeight: '600',
+    color: theme.colors.text,
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+  },
   errorText: {
     fontSize: 16,
-    color: theme.colors.destructive,
+    color: theme.colors.textMuted,
     textAlign: 'center',
   },
-  clinicButton: {
+  clinicCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.card,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.borderRadius.lg, // Consistent with dashboard cards
     padding: theme.spacing.md,
     marginBottom: theme.spacing.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  clinicIconContainer: {
+  cardIconContainer: {
     marginRight: theme.spacing.md,
-    padding: theme.spacing.sm,
     backgroundColor: theme.colors.primaryMuted,
-    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.full, // Circular background for icon
   },
-  clinicTextContainer: {
+  cardTextContainer: {
     flex: 1,
   },
-  clinicName: {
-    fontSize: 18,
+  cardTitle: {
+    fontSize: theme.typography.body,
     fontWeight: '600',
     color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
   },
-  clinicAddress: {
-    fontSize: 14,
+  cardSubtitle: {
+    fontSize: theme.typography.caption,
     color: theme.colors.textMuted,
-    marginTop: 4,
+    marginBottom: theme.spacing.xs,
+  },
+  cardLocation: {
+    fontSize: theme.typography.caption,
+    fontWeight: '500',
+    color: theme.colors.secondary, // Use an accent color for location
   },
 }); 

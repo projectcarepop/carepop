@@ -1,7 +1,7 @@
 -- Function to search suppliers with filtering
 CREATE OR REPLACE FUNCTION search_suppliers(
-    search_term TEXT,
-    p_clinic_id UUID
+    search_term TEXT DEFAULT NULL,
+    p_clinic_id UUID DEFAULT NULL
 )
 RETURNS SETOF public.suppliers AS $$
 BEGIN

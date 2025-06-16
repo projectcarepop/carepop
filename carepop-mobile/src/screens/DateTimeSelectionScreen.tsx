@@ -9,10 +9,10 @@ import { Calendar, DateData } from 'react-native-calendars';
 type DateTimeSelectionRouteProp = RouteProp<AppointmentStackParamList, 'DateTimeSelection'>;
 type DateTimeSelectionNavigationProp = NavigationProp<AppointmentStackParamList, 'DateTimeSelection'>;
 
-// Mock time slots
+// Mock time slots for demonstration
 const timeSlots = [
-    '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', 
-    '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM', '03:00 PM'
+    '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
+    '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM'
 ];
 
 export const DateTimeSelectionScreen = () => {
@@ -27,7 +27,7 @@ export const DateTimeSelectionScreen = () => {
 
     const onDayPress = (day: DateData) => {
         setSelectedDate(day.dateString);
-        setSelectedTime(null); // Reset time when date changes
+        setSelectedTime(null);
     };
 
     const handleSelectTime = (time: string) => {
@@ -40,7 +40,6 @@ export const DateTimeSelectionScreen = () => {
             return;
         }
         
-        // The slot combines date and time for the confirmation screen
         const slot = `${selectedDate} ${selectedTime}`;
 
         navigation.navigate('BookingConfirmation', {
@@ -50,10 +49,34 @@ export const DateTimeSelectionScreen = () => {
         });
     };
 
+    // Calendar theme integrated with our app's theme
+    const calendarTheme = {
+        backgroundColor: theme.colors.background,
+        calendarBackground: theme.colors.card,
+        textSectionTitleColor: theme.colors.textMuted,
+        selectedDayBackgroundColor: theme.colors.primary,
+        selectedDayTextColor: theme.colors.card,
+        todayTextColor: theme.colors.primary,
+        dayTextColor: theme.colors.text,
+        textDisabledColor: theme.colors.disabled,
+        arrowColor: theme.colors.primary,
+        monthTextColor: theme.colors.secondary,
+        indicatorColor: theme.colors.primary,
+        textDayFontFamily: theme.typography.fontFamily,
+        textMonthFontFamily: theme.typography.fontFamilyBold,
+        textDayHeaderFontFamily: theme.typography.fontFamily,
+        textDayFontWeight: '500' as const,
+        textMonthFontWeight: 'bold' as const,
+        textDayHeaderFontWeight: '300' as const,
+        textDayFontSize: 16,
+        textMonthFontSize: 20,
+        textDayHeaderFontSize: 14,
+    };
+
     return (
         <SafeAreaView style={styles.safeArea}>
             <ScrollView contentContainerStyle={styles.container}>
-                <Text style={styles.header}>Select a Date</Text>
+                <Text style={styles.header}>1. Select a Date</Text>
                 <Calendar
                     style={styles.calendar}
                     onDayPress={onDayPress}
@@ -61,34 +84,16 @@ export const DateTimeSelectionScreen = () => {
                         [selectedDate]: { selected: true, marked: true, selectedColor: theme.colors.primary },
                     }}
                     minDate={today}
-                    theme={{
-                        backgroundColor: theme.colors.background,
-                        calendarBackground: theme.colors.card,
-                        textSectionTitleColor: theme.colors.textMuted,
-                        selectedDayBackgroundColor: theme.colors.primary,
-                        selectedDayTextColor: '#ffffff',
-                        todayTextColor: theme.colors.primary,
-                        dayTextColor: theme.colors.text,
-                        arrowColor: theme.colors.primary,
-                        monthTextColor: theme.colors.text,
-                        indicatorColor: theme.colors.primary,
-                        'stylesheet.calendar.header': {
-                            week: {
-                                marginTop: 5,
-                                flexDirection: 'row',
-                                justifyContent: 'space-between'
-                            }
-                        }
-                    }}
+                    theme={calendarTheme}
                 />
 
                 {selectedDate && (
-                     <View style={styles.timeSlotContainer}>
-                        <Text style={styles.header}>Select a Time</Text>
+                     <View>
+                        <Text style={styles.header}>2. Select a Time</Text>
                         <View style={styles.timeSlotGrid}>
-                            {timeSlots.map((time, index) => (
+                            {timeSlots.map((time) => (
                                 <TouchableOpacity
-                                    key={index}
+                                    key={time}
                                     style={[
                                         styles.timeSlotButton,
                                         selectedTime === time && styles.timeSlotButtonSelected
@@ -104,8 +109,8 @@ export const DateTimeSelectionScreen = () => {
                         </View>
                     </View>
                 )}
-
             </ScrollView>
+            
             <View style={styles.footer}>
                 <TouchableOpacity 
                     style={[styles.continueButton, (!selectedDate || !selectedTime) && styles.continueButtonDisabled]} 
@@ -113,7 +118,7 @@ export const DateTimeSelectionScreen = () => {
                     disabled={!selectedDate || !selectedTime}
                 >
                     <Text style={styles.continueButtonText}>Continue</Text>
-                    <Ionicons name="arrow-forward-outline" size={20} color={theme.colors.card} />
+                    <Ionicons name="arrow-forward-circle" size={24} color={theme.colors.card} />
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
@@ -127,40 +132,39 @@ const styles = StyleSheet.create({
     },
     container: {
         padding: theme.spacing.md,
+        paddingBottom: theme.spacing.xl,
     },
     header: {
-        fontSize: 22,
+        fontSize: theme.typography.subheading,
         fontWeight: 'bold',
-        color: theme.colors.text,
+        color: theme.colors.secondary,
         marginBottom: theme.spacing.md,
+        paddingLeft: theme.spacing.xs,
     },
     calendar: {
-        borderRadius: theme.borderRadius.md,
+        borderRadius: theme.borderRadius.lg,
         borderWidth: 1,
         borderColor: theme.colors.border,
         marginBottom: theme.spacing.lg,
     },
-    timeSlotContainer: {
-        marginTop: theme.spacing.md,
-    },
     timeSlotGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        justifyContent: 'space-between',
+        justifyContent: 'flex-start', // Align to start
     },
     timeSlotButton: {
-        width: '32%',
+        width: '31%', // Adjust for 3 columns with margin
+        margin: '1.1%', // Create space between buttons
         paddingVertical: 12,
         backgroundColor: theme.colors.card,
-        borderRadius: theme.borderRadius.sm,
+        borderRadius: theme.borderRadius.md,
         borderWidth: 1,
         borderColor: theme.colors.border,
         alignItems: 'center',
-        marginBottom: theme.spacing.sm,
     },
     timeSlotButtonSelected: {
         backgroundColor: theme.colors.primary,
-        borderColor: theme.colors.primary,
+        borderColor: theme.colors.primaryDark,
     },
     timeSlotText: {
         fontSize: 14,
@@ -169,12 +173,14 @@ const styles = StyleSheet.create({
     },
     timeSlotTextSelected: {
         color: theme.colors.card,
+        fontWeight: 'bold',
     },
     footer: {
-        padding: theme.spacing.md,
+        paddingVertical: theme.spacing.md,
+        paddingHorizontal: theme.spacing.lg,
         borderTopWidth: 1,
         borderTopColor: theme.colors.border,
-        backgroundColor: theme.colors.card,
+        backgroundColor: theme.colors.background, // Match screen background
     },
     continueButton: {
         backgroundColor: theme.colors.primary,
@@ -185,7 +191,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     continueButtonDisabled: {
-        backgroundColor: theme.colors.muted,
+        backgroundColor: theme.colors.disabledBackground,
     },
     continueButtonText: {
         color: theme.colors.card,

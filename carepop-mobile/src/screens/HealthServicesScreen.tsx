@@ -12,7 +12,7 @@ interface Service {
   id: string;
   name: string;
   description: string;
-  // Add other relevant fields if available, e.g., price, duration
+  price: number; // Assuming price is available
 }
 
 type ServiceSelectionRouteProp = RouteProp<AppointmentStackParamList, 'ServiceSelection'>;
@@ -21,7 +21,7 @@ type ServiceSelectionNavigationProp = NavigationProp<AppointmentStackParamList, 
 export function HealthServicesScreen() {
   const navigation = useNavigation<ServiceSelectionNavigationProp>();
   const route = useRoute<ServiceSelectionRouteProp>();
-  const { clinicId } = route.params;
+  const { clinicId, clinicName } = route.params;
 
   const { session } = useAuth();
   const [services, setServices] = useState<Service[]>([]);
@@ -76,53 +76,58 @@ export function HealthServicesScreen() {
   };
 
   const renderServiceItem = ({ item }: { item: Service }) => (
-    <TouchableOpacity onPress={() => handleSelectService(item)} style={styles.serviceButton}>
-        <View style={styles.serviceIconContainer}>
-            <Ionicons name="medkit-outline" size={28} color={theme.colors.primary} />
-        </View>
-        <View style={styles.serviceTextContainer}>
-            <Text style={styles.serviceName}>{item.name}</Text>
-            <Text style={styles.serviceDescription} numberOfLines={2}>{item.description}</Text>
-        </View>
-        <Ionicons name="chevron-forward-outline" size={24} color={theme.colors.textMuted} />
+    <TouchableOpacity onPress={() => handleSelectService(item)} style={styles.serviceCard}>
+      <View style={styles.cardIconContainer}>
+          <Ionicons name="medkit-outline" size={28} color={theme.colors.primary} />
+      </View>
+      <View style={styles.cardTextContainer}>
+          <Text style={styles.cardTitle}>{item.name}</Text>
+          <Text style={styles.cardSubtitle} numberOfLines={2}>{item.description}</Text>
+      </View>
+      <View style={styles.cardRightContainer}>
+        <Text style={styles.cardPrice}>{`₱${item.price}`}</Text>
+        <Ionicons name="chevron-forward" size={24} color={theme.colors.textMuted} />
+      </View>
     </TouchableOpacity>
   );
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.centeredContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.loadingText}>Loading Services...</Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.centeredContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={styles.loadingText}>Loading Services...</Text>
+      </View>
     );
   }
 
   if (error) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.centeredContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.centeredContainer}>
+        <Ionicons name="alert-circle-outline" size={48} color={theme.colors.destructive} />
+        <Text style={styles.errorTextTitle}>Something went wrong</Text>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
     );
   }
 
   return (
     <SafeAreaView style={styles.safeArea}>
-        <FlatList
-          data={services}
-          renderItem={renderServiceItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContainer}
-          // The title is now set in the navigator, so we don't need a ListHeaderComponent here.
-          ListEmptyComponent={
-            <View style={styles.centeredContainer}>
-                <Text style={styles.placeholderText}>No services available at this clinic.</Text>
-            </View>
-          }
-        />
+      <FlatList
+        data={services}
+        renderItem={renderServiceItem}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContainer}
+        ListHeaderComponent={
+          // The title is now set in the navigator, but we can add a subtitle
+          <Text style={styles.screenSubtitle}>Showing services for <Text style={{fontWeight: 'bold'}}>{clinicName}</Text></Text>
+        }
+        ListEmptyComponent={
+          <View style={styles.centeredContainer}>
+            <Ionicons name="search-outline" size={48} color={theme.colors.textMuted} />
+            <Text style={styles.placeholderText}>No services available at this clinic.</Text>
+          </View>
+        }
+      />
     </SafeAreaView>
   );
 }
@@ -133,60 +138,83 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   listContainer: {
-    padding: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.sm,
+    paddingBottom: theme.spacing.xl,
   },
   centeredContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: theme.spacing.md,
+    padding: theme.spacing.xl,
+    marginTop: 50,
   },
-  title: { // This style is no longer used for a header, but can be kept for other text
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: theme.colors.text,
+  screenSubtitle: {
+    fontSize: theme.typography.body,
+    color: theme.colors.textMuted,
     marginBottom: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.xs,
   },
   placeholderText: {
     fontSize: theme.typography.body,
     color: theme.colors.textMuted,
     textAlign: 'center',
-    marginTop: 50,
+    marginTop: theme.spacing.md,
   },
   loadingText: {
     marginTop: theme.spacing.md,
     fontSize: 16,
     color: theme.colors.textMuted,
   },
+  errorTextTitle: {
+    fontSize: theme.typography.subheading,
+    fontWeight: '600',
+    color: theme.colors.text,
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+  },
   errorText: {
     fontSize: 16,
-    color: theme.colors.destructive,
+    color: theme.colors.textMuted,
     textAlign: 'center',
   },
-  serviceButton: {
+  serviceCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.card,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.md,
     marginBottom: theme.spacing.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  serviceIconContainer: {
+  cardIconContainer: {
     marginRight: theme.spacing.md,
+    backgroundColor: theme.colors.primaryMuted,
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.full,
   },
-  serviceTextContainer: {
+  cardTextContainer: {
     flex: 1,
   },
-  serviceName: {
-    fontSize: 18,
+  cardTitle: {
+    fontSize: theme.typography.body,
     fontWeight: '600',
     color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
   },
-  serviceDescription: {
-    fontSize: 14,
+  cardSubtitle: {
+    fontSize: theme.typography.caption,
     color: theme.colors.textMuted,
-    marginTop: 4,
   },
+  cardRightContainer: {
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  cardPrice: {
+    fontSize: theme.typography.body,
+    fontWeight: 'bold',
+    color: theme.colors.primary,
+    marginRight: theme.spacing.sm,
+  }
 }); 

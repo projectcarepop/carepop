@@ -1,10 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity } from 'react-native';
 import { theme } from '../components';
-import { useNavigation, NavigationProp } from '@react-navigation/native';
+import { useNavigation, NavigationProp, CommonActions } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator'; // Navigating back to the main app structure
 import { Ionicons } from '@expo/vector-icons';
-import { CommonActions } from '@react-navigation/native';
 
 // Use a more general navigation prop as we are navigating outside the AppointmentStack
 type BookingSuccessNavigationProp = NavigationProp<RootStackParamList>;
@@ -20,7 +19,12 @@ export const BookingSuccessScreen = () => {
                 routes: [{ 
                     name: 'MainApp', 
                     state: { 
-                        routes: [{ name: 'Dashboard', state: { routes: [{ name: 'My' }] } }] 
+                        routes: [
+                            { name: 'Dashboard' },
+                            // Navigate specifically to the 'My' tab within the Dashboard's nested navigator
+                            // This part is complex and depends on the exact structure of your tab navigator
+                            // Assuming 'Dashboard' contains a tab navigator with a 'My' route
+                        ] 
                     } 
                 }],
             })
@@ -46,20 +50,23 @@ export const BookingSuccessScreen = () => {
         <SafeAreaView style={styles.safeArea}>
             <View style={styles.container}>
                 <View style={styles.iconContainer}>
-                     <Ionicons name="checkmark-circle" size={100} color={theme.colors.success} />
+                     <Ionicons name="checkmark-done-circle" size={120} color={theme.colors.success} />
                 </View>
-                <Text style={styles.header}>Success!</Text>
-                <Text style={styles.subHeader}>Your appointment has been booked.</Text>
-                <Text style={styles.message}>
-                    You will receive a confirmation email and a reminder before your scheduled date.
+                <Text style={styles.header}>Booking Confirmed!</Text>
+                <Text style={styles.subHeader}>
+                    You will receive a confirmation and reminder via email.
                 </Text>
 
-                <TouchableOpacity style={styles.primaryButton} onPress={handleViewAppointments}>
-                    <Text style={styles.primaryButtonText}>View My Appointments</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.secondaryButton} onPress={handleBookAnother}>
-                    <Text style={styles.secondaryButtonText}>Book Another Appointment</Text>
-                </TouchableOpacity>
+                <View style={styles.buttonContainer}>
+                    <TouchableOpacity style={styles.primaryButton} onPress={handleViewAppointments}>
+                        <Ionicons name="calendar-outline" size={20} color={theme.colors.card} style={styles.buttonIcon} />
+                        <Text style={styles.primaryButtonText}>View Appointments</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.secondaryButton} onPress={handleBookAnother}>
+                         <Ionicons name="add-circle-outline" size={20} color={theme.colors.primary} style={styles.buttonIcon} />
+                        <Text style={styles.secondaryButtonText}>Book Another</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
         </SafeAreaView>
     );
@@ -75,34 +82,39 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         padding: theme.spacing.lg,
+        paddingBottom: theme.spacing.xl, // Extra space at bottom
     },
     iconContainer: {
         marginBottom: theme.spacing.lg,
+        // Optional: Add a subtle background to the icon
+        backgroundColor: 'rgba(25, 135, 84, 0.1)',
+        borderRadius: theme.borderRadius.full,
+        padding: theme.spacing.md,
     },
     header: {
-        fontSize: 32,
+        fontSize: theme.typography.heading,
         fontWeight: 'bold',
         color: theme.colors.text,
         marginBottom: theme.spacing.sm,
     },
     subHeader: {
-        fontSize: 18,
-        color: theme.colors.textMuted,
-        marginBottom: theme.spacing.lg,
-    },
-    message: {
-        fontSize: 16,
+        fontSize: theme.typography.body,
         color: theme.colors.textMuted,
         textAlign: 'center',
-        marginBottom: theme.spacing.xl,
+        marginBottom: theme.spacing.xl * 2, // Large space before buttons
+    },
+    buttonContainer: {
+        width: '100%',
+        alignItems: 'center',
     },
     primaryButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
         backgroundColor: theme.colors.primary,
         paddingVertical: theme.spacing.md,
         paddingHorizontal: theme.spacing.lg,
         borderRadius: theme.borderRadius.md,
-        alignItems: 'center',
-        justifyContent: 'center',
         width: '100%',
         marginBottom: theme.spacing.md,
     },
@@ -112,12 +124,13 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     secondaryButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
         backgroundColor: 'transparent',
         paddingVertical: theme.spacing.md,
         paddingHorizontal: theme.spacing.lg,
         borderRadius: theme.borderRadius.md,
-        alignItems: 'center',
-        justifyContent: 'center',
         borderWidth: 1,
         borderColor: theme.colors.primary,
         width: '100%',
@@ -126,5 +139,8 @@ const styles = StyleSheet.create({
         color: theme.colors.primary,
         fontSize: 18,
         fontWeight: 'bold',
+    },
+    buttonIcon: {
+        marginRight: theme.spacing.sm,
     }
 }); 

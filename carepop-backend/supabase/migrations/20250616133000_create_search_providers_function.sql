@@ -1,5 +1,6 @@
 CREATE OR REPLACE FUNCTION search_providers(
-    search_term TEXT
+    search_term TEXT DEFAULT NULL,
+    p_clinic_id UUID DEFAULT NULL
 )
 RETURNS TABLE (
     id UUID,

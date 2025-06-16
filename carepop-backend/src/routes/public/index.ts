@@ -6,6 +6,7 @@ import userRoutes from './user.routes';
 import navigationRoutes from './navigation.public.routes';
 import appointmentRoutes from './appointment.routes';
 import medicalRecordRoutes from './medicalRecord.public.routes';
+import { healthRoutes } from './health.routes';
 
 
 const publicRouter = Router();
@@ -17,5 +18,6 @@ publicRouter.use('/users', userRoutes);
 publicRouter.use('/navigation', navigationRoutes);
 publicRouter.use('/appointments', appointmentRoutes);
 publicRouter.use('/medical-records', medicalRecordRoutes);
+publicRouter.use('/health-entries', healthRoutes);
 
 export default publicRouter; 

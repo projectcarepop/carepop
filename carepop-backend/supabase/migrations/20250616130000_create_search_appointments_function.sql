@@ -1,5 +1,7 @@
+DROP FUNCTION IF EXISTS search_appointments(text,uuid,uuid,text,timestamptz,timestamptz);
+
 CREATE OR REPLACE FUNCTION search_appointments(
-    search_term TEXT,
+    search_term TEXT DEFAULT NULL,
     p_clinic_id UUID DEFAULT NULL,
     p_provider_id UUID DEFAULT NULL,
     p_status TEXT DEFAULT NULL,

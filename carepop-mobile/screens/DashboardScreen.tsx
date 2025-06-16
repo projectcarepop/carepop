@@ -1,54 +1,92 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, ScrollView, ActivityIndicator, TouchableOpacity, FlatList } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, ActivityIndicator, TouchableOpacity, FlatList, Alert } from 'react-native';
 import { Button, Card, theme } from '../src/components';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../src/context/AuthContext';
+import Constants from 'expo-constants';
 
-// Define service data with icons
-const healthServicesData = [
-  { name: 'Family Planning Counseling', iconName: 'group' },
-  { name: 'Contraceptive Pills/Injectables', iconName: 'medication' },
-  { name: 'IUD Insertion/Removal', iconName: 'woman' }, // Example icon, choose appropriate
-  { name: 'Prenatal Checkups', iconName: 'pregnant-woman' },
-  { name: 'Pap Smear / Cervical Cancer Screening', iconName: 'healing' }, // Example icon
-  { name: 'HIV Testing & Counseling', iconName: 'bloodtype' }, // Example icon
-  { name: 'Gender-Affirming Care Counseling', iconName: 'transgender' }, // Example icon
-];
+interface HealthService {
+  id: string;
+  name: string;
+  // This is a placeholder for an icon name. We'd need a mapping from service type/name to an icon.
+  iconName: keyof typeof MaterialIcons.glyphMap; 
+}
+
+// Function to map service names to icons, placeholder logic for now
+const getIconForService = (serviceName: string): keyof typeof MaterialIcons.glyphMap => {
+  const name = serviceName.toLowerCase();
+  if (name.includes('family planning')) return 'group';
+  if (name.includes('contraceptive')) return 'medication';
+  if (name.includes('iud')) return 'woman';
+  if (name.includes('prenatal')) return 'pregnant-woman';
+  if (name.includes('pap smear')) return 'healing';
+  if (name.includes('hiv')) return 'bloodtype';
+  if (name.includes('gender-affirming')) return 'transgender';
+  return 'medical-services'; // Default icon
+};
 
 // Define props, including navigation
 interface DashboardScreenProps {
-  navigation: any; // Add navigation prop type (consider using a more specific type from @react-navigation)
+  navigation: any;
 }
 
 export const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) => {
-  const { profile, isLoading, user } = useAuth();
+  const { profile, isLoading: isAuthLoading, session } = useAuth();
+  const [services, setServices] = useState<HealthService[]>([]);
+  const [isLoadingServices, setIsLoadingServices] = useState(true);
 
-  // Use first_name if available, fallback to username or 'User'
   const displayName = profile?.first_name || profile?.username || 'User';
 
-  // Render function for each service item in the carousel
-  const renderServiceItem = ({ item }: { item: typeof healthServicesData[0] }) => (
+  const fetchHealthServices = useCallback(async () => {
+    if (!session) return;
+    setIsLoadingServices(true);
+    const backendUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL;
+
+    try {
+      const response = await fetch(`${backendUrl}/api/v1/public/services`, {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to fetch services.');
+
+      const mappedServices = data.data.map((service: any) => ({
+        ...service,
+        iconName: getIconForService(service.name),
+      }));
+      setServices(mappedServices);
+
+    } catch (error: any) {
+      Alert.alert('Error', `Could not load health services: ${error.message}`);
+    } finally {
+      setIsLoadingServices(false);
+    }
+  }, [session]);
+
+  useEffect(() => {
+    fetchHealthServices();
+  }, [fetchHealthServices]);
+
+  const renderServiceItem = ({ item }: { item: HealthService }) => (
     <TouchableOpacity 
       style={styles.serviceItemBox}
-      onPress={() => navigation.navigate('Make Appointment', { 
-          screen: 'ServiceBooking', 
-          params: { serviceName: item.name } 
+      onPress={() => navigation.navigate('Appointments', { 
+          screen: 'ServiceSelection', // Navigate to the beginning of the booking flow
+          params: { serviceId: item.id, serviceName: item.name } // Pass initial service info
       })}
     >
-      <MaterialIcons name={item.iconName as any} size={32} color={theme.colors.primary} style={styles.serviceItemIcon} />
+      <MaterialIcons name={item.iconName} size={32} color={theme.colors.primary} style={styles.serviceItemIcon} />
       <Text style={styles.serviceItemText}>{item.name}</Text>
     </TouchableOpacity>
   );
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      {/* Welcome Message */}
       <Text style={styles.welcomeText}>
-        {isLoading ? 'Loading...' : `Welcome back, ${displayName}!`}
+        {isAuthLoading ? 'Loading...' : `Welcome back, ${displayName}!`}
       </Text>
 
-      {/* Upcoming Appointment Card */}
+      {/* Upcoming Appointment Card - Still static for now */}
       <Card style={styles.card}>
         <Text style={styles.cardTitle}>Upcoming Appointment</Text>
         <Text style={styles.cardContent}>No upcoming appointments scheduled.</Text>
@@ -57,27 +95,31 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) 
           variant="secondary" 
           styleType="solid" 
           style={styles.cardButton}
-          onPress={() => navigation.navigate('Make Appointment')}
+          onPress={() => navigation.navigate('Appointments')}
         />
       </Card>
 
-      {/* Health Services Card - Carousel */}
+      {/* Health Services Card - Now dynamic */}
       <Card style={styles.card}> 
         <View style={styles.cardTitleContainer}>
           <MaterialIcons name="medical-services" size={24} color={theme.colors.secondary} style={styles.cardTitleIcon} />
           <Text style={styles.cardTitle}>Health Services</Text>
         </View>
-        <FlatList
-          data={healthServicesData}
-          renderItem={renderServiceItem}
-          keyExtractor={(item) => item.name}
-          horizontal={true}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.healthServicesContainer} // Use for padding
-        />
+        {isLoadingServices ? (
+          <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginVertical: 20 }}/>
+        ) : (
+          <FlatList
+            data={services}
+            renderItem={renderServiceItem}
+            keyExtractor={(item) => item.id}
+            horizontal={true}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.healthServicesContainer}
+          />
+        )}
       </Card>
 
-      {/* Health Stats Summary Card */}
+      {/* Health Stats Summary Card - Unchanged for now */}
       <Card style={styles.card}>
         <Text style={styles.cardTitle}>Health Snapshot</Text>
         <View style={styles.statsContainer}>
@@ -100,7 +142,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) 
           variant="secondary"
           styleType="outline" 
           style={styles.cardButton}
-          onPress={() => navigation.navigate('Health Buddy')}
+          onPress={() => navigation.navigate('HealthBuddy')}
         />
       </Card>
 

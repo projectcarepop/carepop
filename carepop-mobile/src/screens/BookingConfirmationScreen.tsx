@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { theme } from '../components';
 import { useNavigation, useRoute, NavigationProp, RouteProp } from '@react-navigation/native';
 import { AppointmentStackParamList } from '../navigation/AppNavigator';
@@ -35,9 +35,12 @@ export const BookingConfirmationScreen = () => {
     const { session } = useAuth();
     const { clinicId, serviceId, slot } = route.params;
 
-    const [clinicName, setClinicName] = useState('Loading...');
-    const [serviceName, setServiceName] = useState('Loading...');
-    const [price, setPrice] = useState('...');
+    const [details, setDetails] = useState({
+        clinicName: '',
+        clinicAddress: '',
+        serviceName: '',
+        price: '',
+    });
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -46,11 +49,12 @@ export const BookingConfirmationScreen = () => {
             try {
                 const clinicDetails = await fetchClinicDetails(clinicId, session.access_token);
                 const serviceDetails = await fetchServiceDetails(serviceId, session.access_token);
-
-                setClinicName(clinicDetails.name);
-                setServiceName(serviceDetails.name);
-                setPrice(serviceDetails.price);
-
+                setDetails({
+                    clinicName: clinicDetails.name,
+                    clinicAddress: clinicDetails.address,
+                    serviceName: serviceDetails.name,
+                    price: serviceDetails.price,
+                });
             } catch (error) {
                 console.error("Failed to load booking details:", error);
                 Alert.alert("Error", "Could not load appointment details.");
@@ -58,7 +62,6 @@ export const BookingConfirmationScreen = () => {
                 setIsLoading(false);
             }
         };
-
         loadDetails();
     }, [clinicId, serviceId, session]);
 
@@ -70,56 +73,43 @@ export const BookingConfirmationScreen = () => {
         navigation.navigate('BookingSuccess');
     };
 
+    const DetailRow = ({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap, label: string, value: string }) => (
+        <View style={styles.detailRow}>
+            <Ionicons name={icon} size={24} color={theme.colors.secondary} style={styles.icon} />
+            <View>
+                <Text style={styles.detailLabel}>{label}</Text>
+                <Text style={styles.detailValue}>{value}</Text>
+            </View>
+        </View>
+    );
+
     if (isLoading) {
         return (
-            <SafeAreaView style={styles.safeArea}>
-                <View style={[styles.container, styles.centered]}>
-                    <ActivityIndicator size="large" color={theme.colors.primary} />
-                    <Text style={styles.loadingText}>Loading Details...</Text>
-                </View>
-            </SafeAreaView>
+            <View style={styles.centeredContainer}>
+                <ActivityIndicator size="large" color={theme.colors.primary} />
+            </View>
         );
     }
 
-
     return (
         <SafeAreaView style={styles.safeArea}>
-            <View style={styles.container}>
-                <Text style={styles.header}>Confirm Your Appointment</Text>
+            <ScrollView contentContainerStyle={styles.container}>
+                <Text style={styles.header}>Review Your Booking</Text>
                 
                 <View style={styles.detailsCard}>
-                    <View style={styles.detailRow}>
-                        <Ionicons name="business-outline" size={24} color={theme.colors.primary} style={styles.icon} />
-                        <View>
-                            <Text style={styles.detailLabel}>Clinic</Text>
-                            <Text style={styles.detailValue}>{clinicName}</Text>
-                        </View>
-                    </View>
-                     <View style={styles.detailRow}>
-                        <Ionicons name="medkit-outline" size={24} color={theme.colors.primary} style={styles.icon} />
-                        <View>
-                            <Text style={styles.detailLabel}>Service</Text>
-                            <Text style={styles.detailValue}>{serviceName}</Text>
-                        </View>
-                    </View>
-                     <View style={styles.detailRow}>
-                        <Ionicons name="calendar-outline" size={24} color={theme.colors.primary} style={styles.icon} />
-                        <View>
-                            <Text style={styles.detailLabel}>Date & Time</Text>
-                            <Text style={styles.detailValue}>{slot}</Text>
-                        </View>
-                    </View>
-                      <View style={styles.detailRow}>
-                        <Ionicons name="pricetag-outline" size={24} color={theme.colors.primary} style={styles.icon} />
-                        <View>
-                            <Text style={styles.detailLabel}>Price</Text>
-                            <Text style={styles.detailValue}>{price}</Text>
-                        </View>
-                    </View>
+                    <Text style={styles.cardHeader}>Appointment Details</Text>
+                    <DetailRow icon="business-outline" label="Clinic" value={details.clinicName} />
+                    <DetailRow icon="location-outline" label="Address" value={details.clinicAddress} />
+                    <DetailRow icon="medkit-outline" label="Service" value={details.serviceName} />
+                    <DetailRow icon="calendar-outline" label="Date & Time" value={slot} />
+                    <DetailRow icon="pricetag-outline" label="Price" value={details.price} />
                 </View>
+            </ScrollView>
 
+            <View style={styles.footer}>
                 <TouchableOpacity style={styles.confirmButton} onPress={handleConfirmBooking}>
-                    <Text style={styles.confirmButtonText}>Confirm & Book</Text>
+                    <Text style={styles.confirmButtonText}>Confirm & Book Now</Text>
+                    <Ionicons name="checkmark-circle-outline" size={22} color={theme.colors.card} />
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
@@ -132,39 +122,45 @@ const styles = StyleSheet.create({
         backgroundColor: theme.colors.background,
     },
     container: {
-        flex: 1,
         padding: theme.spacing.md,
+        flexGrow: 1,
     },
-    centered: {
+    centeredContainer: {
+        flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    loadingText: {
-        marginTop: theme.spacing.md,
-        fontSize: 16,
-        color: theme.colors.textMuted,
-    },
     header: {
-        fontSize: 28,
+        fontSize: theme.typography.heading,
         fontWeight: 'bold',
         color: theme.colors.text,
         marginBottom: theme.spacing.lg,
     },
     detailsCard: {
         backgroundColor: theme.colors.card,
-        borderRadius: theme.borderRadius.md,
+        borderRadius: theme.borderRadius.lg,
         padding: theme.spacing.md,
         marginBottom: theme.spacing.lg,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+    },
+    cardHeader: {
+        fontSize: theme.typography.subheading,
+        fontWeight: 'bold',
+        color: theme.colors.secondary,
+        marginBottom: theme.spacing.md,
+        paddingBottom: theme.spacing.sm,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.colors.border,
     },
     detailRow: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: theme.spacing.md,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.colors.border,
     },
     icon: {
         marginRight: theme.spacing.md,
+        width: 24, // ensure alignment
     },
     detailLabel: {
         fontSize: 14,
@@ -176,17 +172,24 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: theme.colors.text,
     },
+    footer: {
+        padding: theme.spacing.md,
+        borderTopWidth: 1,
+        borderTopColor: theme.colors.border,
+        backgroundColor: theme.colors.background,
+    },
     confirmButton: {
         backgroundColor: theme.colors.primary,
         padding: theme.spacing.md,
         borderRadius: theme.borderRadius.md,
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 'auto', // Push to bottom
+        flexDirection: 'row',
     },
     confirmButtonText: {
         color: theme.colors.card,
         fontSize: 18,
         fontWeight: 'bold',
+        marginRight: theme.spacing.sm,
     }
 }); 
