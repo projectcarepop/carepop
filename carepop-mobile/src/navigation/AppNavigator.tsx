@@ -105,8 +105,9 @@ export type HealthBuddyStackParamList = {
   PillTrackerScreen: undefined;
   MensTrackerScreen: undefined;
   LogBloodPressureScreen: undefined;
-  // Add other health-buddy related screens here, e.g., AddMedicationScreen
   AddMedicationScreen: undefined; 
+  LogPeriodScreen: undefined;
+  LogSymptomsScreen: undefined;
 };
 
 
@@ -147,14 +148,21 @@ function HealthBuddyStack() {
         component={LogBloodPressureScreen} 
         options={{ title: 'Log Blood Pressure' }} // Set header title
       />
-       {/* Example for potentially adding medication screen later */}
-       {/* 
        <HealthBuddyStackNav.Screen 
         name="AddMedicationScreen" 
         component={AddMedicationScreen} 
         options={{ title: 'Add Medication' }} 
       /> 
-       */}
+       <HealthBuddyStackNav.Screen 
+        name="LogPeriodScreen" 
+        component={LogPeriodScreen} 
+        options={{ title: 'Log Period' }} 
+      />
+       <HealthBuddyStackNav.Screen 
+        name="LogSymptomsScreen" 
+        component={LogSymptomsScreen} 
+        options={{ title: 'Log Symptoms' }} 
+      />
     </HealthBuddyStackNav.Navigator>
   );
 }
