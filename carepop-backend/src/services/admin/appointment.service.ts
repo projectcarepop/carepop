@@ -40,31 +40,36 @@ export class AppointmentAdminService {
   }
   
   async findAll(options: any) {
-    const { page, limit, search, clinic_id, provider_id, status, date_range_start, date_range_end, sortBy, sortOrder } = options;
-    
-    let query = supabase
-      .from(this.tableName)
-      .select(APPOINTMENT_SELECT_QUERY, { count: 'exact' });
+    const { page = 1, limit = 10, search, clinic_id, provider_id, status, date_range_start, date_range_end, sortBy = 'appointment_datetime', sortOrder = 'desc' } = options;
 
-    if (search) {
-      query = query.ilike('users_view.first_name', `%${search}%`); // This requires a join, RPC may be better
-    }
-    if (clinic_id) query = query.eq('clinic_id', clinic_id);
-    if (provider_id) query = query.eq('provider_id', provider_id);
-    if (status) query = query.eq('status', status);
-    if (date_range_start) query = query.gte('appointment_datetime', date_range_start);
-    if (date_range_end) query = query.lte('appointment_datetime', date_range_end);
-    
-    const offset = (page - 1) * limit;
-    query = query.range(offset, offset + limit - 1)
-                 .order(sortBy, { ascending: sortOrder === 'asc' });
+    const rpcParams = {
+        search_term: search,
+        p_clinic_id: clinic_id,
+        p_provider_id: provider_id,
+        p_status: status,
+        p_date_range_start: date_range_start,
+        p_date_range_end: date_range_end
+    };
 
-    const { data, error, count } = await query;
-    if (error) this.handleError(error, 'findAll');
-    
+    // First, get the total count without pagination for metadata
+    const { count, error: countError } = await supabase
+        .rpc('search_appointments', rpcParams, { count: 'exact' });
+
+    if (countError) this.handleError(countError, 'findAll (count)');
+
     const totalItems = count ?? 0;
     const totalPages = Math.ceil(totalItems / limit);
+    const offset = (page - 1) * limit;
 
+    // Then, fetch the paginated and joined data
+    const { data, error } = await supabase
+        .rpc('search_appointments', rpcParams)
+        .select(APPOINTMENT_SELECT_QUERY)
+        .order(sortBy, { ascending: sortOrder === 'asc' })
+        .range(offset, offset + limit - 1);
+        
+    if (error) this.handleError(error, 'findAll (data)');
+    
     return {
       data: data || [],
       meta: { totalItems, itemsPerPage: limit, currentPage: page, totalPages },
