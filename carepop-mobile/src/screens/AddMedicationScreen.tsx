@@ -1,97 +1,110 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, Alert, TouchableOpacity } from 'react-native';
-import { theme } from '../components';
-import { Card, Button, TextInput } from '../components'; // Changed Input to TextInput
-import { MaterialIcons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, SafeAreaView, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-export function AddMedicationScreen({ navigation }: any) { // Add navigation prop
-  const [name, setName] = useState('');
-  const [dosage, setDosage] = useState('');
-  const [frequency, setFrequency] = useState('');
-  const [time, setTime] = useState(''); // Could use a time picker later
+import { theme, Button } from '../components';
+import { addMedication } from '../data/api/medication';
+import { HealthBuddyStackParamList } from '../navigation/AppNavigator';
 
-  const handleSave = () => {
-    // TODO: Add validation and API call to save medication
-    if (!name || !dosage || !frequency || !time) {
-        Alert.alert('Error', 'Please fill in all fields.');
-        return;
-    }
-    console.log('Saving Medication:', { name, dosage, frequency, time });
-    Alert.alert('Success', 'Medication Added (Placeholder)');
-    navigation.goBack(); // Go back after saving
-  };
+type AddMedicationNavigationProp = NativeStackNavigationProp<HealthBuddyStackParamList, 'AddMedicationScreen'>;
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container}>
-        <Text style={styles.title}>Add New Medication</Text>
+export function AddMedicationScreen() {
+    const navigation = useNavigation<AddMedicationNavigationProp>();
+    const [name, setName] = useState('');
+    const [dosage, setDosage] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
 
-        <Card style={styles.card}>
-          <TextInput
-            label="Medication Name"
-            value={name}
-            onChangeText={setName}
-            placeholder="e.g., Metformin"
-            style={styles.input}
-          />
-          <TextInput
-            label="Dosage"
-            value={dosage}
-            onChangeText={setDosage}
-            placeholder="e.g., 500mg"
-            style={styles.input}
-          />
-          <TextInput
-            label="Frequency"
-            value={frequency}
-            onChangeText={setFrequency}
-            placeholder="e.g., Twice daily"
-            style={styles.input}
-          />
-          <TextInput
-            label="Time(s)"
-            value={time}
-            onChangeText={setTime}
-            placeholder="e.g., 8:00 AM, 8:00 PM"
-            style={styles.input}
-          />
-        </Card>
-        
-        <Button 
-            title="Save Medication" 
-            onPress={handleSave} 
-            style={styles.saveButton}
-        />
-      </ScrollView>
-    </SafeAreaView>
-  );
+    const handleSave = async () => {
+        if (!name.trim()) {
+            Alert.alert('Required', 'Please enter a medication name.');
+            return;
+        }
+
+        setIsSaving(true);
+        const newMed = await addMedication(name.trim(), dosage.trim());
+        setIsSaving(false);
+
+        if (newMed) {
+            Alert.alert('Success', `${newMed.name} has been added to your list.`);
+            navigation.goBack();
+        }
+        // Error alerts are handled in the API function
+    };
+
+    return (
+        <SafeAreaView style={styles.safeArea}>
+            <View style={styles.container}>
+                <Text style={styles.screenTitle}>Add New Medication</Text>
+                
+                <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Medication Name</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="e.g., Lisinopril"
+                        value={name}
+                        onChangeText={setName}
+                        autoCapitalize="words"
+                    />
+                </View>
+
+                <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Dosage (Optional)</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="e.g., 10mg, once daily"
+                        value={dosage}
+                        onChangeText={setDosage}
+                    />
+                </View>
+
+                <Button
+                    title={isSaving ? 'Saving...' : 'Save Medication'}
+                    onPress={handleSave}
+                    disabled={isSaving}
+                    variant="primary"
+                    styleType="solid"
+                    style={styles.saveButton}
+                    icon={isSaving ? <ActivityIndicator color={theme.colors.background} /> : undefined}
+                />
+            </View>
+        </SafeAreaView>
+    );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  container: {
-    flex: 1,
-    paddingVertical: theme.spacing.md,
-  },
-  title: {
-    fontSize: theme.typography.heading,
-    fontWeight: 'bold',
-    color: theme.colors.primary,
-    textAlign: 'center',
-    marginBottom: theme.spacing.lg,
-  },
-  card: {
-    marginHorizontal: theme.spacing.md,
-    marginBottom: theme.spacing.lg,
-    padding: theme.spacing.md,
-  },
-  input: {
-    marginBottom: theme.spacing.md,
-  },
-  saveButton: {
-    marginHorizontal: theme.spacing.md,
-  }
+    safeArea: {
+        flex: 1,
+        backgroundColor: theme.colors.background,
+    },
+    container: {
+        flex: 1,
+        padding: 20,
+    },
+    screenTitle: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: theme.colors.text,
+        marginBottom: 20,
+    },
+    inputGroup: {
+        marginBottom: 15,
+    },
+    label: {
+        fontSize: 16,
+        color: theme.colors.textMuted,
+        marginBottom: 8,
+    },
+    input: {
+        backgroundColor: theme.colors.card,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        borderRadius: theme.borderRadius.md,
+        padding: 12,
+        fontSize: 16,
+        color: theme.colors.text,
+    },
+    saveButton: {
+        marginTop: 20,
+    },
 }); 

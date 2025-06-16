@@ -44,7 +44,6 @@ BEGIN
             search_term IS NULL OR
             search_term = '' OR
             p.full_name ILIKE '%' || search_term || '%' OR
-            p.specialty ILIKE '%' || search_term || '%' OR
             uv.first_name ILIKE '%' || search_term || '%' OR
             uv.last_name ILIKE '%' || search_term || '%'
         );

@@ -63,13 +63,13 @@ export function PillTrackerScreen() {
 
     const handleDeleteMedication = async (medId: string) => {
         Alert.alert(
-            "Deactivate Medication",
-            "Are you sure you want to deactivate this medication? This cannot be undone.",
+            'Deactivate Medication',
+            'Are you sure you want to deactivate this medication? This action cannot be undone.',
             [
-                { text: "Cancel", style: "cancel" },
+                { text: 'Cancel', style: 'cancel' },
                 {
-                    text: "Deactivate",
-                    style: "destructive",
+                    text: 'Deactivate',
+                    style: 'destructive',
                     onPress: async () => {
                         const success = await deactivateMedication(medId);
                         if (success) {
@@ -87,7 +87,7 @@ export function PillTrackerScreen() {
             <TouchableOpacity
                 onPress={() => handleDeleteMedication(medId)}
                 style={styles.deleteButton}>
-                <Ionicons name="trash-outline" size={24} color={theme.colors.white} />
+                <Ionicons name="trash-outline" size={24} color={theme.colors.background} />
             </TouchableOpacity>
         );
     };
@@ -107,7 +107,7 @@ export function PillTrackerScreen() {
                     <Ionicons 
                         name={item.takenToday ? "checkmark-circle" : "ellipse-outline"}
                         size={24}
-                        color={item.takenToday ? theme.colors.white : theme.colors.primary}
+                        color={item.takenToday ? theme.colors.background : theme.colors.primary}
                     />
                     <Text style={[styles.statusText, item.takenToday && styles.takenText]}>
                         {item.takenToday ? 'Taken' : 'Take'}
@@ -134,7 +134,7 @@ export function PillTrackerScreen() {
                     onPress={() => navigation.navigate('AddMedicationScreen')}
                     variant="primary"
                     styleType="solid"
-                    icon={<Ionicons name="add" size={20} color={theme.colors.white} />}
+                    icon={<Ionicons name="add" size={20} color={theme.colors.background} />}
                 />
             </View>
             
@@ -149,7 +149,7 @@ export function PillTrackerScreen() {
                 <View style={styles.emptyContainer}>
                     <Ionicons name="file-tray-outline" size={64} color={theme.colors.border} />
                     <Text style={styles.emptyText}>No medications added yet.</Text>
-                    <Text style={styles.emptySubText}>Press "Add Med" to get started.</Text>
+                    <Text style={styles.emptySubText}>Press Add Med to get started.</Text>
                 </View>
             )}
         </SafeAreaView>
@@ -220,15 +220,15 @@ const styles = StyleSheet.create({
         color: theme.colors.primary,
     },
     takenText: {
-        color: theme.colors.white,
+        color: theme.colors.background,
     },
     deleteButton: {
-        backgroundColor: theme.colors.danger,
+        backgroundColor: theme.colors.destructive,
         justifyContent: 'center',
         alignItems: 'center',
         width: 75,
         height: '90%',
-        borderRadius: theme.roundness,
+        borderRadius: theme.borderRadius.md,
     },
     emptyContainer: {
         flex: 1,

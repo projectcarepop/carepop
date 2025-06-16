@@ -13,7 +13,7 @@ BEGIN
         search_term IS NULL OR
         search_term = '' OR
         s.name ILIKE '%' || search_term || '%' OR
-        s.contact_name ILIKE '%' || search_term || '%' OR
+        s.contact_person ILIKE '%' || search_term || '%' OR
         s.contact_email ILIKE '%' || search_term || '%' OR
         s.address ILIKE '%' || search_term || '%';
 END;
