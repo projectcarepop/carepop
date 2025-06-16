@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, FlatList, TouchableOpacity, Alert, ActivityIndicator, TextInput, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, FlatList, TouchableOpacity, Alert, ActivityIndicator, TextInput, Modal, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native'; // Import useNavigation
 import type { NavigationProp } from '@react-navigation/native';
 import { theme } from '../components';
@@ -7,6 +7,7 @@ import { Card, Button } from '../components'; // Import Card and Button if neede
 import { MaterialIcons, Ionicons } from '@expo/vector-icons'; // Added Ionicons for more icon choices
 import { useAuth } from '../context/AuthContext';
 import Constants from 'expo-constants';
+import { LineChart, BarChart } from 'react-native-chart-kit';
 
 // Define param list for navigation type safety (if possible)
 // Consider creating a dedicated HealthBuddyStackParamList if not already done
@@ -31,15 +32,25 @@ interface HealthEntry {
     id: number;
     value_text?: string;
     value_numeric?: number;
+    value_numeric_secondary?: number;
     notes?: string;
     created_at: string;
 }
+
+const moodToValue = (mood: string): number => {
+    const mapping: { [key: string]: number } = { 'Happy': 5, 'Calm': 4, 'Okay': 3, 'Anxious': 2, 'Sad': 1 };
+    return mapping[mood] || 0;
+};
 
 export function HealthBuddyScreen() { // Remove navigation prop if using hook
   const navigation = useNavigation<HealthBuddyNavigationProp>(); // Use the hook
   const { session } = useAuth();
   const [moodHistory, setMoodHistory] = useState<HealthEntry[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [bloodPressureHistory, setBloodPressureHistory] = useState<HealthEntry[]>([]);
+  const [activityHistory, setActivityHistory] = useState<HealthEntry[]>([]);
+  const [isLoadingMood, setIsLoadingMood] = useState(true);
+  const [isLoadingBp, setIsLoadingBp] = useState(true);
+  const [isLoadingActivity, setIsLoadingActivity] = useState(true);
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
 
   // State for Blood Pressure
@@ -72,8 +83,12 @@ export function HealthBuddyScreen() { // Remove navigation prop if using hook
   const fetchMoodHistory = useCallback(async () => {
     if (!session) return;
     try {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(endDate.getDate() - 30); // Last 30 days
+
       const backendUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL;
-      const response = await fetch(`${backendUrl}/api/v1/public/health-entries?type=MOOD`, {
+      const response = await fetch(`${backendUrl}/api/v1/public/health-entries?type=MOOD&startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`, {
         headers: { 'Authorization': `Bearer ${session.access_token}` },
       });
       const data = await response.json();
@@ -82,13 +97,57 @@ export function HealthBuddyScreen() { // Remove navigation prop if using hook
     } catch (error: any) {
       Alert.alert('Error', error.message);
     } finally {
-      setIsLoading(false);
+      setIsLoadingMood(false);
+    }
+  }, [session]);
+
+  const fetchBloodPressureHistory = useCallback(async () => {
+    if (!session) return;
+    try {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(endDate.getDate() - 30);
+
+      const backendUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL;
+      const response = await fetch(`${backendUrl}/api/v1/public/health-entries?type=BLOOD_PRESSURE&startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`, {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to fetch blood pressure history.');
+      setBloodPressureHistory(data.data || []);
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setIsLoadingBp(false);
+    }
+  }, [session]);
+
+  const fetchActivityHistory = useCallback(async () => {
+    if (!session) return;
+    try {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(endDate.getDate() - 30);
+
+      const backendUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL;
+      const response = await fetch(`${backendUrl}/api/v1/public/health-entries?type=ACTIVITY&startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`, {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to fetch activity history.');
+      setActivityHistory(data.data || []);
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setIsLoadingActivity(false);
     }
   }, [session]);
 
   useEffect(() => {
     fetchMoodHistory();
-  }, [fetchMoodHistory]);
+    fetchBloodPressureHistory();
+    fetchActivityHistory();
+  }, [fetchMoodHistory, fetchBloodPressureHistory, fetchActivityHistory]);
 
   // --- Event Handlers ---
 
@@ -138,7 +197,7 @@ export function HealthBuddyScreen() { // Remove navigation prop if using hook
         body: JSON.stringify({
           type: 'BLOOD_PRESSURE',
           value_numeric: parseInt(systolic, 10),
-          notes: `Diastolic: ${diastolic}` // Storing diastolic in notes for now
+          value_numeric_secondary: parseInt(diastolic, 10)
         }),
       });
       if (!response.ok) {
@@ -149,6 +208,7 @@ export function HealthBuddyScreen() { // Remove navigation prop if using hook
       setShowBpModal(false);
       setSystolic('');
       setDiastolic('');
+      fetchBloodPressureHistory(); // Refresh data
     } catch (error: any) {
       Alert.alert('Error', error.message);
     } finally {
@@ -183,6 +243,7 @@ export function HealthBuddyScreen() { // Remove navigation prop if using hook
       Alert.alert('Success', 'Activity logged successfully!');
       setShowActivityModal(false);
       setActivityMinutes('');
+      fetchActivityHistory(); // Refresh data
     } catch (error: any) {
       Alert.alert('Error', error.message);
     } finally {
@@ -215,20 +276,40 @@ export function HealthBuddyScreen() { // Remove navigation prop if using hook
 
         {/* Mood History Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Your Week in Moods</Text>
-          {isLoading ? (
+          <Text style={styles.cardTitle}>Your Mood Over Time</Text>
+          {isLoadingMood ? (
             <ActivityIndicator color={theme.colors.primary} />
-          ) : moodHistory.length > 0 ? (
-            <View style={styles.chartPlaceholder}>
-              <Ionicons name="stats-chart-outline" size={48} color={theme.colors.border} />
-              <Text style={styles.placeholderText}>Mood chart coming soon!</Text>
-              <Text style={styles.placeholderSubText}>Last entry: {moodHistory[0].value_text} on {new Date(moodHistory[0].created_at).toLocaleDateString()}</Text>
-            </View>
+          ) : moodHistory.length > 1 ? (
+            <LineChart
+                data={{
+                    labels: moodHistory.map(e => new Date(e.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })).reverse(),
+                    datasets: [{
+                        data: moodHistory.map(e => moodToValue(e.value_text || '')).reverse(),
+                    }]
+                }}
+                width={Dimensions.get('window').width - 60}
+                height={220}
+                yAxisLabel=""
+                yAxisSuffix=""
+                yAxisInterval={1}
+                chartConfig={{
+                    backgroundColor: theme.colors.background,
+                    backgroundGradientFrom: theme.colors.background,
+                    backgroundGradientTo: theme.colors.background,
+                    decimalPlaces: 0,
+                    color: (opacity = 1) => `rgba(20, 36, 116, ${opacity})`, // secondary
+                    labelColor: (opacity = 1) => `rgba(108, 117, 125, ${opacity})`, // textMuted
+                    style: { borderRadius: 16 },
+                    propsForDots: { r: '4', strokeWidth: '2', stroke: theme.colors.primary }
+                }}
+                bezier
+                style={{ marginVertical: 8, borderRadius: 16 }}
+            />
           ) : (
             <View style={styles.chartPlaceholder}>
               <Ionicons name="happy-outline" size={48} color={theme.colors.border} />
-              <Text style={styles.placeholderText}>No mood history yet.</Text>
-              <Text style={styles.placeholderSubText}>Log your mood above to get started!</Text>
+              <Text style={styles.placeholderText}>Not enough data to show a chart.</Text>
+              <Text style={styles.placeholderSubText}>Log your mood for a few days to see your trend!</Text>
             </View>
           )}
         </View>
@@ -292,28 +373,102 @@ export function HealthBuddyScreen() { // Remove navigation prop if using hook
           />
         </Card>
 
-        {/* Blood Pressure Tracker Section - Updated onPress */}
-        <Card style={styles.card}>
-          {renderSectionHeader("Blood Pressure", "favorite-border")}
-          <Text style={styles.cardContent}>Monitor your blood pressure regularly.</Text>
-          <Text style={styles.cardSubtitle}>Keep a log of your BP readings.</Text>
-          <TouchableOpacity style={styles.primaryButton} onPress={() => setShowBpModal(true)}>
-            <Ionicons name="add-outline" size={20} color={theme.colors.card} style={styles.buttonIcon} />
-            <Text style={styles.primaryButtonText}>Log Today's Reading</Text>
-          </TouchableOpacity>
-        </Card>
-
-        {/* --- NEW: Activity Card --- */}
+        {/* Blood Pressure Card - Now with Chart */}
         <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Ionicons name="walk-outline" size={24} color={theme.colors.secondary} style={styles.cardIcon} />
-            <Text style={styles.cardTitle}>Daily Activity</Text>
-          </View>
-          <Text style={styles.cardSubtitle}>Log your physical activity for the day.</Text>
-          <TouchableOpacity style={styles.primaryButton} onPress={() => setShowActivityModal(true)}>
-            <Ionicons name="add-outline" size={20} color={theme.colors.card} style={styles.buttonIcon} />
-            <Text style={styles.primaryButtonText}>Log Activity</Text>
-          </TouchableOpacity>
+          {renderSectionHeader('Blood Pressure', 'pulse', 'Ionicons')}
+          {isLoadingBp ? (
+            <ActivityIndicator color={theme.colors.primary} />
+          ) : bloodPressureHistory.length > 1 ? (
+            <LineChart
+                data={{
+                    labels: bloodPressureHistory.map(e => new Date(e.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })).reverse(),
+                    datasets: [
+                        {
+                            data: bloodPressureHistory.map(e => e.value_numeric || 0).reverse(),
+                            color: (opacity = 1) => `rgba(220, 53, 69, ${opacity})`, // Danger color for Systolic
+                            strokeWidth: 2
+                        },
+                        {
+                            data: bloodPressureHistory.map(e => e.value_numeric_secondary || 0).reverse(),
+                            color: (opacity = 1) => `rgba(25, 135, 84, ${opacity})`, // Success color for Diastolic
+                            strokeWidth: 2
+                        },
+                    ],
+                    legend: ['Systolic', 'Diastolic']
+                }}
+                width={Dimensions.get('window').width - 60}
+                height={220}
+                yAxisLabel=""
+                yAxisSuffix=" mmHg"
+                chartConfig={{
+                    backgroundColor: theme.colors.background,
+                    backgroundGradientFrom: theme.colors.background,
+                    backgroundGradientTo: theme.colors.background,
+                    decimalPlaces: 0,
+                    color: (opacity = 1) => `rgba(20, 36, 116, ${opacity})`,
+                    labelColor: (opacity = 1) => `rgba(108, 117, 125, ${opacity})`,
+                    style: { borderRadius: 16 },
+                    propsForDots: { r: '4', strokeWidth: '2' }
+                }}
+                bezier
+                style={{ marginVertical: 8, borderRadius: 16 }}
+            />
+          ) : (
+            <View style={styles.chartPlaceholder}>
+              <Ionicons name="analytics-outline" size={48} color={theme.colors.border} />
+              <Text style={styles.placeholderText}>No blood pressure history yet.</Text>
+              <Text style={styles.placeholderSubText}>Tap the button below to log your first reading!</Text>
+            </View>
+          )}
+          <Button
+            title="Log Blood Pressure"
+            onPress={() => setShowBpModal(true)}
+            icon={<Ionicons name="add-circle-outline" size={20} color={theme.colors.card} style={{ marginRight: 8 }} />}
+            style={{ marginTop: 16 }}
+          />
+        </View>
+
+        {/* Daily Activity Card */}
+        <View style={styles.card}>
+          {renderSectionHeader('Daily Activity', 'fitness-outline', 'Ionicons')}
+           {isLoadingActivity ? (
+            <ActivityIndicator color={theme.colors.primary} />
+          ) : activityHistory.length > 1 ? (
+            <BarChart
+                data={{
+                    labels: activityHistory.map(e => new Date(e.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })).reverse(),
+                    datasets: [{
+                        data: activityHistory.map(e => e.value_numeric || 0).reverse(),
+                    }]
+                }}
+                width={Dimensions.get('window').width - 60}
+                height={220}
+                yAxisLabel=""
+                yAxisSuffix=" min"
+                chartConfig={{
+                    backgroundColor: theme.colors.background,
+                    backgroundGradientFrom: theme.colors.background,
+                    backgroundGradientTo: theme.colors.background,
+                    decimalPlaces: 0,
+                    color: (opacity = 1) => `rgba(25, 135, 84, ${opacity})`, // Success color
+                    labelColor: (opacity = 1) => `rgba(108, 117, 125, ${opacity})`,
+                    style: { borderRadius: 16 },
+                }}
+                style={{ marginVertical: 8, borderRadius: 16 }}
+            />
+            ) : (
+            <View style={styles.chartPlaceholder}>
+                <Ionicons name="bicycle-outline" size={48} color={theme.colors.border} />
+                <Text style={styles.placeholderText}>No activity history yet.</Text>
+                <Text style={styles.placeholderSubText}>Log your activity to see your progress!</Text>
+            </View>
+            )}
+            <Button
+                title="Log Activity"
+                onPress={() => setShowActivityModal(true)}
+                icon={<Ionicons name="add-circle-outline" size={20} color={theme.colors.card} style={{ marginRight: 8 }} />}
+                style={{ marginTop: 16 }}
+            />
         </View>
 
         {/* Health Insights Section - Kept as is */}

@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Dimensions, ActivityIndicator, Text, Button } from 'react-native';
-import MapView, { Marker, Callout, Polyline } from 'react-native-maps';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, StyleSheet, Dimensions, ActivityIndicator, Text, Button, Linking, Platform } from 'react-native';
+import MapView, { Marker, Callout } from 'react-native-maps';
+import MapViewDirections from 'react-native-maps-directions';
 import { Appbar } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import Constants from 'expo-constants';
@@ -19,10 +20,15 @@ const ClinicFinderMapScreen = () => {
     const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [route, setRoute] = useState<any>(null);
-    const [isNavigating, setIsNavigating] = useState(false);
+    const [destination, setDestination] = useState<Clinic | null>(null);
+    const mapRef = useRef<MapView>(null);
+
+    const GOOGLE_MAPS_API_KEY = Constants.expoConfig?.extra?.GOOGLE_MAPS_API_KEY;
 
     useEffect(() => {
+        if (!GOOGLE_MAPS_API_KEY) {
+            setError("Google Maps API key is missing. Directions service will not work.");
+        }
         const initialize = async () => {
             try {
                 // Request location permissions
@@ -58,35 +64,34 @@ const ClinicFinderMapScreen = () => {
         initialize();
     }, []);
 
-    const handleNavigation = async (clinic: Clinic) => {
-        if (!userLocation) {
-            setError("Could not determine your location to start navigation.");
-            return;
+    const handleSelectClinic = (clinic: Clinic) => {
+        setDestination(clinic);
+        // Animate to fit the route
+        if (mapRef.current && userLocation) {
+            mapRef.current.fitToCoordinates(
+                [
+                    { latitude: userLocation.coords.latitude, longitude: userLocation.coords.longitude },
+                    { latitude: clinic.latitude, longitude: clinic.longitude },
+                ],
+                {
+                    edgePadding: { top: 100, right: 50, bottom: 50, left: 50 },
+                    animated: true,
+                }
+            );
         }
+    };
 
-        setIsNavigating(true);
-        setLoading(true);
+    const openInMaps = (clinic: Clinic) => {
+        const scheme = Platform.select({ ios: 'maps:0,0?q=', android: 'geo:0,0?q=' });
+        const latLng = `${clinic.latitude},${clinic.longitude}`;
+        const label = clinic.name;
+        const url = Platform.select({
+            ios: `${scheme}${label}@${latLng}`,
+            android: `${scheme}${latLng}(${label})`
+        });
 
-        try {
-            const backendUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL;
-            const response = await fetch(`${backendUrl}/api/v1/public/navigation/route`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    start: { lat: userLocation.coords.latitude, lon: userLocation.coords.longitude },
-                    end: { lat: clinic.latitude, lon: clinic.longitude },
-                }),
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to fetch route.');
-            }
-            const routeData = await response.json();
-            setRoute(routeData.data);
-        } catch (e) {
-            setError(e instanceof Error ? e.message : 'Failed to get route');
-        } finally {
-            setLoading(false);
+        if (url) {
+            Linking.openURL(url);
         }
     };
 
@@ -108,6 +113,7 @@ const ClinicFinderMapScreen = () => {
         )}
         {!loading && !error && (
             <MapView 
+                ref={mapRef}
                 style={styles.map}
                 initialRegion={{
                     latitude: userLocation ? userLocation.coords.latitude : 14.6760,
@@ -132,22 +138,33 @@ const ClinicFinderMapScreen = () => {
                         coordinate={{ latitude: clinic.latitude, longitude: clinic.longitude }}
                         title={clinic.name}
                     >
-                        <Callout onPress={() => handleNavigation(clinic)}>
-                            <View>
-                                <Text>{clinic.name}</Text>
-                                <Button title="Navigate" />
+                        <Callout>
+                            <View style={styles.calloutView}>
+                                <Text style={styles.calloutTitle}>{clinic.name}</Text>
+                                <Button title="See Route" onPress={() => handleSelectClinic(clinic)} />
+                                {destination && destination.id === clinic.id && (
+                                    <Button title="Get Directions" onPress={() => openInMaps(clinic)} />
+                                )}
                             </View>
                         </Callout>
                     </Marker>
                 ))}
+                {userLocation && destination && GOOGLE_MAPS_API_KEY && (
+                    <MapViewDirections
+                        origin={{
+                            latitude: userLocation.coords.latitude,
+                            longitude: userLocation.coords.longitude,
+                        }}
+                        destination={{
+                            latitude: destination.latitude,
+                            longitude: destination.longitude,
+                        }}
+                        apikey={GOOGLE_MAPS_API_KEY}
+                        strokeWidth={4}
+                        strokeColor="hotpink"
+                    />
+                )}
             </MapView>
-        )}
-        {isNavigating && route && (
-            <View style={styles.instructionsContainer}>
-                <Text style={styles.instructionsText}>
-                    Next: {route.instructions[0].instruction}
-                </Text>
-            </View>
         )}
     </View>
   );
@@ -184,6 +201,16 @@ const styles = StyleSheet.create({
   instructionsText: {
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  calloutView: {
+    padding: 10,
+    minWidth: 150,
+    alignItems: 'center',
+  },
+  calloutTitle: {
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginBottom: 5,
   },
 });
 

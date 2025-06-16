@@ -1,3 +1,5 @@
+DROP FUNCTION IF EXISTS public.search_suppliers(text, uuid);
+
 -- Function to search suppliers with filtering
 CREATE OR REPLACE FUNCTION search_suppliers(
     search_term TEXT DEFAULT NULL

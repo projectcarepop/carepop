@@ -1,3 +1,4 @@
+DROP FUNCTION IF EXISTS search_appointments(text,uuid);
 DROP FUNCTION IF EXISTS search_appointments(text,uuid,uuid,text,timestamptz,timestamptz);
 
 CREATE OR REPLACE FUNCTION search_appointments(

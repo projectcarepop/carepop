@@ -35,15 +35,13 @@ export class SupplierAdminService {
     page?: number;
     limit?: number;
     search?: string;
-    clinic_id?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
   }) {
-    const { page = 1, limit = 10, search, clinic_id, sortBy = 'name', sortOrder = 'asc' } = options;
+    const { page = 1, limit = 10, search, sortBy = 'name', sortOrder = 'asc' } = options;
     
     const rpcParams = {
         search_term: search,
-        p_clinic_id: clinic_id,
     };
 
     const { count, error: countError } = await supabase

@@ -51,13 +51,13 @@ export class InventoryAdminService {
   
   async findAll(options: {
     page?: number; limit?: number; search?: string; clinic_id?: string;
-    category_id?: string; supplier_id?: string; stock_level_threshold?: number;
+    supplier_id?: string; stock_level_threshold?: number;
     sortBy?: string; sortOrder?: 'asc' | 'desc';
   }) {
-    const { page = 1, limit = 10, search, clinic_id, category_id, supplier_id, stock_level_threshold, sortBy = 'name', sortOrder = 'asc' } = options;
+    const { page = 1, limit = 10, search, clinic_id, supplier_id, stock_level_threshold, sortBy = 'name', sortOrder = 'asc' } = options;
     
     const rpcParams = {
-        search_term: search, p_clinic_id: clinic_id, p_category_id: category_id,
+        search_term: search, p_clinic_id: clinic_id,
         p_supplier_id: supplier_id, p_stock_level_threshold: stock_level_threshold
     };
 
