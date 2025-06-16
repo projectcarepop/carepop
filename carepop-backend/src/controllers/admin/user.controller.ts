@@ -29,7 +29,6 @@ export const updateUserRoles = asyncHandler(async (req: Request, res: Response) 
 
     await userService.updateUserRoles(id, roles);
     
-    // Fetch the updated user view to return the latest data
     const updatedUser = await userService.findOne(id);
     if (!updatedUser) {
         throw new AppError('User not found after role update', StatusCodes.NOT_FOUND);
@@ -46,4 +45,4 @@ export const getMyProfile = asyncHandler(async (req: Request, res: Response) => 
     throw new AppError('Authenticated user not found on request.', StatusCodes.UNAUTHORIZED);
   }
   sendSuccess(res, req.user);
-}); 
+});

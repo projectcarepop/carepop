@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { theme } from '../components';
-import { useNavigation, NavigationProp } from '@react-navigation/native';
+import { useNavigation, useRoute, NavigationProp, RouteProp } from '@react-navigation/native';
 import { AppointmentStackParamList } from '../navigation/AppNavigator';
 import { useAuth } from '../context/AuthContext';
 import Constants from 'expo-constants';
@@ -15,16 +15,20 @@ interface Service {
   // Add other relevant fields if available, e.g., price, duration
 }
 
-type HealthServicesNavigationProp = NavigationProp<AppointmentStackParamList, 'ServiceSelection'>;
+type ServiceSelectionRouteProp = RouteProp<AppointmentStackParamList, 'ServiceSelection'>;
+type ServiceSelectionNavigationProp = NavigationProp<AppointmentStackParamList, 'ServiceSelection'>;
 
 export function HealthServicesScreen() {
-  const navigation = useNavigation<HealthServicesNavigationProp>();
+  const navigation = useNavigation<ServiceSelectionNavigationProp>();
+  const route = useRoute<ServiceSelectionRouteProp>();
+  const { clinicId } = route.params;
+
   const { session } = useAuth();
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchServices = useCallback(async () => {
+  const fetchServicesForClinic = useCallback(async () => {
     if (!session) {
       setError('You must be logged in to view services.');
       setIsLoading(false);
@@ -39,7 +43,7 @@ export function HealthServicesScreen() {
     }
 
     try {
-      const response = await fetch(`${backendUrl}/api/v1/public/services`, {
+      const response = await fetch(`${backendUrl}/api/v1/public/clinics/${clinicId}/services`, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
         },
@@ -48,25 +52,26 @@ export function HealthServicesScreen() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch services.');
+        throw new Error(data.message || 'Failed to fetch services for this clinic.');
       }
       
+      // The backend returns { data: [...] }, so we access data.data
       setServices(data.data || []);
     } catch (e: any) {
       setError(e.message || 'An unexpected error occurred.');
     } finally {
       setIsLoading(false);
     }
-  }, [session]);
+  }, [session, clinicId]);
 
   useEffect(() => {
-    fetchServices();
-  }, [fetchServices]);
+    fetchServicesForClinic();
+  }, [fetchServicesForClinic]);
 
   const handleSelectService = (service: Service) => {
-    navigation.navigate('ClinicSelection', {
+    navigation.navigate('DateTimeSelection', {
+      clinicId: clinicId,
       serviceId: service.id,
-      serviceName: service.name,
     });
   };
 
@@ -111,12 +116,10 @@ export function HealthServicesScreen() {
           renderItem={renderServiceItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContainer}
-          ListHeaderComponent={
-            <Text style={styles.title}>Select a Service</Text>
-          }
+          // The title is now set in the navigator, so we don't need a ListHeaderComponent here.
           ListEmptyComponent={
             <View style={styles.centeredContainer}>
-                <Text style={styles.placeholderText}>No services available at this time.</Text>
+                <Text style={styles.placeholderText}>No services available at this clinic.</Text>
             </View>
           }
         />
@@ -138,7 +141,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: theme.spacing.md,
   },
-  title: {
+  title: { // This style is no longer used for a header, but can be kept for other text
     fontSize: 28,
     fontWeight: 'bold',
     color: theme.colors.text,
@@ -148,6 +151,7 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.body,
     color: theme.colors.textMuted,
     textAlign: 'center',
+    marginTop: 50,
   },
   loadingText: {
     marginTop: theme.spacing.md,

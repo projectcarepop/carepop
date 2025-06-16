@@ -72,10 +72,10 @@ export type AboutUsStackParamList = {
 
 // --- Add new ParamList for the Appointment flow ---
 export type AppointmentStackParamList = {
-  ServiceSelection: undefined; // Previously HealthServicesScreen
-  ClinicSelection: { 
-    serviceId: string;
-    serviceName: string;
+  ClinicSelection: undefined; // Entry point
+  ServiceSelection: { 
+    clinicId: string;
+    clinicName: string;
   };
   DateTimeSelection: {
     serviceId: string;
@@ -207,14 +207,14 @@ function AppointmentStack() {
   return (
     <AppointmentStackNav.Navigator screenOptions={{ headerShown: true }}>
       <AppointmentStackNav.Screen 
-        name="ServiceSelection" 
-        component={HealthServicesScreen} 
-        options={{ title: 'Select a Service' }}
-      />
-      <AppointmentStackNav.Screen 
         name="ClinicSelection" 
         component={ClinicSelectionScreen} 
         options={{ title: 'Select a Clinic' }}
+      />
+      <AppointmentStackNav.Screen 
+        name="ServiceSelection" 
+        component={HealthServicesScreen} 
+        options={({ route }) => ({ title: route.params.clinicName })}
       />
       <AppointmentStackNav.Screen 
         name="DateTimeSelection" 

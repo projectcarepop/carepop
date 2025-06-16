@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { theme } from '../components';
-import { useNavigation, useRoute, NavigationProp, RouteProp } from '@react-navigation/native';
+import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { AppointmentStackParamList } from '../navigation/AppNavigator';
 import { useAuth } from '../context/AuthContext';
 import Constants from 'expo-constants';
@@ -15,14 +15,10 @@ interface Clinic {
   // Add other relevant fields, e.g., city, operating_hours
 }
 
-type ClinicSelectionRouteProp = RouteProp<AppointmentStackParamList, 'ClinicSelection'>;
 type ClinicSelectionNavigationProp = NavigationProp<AppointmentStackParamList, 'ClinicSelection'>;
 
 export const ClinicSelectionScreen = () => {
   const navigation = useNavigation<ClinicSelectionNavigationProp>();
-  const route = useRoute<ClinicSelectionRouteProp>();
-  const { serviceId, serviceName } = route.params;
-  
   const { session } = useAuth();
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -43,8 +39,7 @@ export const ClinicSelectionScreen = () => {
     }
 
     try {
-      // Note the `serviceIds[]` syntax for the query parameter
-      const response = await fetch(`${backendUrl}/api/v1/public/clinics?serviceIds[]=${serviceId}`, {
+      const response = await fetch(`${backendUrl}/api/v1/public/clinics`, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
         },
@@ -56,22 +51,23 @@ export const ClinicSelectionScreen = () => {
         throw new Error(data.message || 'Failed to fetch clinics.');
       }
       
-      setClinics(data.data?.clinics || []);
+      // Adjusted to match the new backend response from previous steps
+      setClinics(data.data.clinics || []);
     } catch (e: any) {
       setError(e.message || 'An unexpected error occurred.');
     } finally {
       setIsLoading(false);
     }
-  }, [session, serviceId]);
+  }, [session]);
 
   useEffect(() => {
     fetchClinics();
   }, [fetchClinics]);
 
   const handleSelectClinic = (clinic: Clinic) => {
-    navigation.navigate('DateTimeSelection', {
-      serviceId: serviceId,
+    navigation.navigate('ServiceSelection', {
       clinicId: clinic.id,
+      clinicName: clinic.name,
     });
   };
 
@@ -93,7 +89,7 @@ export const ClinicSelectionScreen = () => {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.centeredContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.loadingText}>Finding Clinics...</Text>
+          <Text style={styles.loadingText}>Loading Clinics...</Text>
         </View>
       </SafeAreaView>
     );
@@ -117,14 +113,11 @@ export const ClinicSelectionScreen = () => {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContainer}
           ListHeaderComponent={
-            <View>
-                <Text style={styles.title}>Select a Clinic</Text>
-                <Text style={styles.subtitle}>Showing clinics that offer: <Text style={styles.serviceNameText}>{serviceName}</Text></Text>
-            </View>
+            <Text style={styles.title}>Select a Clinic</Text>
           }
           ListEmptyComponent={
             <View style={styles.centeredContainer}>
-                <Text style={styles.placeholderText}>No clinics found for this service.</Text>
+                <Text style={styles.placeholderText}>No clinics are available at this time.</Text>
             </View>
           }
         />
@@ -150,22 +143,13 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: theme.colors.textMuted,
     marginBottom: theme.spacing.lg,
-  },
-  serviceNameText: {
-    fontWeight: '600',
-    color: theme.colors.primary
   },
   placeholderText: {
     fontSize: theme.typography.body,
     color: theme.colors.textMuted,
     textAlign: 'center',
-    marginTop: 50, // Add some top margin to center it better
+    marginTop: 50,
   },
   loadingText: {
     marginTop: theme.spacing.md,
