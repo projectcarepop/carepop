@@ -63,7 +63,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8
 
 async function getClinics(): Promise<Clinic[]> {
   // Use the correct public endpoint
-  const url = `${API_BASE_URL}/api/v1/clinics`;
+  const url = `${API_BASE_URL}/api/v1/public/clinics`;
   console.log(`Fetching clinics from: ${url}`);
   try {
     // Use an absolute URL for server-side fetch
@@ -82,7 +82,7 @@ async function getClinics(): Promise<Clinic[]> {
 }
 
 async function getServices(): Promise<Service[]> {
-  const url = `${API_BASE_URL}/api/v1/services`;
+  const url = `${API_BASE_URL}/api/v1/public/services`;
   console.log(`Fetching services from: ${url}`);
   try {
     const response = await fetch(url, { cache: 'no-store' });

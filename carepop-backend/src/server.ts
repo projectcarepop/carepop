@@ -44,6 +44,16 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
+// Add handlers for root and robots.txt
+app.get('/', (req, res) => {
+  res.status(200).json({ message: 'CarePoP Backend API is running.' });
+});
+
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain');
+  res.send('User-agent: *\nDisallow: /');
+});
+
 // --- Health Check ---
 app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ status: 'UP', message: 'Backend is healthy' });
