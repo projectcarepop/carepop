@@ -35,8 +35,8 @@ export const getDashboardStats = async () => {
         id, 
         created_at, 
         status,
-        profiles ( first_name, last_name ),
-        services ( name )
+        profiles!inner ( first_name, last_name ),
+        services!inner ( name )
       `).eq('status', 'pending_confirmation').order('created_at', { ascending: true }).limit(4)
     ]);
 
@@ -47,7 +47,10 @@ export const getDashboardStats = async () => {
     if (pendingAppointmentsCount.error) logger.error('Error fetching pending appointments count:', pendingAppointmentsCount.error.message);
     if (futureAppointments.error) logger.error('Error fetching future appointments:', futureAppointments.error.message);
     if (inventoryAlerts.error) logger.error('Error fetching inventory alerts:', inventoryAlerts.error.message);
-    if (pendingAppointmentsList.error) logger.error('Error fetching pending appointments list:', pendingAppointmentsList.error.message);
+    if (pendingAppointmentsList.error) {
+        logger.error('Error fetching pending appointments list:', pendingAppointmentsList.error.message);
+        throw new AppError('Failed to fetch pending appointments.', StatusCodes.INTERNAL_SERVER_ERROR);
+    }
 
     return {
       totalClinics: clinicsResult.count ?? 0,

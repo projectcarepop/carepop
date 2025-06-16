@@ -1,4 +1,6 @@
-import { Router, RequestHandler } from 'express';
+import { Router } from 'express';
+import { authMiddleware } from '../../lib/middleware/auth.middleware';
+import { authorize } from '../../lib/middleware/role.middleware';
 
 // Import modular route handlers
 import inventoryRoutes from './inventory.routes';
@@ -10,12 +12,9 @@ import serviceRoutes from './service.routes';
 import userRoutes from './user.routes';
 import appointmentRoutes from './appointment.routes';
 import profileRoutes from './profile.routes';
-import medicalRecordRoutes from './medical-record.routes';
 import reportRoutes from './report.routes';
 import dashboardRoutes from './dashboard.routes';
-import { authMiddleware } from '../../lib/middleware/auth.middleware';
-import { authorize } from '../../lib/middleware/role.middleware';
-// ... import other admin routes as they are modularized
+import medicalRecordAdminRoutes from './medicalRecord.admin.routes';
 
 const adminRouter = Router();
 
@@ -33,9 +32,8 @@ adminRouter.use('/services', serviceRoutes);
 adminRouter.use('/users', userRoutes);
 adminRouter.use('/appointments', appointmentRoutes);
 adminRouter.use('/profiles', profileRoutes);
-adminRouter.use('/medical-records', medicalRecordRoutes);
 adminRouter.use('/reports', reportRoutes);
 adminRouter.use('/dashboard', dashboardRoutes);
-// ... and so on
+adminRouter.use('/medical-records', medicalRecordAdminRoutes);
 
 export default adminRouter; 
