@@ -5,6 +5,19 @@ import logger from '@/utils/logger';
 import { supabaseServiceRole } from '@/config/supabaseClient';
 import { StatusCodes } from 'http-status-codes';
 
+type PendingAppointmentData = {
+  id: string;
+  created_at: string;
+  status: string;
+  user: {
+    first_name: string;
+    last_name: string;
+  };
+  service: {
+    name: string;
+  };
+};
+
 export const getDashboardStats = async () => {
   if (!supabaseServiceRole) {
     throw new AppError('Supabase service client not initialized.', StatusCodes.INTERNAL_SERVER_ERROR);
@@ -37,8 +50,8 @@ export const getDashboardStats = async () => {
         id, 
         created_at, 
         status,
-        profiles!inner ( first_name, last_name ),
-        services!inner ( name )
+        user:users_view!inner ( first_name, last_name ),
+        service:services!inner ( name )
       `).eq('status', 'pending_confirmation').order('created_at', { ascending: true }).limit(4)
     ]);
 
@@ -54,6 +67,21 @@ export const getDashboardStats = async () => {
         throw new AppError('Failed to fetch pending appointments.', StatusCodes.INTERNAL_SERVER_ERROR);
     }
 
+    const appointmentsData = pendingAppointmentsList.data as unknown as PendingAppointmentData[];
+
+    const transformedAppointments = appointmentsData?.map(appt => ({
+        id: appt.id,
+        createdAt: appt.created_at,
+        status: appt.status,
+        profile: {
+            firstName: appt.user.first_name ?? 'N/A',
+            lastName: appt.user.last_name ?? ''
+        },
+        service: {
+            name: appt.service.name ?? 'Unknown Service'
+        }
+    })) || [];
+
     return {
       totalClinics: clinicsResult.count ?? 0,
       totalProviders: providersResult.count ?? 0,
@@ -62,7 +90,7 @@ export const getDashboardStats = async () => {
       pendingAppointmentsCount: pendingAppointmentsCount.count ?? 0,
       futureAppointmentsCount: futureAppointments.count ?? 0,
       inventoryAlertsCount: inventoryAlerts.count ?? 0,
-      pendingAppointments: pendingAppointmentsList.data ?? []
+      pendingAppointments: transformedAppointments
     };
   } catch (error) {
     logger.error('Error in getDashboardStats service:', error);

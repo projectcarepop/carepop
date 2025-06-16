@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "carepop",
-    "slug": "carepop-mobile",
+    "name": "CarePop Mobile",
+    "slug": "nativeapp",
     "version": "1.0.0",
     "entryPoint": "./index.ts",
     "orientation": "portrait",
@@ -13,14 +13,22 @@
     },
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.carepop.mobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/carepop-logo-pink.png"
       },
       "package": "com.carepop.mobile",
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
