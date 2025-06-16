@@ -51,8 +51,8 @@ export const ClinicSelectionScreen = () => {
         throw new Error(data.message || 'Failed to fetch clinics.');
       }
       
-      // Adjusted to match the new backend response from previous steps
-      setClinics(data.data.clinics || []);
+      // Corrected to match the backend response { data: [...] }
+      setClinics(data.data || []);
     } catch (e: any) {
       setError(e.message || 'An unexpected error occurred.');
     } finally {

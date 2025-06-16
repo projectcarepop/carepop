@@ -34,6 +34,12 @@
       "EXPO_PUBLIC_BACKEND_API_URL": "https://carepop-backend-staging-199126225625.asia-southeast1.run.app"
     },
     "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location."
+        }
+      ],
       "expo-font",
       "expo-secure-store"
     ]

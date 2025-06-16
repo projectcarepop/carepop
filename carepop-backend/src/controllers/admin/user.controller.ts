@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
-import { UserAdminService } from '@/services/admin/user.service';
+import { UserAdminService } from '@/services/admin/userService';
 import { asyncHandler } from '@/lib/utils/asyncHandler';
 import { AppError } from '@/lib/utils/appError';
 import { sendSuccess } from '@/utils/responseHandler';

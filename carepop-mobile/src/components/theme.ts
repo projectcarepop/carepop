@@ -22,6 +22,7 @@ const colors = {
   inputBackground: '#FFFFFF', // Background for TextInput components
   disabled: '#ADB5BD', // Color for disabled text or icons
   disabledBackground: '#E9ECEF', // Background for disabled interactive elements
+  muted: '#CED4DA', // A slightly different grey for general muted/disabled states
   success: '#198754', // Color for success states/messages
   warning: '#FFC107', // Color for warning states/messages
   notification: '#ff4d6d', // Added to conform to NavigationTheme
