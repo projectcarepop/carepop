@@ -28,6 +28,12 @@ import { EditProfileScreen } from '../screens/EditProfileScreen';
 import { ClinicFinderScreen } from '../screens/ClinicFinderScreen';
 import { AboutUsScreen } from '../screens/AboutUsScreen';
 
+// Import new booking flow screens
+import { ClinicSelectionScreen } from '../screens/ClinicSelectionScreen';
+import { DateTimeSelectionScreen } from '../screens/DateTimeSelectionScreen';
+import { BookingConfirmationScreen } from '../screens/BookingConfirmationScreen';
+import { BookingSuccessScreen } from '../screens/BookingSuccessScreen';
+
 // Import Context and Theme
 import { useAuth } from '../context/AuthContext';
 import { theme } from '../components'; 
@@ -64,6 +70,26 @@ export type AboutUsStackParamList = {
   AboutUsMain: undefined;
 };
 
+// --- Add new ParamList for the Appointment flow ---
+export type AppointmentStackParamList = {
+  ServiceSelection: undefined; // Previously HealthServicesScreen
+  ClinicSelection: { 
+    serviceId: string;
+    serviceName: string;
+  };
+  DateTimeSelection: {
+    serviceId: string;
+    clinicId: string;
+  };
+  BookingConfirmation: {
+    serviceId: string;
+    clinicId: string;
+    // providerId: string; // Add provider later if needed
+    slot: string; // Combined date and time for simplicity
+  };
+  BookingSuccess: undefined;
+};
+
 export type RootStackParamList = {
   Loading: undefined; // Consider if Loading screen is needed here or handled in App.tsx
   Auth: undefined; 
@@ -86,7 +112,7 @@ export type HealthBuddyStackParamList = {
 const Drawer = createDrawerNavigator<MainDrawerParamList>();
 const AuthStackNav = createNativeStackNavigator<AuthStackParamList>();
 const RootStack = createNativeStackNavigator<RootStackParamList>();
-const AppointmentStackNav = createNativeStackNavigator(); 
+const AppointmentStackNav = createNativeStackNavigator<AppointmentStackParamList>(); // Use the new ParamList
 const HealthBuddyStackNav = createNativeStackNavigator<HealthBuddyStackParamList>(); // Use the new ParamList
 const MyProfileStackNav = createNativeStackNavigator<MyProfileStackParamList>(); 
 const ClinicFinderStackNav = createNativeStackNavigator<ClinicFinderStackParamList>(); 
@@ -181,17 +207,30 @@ function AppointmentStack() {
   return (
     <AppointmentStackNav.Navigator screenOptions={{ headerShown: true }}>
       <AppointmentStackNav.Screen 
-        name="SelectService" 
+        name="ServiceSelection" 
         component={HealthServicesScreen} 
-        // Hide header on initial screen of the stack
-        options={{ headerShown: false }}
+        options={{ title: 'Select a Service' }}
       />
       <AppointmentStackNav.Screen 
-        name="ServiceBooking" 
-        component={ServiceBookingScreen} 
-        options={{ title: 'Book Service' }} // Show header for deeper screens
+        name="ClinicSelection" 
+        component={ClinicSelectionScreen} 
+        options={{ title: 'Select a Clinic' }}
       />
-      {/* Add more appointment flow screens here */}
+      <AppointmentStackNav.Screen 
+        name="DateTimeSelection" 
+        component={DateTimeSelectionScreen} 
+        options={{ title: 'Select Date & Time' }}
+      />
+      <AppointmentStackNav.Screen 
+        name="BookingConfirmation" 
+        component={BookingConfirmationScreen} 
+        options={{ title: 'Confirm Appointment' }}
+      />
+      <AppointmentStackNav.Screen 
+        name="BookingSuccess" 
+        component={BookingSuccessScreen} 
+        options={{ headerShown: false }} // Typically no header on a success screen
+      />
     </AppointmentStackNav.Navigator>
   );
 }

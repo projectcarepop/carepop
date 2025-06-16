@@ -39,13 +39,11 @@ export const updateUserRoles = asyncHandler(async (req: Request, res: Response) 
 });
 
 export const getMyProfile = asyncHandler(async (req: Request, res: Response) => {
-  const user = (req as any).user;
-  if (!user || !user.id) {
-    throw new AppError('Authenticated user not found', StatusCodes.UNAUTHORIZED);
+  // The authMiddleware has already fetched and attached the full user profile.
+  // We can trust it and send it back directly.
+  if (!req.user) {
+    // This check is for type safety and as a fallback.
+    throw new AppError('Authenticated user not found on request.', StatusCodes.UNAUTHORIZED);
   }
-  const fullProfile = await userService.findOne(user.id);
-  if (!fullProfile) {
-    throw new AppError('User profile not found', StatusCodes.NOT_FOUND);
-  }
-  sendSuccess(res, fullProfile);
+  sendSuccess(res, req.user);
 }); 

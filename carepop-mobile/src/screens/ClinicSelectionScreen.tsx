@@ -1,32 +1,36 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { theme } from '../components';
-import { useNavigation, NavigationProp } from '@react-navigation/native';
+import { useNavigation, useRoute, NavigationProp, RouteProp } from '@react-navigation/native';
 import { AppointmentStackParamList } from '../navigation/AppNavigator';
 import { useAuth } from '../context/AuthContext';
 import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 
-// Define the structure of a Service object based on backend response
-interface Service {
+// Define the structure of a Clinic object
+interface Clinic {
   id: string;
   name: string;
-  description: string;
-  // Add other relevant fields if available, e.g., price, duration
+  address: string;
+  // Add other relevant fields, e.g., city, operating_hours
 }
 
-type HealthServicesNavigationProp = NavigationProp<AppointmentStackParamList, 'ServiceSelection'>;
+type ClinicSelectionRouteProp = RouteProp<AppointmentStackParamList, 'ClinicSelection'>;
+type ClinicSelectionNavigationProp = NavigationProp<AppointmentStackParamList, 'ClinicSelection'>;
 
-export function HealthServicesScreen() {
-  const navigation = useNavigation<HealthServicesNavigationProp>();
+export const ClinicSelectionScreen = () => {
+  const navigation = useNavigation<ClinicSelectionNavigationProp>();
+  const route = useRoute<ClinicSelectionRouteProp>();
+  const { serviceId, serviceName } = route.params;
+  
   const { session } = useAuth();
-  const [services, setServices] = useState<Service[]>([]);
+  const [clinics, setClinics] = useState<Clinic[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchServices = useCallback(async () => {
+  const fetchClinics = useCallback(async () => {
     if (!session) {
-      setError('You must be logged in to view services.');
+      setError('You must be logged in to view clinics.');
       setIsLoading(false);
       return;
     }
@@ -39,7 +43,8 @@ export function HealthServicesScreen() {
     }
 
     try {
-      const response = await fetch(`${backendUrl}/api/v1/public/services`, {
+      // Note the `serviceIds[]` syntax for the query parameter
+      const response = await fetch(`${backendUrl}/api/v1/public/clinics?serviceIds[]=${serviceId}`, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
         },
@@ -48,36 +53,36 @@ export function HealthServicesScreen() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch services.');
+        throw new Error(data.message || 'Failed to fetch clinics.');
       }
       
-      setServices(data.data || []);
+      setClinics(data.data?.clinics || []);
     } catch (e: any) {
       setError(e.message || 'An unexpected error occurred.');
     } finally {
       setIsLoading(false);
     }
-  }, [session]);
+  }, [session, serviceId]);
 
   useEffect(() => {
-    fetchServices();
-  }, [fetchServices]);
+    fetchClinics();
+  }, [fetchClinics]);
 
-  const handleSelectService = (service: Service) => {
-    navigation.navigate('ClinicSelection', {
-      serviceId: service.id,
-      serviceName: service.name,
+  const handleSelectClinic = (clinic: Clinic) => {
+    navigation.navigate('DateTimeSelection', {
+      serviceId: serviceId,
+      clinicId: clinic.id,
     });
   };
 
-  const renderServiceItem = ({ item }: { item: Service }) => (
-    <TouchableOpacity onPress={() => handleSelectService(item)} style={styles.serviceButton}>
-        <View style={styles.serviceIconContainer}>
-            <Ionicons name="medkit-outline" size={28} color={theme.colors.primary} />
+  const renderClinicItem = ({ item }: { item: Clinic }) => (
+    <TouchableOpacity onPress={() => handleSelectClinic(item)} style={styles.clinicButton}>
+        <View style={styles.clinicIconContainer}>
+            <Ionicons name="business-outline" size={32} color={theme.colors.primary} />
         </View>
-        <View style={styles.serviceTextContainer}>
-            <Text style={styles.serviceName}>{item.name}</Text>
-            <Text style={styles.serviceDescription} numberOfLines={2}>{item.description}</Text>
+        <View style={styles.clinicTextContainer}>
+            <Text style={styles.clinicName}>{item.name}</Text>
+            <Text style={styles.clinicAddress} numberOfLines={2}>{item.address}</Text>
         </View>
         <Ionicons name="chevron-forward-outline" size={24} color={theme.colors.textMuted} />
     </TouchableOpacity>
@@ -88,7 +93,7 @@ export function HealthServicesScreen() {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.centeredContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.loadingText}>Loading Services...</Text>
+          <Text style={styles.loadingText}>Finding Clinics...</Text>
         </View>
       </SafeAreaView>
     );
@@ -107,22 +112,25 @@ export function HealthServicesScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
         <FlatList
-          data={services}
-          renderItem={renderServiceItem}
+          data={clinics}
+          renderItem={renderClinicItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContainer}
           ListHeaderComponent={
-            <Text style={styles.title}>Select a Service</Text>
+            <View>
+                <Text style={styles.title}>Select a Clinic</Text>
+                <Text style={styles.subtitle}>Showing clinics that offer: <Text style={styles.serviceNameText}>{serviceName}</Text></Text>
+            </View>
           }
           ListEmptyComponent={
             <View style={styles.centeredContainer}>
-                <Text style={styles.placeholderText}>No services available at this time.</Text>
+                <Text style={styles.placeholderText}>No clinics found for this service.</Text>
             </View>
           }
         />
     </SafeAreaView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -142,12 +150,22 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: theme.colors.textMuted,
     marginBottom: theme.spacing.lg,
+  },
+  serviceNameText: {
+    fontWeight: '600',
+    color: theme.colors.primary
   },
   placeholderText: {
     fontSize: theme.typography.body,
     color: theme.colors.textMuted,
     textAlign: 'center',
+    marginTop: 50, // Add some top margin to center it better
   },
   loadingText: {
     marginTop: theme.spacing.md,
@@ -159,7 +177,7 @@ const styles = StyleSheet.create({
     color: theme.colors.destructive,
     textAlign: 'center',
   },
-  serviceButton: {
+  clinicButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.card,
@@ -169,18 +187,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  serviceIconContainer: {
+  clinicIconContainer: {
     marginRight: theme.spacing.md,
+    padding: theme.spacing.sm,
+    backgroundColor: theme.colors.primaryMuted,
+    borderRadius: theme.borderRadius.lg,
   },
-  serviceTextContainer: {
+  clinicTextContainer: {
     flex: 1,
   },
-  serviceName: {
+  clinicName: {
     fontSize: 18,
     fontWeight: '600',
     color: theme.colors.text,
   },
-  serviceDescription: {
+  clinicAddress: {
     fontSize: 14,
     color: theme.colors.textMuted,
     marginTop: 4,
