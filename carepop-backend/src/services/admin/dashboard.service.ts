@@ -50,7 +50,7 @@ export const getDashboardStats = async () => {
     if (futureAppointments.error) logger.error('Error fetching future appointments:', futureAppointments.error.message);
     if (inventoryAlerts.error) logger.error('Error fetching inventory alerts:', inventoryAlerts.error.message);
     if (pendingAppointmentsList.error) {
-        logger.error('Error fetching pending appointments list:', pendingAppointmentsList.error.message);
+        logger.error('Error fetching pending appointments list:', pendingAppointmentsList.error);
         throw new AppError('Failed to fetch pending appointments.', StatusCodes.INTERNAL_SERVER_ERROR);
     }
 
