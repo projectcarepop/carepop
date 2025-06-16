@@ -4,6 +4,7 @@ import serviceRoutes from './service.routes';
 import authRoutes from './auth.routes';
 import userRoutes from './user.routes';
 import navigationRoutes from './navigation.public.routes';
+import appointmentRoutes from './appointment.routes';
 
 
 const publicRouter = Router();
@@ -13,5 +14,6 @@ publicRouter.use('/clinics', clinicRoutes);
 publicRouter.use('/services', serviceRoutes);
 publicRouter.use('/users', userRoutes);
 publicRouter.use('/navigation', navigationRoutes);
+publicRouter.use('/appointments', appointmentRoutes);
 
 export default publicRouter; 

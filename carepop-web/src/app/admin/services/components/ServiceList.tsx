@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import useSWR from 'swr';
 import { useDebounce } from '@/hooks/useDebounce';
-import { fetcher } from '@/lib/utils/fetcher';
+import { fetcherWithAuth } from '@/lib/utils';
 
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -22,8 +22,13 @@ export default function ServiceList() {
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
-  const apiUrl = `/api/v1/admin/services?search=${debouncedSearchTerm}`;
-  const { data: services, error, isLoading } = useSWR<Service[]>(apiUrl, fetcher);
+  const apiUrl = useMemo(() => {
+    return `/api/v1/admin/services?search=${debouncedSearchTerm}`;
+  }, [debouncedSearchTerm]);
+
+  const { data: result, error, isLoading } = useSWR(apiUrl, fetcherWithAuth);
+  
+  const services: Service[] | undefined = result?.data?.data;
 
   return (
     <div className="space-y-4">
@@ -56,7 +61,10 @@ export default function ServiceList() {
               ))
             )}
             {error && (
-              <TableRow><TableCell colSpan={4} className="text-center text-red-500">Failed to load services.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={4} className="text-center text-red-500">Failed to load services: {error.message}</TableCell></TableRow>
+            )}
+            {services && services.length === 0 && !isLoading && (
+              <TableRow><TableCell colSpan={4} className="text-center">No services found.</TableCell></TableRow>
             )}
             {services && services.map((service) => (
               <TableRow key={service.id}>

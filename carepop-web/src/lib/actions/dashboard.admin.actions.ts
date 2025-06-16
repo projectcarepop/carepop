@@ -49,7 +49,7 @@ export async function getDashboardStats() {
     throw new Error('API base URL is not configured.');
   }
 
-  const response = await fetch(`${apiBaseUrl}/api/v1/admin/stats`, {
+  const response = await fetch(`${apiBaseUrl}/api/v1/admin/dashboard/stats`, {
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,

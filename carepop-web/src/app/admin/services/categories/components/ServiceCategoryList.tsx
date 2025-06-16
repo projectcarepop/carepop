@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import useSWR from 'swr';
 import { useDebounce } from '@/hooks/useDebounce';
-import { fetcher } from '@/lib/utils/fetcher';
+import { fetcherWithAuth } from '@/lib/utils';
 
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -19,8 +19,13 @@ export default function ServiceCategoryList() {
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
-  const apiUrl = `/api/v1/admin/service-categories?search=${debouncedSearchTerm}`;
-  const { data: categories, error, isLoading } = useSWR<ServiceCategory[]>(apiUrl, fetcher);
+  const apiUrl = useMemo(() => {
+    return `/api/v1/admin/service-categories?search=${debouncedSearchTerm}`;
+  }, [debouncedSearchTerm]);
+
+  const { data: result, error, isLoading } = useSWR(apiUrl, fetcherWithAuth);
+
+  const categories: ServiceCategory[] | undefined = result?.data?.data;
 
   return (
     <div className="space-y-4">
@@ -49,7 +54,10 @@ export default function ServiceCategoryList() {
               ))
             )}
             {error && (
-              <TableRow><TableCell colSpan={2} className="text-center text-red-500">Failed to load categories.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={2} className="text-center text-red-500">Failed to load categories: {error.message}</TableCell></TableRow>
+            )}
+            {categories && categories.length === 0 && !isLoading && (
+                <TableRow><TableCell colSpan={2} className="text-center">No categories found.</TableCell></TableRow>
             )}
             {categories && categories.map((category) => (
               <TableRow key={category.id}>

@@ -104,8 +104,8 @@ export function UserTable() {
   );
 
   React.useEffect(() => {
-    if (result) {
-      const mappedData = result.data.map((u: RawUserData) => ({
+    if (result && result.data && Array.isArray(result.data.data)) {
+      const mappedData = result.data.data.map((u: RawUserData) => ({
         id: u.user_id,
         email: u.email,
         firstName: u.first_name,
@@ -115,9 +115,9 @@ export function UserTable() {
       }));
 
       setData(mappedData);
-      setTotalPages(Math.ceil(result.count / pagination.pageSize));
+      setTotalPages(result.data.meta.totalPages);
     }
-  }, [result, pagination.pageSize]);
+  }, [result]);
 
   const handleDelete = async (userId: string) => {
     if (!confirm('Are you sure you want to delete this user? This may be irreversible.')) {
