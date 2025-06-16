@@ -2,10 +2,10 @@ import { createClient } from '@supabase/supabase-js';
 
 // Ensure these environment variables are set in your deployment environment.
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Supabase URL or Service Key is not defined in environment variables.');
+  throw new Error('Supabase URL or Service Role Key is not defined in environment variables. Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');
 }
 
 // Create a new Supabase client with the service role key.
