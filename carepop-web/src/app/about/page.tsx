@@ -95,15 +95,7 @@ const AboutPage = () => {
       {/* FPOP Partner Section */}
       <section className="w-full py-16 md:py-20 lg:py-24 bg-muted">
         <div className="container mx-auto px-4 md:px-6">
-          <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 xl:gap-16">
-            <Image
-              src="/FPOP-NCR.png"
-              width={600}
-              height={400}
-              alt="The logo of FPOP NCR Chapter"
-              className="mx-auto aspect-video overflow-hidden rounded-xl object-contain"
-              style={{ height: 'auto' }}
-            />
+          <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 xl:gap-16 items-center">
             <div className="flex flex-col justify-center space-y-6">
                 <div className="space-y-2">
                     <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl font-space-grotesk text-primary">Our Partner in Care</h2>
@@ -118,6 +110,14 @@ const AboutPage = () => {
                     </p>
                 </div>
             </div>
+            <Image
+              src="/FPOP-NCR.png"
+              width={600}
+              height={400}
+              alt="The logo of FPOP NCR Chapter"
+              className="mx-auto aspect-video overflow-hidden rounded-xl object-contain"
+              style={{ height: 'auto' }}
+            />
           </div>
         </div>
       </section>
@@ -167,7 +167,7 @@ const AboutPage = () => {
           </div>
           <div className="mx-auto grid max-w-5xl items-start gap-8 sm:grid-cols-2 md:gap-10 lg:grid-cols-3">
             {values.map((value) => (
-               <Card key={value.title} className="flex flex-col items-center justify-start text-center p-6 transition-all duration-300 ease-in-out hover:shadow-lg hover:scale-105 bg-transparent border-0 shadow-none">
+               <Card key={value.title} className="flex flex-col items-center justify-start text-center p-6 transition-all duration-300 ease-in-out md:hover:shadow-lg md:hover:scale-105 bg-transparent border-0 shadow-none">
                 <div className="mb-4 rounded-full bg-primary/10 p-4">
                   {React.cloneElement(value.icon, { className: "w-10 h-10 text-primary" })}
                 </div>
