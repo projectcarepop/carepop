@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ProviderForm, ProviderFormValues } from '../../components/ProviderForm'; // Adjusted import path
+import { ProviderForm } from '../../components/ProviderForm';
+import { ProviderFormValues } from '../../components/providerForm-types';
 import { useRouter, useParams } from 'next/navigation';
 import React, { useEffect, useState, useMemo } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'; // Ensure this is imported
@@ -13,7 +14,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client'; // Ensure t
 // that might be fetched, even if not all are used by ProviderFormValues directly.
 // This should align with ProviderFormProps['initialData']
 type InitialProviderData = Partial<ProviderFormValues> & { 
-  id?: string; 
+  id: string; // The ID is required for an existing provider
   isActive?: boolean; 
   specialization?: string | null; // Add this
   licenseNumber?: string | null;  // Add this
@@ -24,7 +25,8 @@ type InitialProviderData = Partial<ProviderFormValues> & {
 // Updated fetch function to make a real API call
 async function fetchProviderById(id: string, token: string): Promise<InitialProviderData | null> {
   console.log(`Fetching provider with ID: ${id} using token.`);
-  const response = await fetch(`/api/v1/admin/providers/${id}`, {
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+  const response = await fetch(`${baseUrl}/api/v1/admin/providers/${id}`, {
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,
@@ -41,7 +43,9 @@ async function fetchProviderById(id: string, token: string): Promise<InitialProv
   }
 
   const result = await response.json();
-  const providerData = result.data; // Assuming API returns { data: ProviderDetails }
+  // The API returns { status, data: { providerData } }
+  // So the actual provider data is in result.data
+  const providerData = result.data; 
 
   if (!providerData) {
     console.error(`No data found for provider with ID ${id} in API response.`);

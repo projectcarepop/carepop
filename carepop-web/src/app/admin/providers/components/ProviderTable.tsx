@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge';
 import { MoreHorizontal } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Link from 'next/link';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AppError, getErrorMessage, fetcher } from '@/lib/utils';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
 import { ColumnDef, useReactTable, getCoreRowModel, getPaginationRowModel, flexRender } from '@tanstack/react-table';
+import { useAuth } from '@/lib/contexts/AuthContext';
 
 // Type for the raw data from the API (snake_case)
 interface BackendProvider {
@@ -32,8 +32,6 @@ interface BackendProvider {
     contact_number: string | null;
     is_active: boolean;
     user_id: string;
-    // The RPC function also returns this in every row
-    total_count?: number; 
 }
 
 // Type for the frontend component's state and columns (camelCase)
@@ -53,28 +51,22 @@ export function ProviderTable() {
     const [totalPages, setTotalPages] = useState(1);
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
-    const [token, setToken] = useState<string | null>(null);
-
-    const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+    const { session } = useAuth();
+    const token = session?.access_token;
     const { toast } = useToast();
 
-    useEffect(() => {
-        const fetchToken = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            setToken(session?.access_token || null);
-        };
-        fetchToken();
-    }, [supabase.auth]);
-
     const apiUrl = useMemo(() => {
+        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
         const params = new URLSearchParams({
             page: (pagination.pageIndex + 1).toString(),
             limit: pagination.pageSize.toString(),
+            sortBy: 'last_name', // Default sort
+            sortOrder: 'asc',
         });
         if (debouncedSearchTerm) {
             params.append('search', debouncedSearchTerm);
         }
-        return `/api/v1/admin/providers?${params.toString()}`;
+        return `${baseUrl}/api/v1/admin/providers?${params.toString()}`;
     }, [pagination, debouncedSearchTerm]);
 
     const { data: result, error: swrError, isLoading, mutate } = useSWR(
@@ -108,7 +100,8 @@ export function ProviderTable() {
         try {
             if (!token) throw new AppError("Not authenticated", {} as Response);
             
-            const response = await fetch(`/api/v1/admin/providers/${providerId}`, {
+            const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+            const response = await fetch(`${baseUrl}/api/v1/admin/providers/${providerId}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` },
             });
@@ -224,7 +217,7 @@ export function ProviderTable() {
                             </TableRow>
                         ) : swrError ? (
                             <TableRow>
-                                <TableCell colSpan={columns.length} className="h-24 text-center text-destructive">{swrError.message}</TableCell>
+                                <TableCell colSpan={columns.length} className="h-24 text-center text-destructive">{getErrorMessage(swrError)}</TableCell>
                             </TableRow>
                         ) : table.getRowModel().rows.length > 0 ? (
                             table.getRowModel().rows.map(row => (

@@ -9,11 +9,11 @@ type DbPendingAppointment = {
   id: string;
   created_at: string;
   status: string;
-  user: {
+  profiles: {
     first_name: string;
     last_name: string;
   }[];
-  service: {
+  services: {
     name: string;
   }[];
 };
@@ -50,8 +50,8 @@ export const getDashboardStats = async () => {
         id,
         created_at,
         status,
-        user:profiles!inner(first_name, last_name),
-        service:services!inner(name)
+        profiles:user!inner(first_name, last_name),
+        services:service!inner(name)
       `).eq('status', 'pending_confirmation').order('created_at', { ascending: true }).limit(4)
     ]);
 
@@ -70,8 +70,8 @@ export const getDashboardStats = async () => {
     const appointmentsData = pendingAppointmentsList.data as DbPendingAppointment[];
 
     const transformedAppointments = appointmentsData?.map(appt => {
-        const user = appt.user?.[0];
-        const service = appt.service?.[0];
+        const user = appt.profiles?.[0];
+        const service = appt.services?.[0];
 
         return {
             id: appt.id,

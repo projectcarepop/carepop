@@ -120,10 +120,10 @@ export function ClinicTable() {
   );
 
   React.useEffect(() => {
-    if (result) {
-      // The API returns { data: [...], meta: {...} }
-      // So the actual array of clinics is in result.data
-      const clinicsArray = result.data || [];
+    if (result && result.data) {
+      // The final API response is { status: 'success', data: { data: [...], meta: {...} } }
+      // The array of clinics is in result.data.data
+      const clinicsArray = result.data.data || [];
       const mappedData = clinicsArray.map((c: BackendClinicData) => ({
         id: c.id,
         name: c.name,
@@ -138,9 +138,9 @@ export function ClinicTable() {
       }));
       setData(mappedData);
       
-      // The pagination metadata is in result.meta
-      if (result.meta) {
-        setTotalPages(result.meta.totalPages);
+      // The pagination metadata is in result.data.meta
+      if (result.data.meta) {
+        setTotalPages(result.data.meta.totalPages);
       }
     }
   }, [result]);
