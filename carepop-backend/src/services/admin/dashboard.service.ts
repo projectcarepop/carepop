@@ -12,10 +12,10 @@ type DbPendingAppointment = {
   profiles: {
     first_name: string;
     last_name: string;
-  }[];
+  } | null;
   services: {
     name: string;
-  }[];
+  } | null;
 };
 
 export const getDashboardStats = async () => {
@@ -50,8 +50,8 @@ export const getDashboardStats = async () => {
         id,
         created_at,
         status,
-        profiles:user!inner(first_name, last_name),
-        services:service!inner(name)
+        profiles!inner(first_name, last_name),
+        services!inner(name)
       `).eq('status', 'pending_confirmation').order('created_at', { ascending: true }).limit(4)
     ]);
 
@@ -67,11 +67,11 @@ export const getDashboardStats = async () => {
         throw new AppError('Failed to fetch pending appointments.', StatusCodes.INTERNAL_SERVER_ERROR);
     }
 
-    const appointmentsData = pendingAppointmentsList.data as DbPendingAppointment[];
+    const appointmentsData = pendingAppointmentsList.data as unknown as DbPendingAppointment[];
 
     const transformedAppointments = appointmentsData?.map(appt => {
-        const user = appt.profiles?.[0];
-        const service = appt.services?.[0];
+        const user = appt.profiles;
+        const service = appt.services;
 
         return {
             id: appt.id,
