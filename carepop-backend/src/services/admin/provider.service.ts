@@ -1,4 +1,4 @@
-import { supabase } from '@/config/supabaseClient';
+import { supabaseServiceRole } from '@/config/supabaseClient';
 import { Database } from '@/types/supabase.types';
 import { AppError } from '@/lib/utils/appError';
 import { StatusCodes } from 'http-status-codes';
@@ -21,7 +21,10 @@ export class ProviderAdminService {
   }
 
   async create(createDto: CreateProviderDto): Promise<Provider> {
-    const { data, error } = await supabase
+    if (!supabaseServiceRole) {
+      throw new AppError('Service client not available', StatusCodes.INTERNAL_SERVER_ERROR);
+    }
+    const { data, error } = await supabaseServiceRole
       .from(this.tableName)
       .insert(createDto)
       .select()
@@ -32,6 +35,9 @@ export class ProviderAdminService {
   }
   
   async findAll(options: { page: number, limit: number, search?: string, clinicId?: string, sortBy: string, sortOrder: 'asc' | 'desc' }) {
+    if (!supabaseServiceRole) {
+      throw new AppError('Service client not available', StatusCodes.INTERNAL_SERVER_ERROR);
+    }
     const { page, limit, search, clinicId, sortBy, sortOrder } = options;
     
     const rpcParams = { 
@@ -43,23 +49,28 @@ export class ProviderAdminService {
     const to = from + limit - 1;
 
     // The RPC function now returns total_count, so we make one call.
-    const { data, error: queryError } = await supabase
+    const { data, error: queryError } = await supabaseServiceRole
       .rpc('search_providers', rpcParams)
       .range(from, to)
       .order(sortBy, { ascending: sortOrder === 'desc' ? false : true });
 
     if (queryError) this.handleError(queryError, 'findAll (query)');
     
-    const count = data?.[0]?.total_count ?? 0;
+    const providers = data || [];
+    const totalItems = providers?.[0]?.total_count ?? 0;
+    const totalPages = Math.ceil(totalItems / limit);
     
     return {
-      data,
-      count
+      data: providers,
+      meta: { totalItems, itemsPerPage: limit, currentPage: page, totalPages },
     };
   }
 
   async findOne(id: string): Promise<Provider | null> {
-    const { data, error } = await supabase
+    if (!supabaseServiceRole) {
+      throw new AppError('Service client not available', StatusCodes.INTERNAL_SERVER_ERROR);
+    }
+    const { data, error } = await supabaseServiceRole
       .from(this.tableName)
       .select('*')
       .eq('id', id)
@@ -70,7 +81,10 @@ export class ProviderAdminService {
   }
 
   async update(id: string, updateDto: UpdateProviderDto): Promise<Provider | null> {
-    const { data, error } = await supabase
+    if (!supabaseServiceRole) {
+      throw new AppError('Service client not available', StatusCodes.INTERNAL_SERVER_ERROR);
+    }
+    const { data, error } = await supabaseServiceRole
       .from(this.tableName)
       .update(updateDto)
       .eq('id', id)
@@ -82,7 +96,10 @@ export class ProviderAdminService {
   }
 
   async remove(id: string): Promise<void> {
-    const { error } = await supabase
+    if (!supabaseServiceRole) {
+      throw new AppError('Service client not available', StatusCodes.INTERNAL_SERVER_ERROR);
+    }
+    const { error } = await supabaseServiceRole
       .from(this.tableName)
       .delete()
       .eq('id', id);

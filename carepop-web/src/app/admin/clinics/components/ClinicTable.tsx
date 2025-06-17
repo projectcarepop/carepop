@@ -37,10 +37,10 @@ import {
 } from '@/components/ui/table';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { AppError, fetcher } from '@/lib/utils';
+import { AppError, fetcher, getErrorMessage } from '@/lib/utils';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
+import { useAuth } from "@/lib/contexts/AuthContext";
 
 interface OperatingHour {
   day: string;
@@ -91,6 +91,7 @@ export function ClinicTable() {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = React.useState({});
   
   const [pagination, setPagination] = React.useState({
     pageIndex: 0, // tanstack-table uses 0-indexed pages
@@ -98,26 +99,19 @@ export function ClinicTable() {
   });
   const [totalPages, setTotalPages] = React.useState(0);
   const [searchTerm, setSearchTerm] = React.useState('');
-  const [debouncedSearchTerm] = useDebounce(searchTerm, 500); // 500ms delay
-  const [token, setToken] = React.useState<string | null>(null);
-
-  const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
+  const { session } = useAuth();
+  const token = session?.access_token;
+  
   const { toast } = useToast();
 
-  React.useEffect(() => {
-    const fetchToken = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setToken(session?.access_token || null);
-    };
-    fetchToken();
-  }, [supabase.auth]);
-  
   const apiUrl = React.useMemo(() => {
+    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
     const params = new URLSearchParams();
     params.append('page', (pagination.pageIndex + 1).toString());
     params.append('limit', pagination.pageSize.toString());
     if (debouncedSearchTerm) params.append('search', debouncedSearchTerm);
-    return `/api/v1/admin/clinics?${params.toString()}`;
+    return `${baseUrl}/api/v1/admin/clinics?${params.toString()}`;
   }, [pagination, debouncedSearchTerm]);
 
   const { data: result, error: swrError, isLoading, mutate } = useSWR(
@@ -126,9 +120,10 @@ export function ClinicTable() {
   );
 
   React.useEffect(() => {
-    if (result && result.data) {
-      // The actual array is in result.data.data
-      const clinicsArray = result.data.data || [];
+    if (result) {
+      // The API returns { data: [...], meta: {...} }
+      // So the actual array of clinics is in result.data
+      const clinicsArray = result.data || [];
       const mappedData = clinicsArray.map((c: BackendClinicData) => ({
         id: c.id,
         name: c.name,
@@ -142,9 +137,10 @@ export function ClinicTable() {
         updatedAt: c.updated_at,
       }));
       setData(mappedData);
-      // The pagination metadata is in result.data.meta
-      if (result.data.meta) {
-        setTotalPages(result.data.meta.totalPages);
+      
+      // The pagination metadata is in result.meta
+      if (result.meta) {
+        setTotalPages(result.meta.totalPages);
       }
     }
   }, [result]);
@@ -153,12 +149,12 @@ export function ClinicTable() {
     if (!confirm('Are you sure you want to delete this clinic? This action cannot be undone.')) return;
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new AppError("Not authenticated", {} as Response);
+      if (!token) throw new AppError("Not authenticated", {} as Response);
       
-      const response = await fetch(`/api/v1/admin/clinics/${clinicId}`, {
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+      const response = await fetch(`${baseUrl}/api/v1/admin/clinics/${clinicId}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${session.access_token}` },
+        headers: { 'Authorization': `Bearer ${token}` },
       });
 
       if (!response.ok) {
@@ -172,13 +168,13 @@ export function ClinicTable() {
       });
       mutate(); // Revalidate data after delete
 
-    } catch (err: unknown) {
-      const error = err as AppError | Error;
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+    } catch (error) {
+        console.error("Deletion failed:", error);
+        toast({
+          title: 'Error',
+          description: getErrorMessage(error),
+          variant: 'destructive',
+        });
     }
   };
   
@@ -250,15 +246,17 @@ export function ClinicTable() {
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
-    onPaginationChange: setPagination,
+    onRowSelectionChange: setRowSelection,
     state: {
       sorting,
       columnFilters,
       columnVisibility,
+      rowSelection,
       pagination,
     },
-    manualPagination: true,
     pageCount: totalPages,
+    manualPagination: true,
+    onPaginationChange: setPagination,
   });
 
   return (
@@ -271,7 +269,7 @@ export function ClinicTable() {
           className="max-w-sm"
         />
       </div>
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -294,7 +292,7 @@ export function ClinicTable() {
             ) : swrError ? (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center text-destructive">
-                  {swrError.message}
+                  {getErrorMessage(swrError)}
                 </TableCell>
               </TableRow>
             ) : table.getRowModel().rows?.length ? (

@@ -44,31 +44,26 @@ async function getAppointments(params: GetAppointmentsParams) {
     const offset = (page - 1) * per_page;
 
     let query = supabase
-        .from('appointments')
+        .from('detailed_appointments')
         .select(`
             id,
             status,
             appointment_datetime,
-            user:users_view (
-                first_name,
-                last_name,
-                email
-            ),
-            service:services (
-                name
-            ),
-            provider:providers (
-                first_name,
-                last_name
-            )
+            user,
+            service,
+            provider
         `, { count: 'exact' })
         .eq('clinic_id', clinicId)
         .range(offset, offset + per_page - 1)
         .order(sortField, { ascending: sortOrder === 'asc' });
 
     if (search) {
-        // A more robust search would use a tsvector. This is a simple placeholder.
-        query = query.or(`users_view.first_name.ilike.%${search}%,users_view.last_name.ilike.%${search}%,users_view.email.ilike.%${search}%,services.name.ilike.%${search}%`);
+        query = query.or(
+            `user->>first_name.ilike.%${search}%,` +
+            `user->>last_name.ilike.%${search}%,` +
+            `user->>email.ilike.%${search}%,` +
+            `service->>name.ilike.%${search}%`
+        );
     }
 
     const { data, error, count } = await query;

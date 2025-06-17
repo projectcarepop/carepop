@@ -23,8 +23,8 @@ import { AppError, getErrorMessage, fetcher } from '@/lib/utils';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
 import { ColumnDef, useReactTable, getCoreRowModel, getPaginationRowModel, flexRender } from '@tanstack/react-table';
 
-// Define the structure for a Provider
-interface IProvider {
+// Type for the raw data from the API (snake_case)
+interface BackendProvider {
     id: string;
     first_name: string;
     last_name: string;
@@ -32,10 +32,23 @@ interface IProvider {
     contact_number: string | null;
     is_active: boolean;
     user_id: string;
+    // The RPC function also returns this in every row
+    total_count?: number; 
+}
+
+// Type for the frontend component's state and columns (camelCase)
+interface Provider {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    contactNumber: string | null;
+    isActive: boolean;
+    userId: string;
 }
 
 export function ProviderTable() {
-    const [data, setData] = useState<IProvider[]>([]);
+    const [data, setData] = useState<Provider[]>([]);
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
     const [totalPages, setTotalPages] = useState(1);
     const [searchTerm, setSearchTerm] = useState('');
@@ -71,8 +84,21 @@ export function ProviderTable() {
 
     useEffect(() => {
         if (result?.data) {
-            setData(result.data.providers || result.data || []);
-            setTotalPages(result.data.totalPages || 0);
+            const backendProviders = result.data.data || [];
+            const mappedData = backendProviders.map((p: BackendProvider) => ({
+                id: p.id,
+                firstName: p.first_name,
+                lastName: p.last_name,
+                email: p.email,
+                contactNumber: p.contact_number,
+                isActive: p.is_active,
+                userId: p.user_id,
+            }));
+            setData(mappedData);
+
+            if (result.data.meta) {
+                setTotalPages(result.data.meta.totalPages);
+            }
         }
     }, [result]);
 
@@ -107,20 +133,20 @@ export function ProviderTable() {
         }
     }, [token, toast, mutate]);
 
-    const columns = useMemo<ColumnDef<IProvider>[]>(() => [
+    const columns = useMemo<ColumnDef<Provider>[]>(() => [
         {
-            accessorKey: 'first_name',
+            accessorKey: 'firstName',
             header: 'Name',
-            cell: ({ row }) => `${row.original.first_name} ${row.original.last_name}`
+            cell: ({ row }) => `${row.original.firstName} ${row.original.lastName}`
         },
         { accessorKey: 'email', header: 'Email' },
-        { accessorKey: 'contact_number', header: 'Phone' },
+        { accessorKey: 'contactNumber', header: 'Phone' },
         {
-            accessorKey: 'is_active',
+            accessorKey: 'isActive',
             header: 'Status',
             cell: ({ row }) => (
-                <Badge variant={row.original.is_active ? 'default' : 'secondary'}>
-                    {row.original.is_active ? 'Active' : 'Inactive'}
+                <Badge variant={row.original.isActive ? 'default' : 'secondary'}>
+                    {row.original.isActive ? 'Active' : 'Inactive'}
                 </Badge>
             )
         },
@@ -178,7 +204,7 @@ export function ProviderTable() {
                     />
                 </div>
             </div>
-            <div className="rounded-md border">
+            <div className="rounded-md border overflow-x-auto">
                 <Table>
                     <TableHeader>
                         {table.getHeaderGroups().map(headerGroup => (

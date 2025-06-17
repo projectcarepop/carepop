@@ -5,17 +5,17 @@ import logger from '@/utils/logger';
 import { supabaseServiceRole } from '@/config/supabaseClient';
 import { StatusCodes } from 'http-status-codes';
 
-type PendingAppointmentData = {
+type DbPendingAppointment = {
   id: string;
   created_at: string;
   status: string;
   user: {
     first_name: string;
     last_name: string;
-  };
+  }[];
   service: {
     name: string;
-  };
+  }[];
 };
 
 export const getDashboardStats = async () => {
@@ -47,11 +47,11 @@ export const getDashboardStats = async () => {
       supabaseServiceRole.from('appointments').select('id', { count: 'exact', head: true }).gte('appointment_datetime', today.toISOString()),
       supabaseServiceRole.from('inventory_items').select('id', { count: 'exact', head: true }).lte('quantity_on_hand', 0),
       supabaseServiceRole.from('appointments').select(`
-        id, 
-        created_at, 
+        id,
+        created_at,
         status,
-        user:users_view!inner ( first_name, last_name ),
-        service:services!inner ( name )
+        user:profiles!inner(first_name, last_name),
+        service:services!inner(name)
       `).eq('status', 'pending_confirmation').order('created_at', { ascending: true }).limit(4)
     ]);
 
@@ -67,20 +67,24 @@ export const getDashboardStats = async () => {
         throw new AppError('Failed to fetch pending appointments.', StatusCodes.INTERNAL_SERVER_ERROR);
     }
 
-    const appointmentsData = pendingAppointmentsList.data as unknown as PendingAppointmentData[];
+    const appointmentsData = pendingAppointmentsList.data as DbPendingAppointment[];
 
-    const transformedAppointments = appointmentsData?.map(appt => ({
-        id: appt.id,
-        createdAt: appt.created_at,
-        status: appt.status,
-        profile: {
-            firstName: appt.user.first_name ?? 'N/A',
-            lastName: appt.user.last_name ?? ''
-        },
-        service: {
-            name: appt.service.name ?? 'Unknown Service'
+    const transformedAppointments = appointmentsData?.map(appt => {
+        const user = appt.user?.[0];
+        const service = appt.service?.[0];
+
+        return {
+            id: appt.id,
+            created_at: appt.created_at,
+            status: appt.status,
+            patients: { 
+                fullName: `${user?.first_name ?? ''} ${user?.last_name ?? ''}`.trim() || 'Unknown Patient'
+            },
+            services: {
+                name: service?.name ?? 'Unknown Service'
+            }
         }
-    })) || [];
+    }) || [];
 
     return {
       totalClinics: clinicsResult.count ?? 0,
