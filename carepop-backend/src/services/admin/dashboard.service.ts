@@ -50,8 +50,8 @@ export const getDashboardStats = async () => {
         id,
         created_at,
         status,
-        profiles!inner(first_name, last_name),
-        services!inner(name)
+        profiles ( first_name, last_name ),
+        services ( name )
       `).eq('status', 'pending_confirmation').order('created_at', { ascending: true }).limit(4)
     ]);
 
