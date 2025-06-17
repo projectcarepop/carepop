@@ -1,104 +1,77 @@
-'use client';
-
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { PlusCircle } from 'lucide-react';
-import { AppointmentTable } from './components/AppointmentTable'; 
-import { useState, useEffect, useMemo } from 'react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
+import AppointmentPageClient from './components/AppointmentPageClient';
+import { AppointmentTable } from './components/AppointmentTable';
+import { redirect } from 'next/navigation';
 
-interface Clinic {
-  id: string;
-  name: string;
+async function getClinics() {
+    const supabase = await createSupabaseServerClient();
+    const { data: clinics, error } = await supabase
+        .from('clinics')
+        .select('id, name')
+        .order('name', { ascending: true });
+
+    if (error) {
+        console.error('Error fetching clinics:', error);
+        return [];
+    }
+    return clinics;
 }
 
-export default function AdminAppointmentsPage() {
-  const [clinics, setClinics] = useState<Clinic[]>([]);
-  const [selectedClinicId, setSelectedClinicId] = useState<string | null>(null);
-  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+export default async function AdminAppointmentsPage({
+  searchParams,
+}: {
+  searchParams: { clinicId?: string, page?: string, per_page?: string, sort?: string, search?: string };
+}) {
+  const clinics = await getClinics();
+  const selectedClinicId = searchParams.clinicId ?? (clinics.length > 0 ? clinics[0].id : null);
+  
+  if (clinics.length > 0 && !searchParams.clinicId) {
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.set('clinicId', clinics[0].id);
+    redirect(`/admin/appointments?${newSearchParams.toString()}`);
+  }
 
-  useEffect(() => {
-    const fetchClinics = async () => {
-      try {
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL;
-        if (!backendUrl) throw new Error("Backend URL is not configured.");
-
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError || !sessionData.session) throw new Error("Not authenticated");
-        
-        const response = await fetch(`${backendUrl}/api/v1/admin/clinics`, {
-            headers: { 'Authorization': `Bearer ${sessionData.session.access_token}` }
-        });
-        if (!response.ok) {
-            const errorBody = await response.json().catch(() => ({ message: response.statusText }));
-            throw new Error(`Failed to fetch clinics: ${response.status} ${response.statusText} - ${errorBody.message}`);
-        }
-
-        const result = await response.json();
-
-        // The API returns a paginated object like { data: { data: [...] } }
-        const clinicsArray = result?.data?.data;
-
-        if (Array.isArray(clinicsArray)) {
-          setClinics(clinicsArray);
-          if (clinicsArray.length > 0) {
-              setSelectedClinicId(clinicsArray[0].id);
-          }
-        } else {
-          console.error("API did not return a valid array of clinics:", result);
-          setClinics([]); // Set to an empty array to prevent crash
-        }
-      } catch (error) {
-        console.error("Error fetching clinics:", error);
-      }
-    };
-    fetchClinics();
-  }, [supabase]);
+  if (!clinics || clinics.length === 0) {
+    return (
+        <div className="flex flex-col w-full gap-4 items-center text-center">
+            <h1 className="text-2xl font-bold">Appointment Management</h1>
+            <p className="text-muted-foreground">No clinics found.</p>
+            <Button asChild>
+                <Link href="/admin/clinics/new">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add First Clinic
+                </Link>
+            </Button>
+        </div>
+    )
+  }
 
   return (
-    <div className="flex flex-col w-full gap-4">
+    <div className="flex flex-col gap-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Appointment Management</h1>
+        <h1 className="text-2xl font-bold">Manage Appointments</h1>
         <Button asChild>
           <Link href="/admin/appointments/new">
-             <PlusCircle className="mr-2 h-4 w-4" /> Book New Appointment
+            <PlusCircle className="mr-2 h-4 w-4" />
+            New Appointment
           </Link>
         </Button>
       </div>
-       <p className="text-muted-foreground">
-        View, confirm, and manage all appointments across your clinics.
-      </p>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-4">
-            <CardTitle className="text-md whitespace-nowrap">Select Clinic</CardTitle>
-            <div className="w-full max-w-sm">
-                <Select onValueChange={setSelectedClinicId} value={selectedClinicId || ''}>
-                    <SelectTrigger>
-                    <SelectValue placeholder="Select a clinic..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                    {clinics.map(clinic => (
-                        <SelectItem key={clinic.id} value={clinic.id}>{clinic.name}</SelectItem>
-                    ))}
-                    </SelectContent>
-                </Select>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-            {selectedClinicId ? (
-                <AppointmentTable clinicId={selectedClinicId} />
-            ) : (
-                <div className="text-center p-8 text-muted-foreground">
-                    {clinics.length > 0 ? "Select a clinic to view appointments." : "No clinics found or loading..."}
-                </div>
-            )}
-        </CardContent>
-      </Card>
+      <AppointmentPageClient 
+        clinics={clinics} 
+        initialClinicId={selectedClinicId}
+        table={
+            <AppointmentTable 
+                clinicId={selectedClinicId!} 
+                page={searchParams.page ? parseInt(searchParams.page) : 1}
+                per_page={searchParams.per_page ? parseInt(searchParams.per_page) : 10}
+                sort={searchParams.sort}
+                search={searchParams.search}
+            />
+        }
+      />
     </div>
-  );
+  )
 } 

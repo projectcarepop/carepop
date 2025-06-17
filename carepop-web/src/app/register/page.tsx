@@ -2,61 +2,76 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-// import { useRouter } from 'next/navigation'; // Removed unused import
+import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import { useAuth } from '../../lib/contexts/AuthContext';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../components/ui/card';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '../../components/ui/card';
 import { Lock, Eye, EyeOff } from 'lucide-react'; // Icons
 import GoogleIcon from '../../components/ui/GoogleIcon'; // Added GoogleIcon import
 import { useGoogleLogin } from '@react-oauth/google';
 import axios from 'axios';
+import { useToast } from '@/hooks/use-toast';
+
+const registerSchema = z.object({
+  email: z.string().email({ message: 'Invalid email address.' }),
+  password: z.string().min(8, { message: 'Password must be at least 8 characters.' }),
+});
+
+type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
-  // const router = useRouter(); // Removed unused constant
+  const router = useRouter();
+  const { toast } = useToast();
   const { signUp, loginWithGoogle, loading } = useAuth();
-  const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [apiError, setApiError] = useState('');
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.id]: e.target.value });
-  };
+  const form = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+  });
 
-  const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setError('');
+  const {
+    handleSubmit,
+    register,
+    formState: { errors },
+  } = form;
 
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters long.');
-      return;
-    }
-
+  const onSubmit = async (data: RegisterFormValues) => {
+    setApiError('');
     try {
-      await signUp(formData);
-      setShowSuccessModal(true);
+      await signUp(data);
+      toast({
+        title: "Registration Successful",
+        description: "Please check your email to verify your account.",
+      });
+      router.push('/login');
     } catch (err) {
         if (axios.isAxiosError(err) && err.response) {
             if (err.response.data?.message?.includes('already been registered')) {
-                setError('This email address is already in use. Please log in or use a different email.');
+                setApiError('This email address is already in use. Please log in or use a different email.');
             } else {
-                setError(err.response.data.message || 'Registration failed. Please try again.');
+                setApiError(err.response.data.message || 'Registration failed. Please try again.');
             }
         } else if (err instanceof Error) {
-            setError(err.message);
+            setApiError(err.message);
         } else {
-            setError('An unknown error occurred during registration.');
+            setApiError('An unknown error occurred during registration.');
         }
     }
   };
@@ -65,11 +80,11 @@ export default function RegisterPage() {
     onSuccess: (codeResponse) => {
         loginWithGoogle(codeResponse.code).catch((err: unknown) => {
             if (axios.isAxiosError(err) && err.response) {
-                setError(err.response.data.message || 'Google login failed.');
+                setApiError(err.response.data.message || 'Google login failed.');
             } else if (err instanceof Error) {
-                setError(err.message);
+                setApiError(err.message);
             } else {
-                setError('An unknown error occurred during Google login.');
+                setApiError('An unknown error occurred during Google login.');
             }
         });
     },
@@ -84,10 +99,11 @@ export default function RegisterPage() {
           <CardDescription className="text-center">Enter your details to register.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleRegister} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="you@example.com" required onChange={handleInputChange} />
+              <Input id="email" type="email" placeholder="you@example.com" {...register('email')} />
+              {errors.email && <p className="text-sm text-destructive pt-1">{errors.email.message}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
@@ -97,9 +113,7 @@ export default function RegisterPage() {
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
-                  required
-                  minLength={8}
-                  onChange={handleInputChange}
+                  {...register('password')}
                   className="pl-10 pr-10"
                 />
                 <Button
@@ -112,8 +126,9 @@ export default function RegisterPage() {
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </Button>
               </div>
+              {errors.password && <p className="text-sm text-destructive pt-1">{errors.password.message}</p>}
             </div>
-            {error && <p className="text-sm text-destructive text-center">{error}</p>}
+            {apiError && <p className="text-sm text-destructive text-center">{apiError}</p>}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Registering...' : 'Create Account'}
             </Button>
@@ -142,22 +157,6 @@ export default function RegisterPage() {
           </p>
         </CardFooter>
       </Card>
-
-      <AlertDialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Registration Successful</AlertDialogTitle>
-            <AlertDialogDescription>
-              Please check your email to verify your account. You will be able to log in after verification.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction asChild>
-              <Link href="/login">OK</Link>
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 } 

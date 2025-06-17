@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { LogOut, ArrowRight, ChevronDown, Menu } from 'lucide-react';
+import { motion } from 'framer-motion';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -80,9 +81,19 @@ export default function Header() {
               <Button variant="default" asChild className="bg-primary text-background rounded-full px-4 py-2 text-sm font-medium focus:outline-none">
                 <Link href="/login" className="flex items-center group">
                   Get Started
-                  <span className="ml-2 bg-background text-primary rounded-full p-1 flex items-center justify-center transition-transform duration-200 ease-in-out group-hover:translate-x-1">
+                  <motion.span
+                    animate={{ x: [0, 5, 0] }}
+                    transition={{
+                      duration: 1.5,
+                      repeat: Infinity,
+                      repeatType: "loop",
+                      ease: "easeInOut",
+                      delay: 2
+                    }}
+                    className="ml-2 bg-background text-primary rounded-full p-1 flex items-center justify-center"
+                  >
                     <ArrowRight className="h-4 w-4" />
-                  </span>
+                  </motion.span>
                 </Link>
               </Button>
             </>
@@ -137,7 +148,18 @@ export default function Header() {
                   <DropdownMenuItem asChild className="bg-primary text-primary-foreground hover:bg-primary/90 focus:bg-primary/90 font-semibold rounded-md">
                     <Link href="/login" className="flex items-center justify-between w-full group">
                       <span>Get Started</span>
-                      <ArrowRight className="h-5 w-5 ml-2 transition-transform duration-200 ease-in-out group-hover:translate-x-1 text-primary-foreground" />
+                      <motion.span
+                        animate={{ x: [0, 5, 0] }}
+                        transition={{
+                            duration: 1.5,
+                            repeat: Infinity,
+                            repeatType: "loop",
+                            ease: "easeInOut",
+                            delay: 2
+                        }}
+                      >
+                        <ArrowRight className="h-5 w-5 ml-2 text-primary-foreground" />
+                      </motion.span>
                     </Link>
                   </DropdownMenuItem>
                 </>

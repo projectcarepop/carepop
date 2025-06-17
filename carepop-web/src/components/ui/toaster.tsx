@@ -9,7 +9,7 @@ import {
   ToastTitle,
   ToastViewport,
 } from "@/components/ui/toast"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 
 type ToastProps = {
     id: string;
@@ -18,7 +18,7 @@ type ToastProps = {
     action?: React.ReactNode;
 }
 
-function Toaster() {
+export function Toaster() {
   const { toasts } = useToast()
 
   return (
@@ -41,5 +41,3 @@ function Toaster() {
     </ToastProvider>
   )
 }
-
-export { Toaster }

@@ -87,6 +87,8 @@ const AboutPage = () => {
               height={400}
               alt="The CarePoP Team"
               className="mx-auto aspect-[3/2] overflow-hidden rounded-xl object-cover object-center"
+              priority
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
           </div>
         </div>
@@ -115,8 +117,8 @@ const AboutPage = () => {
               width={600}
               height={400}
               alt="The logo of FPOP NCR Chapter"
-              className="mx-auto aspect-video overflow-hidden rounded-xl object-contain"
-              style={{ height: 'auto' }}
+              className="mx-auto aspect-video h-auto w-full max-w-[500px] overflow-hidden rounded-xl object-contain"
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
           </div>
         </div>

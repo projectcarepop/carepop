@@ -137,7 +137,7 @@ export default function DashboardPage() {
     <div className="bg-gray-50 dark:bg-gray-900 min-h-screen font-sans">
       <main className="container mx-auto py-10 px-4 space-y-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-200">
               Welcome, {user?.first_name || 'User'}!

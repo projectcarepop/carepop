@@ -53,7 +53,7 @@ const howItWorksSteps = [
 
 export default function Home() {
   return (
-    <>
+    <main>
       {/* Hero Section */}
       <section className="w-full py-16 md:py-20 lg:py-24">
         <div className="container mx-auto px-4 md:px-6">
@@ -86,6 +86,8 @@ export default function Home() {
               height={400}
               alt="Hero Image - A diverse group of people's hands together in a circle, showing unity and support"
               className="mx-auto aspect-[3/2] overflow-hidden rounded-xl object-cover"
+              priority
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
           </div>
         </div>
@@ -102,19 +104,19 @@ export default function Home() {
               </p>
             </div>
           </div>
-          <div className="mx-auto grid max-w-5xl items-start gap-10 sm:grid-cols-2 md:grid-cols-2 md:gap-12 lg:grid-cols-4 mt-12">
+          <ul className="mx-auto grid max-w-5xl items-start gap-10 sm:grid-cols-2 md:grid-cols-2 md:gap-12 lg:grid-cols-4 mt-12">
             {features.map((feature) => (
-              <div key={feature.title} className="grid gap-2 text-center">
-                 <div className="flex justify-center items-center mb-2">
+              <li key={feature.title} className="grid gap-2 text-center">
+                 <div role="img" aria-label={feature.title} className="flex justify-center items-center mb-2">
                   {feature.icon}
                 </div>
                 <h3 className="text-lg font-bold font-space-grotesk">{feature.title}</h3>
                 <p className="text-sm text-muted-foreground font-inter">
                   {feature.description}
                 </p>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       </section>
 
@@ -166,6 +168,6 @@ export default function Home() {
               </div>
           </div>
       </section>
-    </>
+    </main>
   );
 }
