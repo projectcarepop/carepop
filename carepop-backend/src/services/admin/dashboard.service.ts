@@ -5,18 +5,14 @@ import logger from '@/utils/logger';
 import { supabaseServiceRole } from '@/config/supabaseClient';
 import { StatusCodes } from 'http-status-codes';
 
-// The type must match the query result structure
-type DbPendingAppointment = {
+// This type now matches the flat structure from our RPC function
+type PendingAppointmentDetails = {
   id: string;
   created_at: string;
   status: string;
-  profiles: {
-    first_name: string;
-    last_name: string;
-  }[] | null;
-  services: {
-    name: string;
-  }[] | null;
+  user_first_name: string;
+  user_last_name: string;
+  service_name: string;
 };
 
 export const getDashboardStats = async () => {
@@ -47,15 +43,8 @@ export const getDashboardStats = async () => {
       supabaseServiceRole.from('appointments').select('id', { count: 'exact', head: true }).eq('status', 'pending_confirmation'),
       supabaseServiceRole.from('appointments').select('id', { count: 'exact', head: true }).gte('appointment_datetime', today.toISOString()),
       supabaseServiceRole.from('inventory_items').select('id', { count: 'exact', head: true }).lte('quantity_on_hand', 0),
-      // CORRECTED QUERY STARTS HERE
-      supabaseServiceRole.from('appointments').select(`
-        id,
-        created_at,
-        status,
-        profiles ( first_name, last_name ),
-        services ( name )
-      `).eq('status', 'pending_confirmation').order('created_at', { ascending: true }).limit(4)
-      // CORRECTED QUERY ENDS HERE
+      // NEW RPC CALL HERE
+      supabaseServiceRole.rpc('get_pending_appointments_with_details')
     ]);
 
     if (clinicsResult.error) logger.error('Error fetching clinics count:', clinicsResult.error);
@@ -66,25 +55,23 @@ export const getDashboardStats = async () => {
     if (futureAppointments.error) logger.error('Error fetching future appointments:', futureAppointments.error.message);
     if (inventoryAlerts.error) logger.error('Error fetching inventory alerts:', inventoryAlerts.error.message);
     if (pendingAppointmentsList.error) {
-        logger.error('Error fetching pending appointments list:', pendingAppointmentsList.error);
+        logger.error('Error fetching pending appointments list via RPC:', pendingAppointmentsList.error);
         throw new AppError('Failed to fetch pending appointments.', StatusCodes.INTERNAL_SERVER_ERROR);
     }
 
-    const appointmentsData = pendingAppointmentsList.data as DbPendingAppointment[];
+    const appointmentsData = pendingAppointmentsList.data as PendingAppointmentDetails[];
 
+    // Updated transformation logic
     const transformedAppointments = appointmentsData?.map(appt => {
-        const user = appt.profiles?.[0];
-        const service = appt.services?.[0];
-
         return {
             id: appt.id,
             created_at: appt.created_at,
             status: appt.status,
             patients: { 
-                fullName: `${user?.first_name ?? ''} ${user?.last_name ?? ''}`.trim() || 'Unknown Patient'
+                fullName: `${appt.user_first_name ?? ''} ${appt.user_last_name ?? ''}`.trim() || 'Unknown Patient'
             },
             services: {
-                name: service?.name ?? 'Unknown Service'
+                name: appt.service_name ?? 'Unknown Service'
             }
         }
     }) || [];
