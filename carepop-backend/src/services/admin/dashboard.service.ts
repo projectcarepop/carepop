@@ -5,15 +5,16 @@ import logger from '@/utils/logger';
 import { supabaseServiceRole } from '@/config/supabaseClient';
 import { StatusCodes } from 'http-status-codes';
 
+// The type must match the query result structure
 type DbPendingAppointment = {
   id: string;
   created_at: string;
   status: string;
-  profiles: {
+  users: { // Changed from profiles
     first_name: string;
     last_name: string;
   } | null;
-  services: {
+  service: { // Changed from services
     name: string;
   } | null;
 };
@@ -46,13 +47,15 @@ export const getDashboardStats = async () => {
       supabaseServiceRole.from('appointments').select('id', { count: 'exact', head: true }).eq('status', 'pending_confirmation'),
       supabaseServiceRole.from('appointments').select('id', { count: 'exact', head: true }).gte('appointment_datetime', today.toISOString()),
       supabaseServiceRole.from('inventory_items').select('id', { count: 'exact', head: true }).lte('quantity_on_hand', 0),
+      // CORRECTED QUERY STARTS HERE
       supabaseServiceRole.from('appointments').select(`
         id,
         created_at,
         status,
-        profiles ( first_name, last_name ),
-        services ( name )
+        users:profiles ( first_name, last_name ),
+        service:services ( name )
       `).eq('status', 'pending_confirmation').order('created_at', { ascending: true }).limit(4)
+      // CORRECTED QUERY ENDS HERE
     ]);
 
     if (clinicsResult.error) logger.error('Error fetching clinics count:', clinicsResult.error);
@@ -70,8 +73,8 @@ export const getDashboardStats = async () => {
     const appointmentsData = pendingAppointmentsList.data as unknown as DbPendingAppointment[];
 
     const transformedAppointments = appointmentsData?.map(appt => {
-        const user = appt.profiles;
-        const service = appt.services;
+        const user = appt.users; // Corrected from appt.profiles
+        const service = appt.service; // Corrected from appt.services
 
         return {
             id: appt.id,
@@ -118,4 +121,4 @@ export const grantAdminRole = async (userId: string) => {
 
   logger.info(`Admin role granted successfully to user ${userId}.`);
   return { message: `Admin role granted to user ${userId}.` };
-}; 
+};
