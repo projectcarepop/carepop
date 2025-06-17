@@ -5,17 +5,18 @@ import logger from '@/utils/logger';
 import { supabaseServiceRole } from '@/config/supabaseClient';
 import { StatusCodes } from 'http-status-codes';
 
+// The type must match the query result structure
 type DbPendingAppointment = {
   id: string;
   created_at: string;
   status: string;
-  profiles: { // The joined table is `profiles`
+  profiles: {
     first_name: string;
     last_name: string;
-  } | null;
-  services: { // The joined table is `services`
+  }[] | null;
+  services: {
     name: string;
-  } | null;
+  }[] | null;
 };
 
 export const getDashboardStats = async () => {
@@ -51,8 +52,8 @@ export const getDashboardStats = async () => {
         id,
         created_at,
         status,
-        profiles!inner(first_name, last_name),
-        services!inner(name)
+        profiles ( first_name, last_name ),
+        services ( name )
       `).eq('status', 'pending_confirmation').order('created_at', { ascending: true }).limit(4)
       // CORRECTED QUERY ENDS HERE
     ]);
@@ -69,11 +70,11 @@ export const getDashboardStats = async () => {
         throw new AppError('Failed to fetch pending appointments.', StatusCodes.INTERNAL_SERVER_ERROR);
     }
 
-    const appointmentsData = pendingAppointmentsList.data as unknown as DbPendingAppointment[];
+    const appointmentsData = pendingAppointmentsList.data as DbPendingAppointment[];
 
     const transformedAppointments = appointmentsData?.map(appt => {
-        const user = appt.profiles;
-        const service = appt.services;
+        const user = appt.profiles?.[0];
+        const service = appt.services?.[0];
 
         return {
             id: appt.id,
