@@ -5,16 +5,15 @@ import logger from '@/utils/logger';
 import { supabaseServiceRole } from '@/config/supabaseClient';
 import { StatusCodes } from 'http-status-codes';
 
-// The type must match the query result structure
 type DbPendingAppointment = {
   id: string;
   created_at: string;
   status: string;
-  users: { // Changed from profiles
+  profiles: { // The joined table is `profiles`
     first_name: string;
     last_name: string;
   } | null;
-  service: { // Changed from services
+  services: { // The joined table is `services`
     name: string;
   } | null;
 };
@@ -52,8 +51,8 @@ export const getDashboardStats = async () => {
         id,
         created_at,
         status,
-        users:profiles ( first_name, last_name ),
-        service:services ( name )
+        profiles!inner(first_name, last_name),
+        services!inner(name)
       `).eq('status', 'pending_confirmation').order('created_at', { ascending: true }).limit(4)
       // CORRECTED QUERY ENDS HERE
     ]);
@@ -73,8 +72,8 @@ export const getDashboardStats = async () => {
     const appointmentsData = pendingAppointmentsList.data as unknown as DbPendingAppointment[];
 
     const transformedAppointments = appointmentsData?.map(appt => {
-        const user = appt.users; // Corrected from appt.profiles
-        const service = appt.service; // Corrected from appt.services
+        const user = appt.profiles;
+        const service = appt.services;
 
         return {
             id: appt.id,
