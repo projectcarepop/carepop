@@ -14,13 +14,14 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { providerFormSchema, ProviderFormValues } from './providerForm-types';
 import { AvailabilityManager } from './AvailabilityManager';
 import { ServiceManager } from './ServiceManager';
 import Image from 'next/image';
+import { useToast } from "@/hooks/use-toast";
+import { createProvider, updateProvider } from "@/lib/actions/provider.admin.actions";
 
 // This is the data structure the form expects for initialData
 interface ProviderData extends Partial<ProviderFormValues> {
@@ -35,7 +36,7 @@ interface ProviderFormProps {
 
 export function ProviderForm({ initialData, onSubmitSuccess }: ProviderFormProps) {
   const router = useRouter();
-  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const { toast } = useToast();
   const [avatarPreview, setAvatarPreview] = useState<string | null>(initialData?.avatarUrl || null);
   const form = useForm<ProviderFormValues>({
     resolver: zodResolver(providerFormSchema),
@@ -66,71 +67,41 @@ export function ProviderForm({ initialData, onSubmitSuccess }: ProviderFormProps
   };
 
   async function onSubmit(data: ProviderFormValues) {
-    console.log("Submitting data:", data);
-    form.clearErrors();
-
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !sessionData?.session) {
-      form.setError("root.submit", { type: "manual", message: "Not authenticated. Please log in." });
-      return;
-    }
-    const token = sessionData.session.access_token;
+    const formData = new FormData();
     
-    let avatarUrl = initialData?.avatarUrl || null;
-
-    // Step 1: Handle avatar upload if a new file is present
-    if (data.avatarFile) {
-        const file = data.avatarFile;
-        const fileName = `${Date.now()}-${file.name}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('avatars')
-            .upload(`providers/${fileName}`, file, {
-                cacheControl: '3600',
-                upsert: true,
-            });
-
-        if (uploadError) {
-            form.setError("root.submit", { type: "manual", message: `Avatar Upload Failed: ${uploadError.message}` });
-            return;
+    // Append all form data to FormData object
+    Object.entries(data).forEach(([key, value]) => {
+        if (key === 'avatarFile' && value instanceof File) {
+            formData.append(key, value);
+        } else if (value !== null && value !== undefined) {
+            formData.append(key, String(value));
         }
-
-        // Get the public URL of the uploaded file
-        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(uploadData.path);
-        avatarUrl = urlData.publicUrl;
-    }
-
-    // Step 2: Prepare the provider data for submission
-    const providerPayload = { ...data, avatarUrl: avatarUrl };
-    // We don't want to send the file object to the API
-    delete providerPayload.avatarFile; 
-
-    const method = isEditing ? 'PUT' : 'POST';
-    const endpoint = isEditing ? `/api/v1/admin/providers/${initialData.id}` : '/api/v1/admin/providers';
+    });
 
     try {
-      const response = await fetch(endpoint, {
-        method: method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(providerPayload),
-      });
+        const result = isEditing 
+            ? await updateProvider(initialData.id, formData)
+            : await createProvider(formData);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'An unknown error occurred.');
-      }
+        if (!result.success) {
+            throw new Error(result.message);
+        }
 
-      onSubmitSuccess();
+        toast({
+            title: "Success!",
+            description: result.message,
+        });
+
+        onSubmitSuccess();
       
     } catch (error: unknown) {
-        let errorMessage = "An unexpected error occurred.";
-        if (error instanceof Error) {
-            errorMessage = error.message;
-        }
+        const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
         console.error("Submit error:", errorMessage);
-        form.setError("root.submit", { type: "manual", message: errorMessage });
+        toast({
+            title: isEditing ? "Error Updating Provider" : "Error Creating Provider",
+            description: errorMessage,
+            variant: "destructive",
+        });
     }
   }
 

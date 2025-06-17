@@ -18,10 +18,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, ArrowUpDown } from 'lucide-react';
+import { MoreHorizontal, ArrowUpDown, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { ConfirmAppointmentDialog } from './ConfirmAppointmentDialog';
 import { CancelAppointmentDialog } from './CancelAppointmentDialog';
+import { DeleteAppointmentDialog } from './DeleteAppointmentDialog';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -32,13 +33,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useDebounce } from 'use-debounce';
 
-// We can reuse the columns definition, but it needs to be passed as a prop
-// since it contains client-side components like dialogs.
-// Re-defining the Appointment type here for clarity.
 export interface Appointment {
   id: string;
   status: string;
@@ -149,6 +148,8 @@ export const columns: ColumnDef<Appointment>[] = [
                   View/Create Report
                 </Link>
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DeleteAppointmentDialog appointmentId={appointment.id} />
             </DropdownMenuContent>
           </DropdownMenu>
         )
@@ -159,12 +160,15 @@ export const columns: ColumnDef<Appointment>[] = [
 interface AppointmentTableClientProps {
   data: Appointment[];
   totalRecords: number;
+  error: string | null;
 }
 
-export function AppointmentTableClient({ data, totalRecords }: AppointmentTableClientProps) {
+export function AppointmentTableClient({ data, totalRecords, error }: AppointmentTableClientProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  const [isLoading, setIsLoading] = React.useState(false);
 
   // Pagination and Sorting State from URL
   const page = searchParams.get('page') ?? '1';
@@ -184,23 +188,42 @@ export function AppointmentTableClient({ data, totalRecords }: AppointmentTableC
   const [searchTerm, setSearchTerm] = React.useState(searchParams.get('search') || '');
   const [debouncedSearch] = useDebounce(searchTerm, 500);
 
+  // Effect to handle navigation changes for search, sort, and pagination
   React.useEffect(() => {
     const params = new URLSearchParams(searchParams);
+    // Set loading state to true whenever we are about to navigate
+    setIsLoading(true);
+
     params.set('page', String(pagination.pageIndex + 1));
     params.set('per_page', String(pagination.pageSize));
-    router.replace(`${pathname}?${params.toString()}`);
-  }, [pagination, router, pathname, searchParams]);
-  
-  React.useEffect(() => {
-    const params = new URLSearchParams(searchParams);
+    
+    if (sorting.length > 0) {
+      params.set('sort', `${sorting[0].id}.${sorting[0].desc ? 'desc' : 'asc'}`);
+    } else {
+        params.delete('sort');
+    }
+
     if(debouncedSearch) {
         params.set('search', debouncedSearch);
+        // Reset to first page on a new search
+        if (String(pagination.pageIndex + 1) !== '1') {
+            params.set('page', '1');
+            // This state update will trigger another re-render, but it's necessary
+            // to keep the table's state in sync with the URL.
+            setPagination(prev => ({ ...prev, pageIndex: 0 }));
+        }
     } else {
         params.delete('search');
     }
-    params.set('page', '1'); // Reset to first page on search
+    
     router.replace(`${pathname}?${params.toString()}`);
-  }, [debouncedSearch, router, pathname, searchParams]);
+
+    // We can't know exactly when the server will respond, but we can turn off loading
+    // after a short delay to give feedback. The suspense boundary handles initial load.
+    const timer = setTimeout(() => setIsLoading(false), 300); // Adjust delay as needed
+    return () => clearTimeout(timer);
+
+  }, [pagination, sorting, debouncedSearch, router, pathname, searchParams]);
 
   const table = useReactTable({
     data,
@@ -220,6 +243,18 @@ export function AppointmentTableClient({ data, totalRecords }: AppointmentTableC
     manualFiltering: true,
   });
 
+  if (error) {
+    return (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>
+            {error}
+          </AlertDescription>
+        </Alert>
+    )
+  }
+
   return (
       <div className="w-full">
         <div className="flex items-center py-4">
@@ -230,14 +265,19 @@ export function AppointmentTableClient({ data, totalRecords }: AppointmentTableC
             className="max-w-sm"
           />
         </div>
-        <div className="rounded-md border overflow-x-auto">
+        <div className="rounded-md border overflow-x-auto relative">
+          {isLoading && (
+              <div className="absolute inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center z-10">
+                  <p>Loading...</p>
+              </div>
+          )}
           <Table>
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id}>
                   {headerGroup.headers.map((header) => {
                     return (
-                      <TableHead key={header.id} className="text-left px-6 py-3">
+                      <TableHead key={header.id}>
                         {header.isPlaceholder
                           ? null
                           : flexRender(
@@ -258,7 +298,7 @@ export function AppointmentTableClient({ data, totalRecords }: AppointmentTableC
                     data-state={row.getIsSelected() && "selected"}
                   >
                     {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} className="px-6 py-4">
+                      <TableCell key={cell.id}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </TableCell>
                     ))}
@@ -267,14 +307,16 @@ export function AppointmentTableClient({ data, totalRecords }: AppointmentTableC
               ) : (
                 <TableRow>
                   <TableCell colSpan={columns.length} className="h-24 text-center">
-                    No results.
+                    No results found.
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </div>
-         <DataTablePagination table={table} />
+        <div className="py-4">
+          <DataTablePagination table={table} />
+        </div>
       </div>
-  );
-} 
+  )
+}

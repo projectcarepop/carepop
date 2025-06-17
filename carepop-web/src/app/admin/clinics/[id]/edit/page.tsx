@@ -2,38 +2,11 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { notFound } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { EditClinicForm } from './components/EditClinicForm';
 
 async function getClinicById(id: string) {
-    console.log("--- Debugging Admin Edit Page ---");
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    
-    // Check for the correct key first, but fall back to the common typo.
-    let serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    let keyUsed = 'SUPABASE_SERVICE_ROLE_KEY';
-
-    if (!serviceKey) {
-        console.log(`'SUPABASE_SERVICE_ROLE_KEY' not found. Checking for 'NEXT_SUPABASE_ROLE_KEY'...`);
-        serviceKey = process.env.NEXT_SUPABASE_ROLE_KEY;
-        keyUsed = 'NEXT_SUPABASE_ROLE_KEY';
-    }
-
-    if (serviceKey) {
-        console.log(`Found service key using variable: '${keyUsed}'`);
-    } else {
-        console.error("Critical: No Supabase service key found in any environment variable.");
-    }
-
-    if (!supabaseUrl) {
-        throw new Error('Server-side Error: Missing environment variable NEXT_PUBLIC_SUPABASE_URL.');
-    }
-    if (!serviceKey) {
-        throw new Error('Server-side Error: Missing SUPABASE_SERVICE_ROLE_KEY. Please ensure this is set in a .env.local file inside the /carepop-web directory and that you have fully RESTARTED the server.');
-    }
-
-    // Service role client is needed to bypass RLS for admin functions.
-    const supabase = createClient(supabaseUrl, serviceKey);
+    const supabase = await createSupabaseServerClient();
 
     const { data, error } = await supabase
         .from('clinics')
@@ -42,10 +15,10 @@ async function getClinicById(id: string) {
         .single();
 
     if (error || !data) {
+        console.error(`Error fetching clinic with ID ${id}:`, error);
         notFound();
     }
     
-    // Ensure the returned data matches the type expected by the client component
     return {
         id: data.id,
         name: data.name ?? '',

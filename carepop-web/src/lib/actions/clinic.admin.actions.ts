@@ -1,92 +1,73 @@
 'use server';
 
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { cookies } from 'next/headers';
-import { Clinic, BackendClinicData } from '@/app/admin/clinics/components/ClinicTable';
-import { Database } from '@/types/supabase';
+import { createClient } from '@/utils/supabase/server';
+import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
 
-export async function getClinicsForAdmin(): Promise<Clinic[]> {
-  const cookieStore = await cookies();
+const clinicFormSchema = z.object({
+  name: z.string().min(2, { message: "Clinic name must be at least 2 characters." }),
+  full_address: z.string().min(10, { message: "Please enter a complete address." }),
+  contact_email: z.string().email({ message: "Please enter a valid email address." }).optional().or(z.literal('')),
+  contact_phone: z.string().min(7, { message: "Please enter a valid phone number." }).optional().or(z.literal('')),
+  operating_hours: z.string().optional(),
+  is_active: z.boolean().default(true),
+});
 
-  const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          try {
-            cookieStore.set({ name, value, ...options });
-          } catch {
-            // The `set` method was called from a Server Component.
-          }
-        },
-        remove(name: string, options: CookieOptions) {
-          try {
-            cookieStore.set({ name, value: '', ...options });
-          } catch {
-            // The `delete` method was called from a Server Component.
-          }
-        },
-      },
+export async function createClinic(values: z.infer<typeof clinicFormSchema>) {
+    const supabase = createClient();
+    const validatedData = clinicFormSchema.parse(values);
+
+    const { data, error } = await supabase
+        .from('clinics')
+        .insert([validatedData])
+        .select()
+        .single();
+    
+    if (error) {
+        console.error('Error creating clinic:', error);
+        return { success: false, message: `Failed to create clinic: ${error.message}` };
     }
-  );
-  
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-  if (sessionError || !session) {
-    throw new Error(sessionError?.message || 'User not authenticated.');
-  }
+    revalidatePath('/admin/clinics');
+    // redirect is not used here to allow the client to show a toast
+    return { success: true, message: 'Clinic created successfully.', data };
+}
 
-  const token = session.access_token;
-  
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (!apiBaseUrl) {
-    throw new Error('API base URL is not configured.');
-  }
 
-  const response = await fetch(`${apiBaseUrl}/api/v1/admin/clinics`, {
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    // Use 'no-store' to ensure fresh data is fetched every time, crucial for admin panels.
-    cache: 'no-store', 
-  });
+export async function updateClinic(clinicId: string, values: z.infer<typeof clinicFormSchema>) {
+    const supabase = createClient();
+    const validatedData = clinicFormSchema.parse(values);
 
-  if (!response.ok) {
-    if (response.status === 401) throw new Error('Unauthorized: Access token might be invalid or expired.');
-    if (response.status === 403) throw new Error('Forbidden: You do not have permission to access this resource.');
-    throw new Error(`Failed to fetch clinics: ${response.statusText} (Status: ${response.status})`);
-  }
+    const { data, error } = await supabase
+        .from('clinics')
+        .update(validatedData)
+        .eq('id', clinicId)
+        .select()
+        .single();
+    
+    if (error) {
+        console.error('Error updating clinic:', error);
+        return { success: false, message: `Failed to update clinic: ${error.message}` };
+    }
 
-  const result = await response.json();
+    revalidatePath('/admin/clinics');
+    revalidatePath(`/admin/clinics/${clinicId}/edit`);
+    return { success: true, message: 'Clinic updated successfully.', data };
+}
 
-  // Transform snake_case from backend to camelCase for frontend
-  const transformedData: Clinic[] = (result.data || []).map((clinic: BackendClinicData) => ({
-    id: clinic.id,
-    name: clinic.name,
-    fullAddress: clinic.full_address,
-    streetAddress: clinic.street_address,
-    locality: clinic.locality,
-    region: clinic.region,
-    postalCode: clinic.postal_code,
-    countryCode: clinic.country_code,
-    latitude: clinic.latitude,
-    longitude: clinic.longitude,
-    contactPhone: clinic.contact_phone,
-    contactEmail: clinic.contact_email,
-    websiteUrl: clinic.website_url,
-    operatingHours: clinic.operating_hours,
-    servicesOffered: clinic.services_offered,
-    fpopChapterAffiliation: clinic.fpop_chapter_affiliation,
-    additionalNotes: clinic.additional_notes,
-    isActive: clinic.is_active,
-    createdAt: clinic.created_at,
-    updatedAt: clinic.updated_at,
-  }));
+export async function deleteClinic(clinicId: string) {
+    const supabase = createClient();
 
-  return transformedData;
+    const { error } = await supabase
+        .from('clinics')
+        .delete()
+        .eq('id', clinicId);
+
+    if (error) {
+        console.error('Error deleting clinic:', error);
+        return { success: false, message: 'Failed to delete clinic.' };
+    }
+
+    revalidatePath('/admin/clinics');
+    return { success: true, message: 'Clinic deleted successfully.' };
 } 

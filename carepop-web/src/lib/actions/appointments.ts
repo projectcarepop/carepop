@@ -53,7 +53,7 @@ export async function getPastAppointments() {
 }
 
 // Cancel an Appointment
-export async function cancelAppointment(appointmentId: string) {
+export async function cancelAppointment(appointmentId: string, reason?: string) {
   const supabase = createClient();
    const { data: { user } } = await supabase.auth.getUser();
 
@@ -63,7 +63,7 @@ export async function cancelAppointment(appointmentId: string) {
 
   const { error } = await supabase
     .from('appointments')
-    .update({ status: 'Cancelled' })
+    .update({ status: 'Cancelled', cancellation_reason: reason })
     .eq('id', appointmentId)
     .eq('user_id', user.id);
   
@@ -74,4 +74,47 @@ export async function cancelAppointment(appointmentId: string) {
   
   revalidatePath('/dashboard/appointments');
   return { success: true, message: 'Appointment cancelled successfully.' };
+}
+
+// Admin: Confirm an Appointment
+export async function confirmAppointment(appointmentId: string) {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from('appointments')
+    .update({ status: 'Confirmed' })
+    .eq('id', appointmentId);
+
+  if (error) {
+    console.error('Error confirming appointment:', error);
+    return { success: false, message: 'Failed to confirm appointment.' };
+  }
+
+  revalidatePath('/admin/appointments');
+  return { success: true, message: 'Appointment confirmed successfully.' };
+}
+
+// Admin: Delete an Appointment
+export async function deleteAppointment(appointmentId: string) {
+    const supabase = createClient();
+    const { error } = await supabase
+        .from('appointments')
+        .delete()
+        .eq('id', appointmentId);
+
+    if (error) {
+        console.error('Error deleting appointment:', error);
+        return { success: false, message: 'Failed to delete appointment.' };
+    }
+
+    revalidatePath('/admin/appointments');
+    return { success: true, message: 'Appointment deleted successfully.' };
+}
+
+// Admin: Reschedule an Appointment (Placeholder)
+export async function rescheduleAppointment(appointmentId: string, newDateTime: string) {
+    // const supabase = createClient(); // Keep this commented out until implemented
+    // TODO: Implement reschedule logic
+    console.log(`Rescheduling ${appointmentId} to ${newDateTime}`);
+    revalidatePath('/admin/appointments');
+    return { success: true, message: 'Appointment reschedule functionality not yet implemented.' };
 } 

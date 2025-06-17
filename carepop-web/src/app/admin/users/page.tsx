@@ -3,8 +3,24 @@ import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { PlusCircle } from "lucide-react";
+import { z } from 'zod';
 
-export default function AdminUsersPage() {
+const searchParamsSchema = z.object({
+  page: z.coerce.number().default(1),
+  per_page: z.coerce.number().default(10),
+  sort: z.string().optional(),
+  search: z.string().optional(),
+});
+
+interface AdminUsersPageProps {
+  searchParams: {
+    [key: string]: string | string[] | undefined;
+  };
+}
+
+export default function AdminUsersPage({ searchParams }: AdminUsersPageProps) {
+  const parsedSearchParams = searchParamsSchema.parse(searchParams);
+
   return (
     <div className="flex flex-col w-full gap-4">
       <div className="flex justify-between items-center">
@@ -19,7 +35,7 @@ export default function AdminUsersPage() {
         View and manage all registered users in the system.
       </p>
       <Suspense fallback={<div>Loading users...</div>}>
-        <UserTable />
+        <UserTable {...parsedSearchParams} />
       </Suspense>
     </div>
   );

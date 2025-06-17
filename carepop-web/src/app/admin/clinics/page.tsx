@@ -1,17 +1,24 @@
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { PlusCircle } from 'lucide-react';
-import { ClinicTable } from './components/ClinicTable'; // This component will be created next
+import { ClinicTable } from './components/ClinicTable';
+import { z } from 'zod';
 
-export default async function AdminClinicsPage() {
-  // TODO: Add RBAC check here if not handled by layout
-  // const session = await auth(); // or your auth method
-  // if (session?.user?.role !== 'admin') {
-  //   notFound(); // or redirect
-  // }
+const searchParamsSchema = z.object({
+  page: z.coerce.number().default(1),
+  per_page: z.coerce.number().default(10),
+  sort: z.string().optional(),
+  search: z.string().optional(),
+});
 
-  // TODO: Fetch initial data for the table if doing server-side initial load
-  // const initialClinics = await fetchClinicsAPI(); 
+interface AdminClinicsPageProps {
+  searchParams: {
+    [key: string]: string | string[] | undefined;
+  };
+}
+
+export default async function AdminClinicsPage({ searchParams }: AdminClinicsPageProps) {
+  const parsedSearchParams = searchParamsSchema.parse(searchParams);
 
   return (
     <div className="flex flex-col w-full gap-4">
@@ -27,8 +34,7 @@ export default async function AdminClinicsPage() {
         Here you can view, create, edit, and manage all clinic locations in the system.
       </p>
       
-      <ClinicTable />
-      {/* Pass initialData={initialClinics} if fetching server-side */}
+      <ClinicTable {...parsedSearchParams} />
     </div>
   );
 } 

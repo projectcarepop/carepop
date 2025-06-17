@@ -25,16 +25,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { createService, updateService } from '@/lib/actions/service.admin.actions';
 
 // Define the form schema using Zod
 const formSchema = z.object({
   name: z.string().min(2, { message: "Service name must be at least 2 characters." }),
   description: z.string().optional(),
   cost: z.coerce.number().min(0).optional(),
-  typicalDurationMinutes: z.coerce.number().int().positive().optional(),
-  categoryId: z.string().uuid().optional().nullable(),
-  isActive: z.boolean(),
+  typical_duration_minutes: z.coerce.number().int().positive().optional(),
+  category_id: z.string().uuid().optional().nullable(),
+  is_active: z.boolean(),
 });
 
 type ServiceFormValues = z.infer<typeof formSchema>;
@@ -44,84 +45,54 @@ interface ServiceCategory {
   name: string;
 }
 
-// The form component
-export function ServiceForm({ initialData }: { initialData?: ServiceFormValues & { id: string } }) {
-  const router = useRouter();
-  const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
-  const [categories, setCategories] = React.useState<ServiceCategory[]>([]);
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
+interface ServiceFormProps {
+    initialData?: ServiceFormValues & { id: string };
+    categories: ServiceCategory[];
+}
 
+// The form component
+export function ServiceForm({ initialData, categories }: ServiceFormProps) {
+  const router = useRouter();
+  const { toast } = useToast();
   const form = useForm<ServiceFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: initialData || {
       name: "",
       description: "",
       cost: 0,
-      typicalDurationMinutes: 30,
-      categoryId: null,
-      isActive: true,
+      typical_duration_minutes: 30,
+      category_id: null,
+      is_active: true,
     },
   });
 
-  // Fetch categories on component mount
-  React.useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError || !sessionData.session) throw new Error("Not authenticated");
-        const token = sessionData.session.access_token;
-
-        const response = await fetch('/api/v1/admin/service-categories', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!response.ok) throw new Error("Failed to fetch categories");
-        const result = await response.json();
-        setCategories(result.data);
-      } catch (err) {
-        // Handle error (e.g., show a toast)
-        console.error("Failed to load categories:", err);
-      }
-    };
-    fetchCategories();
-  }, [supabase.auth]);
+  const isEditing = !!initialData;
 
   async function onSubmit(data: ServiceFormValues) {
-    setIsSubmitting(true);
-    setError(null);
     try {
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError || !sessionData.session) throw new Error("Not authenticated");
-        const token = sessionData.session.access_token;
+        const result = isEditing
+            ? await updateService(initialData.id, data)
+            : await createService(data);
 
-        const method = initialData ? 'PUT' : 'POST';
-        const url = initialData 
-            ? `/api/v1/admin/services/${initialData.id}` 
-            : '/api/v1/admin/services';
-        
-        const response = await fetch(url, {
-            method,
-            headers: { 
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}` 
-            },
-            body: JSON.stringify(data),
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'An error occurred.');
+        if (!result.success) {
+            throw new Error(result.message);
         }
 
-        // Redirect to the services list on success
+        toast({
+            title: "Success!",
+            description: result.message,
+        });
+
         router.push('/admin/services');
-        router.refresh(); // Refreshes server components
+        router.refresh();
         
     } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
-        setError(errorMessage);
-    } finally {
-        setIsSubmitting(false);
+        toast({
+            title: isEditing ? "Error Saving Service" : "Error Creating Service",
+            description: errorMessage,
+            variant: "destructive"
+        });
     }
   }
 
@@ -158,7 +129,7 @@ export function ServiceForm({ initialData }: { initialData?: ServiceFormValues &
         
         <FormField
           control={form.control}
-          name="categoryId"
+          name="category_id"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Category</FormLabel>
@@ -203,7 +174,7 @@ export function ServiceForm({ initialData }: { initialData?: ServiceFormValues &
             />
             <FormField
               control={form.control}
-              name="typicalDurationMinutes"
+              name="typical_duration_minutes"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Duration (minutes)</FormLabel>
@@ -218,7 +189,7 @@ export function ServiceForm({ initialData }: { initialData?: ServiceFormValues &
 
         <FormField
           control={form.control}
-          name="isActive"
+          name="is_active"
           render={({ field }) => (
             <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                 <div className="space-y-0.5">
@@ -237,10 +208,8 @@ export function ServiceForm({ initialData }: { initialData?: ServiceFormValues &
           )}
         />
         
-        {error && <p className="text-sm font-medium text-destructive">{error}</p>}
-
-        <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? (initialData ? 'Saving...' : 'Creating...') : (initialData ? 'Save Changes' : 'Create Service')}
+        <Button type="submit" disabled={form.formState.isSubmitting}>
+            {form.formState.isSubmitting ? (isEditing ? 'Saving...' : 'Creating...') : (isEditing ? 'Save Changes' : 'Create Service')}
         </Button>
       </form>
     </Form>

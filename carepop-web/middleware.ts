@@ -1,55 +1,36 @@
-import { type NextRequest, NextResponse } from 'next/server'
-import { updateSession } from '@/utils/supabase/middleware'
-
-// Define a type for the user object we expect in the session cookie
-interface UserProfile {
-  roles?: string[];
-}
-
-interface StoredSession {
-    user?: UserProfile;
-}
-
-const adminPaths = [
-  '/admin/appointments',
-  '/admin/clinics',
-  '/admin/inventory',
-  '/admin/providers',
-  '/admin/service-categories',
-  '/admin/services',
-  '/admin/users',
-  '/admin/suppliers',
-];
+import { type NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/utils/supabase/middleware';
 
 export async function middleware(request: NextRequest) {
-  const pathname = request.nextUrl.pathname;
+  // This function will also refresh the session cookie
+  const { supabase, response } = createClient(request);
 
-  // Check if the user is trying to access the root admin page or any of its sub-pages
-  if (pathname === '/admin' || adminPaths.some(path => pathname.startsWith(path))) {
-    const sessionCookie = request.cookies.get('session')
+  const { data: { session } } = await supabase.auth.getSession();
+  const { pathname } = request.nextUrl;
 
-    if (sessionCookie) {
-      try {
-        const sessionData: StoredSession = JSON.parse(sessionCookie.value)
-        const isAdmin = sessionData.user?.roles?.includes('Admin')
+  // Protect all /admin routes
+  if (pathname.startsWith('/admin')) {
+    if (!session) {
+      // Redirect to login if not authenticated
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
 
-        if (!isAdmin) {
-          // If not an admin, redirect to the forbidden page
-          return NextResponse.redirect(new URL('/forbidden', request.url))
-        }
-      } catch (error) {
-        // If the cookie is malformed or something goes wrong, redirect to login
-        console.error('Error parsing session cookie in middleware:', error)
-        return NextResponse.redirect(new URL('/login', request.url))
-      }
-    } else {
-      // If there's no session cookie, redirect to login
-      return NextResponse.redirect(new URL('/login', request.url))
+    // If authenticated, perform a server-side check for the admin role
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('user_id', session.user.id)
+      .single();
+    
+    // If there's an error, or the profile doesn't exist, or the role is not admin, deny access.
+    if (error || !profile || profile.role !== 'admin') {
+      // Redirect to a generic 'forbidden' page
+      return NextResponse.redirect(new URL('/forbidden', request.url));
     }
   }
 
-  // For all other routes, or for admins passing the check, just update the session
-  return await updateSession(request)
+  // For all other routes, or for admins who passed the check, continue with the response.
+  return response;
 }
 
 export const config = {
@@ -63,4 +44,4 @@ export const config = {
      */
     '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
-} 
+};

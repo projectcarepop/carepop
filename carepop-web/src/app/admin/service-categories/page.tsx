@@ -1,9 +1,26 @@
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { PlusCircle } from 'lucide-react';
-import ServiceCategoryTable from './components/ServiceCategoryTable';
+import { ServiceCategoryTable } from './components/ServiceCategoryTable';
+import { z } from 'zod';
 
-export default async function ServiceCategoriesPage() {
+// This schema validates the search params from the URL
+const searchParamsSchema = z.object({
+  page: z.coerce.number().default(1),
+  per_page: z.coerce.number().default(10),
+  sort: z.string().optional(),
+  search: z.string().optional(),
+});
+
+interface ServiceCategoriesPageProps {
+  searchParams: {
+    [key: string]: string | string[] | undefined;
+  };
+}
+
+export default async function ServiceCategoriesPage({ searchParams }: ServiceCategoriesPageProps) {
+  const parsedSearchParams = searchParamsSchema.parse(searchParams);
+  
   return (
     <div className="flex flex-col w-full gap-4">
       <div className="flex justify-between items-center">
@@ -18,7 +35,7 @@ export default async function ServiceCategoriesPage() {
         Here you can view, create, edit, and manage all service categories in the system.
       </p>
       
-      <ServiceCategoryTable />
+      <ServiceCategoryTable {...parsedSearchParams} />
     </div>
   );
 } 

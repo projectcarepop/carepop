@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
 import { AutoForm } from '@/components/ui/auto-form';
-import { updateClinic } from '@/lib/actions/admin.actions';
+import { updateClinic } from '@/lib/actions/clinic.admin.actions';
 
 // This needs to match the data type passed from the server component
 type ClinicData = {
@@ -20,9 +20,9 @@ type ClinicData = {
 // Define the schema for the form
 const clinicSchemaForForm = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
-  full_address: z.string().optional(),
+  full_address: z.string().min(10, "Please enter a complete address."),
   contact_email: z.string().email("Invalid email address.").optional().or(z.literal('')),
-  contact_phone: z.string().optional(),
+  contact_phone: z.string().min(7, "Please enter a valid phone number.").optional().or(z.literal('')),
   operating_hours: z.string().optional(),
   is_active: z.boolean().default(true),
 });
@@ -32,21 +32,25 @@ export function EditClinicForm({ clinic }: { clinic: ClinicData }) {
     const { toast } = useToast();
 
     const handleSubmit = async (values: z.infer<typeof clinicSchemaForForm>) => {
-        const result = await updateClinic(clinic.id, values);
+        try {
+            const result = await updateClinic(clinic.id, values);
 
-        if (result && 'error' in result && result.error) {
-             toast({
-                title: "Error updating clinic",
-                description: (result.error as Error).message || 'An unknown error occurred.',
-                variant: "destructive",
-            });
-        } else {
+            if (!result.success) {
+                throw new Error(result.message);
+            }
+            
             toast({
                 title: "Success!",
                 description: "Clinic has been updated successfully.",
             });
             router.push('/admin/clinics');
-            router.refresh();
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+            toast({
+                title: "Error updating clinic",
+                description: errorMessage,
+                variant: "destructive",
+            });
         }
     };
 

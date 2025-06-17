@@ -1,5 +1,3 @@
-'use client';
-
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { InventoryItemsList } from './components/inventory-items-list';
@@ -7,23 +5,44 @@ import { SuppliersList } from './components/suppliers-list';
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { PlusCircle } from "lucide-react";
-import { useState } from "react";
+import { z } from "zod";
 
-export default function InventoryManagementPage() {
-  const [activeTab, setActiveTab] = useState("items");
+const inventorySearchParamsSchema = z.object({
+  tab: z.enum(['items', 'suppliers']).default('items'),
+  page: z.coerce.number().default(1),
+  per_page: z.coerce.number().default(10),
+  sort: z.string().optional(),
+  search: z.string().optional(),
+});
+
+interface InventoryPageProps {
+  searchParams: {
+    [key: string]: string | string[] | undefined;
+  };
+}
+
+export default function InventoryManagementPage({ searchParams }: InventoryPageProps) {
+  const parsedSearchParams = inventorySearchParamsSchema.parse(searchParams);
+  const { tab, ...listSearchParams } = parsedSearchParams;
+
+  const getHref = (newTab: 'items' | 'suppliers') => {
+    const newParams = new URLSearchParams();
+    newParams.set('tab', newTab);
+    return `/admin/inventory?${newParams.toString()}`;
+  }
 
   return (
     <div className="flex flex-col w-full gap-4">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Inventory Management</h1>
-        {activeTab === 'items' && (
+        {tab === 'items' && (
              <Button asChild>
               <Link href="/admin/inventory/items/new">
                 <PlusCircle className="mr-2 h-4 w-4" /> Add New Item
               </Link>
             </Button>
         )}
-        {activeTab === 'suppliers' && (
+        {tab === 'suppliers' && (
              <Button asChild>
               <Link href="/admin/inventory/suppliers/new">
                 <PlusCircle className="mr-2 h-4 w-4" /> Add New Supplier
@@ -35,10 +54,10 @@ export default function InventoryManagementPage() {
         Manage your inventory items and suppliers from one place.
       </p>
 
-      <Tabs defaultValue="items" className="space-y-4" onValueChange={setActiveTab}>
+      <Tabs value={tab} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="items">Inventory Items</TabsTrigger>
-          <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
+          <Link href={getHref('items')}><TabsTrigger value="items">Inventory Items</TabsTrigger></Link>
+          <Link href={getHref('suppliers')}><TabsTrigger value="suppliers">Suppliers</TabsTrigger></Link>
         </TabsList>
         <TabsContent value="items" className="space-y-4">
           <Card>
@@ -49,7 +68,7 @@ export default function InventoryManagementPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <InventoryItemsList />
+              <InventoryItemsList {...listSearchParams} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -62,7 +81,7 @@ export default function InventoryManagementPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <SuppliersList />
+              <SuppliersList {...listSearchParams} />
             </CardContent>
           </Card>
         </TabsContent>

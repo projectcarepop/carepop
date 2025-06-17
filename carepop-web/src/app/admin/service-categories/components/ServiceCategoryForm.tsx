@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
-import { getErrorMessage } from "@/lib/utils";
+import { createServiceCategory, updateServiceCategory } from "@/lib/actions/service-category.admin.actions";
 
 const formSchema = z.object({
   name: z.string().min(1, { message: "Category name is required." }),
@@ -20,7 +20,6 @@ type FormValues = z.infer<typeof formSchema>;
 
 interface ServiceCategoryFormProps {
   initialData?: Partial<FormValues> & { id?: string };
-  onSubmitSuccess?: () => void;
 }
 
 export function ServiceCategoryForm({ initialData }: ServiceCategoryFormProps) {
@@ -38,21 +37,20 @@ export function ServiceCategoryForm({ initialData }: ServiceCategoryFormProps) {
 
   async function onSubmit(data: FormValues) {
     try {
-      const method = isEditing ? 'PUT' : 'POST';
-      const endpoint = isEditing ? `/api/v1/admin/service-categories/${initialData.id}` : '/api/v1/admin/service-categories';
-      const response = await fetch(endpoint, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
+      const result = isEditing
+        ? await updateServiceCategory(initialData.id!, data)
+        : await createServiceCategory(data);
 
-      if (!response.ok) throw new Error('Failed to save category');
+      if (!result.success) {
+        throw new Error(result.message);
+      }
       
-      toast({ title: 'Success', description: `Category ${isEditing ? 'updated' : 'created'} successfully.` });
+      toast({ title: 'Success', description: result.message });
       router.push('/admin/service-categories');
       router.refresh();
     } catch (err) {
-      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
+        const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
+      toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
     }
   }
 
@@ -90,4 +88,4 @@ export function ServiceCategoryForm({ initialData }: ServiceCategoryFormProps) {
       </form>
     </Form>
   );
-} 
+}

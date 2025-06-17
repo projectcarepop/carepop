@@ -2,8 +2,13 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { PlusCircle } from 'lucide-react';
 import { ProviderTable } from './components/ProviderTable';
+import { GetProvidersParams } from './components/ProviderTable.server';
 
-export default async function AdminProvidersPage() {
+type AdminProvidersPageProps = {
+  searchParams: GetProvidersParams;
+}
+
+export default async function AdminProvidersPage({ searchParams }: AdminProvidersPageProps) {
   // TODO: Add RBAC check here if not handled by layout
   // const session = await auth(); // or your auth method
   // if (session?.user?.role !== 'admin') {
@@ -27,7 +32,7 @@ export default async function AdminProvidersPage() {
         Manage healthcare providers, their schedules, and assigned services.
       </p>
       
-      <ProviderTable />
+      <ProviderTable {...searchParams} />
       {/* Pass initialData={initialProviders} if fetching server-side */}
     </div>
   );

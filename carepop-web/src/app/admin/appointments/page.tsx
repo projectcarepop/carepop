@@ -23,13 +23,33 @@ async function getClinics() {
 export default async function AdminAppointmentsPage({
   searchParams,
 }: {
-  searchParams: { clinicId?: string, page?: string, per_page?: string, sort?: string, search?: string };
+  searchParams: {
+    clinicId?: string;
+    page?: string;
+    per_page?: string;
+    sort?: string;
+    search?: string;
+    [key: string]: string | undefined;
+  };
 }) {
+  const {
+    clinicId,
+    page = '1',
+    per_page = '10',
+    sort,
+    search,
+  } = searchParams;
   const clinics = await getClinics();
-  const selectedClinicId = searchParams.clinicId ?? (clinics.length > 0 ? clinics[0].id : null);
+  const selectedClinicId = clinicId ?? (clinics.length > 0 ? clinics[0].id : null);
   
-  if (clinics.length > 0 && !searchParams.clinicId) {
-    const newSearchParams = new URLSearchParams(searchParams);
+  if (clinics.length > 0 && !clinicId) {
+    const newSearchParams = new URLSearchParams({
+      page,
+      per_page,
+    });
+    if (sort) newSearchParams.set('sort', sort);
+    if (search) newSearchParams.set('search', search);
+
     newSearchParams.set('clinicId', clinics[0].id);
     redirect(`/admin/appointments?${newSearchParams.toString()}`);
   }
@@ -65,10 +85,10 @@ export default async function AdminAppointmentsPage({
         table={
             <AppointmentTable 
                 clinicId={selectedClinicId!} 
-                page={searchParams.page ? parseInt(searchParams.page) : 1}
-                per_page={searchParams.per_page ? parseInt(searchParams.per_page) : 10}
-                sort={searchParams.sort}
-                search={searchParams.search}
+                page={parseInt(page)}
+                per_page={parseInt(per_page)}
+                sort={sort}
+                search={search}
             />
         }
       />
