@@ -23,7 +23,7 @@ class NavigationService {
     // const data = await response.json();
     
     // return data;
-
+//
     // Returning mock data for now.
     return {
       status: "OK",
