@@ -1,36 +1,29 @@
-import { Request, Response } from 'express';
-import { StatusCodes } from 'http-status-codes';
-import { AppointmentReportAdminService } from '../../services/admin/appointment-report.admin.service';
-import { AuthenticatedRequest } from '../../types/authenticated-request.interface';
-import { 
-  createAppointmentReportSchema, 
-  updateAppointmentReportSchema 
-} from '../../validation/admin/appointment-report.admin.validation';
-import { asyncHandler } from '../../utils/asyncHandler';
+import { Response } from 'express';
+import { asyncHandler } from '@/utils/asyncHandler';
+import { ApiResponse } from '@/utils/ApiResponse';
+import { IAppointmentReport } from '@/types/appointment-report.interface';
+import * as reportService from '@/services/admin/appointment.service';
+import { AuthenticatedRequest } from '@/types/authenticated-request.interface';
+import { supabase } from '@/config/supabaseClient';
 
-export class AppointmentReportAdminController {
-  constructor(private reportService: AppointmentReportAdminService) {}
-
-  getReportForAppointment = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+export const getReportByAppointmentId = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const { appointmentId } = req.params;
-    const report = await this.reportService.getReportByAppointmentId(appointmentId);
-    if (report) {
-      res.status(StatusCodes.OK).json({ success: true, data: report });
-    } else {
-      res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Report not found' });
+    const report = await reportService.findReportByAppointmentId(appointmentId, supabase);
+
+    if (!report) {
+        return res.status(200).json(new ApiResponse(200, null, 'No report found for this appointment.'));
     }
-  });
 
-  createReport = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-    const reportData = createAppointmentReportSchema.parse(req.body);
-    const newReport = await this.reportService.createAppointmentReport(reportData);
-    res.status(StatusCodes.CREATED).json({ success: true, data: newReport });
-  });
+    res.status(200).json(new ApiResponse(200, report, 'Report retrieved successfully.'));
+});
 
-  updateReport = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-    const { reportId } = req.params;
-    const reportData = updateAppointmentReportSchema.parse(req.body);
-    const updatedReport = await this.reportService.updateAppointmentReport(reportId, reportData);
-    res.status(StatusCodes.OK).json({ success: true, data: updatedReport });
-  });
-} 
+export const createOrUpdateReport = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const reportData: Partial<IAppointmentReport> = req.body;
+    
+    if (!reportData.appointment_id) {
+        return res.status(400).json(new ApiResponse(400, null, 'Appointment ID is required to save a report.'));
+    }
+
+    const result = await reportService.upsertAppointmentReport(reportData, supabase);
+    res.status(201).json(new ApiResponse(201, result, 'Report saved successfully.'));
+}); 

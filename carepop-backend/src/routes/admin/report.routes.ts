@@ -1,35 +1,25 @@
 import { Router } from 'express';
-import * as reportController from '@/controllers/admin/report.controller';
-import { validateRequest } from '@/lib/middleware/validate.middleware';
-import {
-  createReportSchema,
-  getReportsSchema,
-  updateReportSchema,
-} from '@/validation/admin/report.validation';
+import * as reportController from '@/controllers/admin/appointment-report.admin.controller';
+import { authMiddleware } from '@/lib/middleware/auth.middleware';
+import { authorize } from '@/lib/middleware/role.middleware';
 
 const router = Router();
+const adminOnly = authorize(['admin']);
 
-// Route to get all reports for a specific appointment and create a new one
-router
-  .route('/appointment/:appointmentId')
-  .get(validateRequest({ params: getReportsSchema.shape.params }), reportController.getReportsForAppointment)
-  .post(
-    validateRequest({
-      params: createReportSchema.shape.params,
-      body: createReportSchema.shape.body,
-    }),
-    reportController.createReport
-  );
+// Get a report for a specific appointment
+router.get(
+    '/appointments/:appointmentId/report',
+    authMiddleware,
+    adminOnly,
+    reportController.getReportByAppointmentId
+);
 
-// Route to update a specific report by its ID
-router
-  .route('/:reportId')
-  .put(
-    validateRequest({
-      params: updateReportSchema.shape.params,
-      body: updateReportSchema.shape.body,
-    }),
-    reportController.updateReport
-  );
+// This matches the POST /api/v1/admin/reports from the frontend
+router.post(
+    '/',
+    authMiddleware,
+    adminOnly,
+    reportController.createOrUpdateReport
+);
 
 export default router; 

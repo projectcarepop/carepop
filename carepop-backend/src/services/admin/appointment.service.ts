@@ -4,6 +4,9 @@ import { AppError } from '@/lib/utils/appError';
 import { StatusCodes } from 'http-status-codes';
 import { PostgrestError } from '@supabase/postgrest-js';
 import logger from '@/utils/logger';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { IAppointmentReport } from '../../types/appointment-report.interface';
+import { AppointmentReportAdminService } from './appointment-report.admin.service';
 
 type Appointment = Database['public']['Tables']['appointments']['Row'];
 type CreateAppointmentDto = Database['public']['Tables']['appointments']['Insert'];
@@ -112,4 +115,59 @@ export class AppointmentAdminService {
 
     if (error) this.handleError(error, 'remove');
   }
+}
+
+/**
+ * Finds a report by appointment ID.
+ * @param appointmentId - The ID of the appointment.
+ * @returns The appointment report or null if not found.
+ */
+export async function findReportByAppointmentId(appointmentId: string, supabase: SupabaseClient): Promise<IAppointmentReport | null> {
+    const reportService = new AppointmentReportAdminService(supabase);
+    return reportService.getReportByAppointmentId(appointmentId);
+}
+
+/**
+ * Creates or updates an appointment report.
+ * If the report has an ID, it updates the existing report.
+ * Otherwise, it creates a new one.
+ * @param reportData - The data for the report.
+ * @returns The created or updated appointment report.
+ */
+export async function upsertAppointmentReport(reportData: Partial<IAppointmentReport>, supabase: SupabaseClient): Promise<IAppointmentReport> {
+    const reportService = new AppointmentReportAdminService(supabase);
+    
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id, created_at, updated_at, ...payload } = reportData;
+
+    if (id) {
+        return reportService.updateAppointmentReport(id, payload);
+    } else {
+        // The service expects a more complete object for creation.
+        // The created_by_admin_id will be added in the controller from the authenticated user.
+        const createPayload: Omit<IAppointmentReport, 'id' | 'created_at' | 'updated_at'> = {
+            appointment_id: payload.appointment_id!,
+            // Add other non-nullable fields here with default values if necessary
+            purpose_of_visit: payload.purpose_of_visit ?? null,
+            symptoms_reported: payload.symptoms_reported ?? null,
+            vitals_blood_pressure: payload.vitals_blood_pressure ?? null,
+            vitals_temperature: payload.vitals_temperature ?? null,
+            vitals_weight: payload.vitals_weight ?? null,
+            vitals_height: payload.vitals_height ?? null,
+            vitals_other: payload.vitals_other ?? null,
+            findings_summary: payload.findings_summary ?? null,
+            diagnoses: payload.diagnoses ?? null,
+            recommendations_summary: payload.recommendations_summary ?? null,
+            treatment_plan: payload.treatment_plan ?? null,
+            lifestyle_recommendations: payload.lifestyle_recommendations ?? null,
+            medications_prescribed: payload.medications_prescribed ?? null,
+            tests_ordered: payload.tests_ordered ?? null,
+            referrals: payload.referrals ?? null,
+            follow_up_date: payload.follow_up_date ?? null,
+            follow_up_notes: payload.follow_up_notes ?? null,
+            additional_notes: payload.additional_notes ?? null,
+            report_content: payload.report_content ?? null,
+        };
+        return reportService.createAppointmentReport(createPayload);
+    }
 } 
