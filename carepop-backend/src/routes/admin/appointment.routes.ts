@@ -12,6 +12,7 @@ import {
   createAppointmentSchema,
   updateAppointmentSchema,
   appointmentIdParamSchema,
+  reportAppointmentIdParamSchema,
   listAppointmentsQuerySchema,
 } from '@/validation/admin/appointment.validation';
 
@@ -28,6 +29,6 @@ router.route('/:id')
 
 // Route for fetching a report for a specific appointment
 router.route('/:appointmentId/report')
-  .get(validateRequest({ params: appointmentIdParamSchema }), getReportByAppointmentId);
+  .get(validateRequest({ params: reportAppointmentIdParamSchema }), getReportByAppointmentId);
 
 export default router; 

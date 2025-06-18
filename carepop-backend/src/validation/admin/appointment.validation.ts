@@ -17,6 +17,10 @@ export const appointmentIdParamSchema = z.object({
   id: z.string().uuid(),
 });
 
+export const reportAppointmentIdParamSchema = z.object({
+  appointmentId: z.string().uuid(),
+});
+
 export const listAppointmentsQuerySchema = z.object({
     page: z.preprocess((val) => Number(val), z.number().int().min(1)).optional().default(1),
     limit: z.preprocess((val) => Number(val), z.number().int().min(1)).optional().default(10),
