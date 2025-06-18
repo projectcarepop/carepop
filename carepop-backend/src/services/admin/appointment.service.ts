@@ -56,11 +56,12 @@ export class AppointmentAdminService {
   }
   
   async findAll(options: any) {
-    const { page = 1, limit = 10, search, clinicId, providerId, status, startDate, endDate, sortBy = 'appointment_datetime', sortOrder = 'desc' } = options;
+    const { page = 1, limit = 10, search, clinicId, providerId, userId, status, startDate, endDate, sortBy = 'appointment_datetime', sortOrder = 'desc' } = options;
 
     const rpcParams: { [key: string]: any } = { search_term: search };
     if (clinicId) rpcParams.p_clinic_id = clinicId;
     if (providerId) rpcParams.p_provider_id = providerId;
+    if (userId) rpcParams.p_user_id = userId;
     if (status) rpcParams.p_status = status;
     if (startDate) rpcParams.p_start_date = startDate;
     if (endDate) rpcParams.p_end_date = endDate;

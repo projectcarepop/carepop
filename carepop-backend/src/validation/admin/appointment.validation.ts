@@ -25,6 +25,7 @@ export const listAppointmentsQuerySchema = z.object({
     page: z.preprocess((val) => Number(val), z.number().int().min(1)).optional().default(1),
     limit: z.preprocess((val) => Number(val), z.number().int().min(1)).optional().default(10),
     search: z.string().optional(), // Will search user name or email
+    user_id: z.string().uuid().optional(),
     clinic_id: z.string().uuid().optional(),
     provider_id: z.string().uuid().optional(),
     status: z.string().optional(),
