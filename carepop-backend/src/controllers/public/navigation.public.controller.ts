@@ -1,10 +1,9 @@
 import type { Request, Response } from 'express';
 import { navigationService } from '../../services/navigation.service';
 import { AppError } from '../../utils/errors';
-import { asyncHandler } from '../../utils/asyncHandler';
 
 class NavigationController {
-  public getDirections = asyncHandler(async (req: Request, res: Response) => {
+  public async getDirections(req: Request, res: Response): Promise<void> {
     const { origin, destination, mode } = req.body;
 
     // Basic validation, since Zod validation is in the route
@@ -22,7 +21,7 @@ class NavigationController {
       status: 'success',
       data: directions.routes,
     });
-  });
+  }
 }
 
 export const navigationController = new NavigationController();
