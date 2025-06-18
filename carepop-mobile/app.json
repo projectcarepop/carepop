@@ -48,14 +48,21 @@
     },
     "plugins": [
       [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ],
+      [
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location."
         }
       ],
       "expo-font",
-      "expo-secure-store",
-      "react-native-maps"
+      "expo-secure-store"
     ]
   }
 }

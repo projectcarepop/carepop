@@ -43,11 +43,9 @@ export function BatchForm({ inventoryItemId, suppliers, onSuccess, initialData }
     });
 
     const onSubmit = async (values: BatchFormValues) => {
-        const action = isEditMode
-            ? () => updateInventoryItemBatch(initialData.id, values)
-            : () => createInventoryItemBatch(values);
-        
-        const result = await action();
+        const result = isEditMode
+            ? await updateInventoryItemBatch(initialData!.id, values)
+            : await createInventoryItemBatch(values);
 
         if (result.success) {
             toast({ title: 'Success', description: result.message });
