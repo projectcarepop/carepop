@@ -1,45 +1,39 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Image } from 'react-native';
-import { Button, TextInput, Card, theme } from '../src/components';
-import { supabase } from '../src/utils/supabase';
-import { useAuth } from '../src/context/AuthContext';
+import {
+  View,
+  Text,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Image,
+  StyleSheet,
+  TouchableOpacity,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { AuthStackParamList } from '../src/navigation/AppNavigator';
-import { Ionicons } from '@expo/vector-icons';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Mail, ArrowLeft } from 'lucide-react-native';
 
-/**
- * Props for the ForgotPasswordScreen component.
- */
-interface ForgotPasswordScreenProps {
-  // navigateToLogin: () => void; // Removed
-}
+import { supabase } from '../src/utils/supabase';
+import {
+  Button,
+  Input,
+  theme,
+} from '../src/components';
+import type { AuthStackParamList } from '../src/navigation/AppNavigator';
 
-// Define navigation prop type
 type ForgotPasswordScreenNavigationProp = NativeStackNavigationProp<
   AuthStackParamList,
-  'ForgotPassword' // This screen's name in the stack
+  'ForgotPassword'
 >;
 
-/**
- * ForgotPasswordScreen component provides UI for users to request a password reset link.
- * It collects the user's email and uses Supabase to send reset instructions.
- */
-export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = () => {
-  const navigation = useNavigation<ForgotPasswordScreenNavigationProp>(); // Get navigation object
+export const ForgotPasswordScreen: React.FC = () => {
+  const navigation = useNavigation<ForgotPasswordScreenNavigationProp>();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const { authError, clearAuthError } = useAuth();
-
-  /**
-   * Handles the password reset request process.
-   * Validates the email, calls Supabase to send a reset email, and manages UI feedback.
-   */
   const handleResetPassword = async () => {
-    if (authError) clearAuthError();
     setError(null);
     setSuccessMessage(null);
 
@@ -53,34 +47,28 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = () => {
     }
 
     setLoading(true);
-    console.log('[ForgotPasswordScreen] Attempting password reset for:', email);
 
     try {
-      // TODO: Configure `redirectTo` for a better mobile password reset experience.
-      // This URL should be a deep link to a screen in your app (e.g., carepop://reset-password)
-      // where the user enters a new password after verifying the token from the email.
-      // The app will need to handle this deep link, parse the token, and use supabase.auth.updateUser().
-      // Example: const resetRedirectUrl = AuthSession.makeRedirectUri({ scheme: 'carepop', path: 'reset-password' });
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-        email
-        // { redirectTo: resetRedirectUrl } // Pass the configured redirect URL here
-      );
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email);
       
       if (resetError) {
-        console.error('[ForgotPasswordScreen] Supabase reset password error:', resetError.message);
-        setError(resetError.message || 'Failed to send reset instructions. Please try again.');
+        setError(resetError.message || 'Failed to send reset instructions.');
       } else {
-        console.log('[ForgotPasswordScreen] Password reset instructions sent successfully.');
-        setSuccessMessage('Password reset instructions have been sent to your email. Please check your inbox (and spam folder).');
-        setEmail(''); // Clear the form on success
+        setSuccessMessage('If an account with this email exists, password reset instructions have been sent.');
+        setEmail('');
       }
-    } catch (err: any) {
-      console.error('[ForgotPasswordScreen] Unexpected error during password reset:', err);
+    } catch (err) {
       setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
   };
+  
+  const AlertBox = ({ type, message }: { type: 'error' | 'success', message: string }) => (
+    <View style={[styles.alertContainer, type === 'error' ? styles.errorBg : styles.successBg]}>
+      <Text style={type === 'error' ? styles.errorText : styles.successText}>{message}</Text>
+    </View>
+  );
 
   return (
     <KeyboardAvoidingView
@@ -91,57 +79,50 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = () => {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <Image 
-          source={require('../assets/carepop-logo-pink.png')} 
-          style={styles.logo} 
-          resizeMode="contain"
-        />
+        <View style={styles.header}>
+            <Image
+              source={require('../assets/carepop-logo-pink.png')}
+              style={styles.logo}
+            />
+            <Text style={styles.title}>Reset Password</Text>
+            <Text style={styles.description}>
+              Enter your email to receive reset instructions. No worries!
+            </Text>
+        </View>
 
-        <Card style={styles.card}>
-          <Text style={styles.title}>Reset Password</Text>
-          <Text style={styles.subtitle}>
-            Enter your email address, and we&apos;ll send you instructions to reset your password.
-          </Text>
+        <View style={styles.formContainer}>
+            {error && <AlertBox type="error" message={error} />}
+            {successMessage && <AlertBox type="success" message={successMessage} />}
+
+            <Input
+              placeholder="you@example.com"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              label="Email"
+              editable={!loading}
+              icon={<Mail size={20} color={theme.colors.mutedForeground} />}
+            />
+            
+            <Button
+              title="Send Instructions"
+              onPress={handleResetPassword}
+              isLoading={loading}
+              disabled={loading}
+              size="lg"
+              fullWidth
+            />
+        </View>
           
-          {error && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          )}
-
-          {successMessage && (
-            <View style={styles.successContainer}>
-              <Text style={styles.successText}>{successMessage}</Text>
-            </View>
-          )}
-
-          <TextInput
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            placeholder="you@example.com"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            containerStyle={styles.input}
-          />
-
-          <Button
-            title="Reset Password"
-            variant="primary"
-            onPress={handleResetPassword}
-            isLoading={loading}
-            style={styles.resetButton}
-          />
-
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => navigation.navigate('Login')} 
-            disabled={loading}
-          >
-            <Ionicons name="arrow-back-outline" size={20} color={loading ? theme.colors.textMuted : theme.colors.primary} />
-            <Text style={[styles.backButtonText, loading && styles.disabledText]}>Back to Login</Text>
+        <View style={styles.footer}>
+          <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.backButton}>
+             <ArrowLeft size={16} color={theme.colors.primary} />
+             <Text style={[styles.footerText, styles.linkText]}>
+              Back to Login
+            </Text>
           </TouchableOpacity>
-        </Card>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -150,79 +131,76 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: '#FFFFFF',
   },
   scrollContent: {
     flexGrow: 1,
-    padding: theme.spacing.lg,
     justifyContent: 'center',
-    alignItems: 'center',
+    paddingHorizontal: 32,
+    paddingVertical: theme.spacing.xl,
   },
-  appName: {
-    fontSize: theme.typography.heading,
-    fontWeight: 'bold',
-    color: theme.colors.primary,
-    textAlign: 'center',
+  header: {
+    alignItems: 'center',
     marginBottom: theme.spacing.xl,
   },
   logo: {
-    width: 200,
+    width: 100,
     height: 100,
-    marginBottom: theme.spacing.xl,
-  },
-  card: {
-    padding: theme.spacing.lg,
-    width: '100%',
+    resizeMode: 'contain',
+    marginBottom: theme.spacing.lg,
   },
   title: {
-    fontSize: theme.typography.subheading,
-    fontWeight: 'bold',
-    marginBottom: theme.spacing.sm,
-    textAlign: 'center',
-    color: theme.colors.text,
+      ...theme.typography.h2,
+      fontFamily: theme.typography.poppinsFontFamilyBold,
+      fontWeight: 'bold',
+      color: theme.colors.secondary,
+      marginBottom: theme.spacing.sm,
+      textAlign: 'center',
   },
-  subtitle: {
-    fontSize: theme.typography.caption,
-    color: theme.colors.textMuted,
-    textAlign: 'center',
-    marginBottom: theme.spacing.lg,
+  description: {
+      ...theme.typography.body,
+      color: theme.colors.secondary,
+      textAlign: 'center',
+      maxWidth: '80%',
   },
-  input: {
-    marginBottom: theme.spacing.md,
+  formContainer: {
+    gap: theme.spacing.lg,
+    width: '100%',
   },
-  resetButton: {
-    marginBottom: theme.spacing.lg,
-  },
-  backButton: {
-    alignItems: 'center',
+  alertContainer: {
     padding: theme.spacing.md,
+    borderRadius: theme.radius.md,
   },
-  backButtonText: {
-    color: theme.colors.primary,
-    fontSize: theme.typography.button,
-    fontWeight: 'bold',
-  },
-  disabledText: {
-    color: theme.colors.textMuted,
-  },
-  errorContainer: {
-    backgroundColor: '#FFEBEE',
-    padding: theme.spacing.sm,
-    borderRadius: theme.borderRadius.sm,
-    marginBottom: theme.spacing.md,
+  errorBg: {
+    backgroundColor: theme.colors.destructiveMuted,
   },
   errorText: {
     color: theme.colors.destructive,
-    fontSize: theme.typography.caption,
+    ...theme.typography.small,
   },
-  successContainer: {
-    backgroundColor: '#E8F5E9',
-    padding: theme.spacing.sm,
-    borderRadius: theme.borderRadius.sm,
-    marginBottom: theme.spacing.md,
+  successBg: {
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
   },
   successText: {
     color: theme.colors.success,
-    fontSize: theme.typography.caption,
+    ...theme.typography.small,
+  },
+  footer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: theme.spacing.xl,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+  },
+  footerText: {
+    ...theme.typography.small,
+    color: theme.colors.mutedForeground,
+  },
+  linkText: {
+    color: theme.colors.primary,
+    fontWeight: 'bold',
   },
 }); 

@@ -1,72 +1,92 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
-import { theme } from '../../src/components/theme';
+import { View, Text, StyleSheet, Image, SafeAreaView } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { theme, Button } from '../../src/components';
+import { Ionicons } from '@expo/vector-icons';
 
-export const OnboardingScreenOne: React.FC = ({ /* navigation */ }) => {
+// Assuming you have a RootStackParamList that includes an Onboarding stack
+// This is a placeholder, adjust to your actual navigation structure
+type OnboardingStackParamList = {
+  OnboardingOne: undefined;
+  OnboardingTwo: undefined;
+  // ... and so on
+};
+
+type Props = NativeStackScreenProps<OnboardingStackParamList, 'OnboardingOne'>;
+
+export const OnboardingScreenOne: React.FC<Props> = ({ navigation }) => {
   return (
-    <View style={styles.container}>
-       <Image 
-        source={require('../../assets/onboarding-1.png')} 
-        style={styles.illustration} // Use illustration style for Image
-        resizeMode="contain" 
-      />
-      <View style={styles.textContainer}> 
-        <Text style={styles.headline}>Welcome to Carepop!</Text>
-        <Text style={styles.bodyText}>
-          Your journey to accessible, inclusive healthcare starts here. 
-          Find the best professionals, manage appointments, and take control of your well-being, 
-          all in one secure place.
-        </Text>
-        <Text style={styles.tagline}>Your Health. Your Choice. Your Space.</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <View style={styles.content}>
+          <Image
+            source={require('../../assets/onboarding-1.png')}
+            style={styles.illustration}
+            resizeMode="contain"
+          />
+          <View style={styles.textContainer}>
+            <Text style={styles.headline}>Welcome to Carepop!</Text>
+            <Text style={styles.bodyText}>
+              Your journey to accessible, inclusive healthcare starts here. Find
+              professionals, manage appointments, and take control of your
+              well-being.
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.footer}>
+            {/* Dots would go here */}
+            <Button
+                size="lg"
+                onPress={() => navigation.navigate('OnboardingTwo')}
+                icon={<Ionicons name="arrow-forward" size={24} color={theme.colors.primaryForeground} />}
+            />
+        </View>
       </View>
-      <Text style={styles.progressIndicator}>● ○ ○</Text>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { 
+  safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background, 
-    alignItems: 'center',
-    justifyContent: 'center', 
-    paddingHorizontal: theme.spacing.xl,
-    paddingVertical: theme.spacing.xl * 1.5, 
+    backgroundColor: theme.colors.background,
   },
-  illustration: { 
-    width: 300, 
-    height: 300, 
-    marginBottom: theme.spacing.xl, 
+  container: {
+    flex: 1,
+    padding: theme.spacing.lg,
+    justifyContent: 'space-between',
   },
-  textContainer: { 
+  content: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    width: '100%',
-    marginBottom: theme.spacing.xl, 
+    gap: theme.spacing.xl,
+  },
+  illustration: {
+    width: 300,
+    height: 300,
+  },
+  textContainer: {
+    alignItems: 'center',
+    gap: theme.spacing.md,
   },
   headline: {
-    fontSize: theme.typography.heading,
-    fontWeight: 'bold',
-    color: theme.colors.primary, 
+    ...theme.typography.h1,
+    color: theme.colors.primary,
     textAlign: 'center',
-    marginBottom: theme.spacing.md,
   },
   bodyText: {
-    fontSize: theme.typography.body,
-    color: theme.colors.text, 
+    ...theme.typography.body,
+    color: theme.colors.foreground,
     textAlign: 'center',
-    marginBottom: theme.spacing.lg,
-    lineHeight: theme.typography.body * 1.5,
+    lineHeight: 24,
   },
-  tagline: {
-    fontSize: theme.typography.subheading,
-    fontWeight: '600',
-    color: theme.colors.secondary, 
-    textAlign: 'center',
-    marginBottom: theme.spacing.lg, 
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.md,
+    height: 60,
   },
-  progressIndicator: {
-    fontSize: theme.typography.heading,
-    color: theme.colors.textMuted, 
-    // Positioned by justifyCoSntent: 'center' in container, and margins
-  },
-}); 
+});

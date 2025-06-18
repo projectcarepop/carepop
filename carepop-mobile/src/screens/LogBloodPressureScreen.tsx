@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, Alert, TouchableOpacity, TextInput } from 'react-native';
 import { theme } from '../components';
-import { Card, Button, TextInput } from '../components';
+import { Card, Button } from '../components';
 import { MaterialIcons } from '@expo/vector-icons';
 
 export function LogBloodPressureScreen({ navigation }: any) {
@@ -36,40 +36,51 @@ export function LogBloodPressureScreen({ navigation }: any) {
 
         <Card style={styles.card}>
           <View style={styles.bpRow}>
-            <TextInput
-                label="Systolic (SYS)"
-                value={systolic}
-                onChangeText={setSystolic}
-                placeholder="e.g., 120"
-                keyboardType="numeric"
-                style={styles.bpInput}
-            />
+            <View style={styles.bpInputContainer}>
+                <Text style={styles.label}>Systolic (SYS)</Text>
+                <TextInput
+                    value={systolic}
+                    onChangeText={setSystolic}
+                    placeholder="e.g., 120"
+                    keyboardType="numeric"
+                    style={styles.bpInput}
+                    placeholderTextColor={theme.colors.mutedForeground}
+                />
+            </View>
             <Text style={styles.bpSeparator}>/</Text>
+            <View style={styles.bpInputContainer}>
+                <Text style={styles.label}>Diastolic (DIA)</Text>
+                <TextInput
+                    value={diastolic}
+                    onChangeText={setDiastolic}
+                    placeholder="e.g., 80"
+                    keyboardType="numeric"
+                    style={styles.bpInput}
+                    placeholderTextColor={theme.colors.mutedForeground}
+                />
+            </View>
+          </View>
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Pulse (BPM) (Optional)</Text>
             <TextInput
-                label="Diastolic (DIA)"
-                value={diastolic}
-                onChangeText={setDiastolic}
-                placeholder="e.g., 80"
+                value={pulse}
+                onChangeText={setPulse}
+                placeholder="e.g., 70"
                 keyboardType="numeric"
-                style={styles.bpInput}
+                style={styles.input}
+                placeholderTextColor={theme.colors.mutedForeground}
             />
           </View>
-          <TextInput
-            label="Pulse (BPM) (Optional)"
-            value={pulse}
-            onChangeText={setPulse}
-            placeholder="e.g., 70"
-            keyboardType="numeric"
-            style={styles.input}
-          />
-          <TextInput
-            label="Date & Time"
-            value={new Date(dateTime).toLocaleString()} // Display formatted date/time
-            // onChangeText={setDateTime} // Requires a picker
-            placeholder="Date and Time of reading"
-            editable={false} // Needs a picker to be editable
-            style={styles.input}
-          />
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Date & Time</Text>
+            <TextInput
+                value={new Date(dateTime).toLocaleString()} // Display formatted date/time
+                // onChangeText={setDateTime} // Requires a picker
+                placeholder="Date and Time of reading"
+                editable={false} // Needs a picker to be editable
+                style={[styles.input, styles.disabledInput]}
+            />
+          </View>
           <Text style={styles.infoText}>Date/Time defaults to now. A picker will be added later.</Text>
         </Card>
 
@@ -93,8 +104,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.md,
   },
   title: {
-    fontSize: theme.typography.heading,
-    fontWeight: 'bold',
+    ...theme.typography.h2,
     color: theme.colors.primary,
     textAlign: 'center',
     marginBottom: theme.spacing.lg,
@@ -104,26 +114,54 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.lg,
     padding: theme.spacing.md,
   },
-  input: {
+  inputContainer: {
     marginBottom: theme.spacing.md,
+  },
+  input: {
+    ...theme.typography.body,
+    backgroundColor: theme.colors.background,
+    borderColor: theme.colors.input,
+    borderWidth: 1,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    color: theme.colors.foreground,
+  },
+  disabledInput: {
+      backgroundColor: theme.colors.muted,
+      color: theme.colors.mutedForeground,
+  },
+  label: {
+      ...theme.typography.small,
+      color: theme.colors.mutedForeground,
+      marginBottom: theme.spacing.sm,
   },
   bpRow: {
       flexDirection: 'row',
       alignItems: 'flex-end', // Align labels and inputs nicely
       marginBottom: theme.spacing.md,
   },
+  bpInputContainer: {
+      flex: 1,
+  },
   bpInput: {
-      flex: 1, // Allow inputs to take equal space
+      ...theme.typography.h3,
+      backgroundColor: theme.colors.background,
+      borderColor: theme.colors.input,
+      borderWidth: 1,
+      borderRadius: theme.radius.md,
+      padding: theme.spacing.md,
+      color: theme.colors.foreground,
+      textAlign: 'center',
   },
   bpSeparator: {
-      fontSize: theme.typography.heading, // Make slash large
+      ...theme.typography.h1,
       marginHorizontal: theme.spacing.sm,
-      color: theme.colors.textMuted,
+      color: theme.colors.mutedForeground,
       paddingBottom: theme.spacing.sm, // Align with input bottom
   },
   infoText: {
-      fontSize: theme.typography.caption,
-      color: theme.colors.textMuted,
+      ...theme.typography.small,
+      color: theme.colors.mutedForeground,
       textAlign: 'center',
       marginTop: theme.spacing.sm,
   },

@@ -1,78 +1,78 @@
-'use client';
+"use client"
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { useState, useTransition } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { toast } from 'sonner';
+import { saveUserProfile } from '@/lib/actions/admin.actions';
+import { UserProfile } from '@/lib/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 
-interface UserProfile {
-  first_name: string | null;
-  last_name: string | null;
-  role: string | null;
-  // Add other profile fields as needed
-}
+// A simple component to display read-only data
+const ReadOnlyField = ({ label, value }: { label: string, value: string | null | undefined }) => (
+  <div className="space-y-2">
+    <Label>{label}</Label>
+    <div className="text-sm p-2 h-10 w-full rounded-md border border-input bg-background">
+        {value || <span className="text-muted-foreground">Not set</span>}
+    </div>
+  </div>
+);
 
 export function ProfileForm({ profile }: { profile: UserProfile }) {
-  const [formData, setFormData] = useState({
-    first_name: profile.first_name || '',
-    last_name: profile.last_name || '',
-    role: profile.role || 'user',
-  });
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
+  const [isPending, startTransition] = useTransition();
+  const [role, setRole] = useState(profile.roles?.[0] || 'user');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Submitting:', formData);
-    // TODO: Implement server action to update profile
+    startTransition(async () => {
+      try {
+        const profileData = {
+            // Pass existing names back, only role is updated from form state
+            first_name: profile.first_name || '',
+            last_name: profile.last_name || '',
+            role: role
+        };
+        await saveUserProfile(profile.id, profileData);
+        toast.success('User role updated successfully!');
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
+        toast.error(`Failed to update user role: ${errorMessage}`);
+      }
+    });
   };
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>User Profile</CardTitle>
-        <CardDescription>View and edit the user&apos;s core profile information.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <CardContent className="space-y-6 pt-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <ReadOnlyField label="User ID" value={profile.id} />
+            <ReadOnlyField label="Email" value={profile.email} />
+            <ReadOnlyField label="First Name" value={profile.first_name} />
+            <ReadOnlyField label="Last Name" value={profile.last_name} />
+
             <div className="space-y-2">
-              <Label htmlFor="first_name">First Name</Label>
-              <Input
-                id="first_name"
-                name="first_name"
-                value={formData.first_name}
-                onChange={handleInputChange}
-              />
+              <Label htmlFor="role">Role</Label>
+              <Select value={role} onValueChange={(value) => setRole(value as 'user' | 'provider' | 'admin')}>
+                <SelectTrigger id="role">
+                  <SelectValue placeholder="Select a role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">User</SelectItem>
+                  <SelectItem value="provider">Provider</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="last_name">Last Name</Label>
-              <Input
-                id="last_name"
-                name="last_name"
-                value={formData.last_name}
-                onChange={handleInputChange}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="role">Role</Label>
-            <Input
-              id="role"
-              name="role"
-              value={formData.role}
-              onChange={handleInputChange}
-            />
           </div>
           <div className="flex justify-end">
-            <Button type="submit">Save Changes</Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? 'Saving...' : 'Save Changes'}
+            </Button>
           </div>
-        </form>
-      </CardContent>
+        </CardContent>
+      </form>
     </Card>
   );
 } 

@@ -9,7 +9,7 @@ import { getCyclesApi, getSymptomsApi } from '../data/api/menstrual';
 import { Cycle, SymptomLog } from '../types/menstrual';
 import { HealthBuddyStackParamList } from '../navigation/AppNavigator';
 
-type MensTrackerNavigationProp = NativeStackNavigationProp<HealthBuddyStackParamList, 'MensTrackerScreen'>;
+type MensTrackerNavigationProp = NativeStackNavigationProp<HealthBuddyStackParamList, 'MensTracker'>;
 
 // --- Helper Functions ---
 const getDaysBetween = (startDate: string, endDate: string) => {
@@ -90,14 +90,15 @@ export function MensTrackerScreen() {
                     markedDates={markedDates}
                     theme={{
                         calendarBackground: theme.colors.background,
-                        textSectionTitleColor: theme.colors.textMuted,
-                        dayTextColor: theme.colors.text,
+                        textSectionTitleColor: theme.colors.mutedForeground,
+                        dayTextColor: theme.colors.foreground,
                         todayTextColor: theme.colors.primary,
                         selectedDayBackgroundColor: theme.colors.primary,
-                        selectedDayTextColor: theme.colors.background,
+                        selectedDayTextColor: theme.colors.primaryForeground,
                         arrowColor: theme.colors.primary,
                         monthTextColor: theme.colors.secondary,
                         textMonthFontWeight: 'bold',
+                        ...theme.typography
                     }}
                 />
 
@@ -118,16 +119,13 @@ export function MensTrackerScreen() {
                 <View style={styles.actionsContainer}>
                     <Button
                         title="Log Period"
-                        onPress={() => navigation.navigate('LogPeriodScreen')}
-                        variant="primary"
-                        styleType="solid"
+                        onPress={() => navigation.navigate('LogPeriod')}
                         style={styles.actionButton}
                     />
                     <Button
                         title="Log Symptoms"
-                        onPress={() => navigation.navigate('LogSymptomsScreen')}
-                        variant="secondary"
-                        styleType="outline"
+                        onPress={() => navigation.navigate('LogSymptoms')}
+                        variant="outline"
                         style={styles.actionButton}
                     />
                 </View>
@@ -139,18 +137,18 @@ export function MensTrackerScreen() {
 const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: theme.colors.background },
     container: { padding: 20 },
-    screenTitle: { fontSize: 24, fontWeight: 'bold', color: theme.colors.text, marginBottom: 20, textAlign: 'center' },
+    screenTitle: { ...theme.typography.h2, color: theme.colors.foreground, marginBottom: 20, textAlign: 'center' },
     infoCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: theme.colors.primaryMuted,
-        borderRadius: theme.borderRadius.md,
+        backgroundColor: theme.colors.accent,
+        borderRadius: theme.radius.md,
         padding: 15,
         marginTop: 20,
     },
     infoTextContainer: { marginLeft: 15 },
-    infoTitle: { fontSize: 18, fontWeight: '600', color: theme.colors.primaryDark },
-    infoSubtitle: { fontSize: 14, color: theme.colors.primaryDark, marginTop: 2 },
+    infoTitle: { ...theme.typography.h4, color: theme.colors.primary, fontFamily: theme.typography.fontFamilySemiBold },
+    infoSubtitle: { ...theme.typography.body, color: theme.colors.primary, marginTop: 2 },
     actionsContainer: {
         flexDirection: 'row',
         justifyContent: 'space-around',

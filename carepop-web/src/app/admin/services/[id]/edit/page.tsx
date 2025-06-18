@@ -1,67 +1,56 @@
 import { ServiceForm } from '../../components/ServiceForm';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createClient } from "@/utils/supabase/server";
+import { cookies } from 'next/headers';
+import { updateService } from '@/lib/actions/service.admin.actions';
 import { notFound } from 'next/navigation';
+import { Toaster } from "sonner";
+import { z } from 'zod';
 
 async function getService(id: string) {
-    const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
-        .from('services')
-        .select('*')
-        .eq('id', id)
-        .single();
-
+    const cookieStore = await cookies();
+    const supabase = createClient(cookieStore);
+    const { data, error } = await supabase.from('services').select('*').eq('id', id).single();
     if (error) {
-        console.error(`Error fetching service ${id}:`, error);
+        console.error("Error fetching service:", error);
         notFound();
     }
     return data;
 }
 
 async function getCategories() {
-    const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
-        .from('service_categories')
-        .select('id, name')
-        .eq('is_active', true)
-        .order('name', { ascending: true });
-
+    const cookieStore = await cookies();
+    const supabase = createClient(cookieStore);
+    const { data, error } = await supabase.from('service_categories').select('id, name').order('name');
+    
     if (error) {
-        console.error("Failed to fetch service categories:", error);
-        return [];
+        console.error("Error fetching categories:", error);
+        throw new Error(`Failed to fetch service categories: ${error.message}`);
     }
+
     return data;
 }
 
-export default async function EditServicePage({ params }: { params: { id: string }}) {
-  const [service, categories] = await Promise.all([
-      getService(params.id),
-      getCategories()
-  ]);
+export default async function EditServicePage({ params }: { params: { id: string } }) {
+    const service = await getService(params.id);
+    const categories = await getCategories();
 
-  const initialData = {
-      id: service.id,
-      name: service.name,
-      description: service.description || undefined,
-      cost: service.cost || 0,
-      typical_duration_minutes: service.typical_duration_minutes || 30,
-      category_id: service.category_id || null,
-      is_active: service.is_active,
-  };
-
-  return (
-    <div className="container mx-auto py-10">
-      <Card className="max-w-4xl mx-auto">
-        <CardHeader>
-          <CardTitle>Edit Service</CardTitle>
-          <CardDescription>
-            Update the details for &quot;{service.name}&quot; below.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ServiceForm initialData={initialData} categories={categories} />
-        </CardContent>
-      </Card>
+    return (
+        <div className="p-4 md:p-8">
+        <Card>
+            <CardHeader>
+                <CardTitle>Edit Service</CardTitle>
+                <CardDescription>Update the details for the service: {service.name}.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <ServiceForm
+                    initialData={service}
+                    categories={categories}
+                    onSave={updateService}
+                />
+            </CardContent>
+        </Card>
+        <Toaster richColors />
     </div>
-  );
+    );
 }

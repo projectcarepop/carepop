@@ -4,7 +4,6 @@ import * as React from 'react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -17,7 +16,6 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -25,11 +23,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from '@/hooks/use-toast';
-import { createService, updateService } from '@/lib/actions/service.admin.actions';
+import { toast } from 'sonner';
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Define the form schema using Zod
-const formSchema = z.object({
+export const formSchema = z.object({
+  id: z.string().uuid().optional(),
   name: z.string().min(2, { message: "Service name must be at least 2 characters." }),
   description: z.string().optional(),
   cost: z.coerce.number().min(0).optional(),
@@ -48,12 +47,11 @@ interface ServiceCategory {
 interface ServiceFormProps {
     initialData?: ServiceFormValues & { id: string };
     categories: ServiceCategory[];
+    onSave: (values: ServiceFormValues) => Promise<any>; // Allow for return value
 }
 
 // The form component
-export function ServiceForm({ initialData, categories }: ServiceFormProps) {
-  const router = useRouter();
-  const { toast } = useToast();
+export function ServiceForm({ initialData, categories, onSave }: ServiceFormProps) {
   const form = useForm<ServiceFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: initialData || {
@@ -66,39 +64,27 @@ export function ServiceForm({ initialData, categories }: ServiceFormProps) {
     },
   });
 
-  const isEditing = !!initialData;
-
-  async function onSubmit(data: ServiceFormValues) {
-    try {
-        const result = isEditing
-            ? await updateService(initialData.id, data)
-            : await createService(data);
-
-        if (!result.success) {
-            throw new Error(result.message);
-        }
-
-        toast({
-            title: "Success!",
-            description: result.message,
-        });
-
-        router.push('/admin/services');
-        router.refresh();
-        
-    } catch (err: unknown) {
-        const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
-        toast({
-            title: isEditing ? "Error Saving Service" : "Error Creating Service",
-            description: errorMessage,
-            variant: "destructive"
-        });
+  React.useEffect(() => {
+    if (initialData) {
+      form.reset(initialData);
     }
-  }
+  }, [initialData, form]);
+
+  async function onSubmit(values: ServiceFormValues) {
+    console.log("Submitting form values:", values);
+    try {
+      await onSave(values);
+      toast.success(`Service ${initialData ? 'updated' : 'created'} successfully.`);
+    } catch (error: any) {
+      toast.error(error.message || 'An error occurred while saving the service.');
+      console.error(error);
+    }
+  };
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        <input type="hidden" {...form.register("id")} />
         <FormField
           control={form.control}
           name="name"
@@ -191,25 +177,27 @@ export function ServiceForm({ initialData, categories }: ServiceFormProps) {
           control={form.control}
           name="is_active"
           render={({ field }) => (
-            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                <div className="space-y-0.5">
-                    <FormLabel>Active</FormLabel>
-                    <FormDescription>
-                        Inactive services will not be available for booking.
-                    </FormDescription>
-                </div>
-                <FormControl>
-                    <Switch
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                    />
-                </FormControl>
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow">
+              <FormControl>
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              </FormControl>
+              <div className="space-y-1 leading-none">
+                <FormLabel>
+                  Active
+                </FormLabel>
+                <FormDescription>
+                  Is this service currently available?
+                </FormDescription>
+              </div>
             </FormItem>
           )}
         />
         
         <Button type="submit" disabled={form.formState.isSubmitting}>
-            {form.formState.isSubmitting ? (isEditing ? 'Saving...' : 'Creating...') : (isEditing ? 'Save Changes' : 'Create Service')}
+            {form.formState.isSubmitting ? 'Saving...' : 'Save Service'}
         </Button>
       </form>
     </Form>

@@ -1,999 +1,644 @@
-import React, { useState, useEffect, useReducer, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Alert,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  TouchableOpacity,
-  ActivityIndicator,
-  SafeAreaView,
-  Image,
-} from 'react-native';
-import { Button, TextInput, Card, theme } from '../components'; // Assuming theme is from ../components
-import { supabase, Profile } from '../utils/supabase'; 
-import { useAuth } from '../context/AuthContext'; // Import useAuth to get current profile and refresh
+import React, { useState, useEffect, useMemo, useLayoutEffect, useRef } from 'react';
+import { View, Text, SafeAreaView, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, DimensionValue } from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import { MotiView, AnimatePresence } from 'moti';
+import { useAuth } from '../context/AuthContext';
+import { Button } from '../components/button.native';
+import { theme } from '../components/theme';
+import { Input as TextInput } from '../components/text-input.native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { Picker } from '@react-native-picker/picker';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
-import Constants from 'expo-constants'; // <-- Import Constants
+import { Pencil, Check, Search, ChevronLeft, ArrowLeft } from 'lucide-react-native';
+import { Card, CardHeader, CardContent, CardTitle } from '../components/card.native';
 
-// Import Param List from Navigator
-import type { MyProfileStackParamList } from '../navigation/AppNavigator';
+// Import location data
+import provinceJson from '../data/psgc/provinces.json';
+import cityJson from '../data/psgc/cities-municipalities.json';
+import barangayJson from '../data/psgc/barangays.json';
 
-// Import local JSON data with explicit typing (for address dropdowns)
-import provinceJson from '../data/province.json';
-import cityJson from '../data/city.json';
-import barangayJson from '../data/barangay.json';
+// --- Option data for dropdowns ---
+const civilStatusOptions = ["Single", "Married", "Divorced", "Widowed", "In a domestic partnership", "Other", "Prefer not to say"];
+const genderIdentityOptions = ["Man", "Woman", "Non-binary", "Transgender Man", "Transgender Woman", "Genderqueer", "Agender", "Other", "Prefer not to say"];
+const pronounsOptions = ["he/him", "she/her", "they/them", "ze/hir", "xe/xem", "Other", "Prefer not to say"];
+const assignedSexOptions = ["Male", "Female", "Intersex", "Prefer not to say"];
 
-// Interfaces for address data (same as CreateProfileScreen)
-interface Province {
-  province_code: string; 
-  province_name: string;
-  // Other fields if present in JSON
+interface PickerItem {
+  name: string;
+  code?: string;
 }
 
-interface CityMunicipality {
-  city_code: string;
-  city_name: string;
-  province_code: string;
-  // Other fields
-}
+type PickerType = 'province' | 'city' | 'barangay' | 'civilStatus' | 'genderIdentity' | 'pronouns' | 'assignedSex';
 
-interface Barangay {
-  brgy_code: string;
-  brgy_name: string;
-  city_code: string;
-  // Other fields
-}
-
-// Interface for the backend DTO (mirrors UpdateProfileDto from backend)
-interface UpdateProfileDto {
-  firstName?: string;
-  middleInitial?: string;
-  lastName?: string;
-  dateOfBirth?: string;      // Expected as 'YYYY-MM-DD' string
-  civilStatus?: string;
-  religion?: string;
-  occupation?: string;
-  street?: string;
-  provinceCode?: string;
-  cityMunicipalityCode?: string;
-  barangayCode?: string;
-  contactNo?: string;
-  philhealthNo?: string;
-  genderIdentity?: string;
-  pronouns?: string;
-  assignedSexAtBirth?: string;
-}
-
-const provinceData: Province[] = provinceJson as Province[];
-const cityData: CityMunicipality[] = cityJson as CityMunicipality[];
-const barangayData: Barangay[] = barangayJson as Barangay[];
-
-/**
- * Props for the EditProfileScreen component.
- */
-interface EditProfileScreenProps extends NativeStackScreenProps<MyProfileStackParamList, 'EditProfile'> {}
-
-// --- State Management (useReducer) ---
-// Identical state shape and actions as CreateProfileScreen
-
-/**
- * Represents the state of the profile edit form.
- */
-interface ProfileFormData {
-  firstName: string;
-  middleInitial: string;
-  lastName: string;
-  dateOfBirth: Date | null;
-  displayAge: string;
-  civilStatus: string;
-  religion: string;
-  occupation: string;
-  street: string;
-  selectedProvince: string; // province_code
-  selectedCity: string;     // city_code
-  selectedBarangay: string; // brgy_code
-  contactNo: string;
-  philhealthNo: string;
-  genderIdentity: string;
-  pronouns: string;
-  assignedSexAtBirth: string;
-  // Consider adding avatar_url if editing is supported
-}
-
-/**
- * Defines the possible actions to update the form state.
- */
-type FormAction = 
-  | { type: 'SET_FIELD'; field: keyof ProfileFormData; value: string }
-  | { type: 'SET_DATE'; value: Date | null }
-  | { type: 'SET_PROVINCE'; value: string }
-  | { type: 'SET_CITY'; value: string }
-  | { type: 'SET_BARANGAY'; value: string }
-  | { type: 'INITIALIZE_FORM'; payload: Partial<ProfileFormData> }
-  | { type: 'SET_PRONOUNS'; value: string }
-  | { type: 'SET_ASSIGNED_SEX'; value: string };
-
-const initialFormState: ProfileFormData = {
-  firstName: '',
-  middleInitial: '',
-  lastName: '',
-  dateOfBirth: null,
-  displayAge: '',
-  civilStatus: '',
-  religion: '',
-  occupation: '',
-  street: '',
-  selectedProvince: '',
-  selectedCity: '',
-  selectedBarangay: '',
-  contactNo: '',
-  philhealthNo: '',
-  genderIdentity: '',
-  pronouns: '',
-  assignedSexAtBirth: '',
+// --- ADDED: Map for user-friendly titles ---
+const pickerTypeToTitleMap: Record<PickerType, string> = {
+    province: "Province",
+    city: "City/Municipality",
+    barangay: "Barangay",
+    civilStatus: "Civil Status",
+    genderIdentity: "Gender Identity",
+    pronouns: "Pronouns",
+    assignedSex: "Assigned Sex at Birth"
 };
 
-/**
- * Calculates age based on birth date.
- */
-function calculateAge(birthDate: Date): number {
-  const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const m = today.getMonth() - birthDate.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
-  }
-  return age;
-}
-
-/**
- * Reducer function for managing the profile edit form state.
- */
-const formReducer = (state: ProfileFormData, action: FormAction): ProfileFormData => {
-  switch (action.type) {
-    case 'SET_FIELD':
-      return { ...state, [action.field]: action.value };
-    case 'SET_DATE': {
-      const age = action.value ? calculateAge(action.value).toString() : '';
-      return { ...state, dateOfBirth: action.value, displayAge: age };
-    }
-    case 'SET_PROVINCE':
-      return { ...state, selectedProvince: action.value, selectedCity: '', selectedBarangay: '' };
-    case 'SET_CITY':
-      return { ...state, selectedCity: action.value, selectedBarangay: '' };
-    case 'SET_BARANGAY':
-      return { ...state, selectedBarangay: action.value };
-    case 'INITIALIZE_FORM':
-      // Merge initial data, calculating age if DOB is present
-      const initialDob = action.payload.dateOfBirth;
-      const initialAge = initialDob ? calculateAge(initialDob).toString() : '';
-      return { 
-        ...state, 
-        ...action.payload, 
-        displayAge: initialAge, 
-      };
-    case 'SET_PRONOUNS':
-      return { ...state, pronouns: action.value };
-    case 'SET_ASSIGNED_SEX':
-      return { ...state, assignedSexAtBirth: action.value };
-    default:
-      return state;
-  }
-};
-
-/**
- * Represents the structure for validation errors.
- */
-type FormErrors = Partial<Record<keyof ProfileFormData | 'general', string>>;
-
-/**
- * Screen component for users to edit their existing profile.
- */
-export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation }) => {
-  const { 
-    profile: currentProfile, 
-    isLoading: isAuthLoading, 
-    authError,
-    refreshUserProfile, // Keep for potential direct use if needed elsewhere, or for error recovery
-    session,
-    manuallySetProfile // <-- Get manuallySetProfile from useAuth()
-  } = useAuth(); 
-  const [state, dispatch] = useReducer(formReducer, initialFormState);
-  const [isSaving, setIsSaving] = useState(false); // Saving state
-  const [isInitializing, setIsInitializing] = useState(true); // State to track form initialization
-  const [errors, setErrors] = useState<FormErrors | null>(null);
-
-  // State for controlling date/picker visibility
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showCivilStatusPicker, setShowCivilStatusPicker] = useState(false);
-  const [showProvincePicker, setShowProvincePicker] = useState(false);
-  const [showCityPicker, setShowCityPicker] = useState(false);
-  const [showBarangayPicker, setShowBarangayPicker] = useState(false);
-  // SOGIE Picker Visibility State
-  const [showPronounsPicker, setShowPronounsPicker] = useState(false);
-  const [showAssignedSexPicker, setShowAssignedSexPicker] = useState(false);
-
-  // State to store the initial profile data loaded into the form
-  const [initialFormData, setInitialFormData] = useState<Partial<ProfileFormData> | null>(null);
-  
-  // Effect to initialize the form state and localAvatarUri when the current profile loads
-  useEffect(() => {
-    if (currentProfile && isInitializing) {
-      console.log('[EditProfileScreen] Initializing form with profile:', currentProfile.user_id);
-      const formData: Partial<ProfileFormData> = {
-        firstName: currentProfile.first_name || '',
-        middleInitial: currentProfile.middle_initial || '',
-        lastName: currentProfile.last_name || '',
-        dateOfBirth: currentProfile.date_of_birth ? new Date(currentProfile.date_of_birth) : null,
-        civilStatus: currentProfile.civil_status || '',
-        religion: currentProfile.religion || '',
-        occupation: currentProfile.occupation || '',
-        street: currentProfile.street || '',
-        selectedProvince: currentProfile.province_code || '',
-        selectedCity: currentProfile.city_municipality_code || '',
-        selectedBarangay: currentProfile.barangay_code || '',
-        contactNo: currentProfile.contact_no || currentProfile.phone_number || '',
-        philhealthNo: currentProfile.philhealth_no || '',
-        genderIdentity: currentProfile.gender_identity || '',
-        pronouns: currentProfile.pronouns || '',
-        assignedSexAtBirth: currentProfile.assigned_sex_at_birth || '',
-      };
-      if (formData.dateOfBirth && isNaN(formData.dateOfBirth.getTime())) {
-        console.warn('[EditProfileScreen] Invalid date_of_birth string received from profile:', currentProfile.date_of_birth);
-        formData.dateOfBirth = null;
-      }
-
-      setInitialFormData(formData);
-      dispatch({ type: 'INITIALIZE_FORM', payload: formData });
-      setIsInitializing(false);
-    } else if (!isAuthLoading && !currentProfile && isInitializing) {
-      console.warn('[EditProfileScreen] No current profile found after auth load.');
-      setIsInitializing(false);
-      Alert.alert('Error', 'Could not load profile data to edit.', [{ text: 'OK', onPress: () => navigation.goBack() }]);
-    }
-  }, [currentProfile, isAuthLoading, isInitializing, navigation]);
-
-  // Memoized lists for pickers (same as CreateProfileScreen)
-  const [provinces] = useState<Province[]>(provinceData);
-  const citiesMunicipalities = React.useMemo(() => {
-    if (!state.selectedProvince) return [];
-    return cityData.filter((city) => city.province_code === state.selectedProvince);
-  }, [state.selectedProvince]);
-  const barangaysList = React.useMemo(() => {
-    if (!state.selectedCity) return [];
-    return barangayData.filter((barangay) => barangay.city_code === state.selectedCity);
-  }, [state.selectedCity]);
-
-  /**
-   * Handles changes from the DateTimePicker.
-   */
-  const handleDateChange = useCallback((event: DateTimePickerEvent, selectedDate?: Date) => {
-    if (Platform.OS === 'android') {
-      setShowDatePicker(false);
-    }
-    if (event.type === 'set' && selectedDate) {
-      dispatch({ type: 'SET_DATE', value: selectedDate });
-      if (Platform.OS === 'ios') {
-        setShowDatePicker(false);
-      }
-    } else if (event.type === 'dismissed') {
-      setShowDatePicker(false);
-    }
-  }, []);
-
-  /**
-   * Validates the profile form data (can reuse validation logic from CreateProfileScreen).
-   */
-  const validateProfileForm = useCallback((): FormErrors | null => {
-    const currentErrors: FormErrors = {};
-    if (!state.firstName.trim()) currentErrors.firstName = 'First name is required.';
-    if (!state.lastName.trim()) currentErrors.lastName = 'Last name is required.';
-    if (!state.dateOfBirth) currentErrors.dateOfBirth = 'Date of birth is required.';
-    if (!state.street.trim()) currentErrors.street = 'Street address is required.';
-    if (!state.selectedProvince) currentErrors.selectedProvince = 'Province is required.';
-    if (!state.selectedCity) currentErrors.selectedCity = 'City/Municipality is required.';
-    if (!state.selectedBarangay) currentErrors.selectedBarangay = 'Barangay is required.';
-    if (!state.contactNo.trim()) {
-        currentErrors.contactNo = 'Contact number is required.';
-    } else if (!/^09\d{9}$/.test(state.contactNo.trim())) {
-        currentErrors.contactNo = 'Please enter a valid 11-digit mobile number starting with 09.';
-    }
-    if (state.middleInitial.trim().length > 1) {
-      currentErrors.middleInitial = 'Middle initial should be a single letter.';
-    }
-    return Object.keys(currentErrors).length > 0 ? currentErrors : null;
-  }, [state]); // Depend on state for validation
-
-  /**
-   * Checks if the form data has changed compared to the initial data.
-   * Uses JSON stringify for a simple deep comparison, suitable for this form data.
-   */
-  const hasFormChanged = useCallback((): boolean => {
-    if (!initialFormData) return false; // Can't compare if initial data wasn't loaded
-
-    // Create a comparable object from the current state
-    const currentStateData: Partial<ProfileFormData> = {
-      firstName: state.firstName,
-      middleInitial: state.middleInitial,
-      lastName: state.lastName,
-      // Compare dates by time value to handle Date object comparison issues
-      dateOfBirth: state.dateOfBirth ? new Date(state.dateOfBirth.toISOString().split('T')[0]) : null,
-      civilStatus: state.civilStatus,
-      religion: state.religion,
-      occupation: state.occupation,
-      street: state.street,
-      selectedProvince: state.selectedProvince,
-      selectedCity: state.selectedCity,
-      selectedBarangay: state.selectedBarangay,
-      contactNo: state.contactNo,
-      philhealthNo: state.philhealthNo,
-      genderIdentity: state.genderIdentity,
-      pronouns: state.pronouns,
-      assignedSexAtBirth: state.assignedSexAtBirth,
-    };
-
-    const initialComparableData = {
-        ...initialFormData,
-        dateOfBirth: initialFormData.dateOfBirth ? new Date(initialFormData.dateOfBirth.toISOString().split('T')[0]) : null,
-    };
-
-    // Basic comparison (might need refinement for edge cases like null vs empty string)
-    return JSON.stringify(currentStateData) !== JSON.stringify(initialComparableData);
-  }, [state, initialFormData]);
-
-  /**
-   * Handles the submission of the profile update form.
-   */
-  const handleUpdateProfile = useCallback(async () => {
-    const formHasChanged = hasFormChanged();
-
-    if (!formHasChanged) {
-      console.log('[EditProfileScreen] No changes detected, navigating back.');
-      navigation.navigate('MyProfileMain');
-      return;
-    }
-
-    const validationErrors = validateProfileForm();
-    if (validationErrors) {
-      setErrors(validationErrors);
-      Alert.alert('Validation Error', 'Please check the highlighted fields.');
-      return;
-    }
-
-    setErrors(null);
-    setIsSaving(true);
-
-    if (!currentProfile?.user_id) {
-      Alert.alert('Error', 'User ID not found. Cannot update profile.');
-      setIsSaving(false);
-      return;
-    }
-
-    if (!session || !session.access_token) {
-      Alert.alert('Authentication Error', 'No active session found. Please log in again.');
-      setIsSaving(false);
-      return;
-    }
-
-    // Prepare data object with DB column names (as before)
-    // Note: The DTO for the backend expects camelCase keys, but our current `updates` object
-    //       is already structured with snake_case keys for direct Supabase update.
-    //       CORRECTION: Backend DTO `UpdateProfileDto` expects camelCase. We will send camelCase.
-    const updatesPayload: UpdateProfileDto = { // Use the DTO type from backend if available, or define inline
-      firstName: state.firstName,
-      middleInitial: state.middleInitial || undefined, // Send undefined if empty, or null based on DTO
-      lastName: state.lastName,
-      dateOfBirth: state.dateOfBirth ? state.dateOfBirth.toISOString().split('T')[0] : undefined,
-      // age is calculated by the backend, not sent from client
-      civilStatus: state.civilStatus || undefined,
-      religion: state.religion || undefined,
-      occupation: state.occupation || undefined,
-      street: state.street || undefined,
-      provinceCode: state.selectedProvince || undefined,
-      cityMunicipalityCode: state.selectedCity || undefined,
-      barangayCode: state.selectedBarangay || undefined,
-      contactNo: state.contactNo || undefined,
-      philhealthNo: state.philhealthNo || undefined,
-      genderIdentity: state.genderIdentity || undefined,
-      pronouns: state.pronouns || undefined,
-      assignedSexAtBirth: state.assignedSexAtBirth || undefined,
-    };
-
-    // Remove undefined properties to ensure they are not sent in the update payload
-    // This helps if the backend DTO expects optional fields to be absent rather than null/empty string
-    Object.keys(updatesPayload).forEach(key => {
-      const K = key as keyof typeof updatesPayload;
-      if (updatesPayload[K] === undefined || updatesPayload[K] === '') { 
-        delete updatesPayload[K];
-      }
-    });
-
-    // Retrieve backend API URL from Expo constants correctly
-    const backendBaseUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL;
-    if (!backendBaseUrl) {
-      Alert.alert('Configuration Error', 'Backend API URL is not configured.');
-      setIsSaving(false);
-      return;
-    }
-    const apiUrl = `${backendBaseUrl}/api/v1/public/users/profile`;
-
-    console.log(`[EditProfileScreen] Attempting to update profile via API: ${apiUrl}`);
-    console.log(`[EditProfileScreen] Payload:`, JSON.stringify(updatesPayload));
-
-    try {
-      const response = await fetch(apiUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify(updatesPayload),
-      });
-
-      const responseData = await response.json();
-
-      if (response.ok) {
-        console.log('[EditProfileScreen] Profile updated successfully via API:', responseData);
-
-        // Manually set the profile data in AuthContext with the nested 'data' object from the backend response
-        manuallySetProfile(responseData.data as Profile); // <-- CORRECTED: Pass responseData.data
-
-        // Navigate immediately to MyProfileMain
-        navigation.navigate('MyProfileMain');
-      } else {
-        console.error('[EditProfileScreen] API error updating profile:', responseData);
-        const errorMessage = responseData.message || responseData.details || 'Failed to update profile via API.';
-        setErrors({ general: errorMessage });
-        Alert.alert('API Error', errorMessage);
-      }
-    } catch (error: any) {
-      console.error('[EditProfileScreen] Network or unexpected error updating profile:', error);
-      setErrors({ general: error.message || 'An unexpected network error occurred.' });
-      Alert.alert('Error', `Failed to update profile: ${error.message || 'Unknown error'}`);
-    } finally {
-      setIsSaving(false);
-    }
-  }, [state, currentProfile, navigation, validateProfileForm, manuallySetProfile, hasFormChanged, session]); // Added manuallySetProfile, removed refreshUserProfile from deps
-
-  /**
-   * Helper to get the display name for a selected code from a list.
-   */
-  const getSelectedName = useCallback((
-      code: string,
-      list: Array<any>,
-      codeKey: string,
-      nameKey: string
-  ): string | undefined => {
-      return list.find(item => item[codeKey] === code)?.[nameKey];
-  }, []);
-
-  // Civil status options
-  const civilStatusOptions = ['Single', 'Married', 'Widowed', 'Separated', 'Divorced', 'Other'];
-
-  // Render loading state while auth context is loading or form is initializing
-  if (isInitializing || isAuthLoading) {
+// --- Helper Components ---
+const CustomToast = ({ message, visible, type }: { message: string, visible: boolean, type: 'success' | 'error' }) => {
+    if (!visible) return null;
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.loadingText}>Loading Profile...</Text>
+        <View style={[styles.toastContainer, type === 'success' ? styles.toastSuccess : styles.toastError]}>
+            <Text style={styles.toastText}>{message}</Text>
         </View>
-      </SafeAreaView>
     );
-  }
-  
-  // Render error state from AuthContext
-  if (!currentProfile) {
-     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.loadingContainer}>
-            <Text style={styles.errorText}>Could not load profile data.</Text>
-            {/* Optionally add a button to retry or go back */}
-        </View>
-      </SafeAreaView>
-    );
-  }
+};
 
+const PickerLabel = ({ children, required }: { children: React.ReactNode, required?: boolean }) => (
+    <Text style={styles.pickerLabel}>
+        {children}
+        {required && <Text style={{ color: theme.colors.destructive }}> *</Text>}
+    </Text>
+);
+
+const PickerRow = ({ label, isSelected, onPress }: {label: string, isSelected: boolean, onPress: () => void}) => {
+    return (
+        <TouchableOpacity onPress={onPress} style={[styles.pickerItem, isSelected && styles.pickerItemSelected]}>
+            <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
+                {isSelected && <Check color={theme.colors.primaryForeground} size={14} />}
+            </View>
+            <Text style={[styles.pickerItemText, isSelected && styles.pickerItemTextSelected]}>{label}</Text>
+        </TouchableOpacity>
+    )
+}
+
+const CustomPicker = ({
+  visible,
+  onClose,
+  children,
+  height = '80%'
+}: {
+  visible: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+  height?: DimensionValue;
+}) => {
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
-        <ScrollView 
-          style={styles.container}
-          contentContainerStyle={styles.contentContainer}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Text style={styles.title}>Edit Profile</Text> 
-
-          <Card style={styles.card}>
-            <Text style={styles.sectionTitle}>Personal Information</Text>
-            
-            <TextInput
-              label="First Name"
-              value={state.firstName}
-              onChangeText={(text) => dispatch({ type: 'SET_FIELD', field: 'firstName', value: text })}
-              placeholder="Enter your first name"
-              error={errors?.firstName}
-              containerStyle={styles.input}
-              placeholderTextColor={theme.colors.textMuted}
-            />
-             <TextInput
-                label="Middle Initial"
-                value={state.middleInitial}
-                onChangeText={(text) => dispatch({ type: 'SET_FIELD', field: 'middleInitial', value: text })}
-                placeholder="M.I."
-                maxLength={1}
-                error={errors?.middleInitial}
-                containerStyle={styles.input}
-                placeholderTextColor={theme.colors.textMuted}
-            />
-            <TextInput
-                label="Last Name"
-                value={state.lastName}
-                onChangeText={(text) => dispatch({ type: 'SET_FIELD', field: 'lastName', value: text })}
-                placeholder="Enter your last name"
-                error={errors?.lastName}
-                containerStyle={styles.input}
-                placeholderTextColor={theme.colors.textMuted}
-            />
-
-            {/* Date of Birth Picker Trigger - Manual Label still needed */}
-            <Text style={[styles.label, errors?.dateOfBirth ? styles.labelError : null]}>
-                Date of Birth {errors?.dateOfBirth ? '*' : ''}
-            </Text>
-            <View style={styles.fieldGroup}>
-              <TouchableOpacity style={[styles.pickerTrigger, errors?.dateOfBirth ? styles.inputErrorBorder : null]} onPress={() => setShowDatePicker(true)}>
-                  <Text style={styles.pickerText}>{state.dateOfBirth ? state.dateOfBirth.toLocaleDateString() : 'Select Date'}</Text>
-                  <Ionicons name="calendar-outline" size={20} color={theme.colors.text} />
-              </TouchableOpacity>
-              {errors?.dateOfBirth && <Text style={styles.errorText}>{errors.dateOfBirth}</Text>}
-            </View>
-
-            {showDatePicker && (
-                <DateTimePicker
-                    value={state.dateOfBirth || new Date()} // Default to today if null
-                    mode="date"
-                    display="default"
-                    onChange={handleDateChange}
-                    maximumDate={new Date()} // Cannot be born in the future
-                />
-            )}
-            {/* Display Age */}
-             <TextInput
-                label="Age"
-                value={state.displayAge}
-                editable={false}
-                placeholder="Age"
-                containerStyle={styles.input}
-                placeholderTextColor={theme.colors.textMuted}
-            />
-
-            {/* Civil Status Picker - User Specified Style */}
-            <Text style={[styles.label, errors?.civilStatus ? styles.labelError : null]}>
-                Civil Status {errors?.civilStatus ? '*' : ''}
-            </Text>
-            <View style={styles.fieldGroup}>
-              <TouchableOpacity style={[styles.pickerTrigger, errors?.civilStatus ? styles.inputErrorBorder : null]} onPress={() => setShowCivilStatusPicker(true)}>
-                  <Text style={styles.pickerText}>{state.civilStatus || 'Select Civil Status'}</Text>
-                  <Ionicons name="caret-down-outline" size={24} color={theme.colors.text} />
-              </TouchableOpacity>
-              {errors?.civilStatus && <Text style={styles.errorText}>{errors.civilStatus}</Text>}
-            </View>
-            {showCivilStatusPicker && (
-                 <View style={styles.pickerContainer}>
-                    <Picker
-                        selectedValue={state.civilStatus}
-                        onValueChange={(itemValue) => {
-                            if (itemValue) dispatch({ type: 'SET_FIELD', field: 'civilStatus', value: itemValue });
-                            setShowCivilStatusPicker(false);
-                        }}
-                        style={{ width: '100%' }}
-                        itemStyle={styles.pickerItem}
-                    >
-                        <Picker.Item label="Select Civil Status..." value="" />
-                        <Picker.Item label="Single" value="Single" />
-                        <Picker.Item label="Married" value="Married" />
-                        <Picker.Item label="Widowed" value="Widowed" />
-                        <Picker.Item label="Separated" value="Separated" />
-                        <Picker.Item label="Divorced" value="Divorced" />
-                        <Picker.Item label="Other" value="Other" />
-                    </Picker>
-                </View>
-            )}
-
-            <TextInput
-                label="Religion"
-                value={state.religion}
-                onChangeText={(text) => dispatch({ type: 'SET_FIELD', field: 'religion', value: text })}
-                placeholder="Enter your religion (optional)"
-                error={errors?.religion}
-                containerStyle={styles.input}
-                placeholderTextColor={theme.colors.textMuted}
-            />
-             <TextInput
-                label="Occupation"
-                value={state.occupation}
-                onChangeText={(text) => dispatch({ type: 'SET_FIELD', field: 'occupation', value: text })}
-                placeholder="Enter your occupation (optional)"
-                error={errors?.occupation}
-                containerStyle={styles.input}
-                placeholderTextColor={theme.colors.textMuted}
-            />
-          </Card>
-
-          <Card style={styles.card}>
-            <Text style={styles.sectionTitle}>SOGIE Information</Text>
-
-            {/* Assigned Sex at Birth Picker - User Specified Style */}
-            <Text style={[styles.label, errors?.assignedSexAtBirth ? styles.labelError : null]}>
-                Assigned Sex at Birth {errors?.assignedSexAtBirth ? '*' : ''}
-            </Text>
-            <View style={styles.fieldGroup}>
-              <TouchableOpacity style={[styles.pickerTrigger, errors?.assignedSexAtBirth ? styles.inputErrorBorder : null]} onPress={() => setShowAssignedSexPicker(true)}>
-                  <Text style={styles.pickerText}>{state.assignedSexAtBirth || 'Select Assigned Sex'}</Text>
-                  <Ionicons name="caret-down-outline" size={24} color={theme.colors.text} />
-              </TouchableOpacity>
-              {errors?.assignedSexAtBirth && <Text style={styles.errorText}>{errors.assignedSexAtBirth}</Text>}
-            </View>
-            {showAssignedSexPicker && (
-                 <View style={styles.pickerContainer}>
-                    <Picker
-                        selectedValue={state.assignedSexAtBirth}
-                        onValueChange={(itemValue) => {
-                            if (itemValue) dispatch({ type: 'SET_ASSIGNED_SEX', value: itemValue });
-                            setShowAssignedSexPicker(false);
-                        }}
-                        style={{ width: '100%' }}
-                        itemStyle={styles.pickerItem}
-                    >
-                        <Picker.Item label="Select Assigned Sex..." value="" />
-                        <Picker.Item label="Female" value="Female" />
-                        <Picker.Item label="Male" value="Male" />
-                        <Picker.Item label="Prefer not to say" value="Prefer not to say" />
-                    </Picker>
-                </View>
-            )}
-
-            {/* Gender Identity Picker - User Specified Style */}
-            <TextInput
-              label="Gender Identity"
-              value={state.genderIdentity}
-              onChangeText={(text) => dispatch({ type: 'SET_FIELD', field: 'genderIdentity', value: text })}
-              placeholder="Enter your gender identity (optional)"
-              error={errors?.genderIdentity}
-              containerStyle={styles.input}
-              placeholderTextColor={theme.colors.textMuted}
-            />
-
-            {/* Pronouns Picker - User Specified Style */}
-            <Text style={[styles.label, errors?.pronouns ? styles.labelError : null]}>
-                Pronouns {errors?.pronouns ? '*' : ''}
-            </Text>
-            <View style={styles.fieldGroup}>
-              <TouchableOpacity style={[styles.pickerTrigger, errors?.pronouns ? styles.inputErrorBorder : null]} onPress={() => setShowPronounsPicker(true)}>
-                  <Text style={styles.pickerText}>{state.pronouns || 'Select Pronouns'}</Text>
-                  <Ionicons name="caret-down-outline" size={24} color={theme.colors.text} />
-              </TouchableOpacity>
-              {errors?.pronouns && <Text style={styles.errorText}>{errors.pronouns}</Text>}
-            </View>
-            {showPronounsPicker && (
-                 <View style={styles.pickerContainer}>
-                    <Picker
-                        selectedValue={state.pronouns}
-                        onValueChange={(itemValue) => {
-                            if (itemValue) dispatch({ type: 'SET_PRONOUNS', value: itemValue });
-                            setShowPronounsPicker(false);
-                        }}
-                        style={{ width: '100%' }}
-                        itemStyle={styles.pickerItem}
-                    >
-                        <Picker.Item label="Select Pronouns..." value="" />
-                        <Picker.Item label="She/Her" value="She/Her" />
-                        <Picker.Item label="He/Him" value="He/Him" />
-                        <Picker.Item label="They/Them" value="They/Them" />
-                        <Picker.Item label="Prefer to self-describe" value="Prefer to self-describe" />
-                        <Picker.Item label="Prefer not to say" value="Prefer not to say" />
-                    </Picker>
-                </View>
-            )}
-
-          </Card>
-
-          <Card style={styles.card}>
-            <Text style={styles.sectionTitle}>Contact Information</Text>
-            
-             <TextInput
-                label="Street Address"
-                value={state.street}
-                onChangeText={(text) => dispatch({ type: 'SET_FIELD', field: 'street', value: text })}
-                placeholder="House No., Street Name"
-                error={errors?.street}
-                containerStyle={styles.input}
-                placeholderTextColor={theme.colors.textMuted}
-            />
-
-            {/* Province Picker Trigger */}
-            <Text style={[styles.label, errors?.selectedProvince ? styles.labelError : null]}>
-                Province {errors?.selectedProvince ? '*' : ''}
-            </Text>
-            <View style={styles.fieldGroup}>
-              <TouchableOpacity style={[styles.pickerTrigger, errors?.selectedProvince ? styles.inputErrorBorder : null]} onPress={() => setShowProvincePicker(true)}>
-                  <Text style={styles.pickerText}>{provinces.find(p => p.province_code === state.selectedProvince)?.province_name || 'Select Province'}</Text>
-                  <Ionicons name="caret-down-outline" size={24} color={theme.colors.text} />
-              </TouchableOpacity>
-              {errors?.selectedProvince && <Text style={styles.errorText}>{errors.selectedProvince}</Text>}
-            </View>
-            {showProvincePicker && (
-                 <View style={styles.pickerContainer}>
-                    <Picker
-                        selectedValue={state.selectedProvince}
-                        onValueChange={(itemValue) => {
-                             if (itemValue) dispatch({ type: 'SET_PROVINCE', value: itemValue });
-                            setShowProvincePicker(false);
-                        }}
-                         style={{ width: '100%' }}
-                        itemStyle={styles.pickerItem}
-                    >
-                        <Picker.Item label="Select Province..." value="" />
-                        {provinces.map((province) => (
-                            <Picker.Item key={province.province_code} label={province.province_name} value={province.province_code} />
-                        ))}
-                    </Picker>
-                 </View>
-            )}
-
-            {/* City/Municipality Picker Trigger */}            
-            <Text style={[styles.label, errors?.selectedCity ? styles.labelError : null]}>
-                City/Municipality {errors?.selectedCity ? '*' : ''}
-            </Text>
-            <View style={styles.fieldGroup}>
-              <TouchableOpacity
-                  style={[styles.pickerTrigger, errors?.selectedCity ? styles.inputErrorBorder : null, !state.selectedProvince ? styles.pickerDisabled : null]}
-                  onPress={() => state.selectedProvince && setShowCityPicker(true)}
-                  disabled={!state.selectedProvince}
-              >
-                  <Text style={styles.pickerText}>{citiesMunicipalities.find(c => c.city_code === state.selectedCity)?.city_name || 'Select City/Municipality'}</Text>
-                  <Ionicons name="caret-down-outline" size={24} color={!state.selectedProvince ? theme.colors.disabled : theme.colors.text} />
-              </TouchableOpacity>
-              {errors?.selectedCity && <Text style={styles.errorText}>{errors.selectedCity}</Text>}
-            </View>
-            {showCityPicker && (
-                 <View style={styles.pickerContainer}>
-                    <Picker
-                        selectedValue={state.selectedCity}
-                        onValueChange={(itemValue) => {
-                            if (itemValue) dispatch({ type: 'SET_CITY', value: itemValue });
-                            setShowCityPicker(false);
-                        }}
-                        enabled={!!state.selectedProvince} // Ensure province is selected
-                         style={{ width: '100%' }}
-                        itemStyle={styles.pickerItem}
-                    >
-                        <Picker.Item label="Select City/Municipality..." value="" />
-                        {citiesMunicipalities.map((city) => (
-                            <Picker.Item key={city.city_code} label={city.city_name} value={city.city_code} />
-                        ))}
-                    </Picker>
-                </View>
-            )}
-
-            {/* Barangay Picker Trigger */}            
-             <Text style={[styles.label, errors?.selectedBarangay ? styles.labelError : null]}>
-                Barangay {errors?.selectedBarangay ? '*' : ''}
-            </Text>
-            <View style={styles.fieldGroup}>
-              <TouchableOpacity
-                  style={[styles.pickerTrigger, errors?.selectedBarangay ? styles.inputErrorBorder : null, !state.selectedCity ? styles.pickerDisabled : null]}
-                  onPress={() => state.selectedCity && setShowBarangayPicker(true)}
-                  disabled={!state.selectedCity}
-              >
-                  <Text style={styles.pickerText}>{barangaysList.find(b => b.brgy_code === state.selectedBarangay)?.brgy_name || 'Select Barangay'}</Text>
-                  <Ionicons name="caret-down-outline" size={24} color={!state.selectedCity ? theme.colors.disabled : theme.colors.text} />
-              </TouchableOpacity>
-               {errors?.selectedBarangay && <Text style={styles.errorText}>{errors.selectedBarangay}</Text>}
-            </View>
-            {showBarangayPicker && (
-                 <View style={styles.pickerContainer}>
-                    <Picker
-                        selectedValue={state.selectedBarangay}
-                        onValueChange={(itemValue) => {
-                            if (itemValue) dispatch({ type: 'SET_BARANGAY', value: itemValue });
-                            setShowBarangayPicker(false);
-                        }}
-                        enabled={!!state.selectedCity} // Ensure city is selected
-                         style={{ width: '100%' }}
-                        itemStyle={styles.pickerItem}
-                    >
-                        <Picker.Item label="Select Barangay..." value="" />
-                        {barangaysList.map((barangay) => (
-                            <Picker.Item key={barangay.brgy_code} label={barangay.brgy_name} value={barangay.brgy_code} />
-                        ))}
-                    </Picker>
-                </View>
-            )}
-
-             <TextInput
-                label="Contact Number"
-                value={state.contactNo}
-                onChangeText={(text) => dispatch({ type: 'SET_FIELD', field: 'contactNo', value: text.replace(/[^0-9]/g, '') })}
-                placeholder="e.g., 09171234567"
-                keyboardType="phone-pad"
-                error={errors?.contactNo}
-                containerStyle={styles.input}
-                placeholderTextColor={theme.colors.textMuted}
-            />
-          </Card>
-
-          <Card style={styles.card}>
-             <Text style={styles.sectionTitle}>Other Information</Text>
-             <TextInput
-                label="PhilHealth Number (Optional)"
-                value={state.philhealthNo}
-                onChangeText={(text) => dispatch({ type: 'SET_FIELD', field: 'philhealthNo', value: text.replace(/[^0-9]/g, '') })}
-                placeholder="Enter your PhilHealth number"
-                keyboardType="numeric"
-                error={errors?.philhealthNo}
-                containerStyle={styles.input}
-                placeholderTextColor={theme.colors.textMuted}
-            />
-          </Card>
-
-          {/* General Error Display */} 
-          {errors?.general && <Text style={styles.generalErrorText}>{errors.general}</Text>}
-
-          {/* Update Button */} 
-          <Button 
-            variant="primary" 
-            title="Update"
-            onPress={handleUpdateProfile}
-            disabled={isSaving || isInitializing}
-            style={styles.button}
-            isLoading={isSaving}
-          />
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    <AnimatePresence>
+      {visible && (
+        <Pressable onPress={onClose} style={styles.modalBackdrop}>
+          <MotiView
+            from={{ translateY: 800 }}
+            animate={{ translateY: 0 }}
+            exit={{ translateY: 800 }}
+            transition={{ type: 'timing', duration: 400 }}
+            style={[styles.bottomSheetContainer, { height }]}
+            onStartShouldSetResponder={() => true}
+          >
+            <View style={styles.grabber} />
+            {children}
+          </MotiView>
+        </Pressable>
+      )}
+    </AnimatePresence>
   );
 };
 
-// --- Styles --- ( Largely reusable from CreateProfileScreen, maybe some minor tweaks )
+export const EditProfileScreen = () => {
+    const { profile, updateProfile, isSaving, user } = useAuth();
+    const navigation = useNavigation();
+    const initialProfileState = useRef<any>(null);
+    const [isFormDirty, setIsFormDirty] = useState(false);
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
+    const [middleInitial, setMiddleInitial] = useState('');
+    const [dateOfBirth, setDateOfBirth] = useState<Date | null>(null);
+    const [contactNo, setContactNo] = useState('');
+    const [street, setStreet] = useState('');
+    const [selectedProvince, setSelectedProvince] = useState('');
+    const [selectedCity, setSelectedCity] = useState('');
+    const [selectedBarangay, setSelectedBarangay] = useState('');
+    const [civilStatus, setCivilStatus] = useState('');
+    const [religion, setReligion] = useState('');
+    const [occupation, setOccupation] = useState('');
+    const [philhealthNo, setPhilhealthNo] = useState('');
+    const [genderIdentity, setGenderIdentity] = useState('');
+    const [pronouns, setPronouns] = useState('');
+    const [assignedSexAtBirth, setAssignedSexAtBirth] = useState('');
+    const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
+    const [tempDate, setTempDate] = useState<Date | null>(null);
+    const [isPickerVisible, setPickerVisible] = useState(false);
+    const [pickerData, setPickerData] = useState<PickerItem[]>([]);
+    const [pickerType, setPickerType] = useState<PickerType | null>(null);
+    const [pickerTitle, setPickerTitle] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [tempSelectedItem, setTempSelectedItem] = useState<PickerItem | null>(null);
+    const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
+    
+    const provinces: PickerItem[] = useMemo(() => Array.isArray(provinceJson) ? provinceJson.map((p) => ({ name: p.province_name, code: p.province_code })) : [], []);
+    const cities: PickerItem[] = useMemo(() => Array.isArray(cityJson) ? cityJson.map((c) => ({ name: c.city_name, code: c.city_code })) : [], []);
+    const barangays: PickerItem[] = useMemo(() => Array.isArray(barangayJson) ? barangayJson.map((b) => ({ name: b.brgy_name, code: b.brgy_code })) : [], []);
+
+    const showToast = (message: string, type: 'success' | 'error') => {
+        setToast({ visible: true, message, type });
+        setTimeout(() => setToast({ visible: false, message: '', type }), 3000);
+    };
+
+    useLayoutEffect(() => {
+        navigation.setOptions({
+            headerStyle: {
+                backgroundColor: theme.colors.background,
+            },
+            headerShadowVisible: false,
+            headerTitle: '',
+            headerLeft: () => (
+                <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginLeft: 8 }}>
+                    <ArrowLeft size={30} color={theme.colors.secondary} />
+                </TouchableOpacity>
+            ),
+        });
+    }, [navigation]);
+
+    useEffect(() => {
+        if (profile) {
+            const dob = profile.date_of_birth ? new Date(profile.date_of_birth) : null;
+            const initialData = {
+                firstName: profile.first_name || '',
+                lastName: profile.last_name || '',
+                middleInitial: profile.middle_initial || '',
+                dateOfBirth: dob && !isNaN(dob.getTime()) ? dob : null,
+                contactNo: profile.contact_no || '',
+                street: profile.street || '',
+                selectedProvince: provinces.find(p => p.code === profile.province_code)?.name || '',
+                selectedCity: cities.find(c => c.code === profile.city_municipality_code)?.name || '',
+                selectedBarangay: barangays.find(b => b.code === profile.barangay_code)?.name || '',
+                civilStatus: profile.civil_status || '',
+                religion: profile.religion || '',
+                occupation: profile.occupation || '',
+                philhealthNo: profile.philhealth_no || '',
+                genderIdentity: profile.gender_identity || '',
+                pronouns: profile.pronouns || '',
+                assignedSexAtBirth: profile.assigned_sex_at_birth || ''
+            };
+            
+            if (!initialProfileState.current) {
+                setFirstName(initialData.firstName);
+                setLastName(initialData.lastName);
+                setMiddleInitial(initialData.middleInitial);
+                setDateOfBirth(initialData.dateOfBirth);
+                setContactNo(initialData.contactNo);
+                setStreet(initialData.street);
+                setSelectedProvince(initialData.selectedProvince);
+                setSelectedCity(initialData.selectedCity);
+                setSelectedBarangay(initialData.selectedBarangay);
+                setCivilStatus(initialData.civilStatus);
+                setReligion(initialData.religion);
+                setOccupation(initialData.occupation);
+                setPhilhealthNo(initialData.philhealthNo);
+                setGenderIdentity(initialData.genderIdentity);
+                setPronouns(initialData.pronouns);
+                setAssignedSexAtBirth(initialData.assignedSexAtBirth);
+                initialProfileState.current = initialData;
+            }
+
+            const currentData = {
+                firstName, lastName, middleInitial, dateOfBirth, contactNo, street,
+                selectedProvince, selectedCity, selectedBarangay, civilStatus, religion,
+                occupation, philhealthNo, genderIdentity, pronouns, assignedSexAtBirth
+            };
+            
+            setIsFormDirty(JSON.stringify(currentData) !== JSON.stringify(initialProfileState.current));
+        }
+    }, [profile, firstName, lastName, middleInitial, dateOfBirth, contactNo, street, selectedProvince, selectedCity, selectedBarangay, civilStatus, religion, occupation, philhealthNo, genderIdentity, pronouns, assignedSexAtBirth]);
+    
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+            if (!isFormDirty || isSaving) return;
+            e.preventDefault();
+            Alert.alert(
+                'Discard changes?',
+                'You have unsaved changes. Are you sure you want to discard them and leave the screen?',
+                [
+                    { text: "Don't leave", style: 'cancel', onPress: () => {} },
+                    { text: 'Discard', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+                ]
+            );
+        });
+        return unsubscribe;
+    }, [navigation, isFormDirty, isSaving]);
+
+    const handleSave = async () => {
+        if (!user) {
+            showToast("You must be logged in to update your profile.", "error");
+            return;
+        }
+        const success = await updateProfile({
+            userId: user.id,
+            updates: {
+                first_name: firstName,
+                last_name: lastName,
+                middle_initial: middleInitial,
+                date_of_birth: dateOfBirth ? dateOfBirth.toISOString().split('T')[0] : null,
+                contact_no: contactNo,
+                street: street,
+                province_code: provinces.find(p => p.name === selectedProvince)?.code || null,
+                city_municipality_code: cities.find(c => c.name === selectedCity)?.code || null,
+                barangay_code: barangays.find(b => b.code === selectedBarangay)?.code || null,
+                civil_status: civilStatus,
+                religion: religion,
+                occupation: occupation,
+                philhealth_no: philhealthNo,
+                gender_identity: genderIdentity,
+                pronouns: pronouns,
+                assigned_sex_at_birth: assignedSexAtBirth,
+                age: dateOfBirth ? new Date().getFullYear() - dateOfBirth.getFullYear() : null,
+            }
+        });
+        if (success) {
+            showToast("Profile updated successfully!", 'success');
+            setTimeout(() => navigation.goBack(), 1000);
+        } else {
+            showToast("Failed to update profile. Please try again.", 'error');
+        }
+    };
+    
+    const showDatePicker = () => {
+        setTempDate(dateOfBirth || new Date());
+        setDatePickerVisibility(true);
+    };
+
+    const handleTempDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+        if (selectedDate) {
+            setTempDate(selectedDate);
+        }
+    };
+
+    const confirmDateSelection = () => {
+        setDateOfBirth(tempDate);
+        setDatePickerVisibility(false);
+    };
+    
+    const handleAndroidDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+        setDatePickerVisibility(false);
+        if (event.type === 'set' && selectedDate) {
+            setDateOfBirth(selectedDate);
+        }
+    };
+
+    const openPicker = (type: PickerType) => {
+        setPickerType(type);
+        setPickerTitle(pickerTypeToTitleMap[type]);
+        setSearchTerm('');
+        let data: PickerItem[] = [];
+        let currentSelection: PickerItem | null = null;
+        
+        switch (type) {
+            case 'province': data = provinces; currentSelection = { name: selectedProvince }; break;
+            case 'city':
+                const provinceCode = provinces.find(p => p.name === selectedProvince)?.code;
+                data = provinceCode ? cities.filter(c => c.code?.startsWith(provinceCode)) : [];
+                currentSelection = { name: selectedCity };
+                break;
+            case 'barangay':
+                const cityCode = cities.find(c => c.name === selectedCity)?.code;
+                data = cityCode ? barangays.filter(b => b.code?.startsWith(cityCode)) : [];
+                currentSelection = { name: selectedBarangay };
+                break;
+            case 'civilStatus': data = civilStatusOptions.map(name => ({ name })); currentSelection = { name: civilStatus }; break;
+            case 'genderIdentity': data = genderIdentityOptions.map(name => ({ name })); currentSelection = { name: genderIdentity }; break;
+            case 'pronouns': data = pronounsOptions.map(name => ({ name })); currentSelection = { name: pronouns }; break;
+            case 'assignedSex': data = assignedSexOptions.map(name => ({ name })); currentSelection = { name: assignedSexAtBirth }; break;
+        }
+        setPickerData(data);
+        setTempSelectedItem(currentSelection);
+        setPickerVisible(true);
+    };
+
+    const handlePickerSelect = (item: PickerItem) => {
+        switch (pickerType) {
+            case 'province': setSelectedProvince(item.name); setSelectedCity(''); setSelectedBarangay(''); break;
+            case 'city': setSelectedCity(item.name); setSelectedBarangay(''); break;
+            case 'barangay': setSelectedBarangay(item.name); break;
+            case 'civilStatus': setCivilStatus(item.name); break;
+            case 'genderIdentity': setGenderIdentity(item.name); break;
+            case 'pronouns': setPronouns(item.name); break;
+            case 'assignedSex': setAssignedSexAtBirth(item.name); break;
+        }
+    };
+    
+    const handleTempPickerSelect = (item: PickerItem) => {
+        setTempSelectedItem(item);
+    };
+
+    const confirmPickerSelection = () => {
+        if (tempSelectedItem) {
+            handlePickerSelect(tempSelectedItem);
+        }
+        setPickerVisible(false);
+    };
+
+    const getSelectedValue = (type: PickerType | null) => {
+        switch(type) {
+            case 'province': return selectedProvince;
+            case 'city': return selectedCity;
+            case 'barangay': return selectedBarangay;
+            case 'civilStatus': return civilStatus;
+            case 'genderIdentity': return genderIdentity;
+            case 'pronouns': return pronouns;
+            case 'assignedSex': return assignedSexAtBirth;
+            default: return '';
+        }
+    }
+
+    if (!profile) {
+        return <SafeAreaView style={styles.loadingContainer}><ActivityIndicator size="large" color={theme.colors.primary} /><Text>Loading profile...</Text></SafeAreaView>;
+    }
+    
+    return (
+        <SafeAreaView style={{flex: 1, backgroundColor: theme.colors.background}}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+                <ScrollView 
+                    contentContainerStyle={styles.container} 
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                >
+                    <Text style={styles.screenTitle}>Edit Profile</Text>
+                    <Text style={styles.screenDescription}>
+                        Keep your profile up-to-date to ensure the best experience.
+                    </Text>
+                    <Card style={styles.card}>
+                        <CardHeader>
+                            <CardTitle style={styles.cardTitle}>Personal Information</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <TextInput label="First Name" value={firstName} onChangeText={setFirstName} required helperText="Your legal first name." />
+                            <TextInput label="Middle Initial" value={middleInitial} onChangeText={setMiddleInitial} maxLength={5} />
+                            <TextInput label="Last Name" value={lastName} onChangeText={setLastName} required helperText="Your legal last name." />
+                            <View style={styles.pickerWrapper}>
+                                <PickerLabel required>Date of Birth</PickerLabel>
+                                <TouchableOpacity onPress={showDatePicker} style={styles.pickerButton}>
+                                    <Text style={styles.pickerText}>{dateOfBirth ? dateOfBirth.toLocaleDateString() : 'Select Date of Birth'}</Text>
+                                </TouchableOpacity>
+                                <Text style={styles.helperText}>Your date of birth will be used to calculate your age.</Text>
+                            </View>
+                        </CardContent>
+                    </Card>
+                    
+                    <Card style={styles.card}>
+                        <CardHeader>
+                             <CardTitle style={styles.cardTitle}>Contact & Address</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <TextInput label="Contact No." value={contactNo} onChangeText={setContactNo} keyboardType="phone-pad" required helperText="A valid phone number where we can reach you." />
+                            <TextInput label="Street Address" value={street} onChangeText={setStreet} required helperText="House number, street name, and subdivision." />
+                            <View style={styles.pickerWrapper}>
+                                <PickerLabel required>Province</PickerLabel>
+                                <TouchableOpacity onPress={() => openPicker('province')} style={styles.pickerButton}><Text style={styles.pickerText}>{selectedProvince || 'Select Province'}</Text></TouchableOpacity>
+                            </View>
+                            <View style={styles.pickerWrapper}>
+                                <PickerLabel required>City/Municipality</PickerLabel>
+                                <TouchableOpacity onPress={() => openPicker('city')} style={styles.pickerButton} disabled={!selectedProvince}><Text style={styles.pickerText}>{selectedCity || 'Select City/Municipality'}</Text></TouchableOpacity>
+                            </View>
+                             <View style={styles.pickerWrapper}>
+                                <PickerLabel required>Barangay</PickerLabel>
+                                <TouchableOpacity onPress={() => openPicker('barangay')} style={styles.pickerButton} disabled={!selectedCity}><Text style={styles.pickerText}>{selectedBarangay || 'Select Barangay'}</Text></TouchableOpacity>
+                            </View>
+                        </CardContent>
+                    </Card>
+                    
+                     <Card style={styles.card}>
+                        <CardHeader>
+                            <CardTitle style={styles.cardTitle}>Identity & Other Info</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <View style={styles.pickerWrapper}>
+                                <PickerLabel>Civil Status</PickerLabel>
+                                <TouchableOpacity onPress={() => openPicker('civilStatus')} style={styles.pickerButton}><Text style={styles.pickerText}>{civilStatus || 'Select Civil Status'}</Text></TouchableOpacity>
+                            </View>
+                             <View style={styles.pickerWrapper}>
+                                <PickerLabel>Gender Identity</PickerLabel>
+                                <TouchableOpacity onPress={() => openPicker('genderIdentity')} style={styles.pickerButton}><Text style={styles.pickerText}>{genderIdentity || 'Select Gender Identity'}</Text></TouchableOpacity>
+                            </View>
+                             <View style={styles.pickerWrapper}>
+                                <PickerLabel>Pronouns</PickerLabel>
+                                <TouchableOpacity onPress={() => openPicker('pronouns')} style={styles.pickerButton}><Text style={styles.pickerText}>{pronouns || 'Select Pronouns'}</Text></TouchableOpacity>
+                            </View>
+                             <View style={styles.pickerWrapper}>
+                                <PickerLabel>Assigned Sex at Birth</PickerLabel>
+                                <TouchableOpacity onPress={() => openPicker('assignedSex')} style={styles.pickerButton}><Text style={styles.pickerText}>{assignedSexAtBirth || 'Select Assigned Sex at Birth'}</Text></TouchableOpacity>
+                            </View>
+                            <TextInput label="Religion" value={religion} onChangeText={setReligion} />
+                            <TextInput label="Occupation" value={occupation} onChangeText={setOccupation} />
+                            <TextInput label="PhilHealth No." value={philhealthNo} onChangeText={setPhilhealthNo} helperText="Optional. Used for insurance claims." />
+                        </CardContent>
+                    </Card>
+                     <Button 
+                        title={isSaving ? "Saving..." : "Save Changes"} 
+                        onPress={handleSave} 
+                        disabled={!isFormDirty || isSaving}
+                        size="xl" 
+                        style={{marginTop: 8}}
+                    />
+                </ScrollView>
+            </KeyboardAvoidingView>
+            
+            {/* --- Generic Picker Modal --- */}
+            <CustomPicker visible={isPickerVisible} onClose={() => setPickerVisible(false)} height="50%">
+                <Text style={styles.modalHeader}>Select {pickerTitle}</Text>
+                <View style={styles.searchInputContainer}>
+                    <Search color={theme.colors.mutedForeground} size={20} style={styles.searchIcon} />
+                    <TextInput 
+                        placeholder="Search..." 
+                        value={searchTerm} 
+                        onChangeText={setSearchTerm} 
+                        style={styles.searchInput} 
+                    />
+                </View>
+                <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+                    {pickerData.filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
+                        <PickerRow 
+                            key={item.name}
+                            label={item.name}
+                            isSelected={tempSelectedItem?.name === item.name}
+                            onPress={() => handleTempPickerSelect(item)}
+                        />
+                    ))}
+                </ScrollView>
+                 <Button title="Done" variant="default" size="xl" onPress={confirmPickerSelection} style={{marginTop: 16}} />
+            </CustomPicker>
+
+            {/* --- Date Picker Modal --- */}
+            <CustomPicker visible={isDatePickerVisible} onClose={() => setDatePickerVisibility(false)} height="45%">
+                <DateTimePicker 
+                    value={tempDate || new Date()} 
+                    mode="date" 
+                    display="spinner"
+                    onChange={handleTempDateChange}
+                    textColor={theme.colors.foreground}
+                />
+                <Button title="Done" variant="default" size="xl" onPress={confirmDateSelection} style={{marginTop: 16}} />
+            </CustomPicker>
+
+            <CustomToast message={toast.message} visible={toast.visible} type={toast.type} />
+        </SafeAreaView>
+    );
+};
+
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: theme.colors.background, // Match background color
-  },
-  container: {
-    flex: 1,
-    // backgroundColor: theme.colors.background, // Removed to allow contentContainer to control background
-  },
-  contentContainer: {
-    padding: theme.spacing.lg, // Changed from .md to .lg
-    backgroundColor: theme.colors.background, // Set background on content container for full scroll area
-    flexGrow: 1, // Ensure it grows to fill ScrollView
-  },
-  title: {
-    fontSize: theme.typography.subheading, // Aligned with LoginScreen
-    fontWeight: 'bold',
-    color: theme.colors.secondary,      // Aligned with LoginScreen (secondary color)
-    marginBottom: theme.spacing.lg,     // Aligned with LoginScreen
-    textAlign: 'center',
-  },
-  card: {
-    marginBottom: theme.spacing.lg,
-    padding: theme.spacing.lg,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: theme.spacing.lg,
-    color: theme.colors.secondary,
-  },
-  input: {
-    marginBottom: theme.spacing.md, 
-  },
-  label: {
-    fontSize: theme.typography.body, // Aligned with TextInput label
-    fontWeight: '500', // Aligned with TextInput label
-    color: theme.colors.secondary, // Aligned with TextInput label
-    marginBottom: theme.spacing.xs, 
-  },
-  labelError: {
-    color: theme.colors.destructive,
-  },
-  pickerTrigger: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: theme.colors.inputBackground,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    height: 44,
-  },
-  pickerText: {
-    fontSize: 16,
-    color: theme.colors.text,
-  },
-  pickerContainer: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    marginBottom: theme.spacing.md,
-    backgroundColor: theme.colors.inputBackground,
-  },
-   pickerItem: {
-      // Style individual Picker items if needed (e.g., on iOS)
-     // height: 120, // Example for iOS item height
-   },
-   pickerDisabled: {
-    backgroundColor: theme.colors.disabledBackground,
-   },
-  inputErrorBorder: {
-      borderColor: theme.colors.destructive,
-  },
-  errorText: {
-    color: theme.colors.destructive,
-    fontSize: theme.typography.caption, // Consistent with TextInput component
-    marginTop: theme.spacing.xs,
-  },
-  generalErrorText: {
-    color: theme.colors.destructive,
-    textAlign: 'center',
-    marginBottom: theme.spacing.md,
-  },
-  button: {
-    marginTop: theme.spacing.lg,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: theme.spacing.lg,
-  },
-  loadingText: {
-      marginTop: theme.spacing.md,
-      fontSize: 16,
-      color: theme.colors.textMuted,
-  },
-  fieldGroup: {
-    marginBottom: theme.spacing.md,
-  },
-  sectionHeader: {
-    fontSize: theme.typography.subheading,
-  },
-  pickerToggleButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: theme.colors.inputBackground,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    height: 44,
-  },
-  pickerToggleButtonText: {
-    fontSize: 16,
-    color: theme.colors.text,
-  },
-  picker: {
-    width: '100%',
-  },
-  divider: { // Added divider style from CreateProfileScreen
-    height: 1,
-    backgroundColor: theme.colors.border,
-    marginVertical: theme.spacing.lg,
-  },
-  // Added safeArea style
-}); 
+    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background },
+    container: {
+        paddingVertical: theme.spacing.xl,
+        paddingHorizontal: theme.spacing.lg,
+        backgroundColor: theme.colors.background,
+        paddingBottom: 40,
+    },
+    screenTitle: {
+        ...theme.typography.h1,
+        textAlign: 'center',
+        marginBottom: theme.spacing.sm,
+        color: theme.colors.secondary,
+    },
+    screenDescription: {
+        ...theme.typography.body,
+        textAlign: 'center',
+        color: theme.colors.foreground,
+        marginBottom: theme.spacing.xl,
+    },
+    card: {
+        marginBottom: theme.spacing.xl,
+    },
+    cardTitle: {
+      color: theme.colors.secondary,
+    },
+    pickerWrapper: {
+        width: '100%',
+        marginBottom: theme.spacing.lg,
+    },
+    pickerLabel: {
+        ...theme.typography.small,
+        color: theme.colors.foreground,
+        marginBottom: theme.spacing.sm,
+        fontWeight: '500',
+    },
+    pickerButton: {
+        width: '100%',
+        height: 50,
+        justifyContent: 'center',
+        paddingHorizontal: theme.spacing.md,
+        backgroundColor: theme.colors.card,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        borderRadius: theme.radius.md,
+    },
+    pickerText: {
+        fontSize: 16,
+        color: theme.colors.foreground,
+    },
+    helperText: {
+        ...theme.typography.small,
+        color: theme.colors.mutedForeground,
+        fontSize: 12,
+        marginTop: theme.spacing.xs,
+        paddingHorizontal: 4,
+    },
+    modalBackdrop: { 
+        ...StyleSheet.absoluteFillObject,
+        justifyContent: 'flex-end',
+        alignItems: 'center', 
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        zIndex: 10,
+    },
+    bottomSheetContainer: { 
+        width: '100%', 
+        backgroundColor: theme.colors.background, 
+        borderTopLeftRadius: theme.radius.lg,
+        borderTopRightRadius: theme.radius.lg,
+        paddingHorizontal: theme.spacing.xl,
+        paddingBottom: 40,
+    },
+    grabber: {
+        width: 48,
+        height: 5,
+        backgroundColor: theme.colors.border,
+        borderRadius: theme.radius.full,
+        alignSelf: 'center',
+        marginTop: theme.spacing.sm,
+        marginBottom: theme.spacing.lg,
+    },
+    modalHeader: { 
+        ...theme.typography.h3,
+        marginBottom: 15, 
+        textAlign: 'center',
+        fontFamily: theme.typography.fontFamilySemiBold,
+    },
+    searchInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: theme.colors.card,
+        borderRadius: theme.radius.full,
+        paddingHorizontal: theme.spacing.lg,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        marginBottom: 16,
+    },
+    searchInput: { 
+        flex: 1,
+        borderWidth: 0,
+        backgroundColor: 'transparent',
+        paddingVertical: 14,
+        fontSize: 16,
+    },
+    searchIcon: {
+        marginRight: theme.spacing.sm,
+    },
+    pickerItem: { 
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: theme.spacing.md,
+        borderRadius: theme.radius.md,
+        marginBottom: theme.spacing.sm,
+    },
+    pickerItemSelected: {
+        backgroundColor: 'rgba(255, 77, 109, 0.1)', // theme.colors.primary at 10% opacity
+    },
+    radioCircle: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        borderWidth: 2,
+        borderColor: theme.colors.border,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: theme.spacing.md,
+    },
+    radioCircleSelected: {
+        backgroundColor: theme.colors.primary,
+        borderColor: theme.colors.primary,
+    },
+    pickerItemText: {
+        fontSize: 16,
+        color: theme.colors.foreground,
+    },
+    pickerItemTextSelected: {
+        fontFamily: theme.typography.fontFamilySemiBold,
+        color: theme.colors.primary,
+    },
+    toastContainer: {
+        position: 'absolute',
+        bottom: 40,
+        left: 20,
+        right: 20,
+        padding: 16,
+        borderRadius: theme.radius.md,
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: 0.95,
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+    },
+    toastSuccess: { backgroundColor: theme.colors.success },
+    toastError: { backgroundColor: theme.colors.destructive },
+    toastText: {
+        color: theme.colors.primaryForeground,
+        ...theme.typography.small,
+        fontWeight: '500',
+    },
+});

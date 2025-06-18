@@ -5,11 +5,11 @@ import { createClient } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
 
 // Ensure your environment variables are configured correctly in app.json -> extra
-const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl;
-const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey;
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 // Retrieve the backend API URL from app.json extra
-const EXPO_PUBLIC_BACKEND_API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL;
+const EXPO_PUBLIC_BACKEND_API_URL = process.env.EXPO_PUBLIC_BACKEND_API_URL;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('**************************************************************************');
@@ -72,6 +72,9 @@ export interface Profile {
   occupation: string | null;
   contact_no: string | null; // App-preferred contact field
   street: string | null;
+  province: string | null;
+  city: string | null;
+  barangay: string | null;
   barangay_code: string | null;
   city_municipality_code: string | null;
   province_code: string | null;

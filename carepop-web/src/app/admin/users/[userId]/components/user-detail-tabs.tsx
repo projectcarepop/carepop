@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProfileForm } from './profile-form';
 import { MedicalRecordsList } from './medical-records-list';
 import { AppointmentsList } from './appointments-list';
+import { UserProfile } from "@/lib/contexts/AuthContext";
 
 // Define the interfaces for the props
 interface Profile {
@@ -18,7 +19,7 @@ interface Profile {
 }
 
 interface UserDetailTabsProps {
-  profile: Profile;
+  profile: UserProfile;
   userId: string;
 }
 

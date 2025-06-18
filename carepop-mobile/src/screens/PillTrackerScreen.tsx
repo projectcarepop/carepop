@@ -10,7 +10,7 @@ import { getMedications, getMedicationLogs, logMedication, deactivateMedication 
 import { Medication } from '../types/medication';
 import { HealthBuddyStackParamList } from '../navigation/AppNavigator';
 
-type PillTrackerNavigationProp = NativeStackNavigationProp<HealthBuddyStackParamList, 'PillTrackerScreen'>;
+type PillTrackerNavigationProp = NativeStackNavigationProp<HealthBuddyStackParamList, 'PillTracker'>;
 
 type MedicationWithLog = Medication & { takenToday: boolean };
 
@@ -87,7 +87,7 @@ export function PillTrackerScreen() {
             <TouchableOpacity
                 onPress={() => handleDeleteMedication(medId)}
                 style={styles.deleteButton}>
-                <Ionicons name="trash-outline" size={24} color={theme.colors.background} />
+                <Ionicons name="trash-outline" size={24} color={theme.colors.primaryForeground} />
             </TouchableOpacity>
         );
     };
@@ -107,7 +107,7 @@ export function PillTrackerScreen() {
                     <Ionicons 
                         name={item.takenToday ? "checkmark-circle" : "ellipse-outline"}
                         size={24}
-                        color={item.takenToday ? theme.colors.background : theme.colors.primary}
+                        color={item.takenToday ? theme.colors.primary : theme.colors.primary}
                     />
                     <Text style={[styles.statusText, item.takenToday && styles.takenText]}>
                         {item.takenToday ? 'Taken' : 'Take'}
@@ -131,10 +131,8 @@ export function PillTrackerScreen() {
                 <Text style={styles.screenTitle}>Pill Tracker</Text>
                 <Button
                     title="Add Med"
-                    onPress={() => navigation.navigate('AddMedicationScreen')}
-                    variant="primary"
-                    styleType="solid"
-                    icon={<Ionicons name="add" size={20} color={theme.colors.background} />}
+                    onPress={() => navigation.navigate('AddMedication')}
+                    icon={<Ionicons name="add" size={20} color={theme.colors.primaryForeground} />}
                 />
             </View>
             
@@ -171,9 +169,8 @@ const styles = StyleSheet.create({
         borderBottomColor: theme.colors.border,
     },
     screenTitle: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: theme.colors.text,
+        ...theme.typography.h2,
+        color: theme.colors.foreground,
     },
     listContainer: {
         paddingHorizontal: 20,
@@ -190,13 +187,13 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     medName: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: theme.colors.text,
+        ...theme.typography.body,
+        fontFamily: theme.typography.fontFamilySemiBold,
+        color: theme.colors.foreground,
     },
     medDosage: {
-        fontSize: 14,
-        color: theme.colors.textMuted,
+        ...theme.typography.small,
+        color: theme.colors.mutedForeground,
         marginTop: 2,
     },
     statusButton: {
@@ -215,12 +212,12 @@ const styles = StyleSheet.create({
     },
     statusText: {
         marginLeft: 8,
-        fontSize: 14,
-        fontWeight: '500',
+        ...theme.typography.small,
+        fontFamily: theme.typography.fontFamilyMedium,
         color: theme.colors.primary,
     },
     takenText: {
-        color: theme.colors.background,
+        color: theme.colors.primaryForeground,
     },
     deleteButton: {
         backgroundColor: theme.colors.destructive,
@@ -228,7 +225,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         width: 75,
         height: '90%',
-        borderRadius: theme.borderRadius.md,
+        borderRadius: theme.radius.md,
     },
     emptyContainer: {
         flex: 1,
@@ -237,14 +234,13 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     emptyText: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: theme.colors.text,
+        ...theme.typography.h4,
+        color: theme.colors.foreground,
         marginTop: 10,
     },
     emptySubText: {
-        fontSize: 14,
-        color: theme.colors.textMuted,
+        ...theme.typography.body,
+        color: theme.colors.mutedForeground,
         marginTop: 5,
         textAlign: 'center',
     },

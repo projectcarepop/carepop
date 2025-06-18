@@ -2,48 +2,45 @@ import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity } from 'react-native';
 import { theme } from '../components';
 import { useNavigation, NavigationProp, CommonActions } from '@react-navigation/native';
-import { RootStackParamList } from '../navigation/AppNavigator'; // Navigating back to the main app structure
+import { BookingStackParamList, DrawerParamList } from '../navigation/AppNavigator';
 import { Ionicons } from '@expo/vector-icons';
+import { DrawerActions } from '@react-navigation/native';
 
-// Use a more general navigation prop as we are navigating outside the AppointmentStack
-type BookingSuccessNavigationProp = NavigationProp<RootStackParamList>;
+type BookingSuccessNavigationProp = NavigationProp<BookingStackParamList, 'BookingSuccess'>;
 
 export const BookingSuccessScreen = () => {
     const navigation = useNavigation<BookingSuccessNavigationProp>();
 
     const handleViewAppointments = () => {
-        // Reset the stack and navigate to the Dashboard's Appointment tab.
+        // This action first navigates to the root 'Dashboard' screen in the drawer, then opens the 'Appointments' screen.
+        navigation.dispatch(
+            CommonActions.navigate({
+                name: 'Dashboard', 
+                params: {
+                    screen: 'Appointments', // This is a screen within the Drawer
+                },
+            })
+        );
+        // Then, ensure the drawer is closed if it was open.
+        navigation.dispatch(DrawerActions.closeDrawer());
+    };
+
+    const handleBookAnother = () => {
+        // This resets the booking stack to the beginning for a fresh start.
         navigation.dispatch(
             CommonActions.reset({
                 index: 0,
-                routes: [{ 
-                    name: 'MainApp', 
-                    state: { 
-                        routes: [
-                            { name: 'Dashboard' },
-                            // Navigate specifically to the 'My' tab within the Dashboard's nested navigator
-                            // This part is complex and depends on the exact structure of your tab navigator
-                            // Assuming 'Dashboard' contains a tab navigator with a 'My' route
-                        ] 
-                    } 
-                }],
+                routes: [{ name: 'ClinicSelection' }],
             })
         );
     };
 
-    const handleBookAnother = () => {
-        // Reset the appointment stack to its beginning
+    const handleGoHome = () => {
+        // A simple action to go back to the main dashboard screen.
         navigation.dispatch(
-             CommonActions.reset({
-                index: 0,
-                routes: [{ 
-                    name: 'MainApp', 
-                    state: { 
-                        routes: [{ name: 'Appointments' }] 
-                    } 
-                }],
-            })
+             CommonActions.navigate({ name: 'Dashboard' })
         );
+         navigation.dispatch(DrawerActions.closeDrawer());
     };
 
     return (
@@ -59,12 +56,15 @@ export const BookingSuccessScreen = () => {
 
                 <View style={styles.buttonContainer}>
                     <TouchableOpacity style={styles.primaryButton} onPress={handleViewAppointments}>
-                        <Ionicons name="calendar-outline" size={20} color={theme.colors.card} style={styles.buttonIcon} />
-                        <Text style={styles.primaryButtonText}>View Appointments</Text>
+                        <Ionicons name="calendar-outline" size={20} color={theme.colors.primaryForeground} style={styles.buttonIcon} />
+                        <Text style={styles.primaryButtonText}>View My Appointments</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.secondaryButton} onPress={handleBookAnother}>
                          <Ionicons name="add-circle-outline" size={20} color={theme.colors.primary} style={styles.buttonIcon} />
-                        <Text style={styles.secondaryButtonText}>Book Another</Text>
+                        <Text style={styles.secondaryButtonText}>Book Another Service</Text>
+                    </TouchableOpacity>
+                     <TouchableOpacity style={styles.tertiaryButton} onPress={handleGoHome}>
+                        <Text style={styles.tertiaryButtonText}>Go to Dashboard</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -86,20 +86,18 @@ const styles = StyleSheet.create({
     },
     iconContainer: {
         marginBottom: theme.spacing.lg,
-        // Optional: Add a subtle background to the icon
-        backgroundColor: 'rgba(25, 135, 84, 0.1)',
-        borderRadius: theme.borderRadius.full,
+        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+        borderRadius: theme.radius.full,
         padding: theme.spacing.md,
     },
     header: {
-        fontSize: theme.typography.heading,
-        fontWeight: 'bold',
-        color: theme.colors.text,
+        ...theme.typography.h1,
+        color: theme.colors.foreground,
         marginBottom: theme.spacing.sm,
     },
     subHeader: {
-        fontSize: theme.typography.body,
-        color: theme.colors.textMuted,
+        ...theme.typography.body,
+        color: theme.colors.mutedForeground,
         textAlign: 'center',
         marginBottom: theme.spacing.xl * 2, // Large space before buttons
     },
@@ -114,14 +112,14 @@ const styles = StyleSheet.create({
         backgroundColor: theme.colors.primary,
         paddingVertical: theme.spacing.md,
         paddingHorizontal: theme.spacing.lg,
-        borderRadius: theme.borderRadius.md,
+        borderRadius: theme.radius.md,
         width: '100%',
         marginBottom: theme.spacing.md,
     },
     primaryButtonText: {
-        color: theme.colors.card,
-        fontSize: 18,
-        fontWeight: 'bold',
+        color: theme.colors.primaryForeground,
+        ...theme.typography.h4,
+        fontFamily: theme.typography.fontFamilyBold,
     },
     secondaryButton: {
         flexDirection: 'row',
@@ -130,15 +128,24 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent',
         paddingVertical: theme.spacing.md,
         paddingHorizontal: theme.spacing.lg,
-        borderRadius: theme.borderRadius.md,
+        borderRadius: theme.radius.md,
         borderWidth: 1,
         borderColor: theme.colors.primary,
         width: '100%',
     },
     secondaryButtonText: {
         color: theme.colors.primary,
-        fontSize: 18,
-        fontWeight: 'bold',
+        ...theme.typography.h4,
+        fontFamily: theme.typography.fontFamilyBold,
+    },
+    tertiaryButton: {
+        marginTop: theme.spacing.sm,
+    },
+    tertiaryButtonText: {
+        color: theme.colors.mutedForeground,
+        ...theme.typography.body,
+        fontFamily: theme.typography.fontFamilyMedium,
+        textDecorationLine: 'underline',
     },
     buttonIcon: {
         marginRight: theme.spacing.sm,

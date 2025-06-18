@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { cookies } from 'next/headers';
 
 const formSchema = z.object({
   name: z.string().min(1, { message: "Category name is required." }),
@@ -10,7 +11,8 @@ const formSchema = z.object({
 });
 
 export async function createServiceCategory(values: z.infer<typeof formSchema>) {
-    const supabase = createClient();
+    const cookieStore = cookies();
+    const supabase = createClient(cookieStore);
     const validatedData = formSchema.parse(values);
 
     const { error } = await supabase.from('service_categories').insert([validatedData]);
@@ -25,7 +27,8 @@ export async function createServiceCategory(values: z.infer<typeof formSchema>) 
 }
 
 export async function updateServiceCategory(categoryId: string, values: z.infer<typeof formSchema>) {
-    const supabase = createClient();
+    const cookieStore = cookies();
+    const supabase = createClient(cookieStore);
     const validatedData = formSchema.parse(values);
 
     const { error } = await supabase.from('service_categories').update(validatedData).eq('id', categoryId);
@@ -41,7 +44,8 @@ export async function updateServiceCategory(categoryId: string, values: z.infer<
 }
 
 export async function deleteServiceCategory(categoryId: string) {
-    const supabase = createClient();
+    const cookieStore = cookies();
+    const supabase = createClient(cookieStore);
 
     const { error } = await supabase
         .from('service_categories')

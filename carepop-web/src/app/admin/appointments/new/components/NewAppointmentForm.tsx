@@ -2,12 +2,11 @@
 
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useActionState, useEffect, useState } from "react";
 import { createAppointment } from "@/lib/actions/appointment.actions";
-import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import React from "react";
 import { Loader2, CalendarIcon } from "lucide-react";
@@ -20,6 +19,7 @@ import { TimePicker } from '@/components/ui/time-picker';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 const fetcher = (url: string) => fetch(url).then(res => res.json());
 
@@ -51,7 +51,6 @@ interface NewAppointmentFormProps {
 }
 
 export function NewAppointmentForm({ clinics, patients }: NewAppointmentFormProps) {
-    const { toast } = useToast();
     const [state, formAction, isPending] = useActionState(createAppointment, null);
     
     const form = useForm<NewAppointmentFormValues>({
@@ -87,20 +86,13 @@ export function NewAppointmentForm({ clinics, patients }: NewAppointmentFormProp
     useEffect(() => {
         if (state?.message) {
             if (state.errors) {
-                toast({
-                    title: "Error",
-                    description: state.message,
-                    variant: "destructive",
-                });
+                toast.error(state.message);
             } else {
-                toast({
-                    title: "Success",
-                    description: state.message,
-                });
+                toast.success(state.message);
                 form.reset();
             }
         }
-    }, [state, toast, form]);
+    }, [state, form]);
     
     useEffect(() => {
         if (selectedProviderId && selectedDate) {
@@ -238,11 +230,8 @@ export function NewAppointmentForm({ clinics, patients }: NewAppointmentFormProp
                                 <FormLabel>Provider</FormLabel>
                                 <FormControl>
                                     <Combobox
-                                    options={providers || []}
+                                    options={providers?.map((p: { id: string, full_name: string }) => ({ value: p.id, label: p.full_name })) || []}
                                     {...field}
-                                    onChange={(value: string) => {
-                                        form.setValue('providerId', value, { shouldValidate: true });
-                                    }}
                                     placeholder={isLoadingProviders ? "Loading..." : "Select a provider..."}
                                     searchPlaceholder="Search providers..."
                                     disabled={!selectedClinicId || isLoadingProviders}
@@ -254,81 +243,85 @@ export function NewAppointmentForm({ clinics, patients }: NewAppointmentFormProp
                         />
                          <FormField
                             control={form.control}
-                            name="duration"
-                            render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Duration (minutes)</FormLabel>
-                                <FormControl>
-                                <Input type="number" placeholder="e.g., 30" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
                             name="appointmentDateTime"
                             render={({ field }) => (
-                            <FormItem className="flex flex-col">
-                                <FormLabel>Appointment Date and Time</FormLabel>
-                                <Popover>
-                                <PopoverTrigger asChild>
-                                    <FormControl>
-                                    <Button
-                                        variant={"outline"}
-                                        className={cn("w-[240px] pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
-                                        disabled={!selectedProviderId}
-                                    >
-                                        {field.value ? format(field.value, "PPP HH:mm") : <span>Pick a date and time</span>}
-                                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                    </Button>
-                                    </FormControl>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar
-                                    mode="single"
-                                    selected={field.value}
-                                    onSelect={(date) => {
-                                        const today = new Date();
-                                        today.setHours(0, 0, 0, 0);
-                                        if (date && date >= today) {
-                                            field.onChange(date);
-                                        }
-                                    }}
-                                    disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                                    initialFocus
-                                    />
-                                    <div className="p-3 border-t border-border">
-                                    <TimePicker setDate={field.onChange} date={field.value} isTimeBlocked={isTimeBlocked} />
-                                    </div>
-                                </PopoverContent>
-                                </Popover>
-                                <FormMessage />
-                            </FormItem>
+                                <FormItem className="flex flex-col">
+                                    <FormLabel>Appointment Date & Time</FormLabel>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                        <FormControl>
+                                            <Button
+                                            variant={"outline"}
+                                            className={cn(
+                                                "w-[240px] pl-3 text-left font-normal",
+                                                !field.value && "text-muted-foreground"
+                                            )}
+                                            >
+                                            {field.value ? (
+                                                format(field.value, "PPP HH:mm:ss")
+                                            ) : (
+                                                <span>Pick a date</span>
+                                            )}
+                                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                            </Button>
+                                        </FormControl>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar
+                                            mode="single"
+                                            selected={field.value}
+                                            onSelect={field.onChange}
+                                            initialFocus
+                                            disabled={(date) => date < new Date(new Date().setHours(0,0,0,0)) }
+                                        />
+                                        <div className="p-3 border-t border-border">
+                                            <TimePicker 
+                                                setDate={field.onChange} 
+                                                date={field.value}
+                                                isTimeBlocked={isTimeBlocked}
+                                            />
+                                        </div>
+                                        </PopoverContent>
+                                    </Popover>
+                                    <FormMessage />
+                                </FormItem>
                             )}
                         />
-
                         <FormField
                             control={form.control}
-                            name="notes"
+                            name="duration"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Notes (Optional)</FormLabel>
+                                    <FormLabel>Duration (minutes)</FormLabel>
                                     <FormControl>
-                                        <Textarea
-                                            placeholder="Add any relevant notes for the appointment..."
-                                            className="resize-none"
-                                            {...field}
-                                        />
+                                        <Input type="number" {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}
                         />
-
-                        <Button type="submit" disabled={isPending || !form.formState.isValid} className="w-full">
-                            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Create Appointment
+                        <FormField
+                            control={form.control}
+                            name="notes"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>Notes</FormLabel>
+                                <FormControl>
+                                    <Textarea placeholder="Any additional notes for the appointment..." {...field} />
+                                </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <Button type="submit" disabled={isPending}>
+                            {isPending ? (
+                                <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Scheduling...
+                                </>
+                            ) : (
+                                "Schedule Appointment"
+                            )}
                         </Button>
                     </form>
                 </Form>

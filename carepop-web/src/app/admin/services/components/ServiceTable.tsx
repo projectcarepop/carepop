@@ -37,7 +37,7 @@ import {
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { AppError, fetcher } from '@/lib/utils';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
 
@@ -85,7 +85,6 @@ export function ServiceTable() {
   const [token, setToken] = React.useState<string | null>(null);
 
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
-  const { toast } = useToast();
 
   React.useEffect(() => {
     const fetchToken = async () => {
@@ -143,18 +142,11 @@ export function ServiceTable() {
         throw new AppError(errorData.message || 'Failed to delete service.', response);
       }
       
-      toast({
-        title: "Success",
-        description: "Service deleted successfully."
-      });
+      toast.success("Service deleted successfully.");
       mutate();
     } catch (err) {
       const error = err as AppError | Error;
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(error.message);
     }
   };
 

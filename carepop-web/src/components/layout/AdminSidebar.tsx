@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Hospital, Stethoscope, Settings, Users, Archive, CalendarCheck, LogOut, CircleUser, FileText } from 'lucide-react';
+import { LayoutDashboard, Hospital, Stethoscope, Settings, Users, Archive, CalendarCheck, LogOut, CircleUser, FileText, LayoutGrid, Briefcase, Warehouse } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -14,8 +14,9 @@ const navItems = [
     { href: "/admin/users", label: "Users", icon: Users },
     { href: "/admin/providers", label: "Providers", icon: Stethoscope },
     { href: "/admin/clinics", label: "Clinics", icon: Hospital },
-    { href: "/admin/services", label: "Services", icon: Settings },
-    { href: "/admin/inventory", label: "Inventory", icon: Archive },
+    { href: "/admin/services", label: "Services", icon: Briefcase },
+    { href: "/admin/service-categories", label: "Categories", icon: LayoutGrid },
+    { href: "/admin/inventory", label: "Inventory", icon: Warehouse },
 ];
 
 const NavLink = ({ href, label, icon: Icon, isActive }: { href: string; label: string; icon: React.ElementType; isActive: boolean; }) => (

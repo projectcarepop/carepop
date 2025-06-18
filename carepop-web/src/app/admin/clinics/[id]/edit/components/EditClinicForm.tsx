@@ -1,7 +1,9 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useToast } from '@/hooks/use-toast';
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { toast } from 'sonner';
 import { z } from 'zod';
 import { AutoForm } from '@/components/ui/auto-form';
 import { updateClinic } from '@/lib/actions/clinic.admin.actions';
@@ -29,35 +31,32 @@ const clinicSchemaForForm = z.object({
 
 export function EditClinicForm({ clinic }: { clinic: ClinicData }) {
     const router = useRouter();
-    const { toast } = useToast();
 
-    const handleSubmit = async (values: z.infer<typeof clinicSchemaForForm>) => {
+    const form = useForm({
+        resolver: zodResolver(clinicSchemaForForm),
+        defaultValues: clinic,
+    });
+
+    const onSubmit = async (data: any) => {
         try {
-            const result = await updateClinic(clinic.id, values);
+            const result = await updateClinic(clinic.id, data);
 
             if (!result.success) {
                 throw new Error(result.message);
             }
             
-            toast({
-                title: "Success!",
-                description: "Clinic has been updated successfully.",
-            });
+            toast.success("Clinic updated successfully!");
             router.push('/admin/clinics');
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-            toast({
-                title: "Error updating clinic",
-                description: errorMessage,
-                variant: "destructive",
-            });
+            toast.error("Failed to update clinic.");
         }
     };
 
     return (
          <AutoForm
             formSchema={clinicSchemaForForm}
-            onSubmit={handleSubmit}
+            onSubmit={onSubmit}
             initialValues={clinic}
             formTitle="Edit Clinic"
             formDescription={`Now editing details for: ${clinic.name}`}

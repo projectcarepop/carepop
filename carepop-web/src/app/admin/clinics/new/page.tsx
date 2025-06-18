@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { AutoForm } from '@/components/ui/auto-form';
 import { createClinic } from '@/lib/actions/clinic.admin.actions';
 import { useRouter } from 'next/navigation';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 const clinicSchema = z.object({
   name: z.string().min(2, { message: "Clinic name must be at least 2 characters." }),
@@ -20,7 +20,6 @@ const clinicSchema = z.object({
 
 export default function NewClinicPage() {
     const router = useRouter();
-    const { toast } = useToast();
 
     const handleSubmit = async (values: z.infer<typeof clinicSchema>) => {
       try {
@@ -28,18 +27,11 @@ export default function NewClinicPage() {
           if (!result.success) {
               throw new Error(result.message);
           }
-          toast({
-              title: "Success!",
-              description: result.message,
-          });
+          toast.success(result.message);
           router.push('/admin/clinics');
       } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-          toast({
-              title: "Error Creating Clinic",
-              description: errorMessage,
-              variant: "destructive",
-          });
+          toast.error(errorMessage);
       }
   };
 

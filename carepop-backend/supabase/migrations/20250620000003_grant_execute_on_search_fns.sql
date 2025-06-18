@@ -1,0 +1,2 @@
+GRANT EXECUTE ON FUNCTION public.search_appointments(TEXT, UUID, UUID, UUID, TEXT, TIMESTAMPTZ, TIMESTAMPTZ) TO service_role;
+GRANT EXECUTE ON FUNCTION public.search_medical_records(UUID, TEXT) TO service_role; 

@@ -2,8 +2,13 @@ import React, { createContext, useState, useEffect, useContext, ReactNode } from
 import { supabase, Profile, getUserProfile } from '../utils/supabase'; // Adjust path as needed, added Profile, getUserProfile
 import type { Session, User, SignUpWithPasswordCredentials, SignInWithPasswordCredentials } from '@supabase/supabase-js'; // Added SignInWithPasswordCredentials, Removed AuthChangeEvent
 import Constants from 'expo-constants';
+import * as WebBrowser from 'expo-web-browser';
+import { makeRedirectUri } from 'expo-auth-session';
+import { Alert } from 'react-native';
 
-// No longer storing raw token directly from here, Supabase SDK handles it via SecureStoreAdapter
+WebBrowser.maybeCompleteAuthSession(); // Required for web and OAuth redirects
+
+const redirectTo = makeRedirectUri();
 
 /**
  * Defines the shape of the authentication context.
@@ -43,6 +48,12 @@ interface AuthContextType {
    * Note: Successful sign-up typically requires email confirmation.
    */
   signUpWithEmail: (credentials: SignUpWithPasswordCredentials) => Promise<{ user: User | null; error: Error | null }>;
+  /**
+   * Initiates the Google OAuth sign-in flow.
+   * Opens a web browser for the user to authenticate with Google.
+   * @returns {Promise<void>}
+   */
+  signInWithGoogle: () => Promise<void>;
   /** 
    * Signs the current user out.
    * Clears the session and user state.
@@ -64,6 +75,25 @@ interface AuthContextType {
    * @param {Profile | null} newProfile - The new profile data.
    */
   manuallySetProfile: (newProfile: Profile | null) => void;
+  isSaving: boolean;
+  /**
+   * Updates a user's profile data and optionally their avatar.
+   * @param {{ userId: string; updates: Partial<Profile>; avatarUri?: string | null }} params
+   * @returns {Promise<boolean>} True on success, false on failure.
+   */
+  updateProfile: (params: {
+    userId: string;
+    updates: Partial<Profile>;
+  }) => Promise<boolean>;
+  /**
+   * Creates a user's profile data.
+   * @param {{ userId: string; updates: Partial<Profile> }} params
+   * @returns {Promise<boolean>} True on success, false on failure.
+   */
+  createProfile: (params: {
+    userId: string;
+    updates: Partial<Profile>;
+  }) => Promise<boolean>;
 }
 
 /**
@@ -87,6 +117,7 @@ interface AuthProviderProps {
  */
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
 
   // Use expo-constants to read from app.json extra for debug logging
@@ -207,12 +238,81 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setProfile(newProfile);
   };
 
+  const createProfile = async ({
+    userId,
+    updates,
+  }: {
+    userId: string;
+    updates: Partial<Profile>;
+  }): Promise<boolean> => {
+    setIsSaving(true);
+    try {
+      const profileData = {
+        user_id: userId,
+        ...updates,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = await supabase
+        .from('profiles')
+        .upsert(profileData, { onConflict: 'user_id' });
+
+      if (error) throw error;
+      
+      await refreshUserProfile();
+      return true;
+    } catch (error) {
+      console.error('Error creating profile:', error);
+      setAuthError(error instanceof Error ? error : new Error('Failed to create profile'));
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const updateProfile = async ({
+    userId,
+    updates,
+  }: {
+    userId: string;
+    updates: Partial<Profile>;
+  }): Promise<boolean> => {
+    setIsSaving(true);
+    try {
+      const updatesToSave = {
+        ...updates,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = await supabase
+        .from('profiles')
+        .update(updatesToSave)
+        .eq('user_id', userId);
+
+      if (error) {
+        throw error;
+      }
+
+      // Refresh the profile data in the context
+      await refreshUserProfile();
+      Alert.alert('Success', 'Profile updated successfully!');
+      return true;
+    } catch (error: any) {
+      console.error('[AuthContext] Error updating profile:', error);
+      Alert.alert('Error', error.message || 'Failed to update profile.');
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const signOut = async () => {
     // console.log('[AuthContext] signOut called. Setting isLoading to true.');
     // setIsLoading(true); 
 
     // Only show loading indicator if signout takes longer than 300ms
-    let loadingTimerId: NodeJS.Timeout | null = setTimeout(() => {
+    let loadingTimerId: number | null = setTimeout(() => {
       console.log('[AuthContext] signOut is taking a while, setting isLoading to true.');
       setIsLoading(true);
       loadingTimerId = null; // Clear the timer ID once it has run
@@ -242,6 +342,52 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
        // isLoading will be set to false by the onAuthStateChange listener when it processes SIGNED_OUT
        // or if an error occurred AND the timer didn't run to set it true, it remains false.
+    }
+  };
+
+  const signInWithGoogle = async () => {
+    console.log('[AuthContext] signInWithGoogle called.');
+    setIsLoading(true);
+    setAuthError(null);
+    
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true, // We will handle the redirect manually with WebBrowser
+        },
+      });
+
+      if (error) {
+        console.error('[AuthContext] Supabase OAuth error:', error.message);
+        throw error;
+      }
+      
+      if (data.url) {
+        console.log('[AuthContext] Opening WebBrowser for Google OAuth at:', data.url);
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+
+        if (result.type === 'success') {
+          console.log('[AuthContext] WebBrowser OAuth flow successful.');
+          // The onAuthStateChange listener will handle setting the session and user.
+        } else if (result.type === 'cancel' || result.type === 'dismiss') {
+          console.log('[AuthContext] WebBrowser OAuth flow was cancelled or dismissed by the user.');
+          // Optional: handle user cancellation explicitly if needed
+        } else {
+          console.warn('[AuthContext] WebBrowser OAuth flow returned an unexpected result type:', result.type);
+        }
+      } else {
+          throw new Error("No URL returned from Supabase for OAuth");
+      }
+
+    } catch (error) {
+      console.error('[AuthContext] signInWithGoogle error:', error);
+      setAuthError(error instanceof Error ? error : new Error('An unknown error occurred during Google sign-in.'));
+    } finally {
+      // onAuthStateChange will set isLoading to false on success.
+      // If there's an error, we need to ensure it's set to false here.
+      setIsLoading(false);
     }
   };
 
@@ -346,11 +492,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         authError,
         isAwaitingEmailConfirmation, 
         signInWithPassword,
+        signInWithGoogle,
         signOut,
         clearAuthError,
         signUpWithEmail,
         refreshUserProfile,
         manuallySetProfile,
+        updateProfile,
+        createProfile,
+        isSaving,
       }}
     >
       {children}

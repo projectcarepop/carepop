@@ -1,93 +1,87 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
-import { theme } from '../../src/components/theme';
-import { Button } from '../../src/components';
+import { View, Text, StyleSheet, Image, SafeAreaView } from 'react-native';
+import { theme, Button } from '../../src/components';
 
+// This screen will likely be part of a larger stack that, upon completion,
+// navigates the user to the main app (e.g., Auth or Dashboard).
+// The onComplete prop is a good pattern for this.
 interface OnboardingScreenThreeProps {
-  onComplete?: () => void; // Function to call when onboarding finishes
-  onSkip?: () => void; // Optional: To match other screens, even if not used
+  onComplete: () => void;
 }
 
 export const OnboardingScreenThree: React.FC<OnboardingScreenThreeProps> = ({ onComplete }) => {
-
-  const handleComplete = () => {
-    console.log('Onboarding finished, calling onComplete');
-    onComplete?.();
-  };
-
   return (
-    <View style={styles.container}> 
-      <Image 
-        source={require('../../assets/onboarding-3.png')} 
-        style={styles.illustration} 
-        resizeMode="contain" 
-      />
-      <View style={styles.textContainer}> 
-        <Text style={styles.headline}>Secure, Confidential & Inclusive.</Text>
-        <Text style={styles.bodyText}>
-          Your privacy is our priority. We use strong security and encryption 
-          to protect your sensitive health information. 
-          Carepop is a safe space for everyone.
-        </Text>
-        <Text style={styles.tagline}>Healthcare with Respect & Confidentiality.</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <View style={styles.content}>
+          <Image
+            source={require('../../assets/onboarding-3.png')}
+            style={styles.illustration}
+            resizeMode="contain"
+          />
+          <View style={styles.textContainer}>
+            <Text style={styles.headline}>Secure & Confidential</Text>
+            <Text style={styles.bodyText}>
+              Your privacy is our priority. We use strong security and
+              encryption to protect your sensitive health information. Carepop
+              is a safe space for everyone.
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.footer}>
+            <Button
+                title="Get Started"
+                size="lg"
+                onPress={onComplete}
+                style={{ flex: 1 }} // Make button take full width of footer
+            />
+        </View>
       </View>
-      <Button 
-        title="Get Started" 
-        onPress={handleComplete} 
-        style={styles.getStartedButton}
-      />
-      <Text style={styles.progressIndicator}>○ ○ ●</Text>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { 
+  safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background, 
-    alignItems: 'center',
-    justifyContent: 'center', 
-    paddingHorizontal: theme.spacing.xl,
-    paddingVertical: theme.spacing.xl * 1.5, 
+    backgroundColor: theme.colors.background,
   },
-  illustration: { 
-    width: 250, 
-    height: 250, 
-    marginBottom: theme.spacing.lg, // A bit less margin for button space
+  container: {
+    flex: 1,
+    padding: theme.spacing.lg,
+    justifyContent: 'space-between',
   },
-  textContainer: { 
+  content: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    width: '100%',
-    marginBottom: theme.spacing.lg, // Space above button
+    gap: theme.spacing.xl,
+  },
+  illustration: {
+    width: 300,
+    height: 300,
+  },
+  textContainer: {
+    alignItems: 'center',
+    gap: theme.spacing.md,
   },
   headline: {
-    fontSize: theme.typography.heading,
-    fontWeight: 'bold',
-    color: theme.colors.primary, 
+    ...theme.typography.h1,
+    color: theme.colors.primary,
     textAlign: 'center',
-    marginBottom: theme.spacing.md,
   },
   bodyText: {
-    fontSize: theme.typography.body,
-    color: theme.colors.text, 
+    ...theme.typography.body,
+    color: theme.colors.foreground,
     textAlign: 'center',
-    marginBottom: theme.spacing.lg,
-    lineHeight: theme.typography.body * 1.5,
+    lineHeight: 24,
   },
-  tagline: {
-    fontSize: theme.typography.subheading,
-    fontWeight: '600',
-    color: theme.colors.secondary, 
-    textAlign: 'center',
-    marginBottom: theme.spacing.md, // Space below tagline, above button
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.md,
+    height: 60,
   },
-  getStartedButton: {
-    width: '80%', 
-    alignSelf: 'center',
-    marginBottom: theme.spacing.lg, // Space below button, above indicator
-  },
-  progressIndicator: {
-    fontSize: theme.typography.heading,
-    color: theme.colors.textMuted, 
-  },
-}); 
+});

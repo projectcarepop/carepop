@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "CarePop Mobile",
-    "slug": "nativeapp",
+    "slug": "carepop",
     "version": "1.0.0",
     "entryPoint": "./index.ts",
     "orientation": "portrait",
@@ -17,6 +17,9 @@
       "bundleIdentifier": "com.carepop.mobile",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
+      },
+      "config": {
+        "googleMapsApiKey": "AIzaSyBFdHeUvS-v3AjW0uNc1y2yILCs_ve3Wrw"
       }
     },
     "android": {
@@ -25,17 +28,22 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.carepop.mobile",
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "supabaseUrl": "https://lpaqfvfuzfqsrciawipu.supabase.co"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "assetBundlePatterns": [
+      "assets/*",
+      "src/data/psgc/*"
+    ],
     "extra": {
       "eas": {
-        "projectId": "3a4725aa-3ba5-4437-88d6-ea043602ccd4"
+        "projectId": "42305f69-4bf4-4559-b9d3-500ad85b7a11"
       },
-      "supabaseUrl": "https://lpaqfvfuzfqsrciawipu.supabase.co",
-      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwYXFmdmZ1emZxc3JjaWF3aXB1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU4NTk1NDQsImV4cCI6MjA2MTQzNTU0NH0.FJgyKU9JWvOSJr1al-PCDxFPPW-yheSuJk95TVP0gi0",
+      "EXPO_PUBLIC_SUPABASE_URL": "https://lpaqfvfuzfqsrciawipu.supabase.co",
+      "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwYXFmdmZ1emZxc3JjaWF3aXB1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU4NTk1NDQsImV4cCI6MjA2MTQzNTU0NH0.FJgyKU9JWvOSJr1al-PCDxFPPW-yheSuJk95TVP0gi0",
       "EXPO_PUBLIC_BACKEND_API_URL": "https://carepop-backend-staging-199126225625.asia-southeast1.run.app"
     },
     "plugins": [

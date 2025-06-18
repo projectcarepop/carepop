@@ -3,16 +3,16 @@
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { cookies } from 'next/headers';
 
 const providerFormSchema = z.object({
   firstName: z.string().min(1, "First name is required."),
   lastName: z.string().min(1, "Last name is required."),
-  email: z.string().email(),
+  email: z.string().email("Invalid email address").or(z.literal('')).optional(),
   phoneNumber: z.string().optional(),
-  specialization: z.string().optional(),
-  licenseNumber: z.string().optional(),
-  credentials: z.string().optional(),
-  bio: z.string().optional(),
+  // specialization: z.string().optional(),
+  // licenseNumber: z.string().optional(),
+  // credentials: z.string().optional(),
   isActive: z.boolean().default(true),
   serviceIds: z.array(z.string()).optional(),
   weeklyAvailability: z.any().optional(), // Using any for now, can be refined with a specific schema
@@ -20,11 +20,17 @@ const providerFormSchema = z.object({
   avatarUrl: z.string().url().optional().nullable(),
 });
 
+type ProviderActionResponse = {
+    success: boolean;
+    message: string;
+    data?: { id: string | null } | null;
+}
 
 // Note: This is a simplified create action. 
 // A real-world scenario would involve creating a user in auth.users as well.
-export async function createProvider(formData: FormData) {
-    const supabase = createClient();
+export async function createProvider(formData: FormData): Promise<ProviderActionResponse> {
+    const cookieStore = cookies();
+    const supabase = createClient(cookieStore);
     const values = Object.fromEntries(formData.entries());
 
     // TODO: Add proper validation logic here before parsing
@@ -53,19 +59,18 @@ export async function createProvider(formData: FormData) {
         avatarUrl = urlData.publicUrl;
     }
 
-    const { error } = await supabase.from('providers').insert([{ 
+    const { error, data } = await supabase.from('providers').insert([{ 
         first_name: validatedData.firstName,
         last_name: validatedData.lastName,
         email: validatedData.email,
         contact_number: validatedData.phoneNumber,
-        specialization: validatedData.specialization,
-        license_number: validatedData.licenseNumber,
-        credentials: validatedData.credentials,
-        bio: validatedData.bio,
+        // specialization: validatedData.specialization,
+        // license_number: validatedData.licenseNumber,
+        // credentials: validatedData.credentials,
         is_active: validatedData.isActive,
         avatar_url: avatarUrl
         // TODO: We need to associate this provider with a user_id
-    }]);
+    }]).select('id').single();
 
     if (error) {
         console.error('Error creating provider:', error);
@@ -73,11 +78,12 @@ export async function createProvider(formData: FormData) {
     }
 
     revalidatePath('/admin/providers');
-    return { success: true, message: 'Provider created successfully.' };
+    return { success: true, message: 'Provider created successfully.', data: { id: error ? null : data.id } };
 }
 
-export async function updateProvider(providerId: string, formData: FormData) {
-    const supabase = createClient();
+export async function updateProvider(providerId: string, formData: FormData): Promise<ProviderActionResponse> {
+    const cookieStore = cookies();
+    const supabase = createClient(cookieStore);
     const values = Object.fromEntries(formData.entries());
     
      const validatedData = providerFormSchema.parse({
@@ -107,10 +113,9 @@ export async function updateProvider(providerId: string, formData: FormData) {
         last_name: validatedData.lastName,
         email: validatedData.email,
         contact_number: validatedData.phoneNumber,
-        specialization: validatedData.specialization,
-        license_number: validatedData.licenseNumber,
-        credentials: validatedData.credentials,
-        bio: validatedData.bio,
+        // specialization: validatedData.specialization,
+        // license_number: validatedData.licenseNumber,
+        // credentials: validatedData.credentials,
         is_active: validatedData.isActive,
         avatar_url: avatarUrl
     }).eq('id', providerId);
@@ -128,7 +133,8 @@ export async function updateProvider(providerId: string, formData: FormData) {
 
 
 export async function deleteProvider(providerId: string) {
-    const supabase = createClient();
+    const cookieStore = cookies();
+    const supabase = createClient(cookieStore);
 
     // TODO: We need to decide on the cascade behavior.
     // Does deleting a provider also delete their user record in auth.users?

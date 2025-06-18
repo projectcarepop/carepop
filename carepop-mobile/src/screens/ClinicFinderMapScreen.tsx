@@ -6,6 +6,7 @@ import { Appbar } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import Constants from 'expo-constants';
 import * as Location from 'expo-location';
+import { theme } from '../components';
 
 interface Clinic {
   id: string;
@@ -97,18 +98,18 @@ const ClinicFinderMapScreen = () => {
 
   return (
     <View style={styles.container}>
-        <Appbar.Header>
-            <Appbar.BackAction onPress={() => navigation.goBack()} />
-            <Appbar.Content title="Clinic Finder" />
+        <Appbar.Header style={{ backgroundColor: theme.colors.background }}>
+            <Appbar.BackAction onPress={() => navigation.goBack()} color={theme.colors.foreground} />
+            <Appbar.Content title="Clinic Finder" color={theme.colors.foreground} titleStyle={styles.appbarTitle} />
         </Appbar.Header>
         {loading && (
             <View style={styles.overlay}>
-                <ActivityIndicator size="large" />
+                <ActivityIndicator size="large" color={theme.colors.primary} />
             </View>
         )}
         {error && (
             <View style={styles.overlay}>
-                <Text>{error}</Text>
+                <Text style={styles.errorText}>{error}</Text>
             </View>
         )}
         {!loading && !error && (
@@ -129,7 +130,7 @@ const ClinicFinderMapScreen = () => {
                             longitude: userLocation.coords.longitude,
                         }}
                         title="Your Location"
-                        pinColor="blue" // Differentiate user's location
+                        pinColor={theme.colors.secondary} // Differentiate user's location
                     />
                 )}
                 {clinics.map(clinic => (
@@ -138,12 +139,14 @@ const ClinicFinderMapScreen = () => {
                         coordinate={{ latitude: clinic.latitude, longitude: clinic.longitude }}
                         title={clinic.name}
                     >
-                        <Callout>
+                        <Callout tooltip>
                             <View style={styles.calloutView}>
                                 <Text style={styles.calloutTitle}>{clinic.name}</Text>
-                                <Button title="See Route" onPress={() => handleSelectClinic(clinic)} />
+                                <Button title="See Route" onPress={() => handleSelectClinic(clinic)} color={theme.colors.primary} />
                                 {destination && destination.id === clinic.id && (
-                                    <Button title="Get Directions" onPress={() => openInMaps(clinic)} />
+                                    <View style={{ marginTop: theme.spacing.sm }}>
+                                        <Button title="Get Directions" onPress={() => openInMaps(clinic)} color={theme.colors.secondary} />
+                                    </View>
                                 )}
                             </View>
                         </Callout>
@@ -161,7 +164,7 @@ const ClinicFinderMapScreen = () => {
                         }}
                         apikey={GOOGLE_MAPS_API_KEY}
                         strokeWidth={4}
-                        strokeColor="hotpink"
+                        strokeColor={theme.colors.primary}
                     />
                 )}
             </MapView>
@@ -173,6 +176,11 @@ const ClinicFinderMapScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  appbarTitle: {
+    ...theme.typography.h4,
+    color: theme.colors.foreground,
   },
   map: {
     ...StyleSheet.absoluteFillObject,
@@ -182,16 +190,22 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  },
+  errorText: {
+    ...theme.typography.body,
+    color: theme.colors.destructive,
+    textAlign: 'center',
+    padding: theme.spacing.lg,
   },
   instructionsContainer: {
     position: 'absolute',
     top: 80,
     left: 20,
     right: 20,
-    backgroundColor: 'white',
+    backgroundColor: theme.colors.card,
     padding: 15,
-    borderRadius: 10,
+    borderRadius: theme.radius.lg,
     elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -199,18 +213,22 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
   },
   instructionsText: {
-    fontSize: 16,
+    ...theme.typography.body,
     fontWeight: 'bold',
   },
   calloutView: {
-    padding: 10,
+    padding: theme.spacing.md,
     minWidth: 150,
     alignItems: 'center',
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius.lg,
+    borderColor: theme.colors.border,
+    borderWidth: 1,
   },
   calloutTitle: {
-    fontWeight: 'bold',
-    fontSize: 16,
-    marginBottom: 5,
+    ...theme.typography.h4,
+    color: theme.colors.cardForeground,
+    marginBottom: theme.spacing.sm,
   },
 });
 

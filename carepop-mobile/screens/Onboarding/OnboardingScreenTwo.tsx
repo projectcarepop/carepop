@@ -1,71 +1,90 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
-import { theme } from '../../src/components/theme';
+import { View, Text, StyleSheet, Image, SafeAreaView } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { theme, Button } from '../../src/components';
+import { Ionicons } from '@expo/vector-icons';
 
-export const OnboardingScreenTwo: React.FC = ({ /* navigation */ }) => {
+// Adjust to your actual navigation structure
+type OnboardingStackParamList = {
+  OnboardingOne: undefined;
+  OnboardingTwo: undefined;
+  OnboardingThree: undefined;
+};
+
+type Props = NativeStackScreenProps<OnboardingStackParamList, 'OnboardingTwo'>;
+
+export const OnboardingScreenTwo: React.FC<Props> = ({ navigation }) => {
   return (
-    <View style={styles.container}> 
-      <Image 
-        source={require('../../assets/onboarding-2.png')} 
-        style={styles.illustration} 
-        resizeMode="contain" 
-      />
-      <View style={styles.textContainer}> 
-        <Text style={styles.headline}>Your Health Journey, Simplified.</Text>
-        <Text style={styles.bodyText}>
-          Easily book appointments that fit your schedule. 
-          Find providers who understand your needs in our curated directory. 
-          Securely track your health goals, medications, and cycles to stay informed and empowered.
-        </Text>
-        <Text style={styles.tagline}>All Your Care Essentials, Right Here.</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <View style={styles.content}>
+          <Image
+            source={require('../../assets/onboarding-2.png')}
+            style={styles.illustration}
+            resizeMode="contain"
+          />
+          <View style={styles.textContainer}>
+            <Text style={styles.headline}>Find Your Perfect Provider</Text>
+            <Text style={styles.bodyText}>
+              Browse profiles of trusted healthcare professionals. Filter by
+              specialty, location, and languages spoken to find the right match.
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.footer}>
+            {/* Dots would go here */}
+            <Button
+                size="lg"
+                onPress={() => navigation.navigate('OnboardingThree')}
+                icon={<Ionicons name="arrow-forward" size={24} color={theme.colors.primaryForeground} />}
+            />
+        </View>
       </View>
-      <Text style={styles.progressIndicator}>○ ● ○</Text>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { 
+  safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background, 
-    alignItems: 'center',
-    justifyContent: 'center', 
-    paddingHorizontal: theme.spacing.xl,
-    paddingVertical: theme.spacing.xl * 1.5, 
+    backgroundColor: theme.colors.background,
   },
-  illustration: { 
-    width: 300, 
-    height: 300, 
-    marginBottom: theme.spacing.xl, 
+  container: {
+    flex: 1,
+    padding: theme.spacing.lg,
+    justifyContent: 'space-between',
   },
-  textContainer: { 
+  content: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    width: '100%',
-    marginBottom: theme.spacing.xl, 
+    gap: theme.spacing.xl,
+  },
+  illustration: {
+    width: 300,
+    height: 300,
+  },
+  textContainer: {
+    alignItems: 'center',
+    gap: theme.spacing.md,
   },
   headline: {
-    fontSize: theme.typography.heading,
-    fontWeight: 'bold',
-    color: theme.colors.primary, 
+    ...theme.typography.h1,
+    color: theme.colors.primary,
     textAlign: 'center',
-    marginBottom: theme.spacing.md,
   },
   bodyText: {
-    fontSize: theme.typography.body,
-    color: theme.colors.text, 
+    ...theme.typography.body,
+    color: theme.colors.foreground,
     textAlign: 'center',
-    marginBottom: theme.spacing.lg,
-    lineHeight: theme.typography.body * 1.5,
+    lineHeight: 24,
   },
-  tagline: {
-    fontSize: theme.typography.subheading,
-    fontWeight: '600',
-    color: theme.colors.secondary, 
-    textAlign: 'center',
-    marginBottom: theme.spacing.lg, 
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.md,
+    height: 60,
   },
-  progressIndicator: {
-    fontSize: theme.typography.heading,
-    color: theme.colors.textMuted, 
-  },
-}); 
+});

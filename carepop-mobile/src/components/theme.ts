@@ -1,103 +1,108 @@
-// carepop-frontend/packages/ui/src/theme.ts
-
-/**
- * Defines the color palette for the application.
- */
 const colors = {
-  primary: '#ff4d6d', // Pink/Red - Main interactive color
-  primaryMuted: 'rgba(255, 77, 109, 0.1)', // Light overlay/background for primary pressed/hover states
-  primaryDark: '#E64460', // Slightly darker pink/red for solid press effect
-  secondary: '#142474', // Dark Blue - Secondary interactive color or accents
-  secondaryMuted: 'rgba(20, 36, 116, 0.1)', // Light overlay/background for secondary pressed/hover states
-  secondaryDark: '#101D5C', // Slightly darker blue for solid press effect
-  destructive: '#DC143C', // Crimson - For error states or destructive actions
-  destructiveMuted: 'rgba(220, 20, 60, 0.1)', // Light overlay/background for destructive pressed/hover states
-  destructiveDark: '#C51235', // Slightly darker crimson for solid press effect
-  accent: '#87CEEB', // Sky Blue - Used for specific highlights or accents if needed
-  background: '#FFFFFF', // Default screen/app background
-  card: '#F8F9FA', // Background for card components
-  text: '#212529', // Default text color
-  textMuted: '#6C757D', // Grey for secondary/helper text
-  border: '#DEE2E6', // Default border color for inputs, cards, dividers
-  inputBackground: '#FFFFFF', // Background for TextInput components
-  disabled: '#ADB5BD', // Color for disabled text or icons
-  disabledBackground: '#E9ECEF', // Background for disabled interactive elements
-  muted: '#CED4DA', // A slightly different grey for general muted/disabled states
-  success: '#198754', // Color for success states/messages
-  warning: '#FFC107', // Color for warning states/messages
-  notification: '#ff4d6d', // Added to conform to NavigationTheme
+  primary: '#ff4d6d',
+  primaryForeground: '#FFFFFF',
+  secondary: '#142474',
+  secondaryForeground: '#FFFFFF',
+  background: '#F9FAFB',
+  foreground: '#1F2937',
+  card: '#FFFFFF',
+  cardForeground: '#1F2937',
+  popover: '#FFFFFF',
+  popoverForeground: '#1F2937',
+  muted: '#F3F4F6',
+  mutedForeground: '#6B7280',
+  accent: '#ff4d6d',
+  accentForeground: '#FFFFFF',
+  destructive: '#EF4444',
+  destructiveMuted: '#FEE2E2',
+  destructiveForeground: '#FFFFFF',
+  success: '#22C55E',
+  border: '#E5E7EB',
+  input: '#E5E7EB',
+  ring: '#ff4d6d',
 };
 
-/**
- * Defines the spacing scale for margins, paddings, etc.
- */
 const spacing = {
   xs: 4,
   sm: 8,
-  md: 16,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  '2xl': 32,
+  '3xl': 40,
+  '4xl': 48,
+};
+
+const radius = {
+  sm: 6,
+  md: 12,
   lg: 24,
-  xl: 32,
-  // Consider adding specific semantic values if needed (e.g., inputPaddingVertical: 12)
+  full: 9999,
 };
 
-/**
- * Defines the border radius scale.
- */
-const borderRadius = {
-  sm: 4,  // Small elements, checkboxes
-  md: 8,  // Buttons, inputs, standard cards
-  lg: 12, // Larger cards, modals
-  xl: 16,
-  full: 9999, // For creating circular elements
-};
+const interFontFamily = 'Inter_400Regular';
+const interFontFamilyMedium = 'Inter_500Medium';
+const interFontFamilySemiBold = 'Inter_600SemiBold';
+const interFontFamilyBold = 'Inter_700Bold';
 
-/**
- * Defines typographic styles like font sizes and families.
- * NOTE: Font files must be loaded separately in the app's entry point (e.g., App.tsx)
- * using expo-font or @expo-google-fonts/* for these families to work.
- */
+const poppinsFontFamily = 'Poppins_400Regular';
+const poppinsFontFamilyMedium = 'Poppins_500Medium';
+const poppinsFontFamilySemiBold = 'Poppins_600SemiBold';
+const poppinsFontFamilyBold = 'Poppins_700Bold';
+
 const typography = {
-  body: 16,
-  heading: 24,
-  subheading: 20,
-  caption: 12,
-  button: 14,
-  // Target font: Space Grotesk
-  fontFamily: 'SpaceGrotesk_400Regular', // UPDATED
-  fontFamilyBold: 'SpaceGrotesk_700Bold',    // UPDATED
+  h1: {
+    fontFamily: interFontFamilyBold,
+    fontSize: 28,
+    lineHeight: 36,
+  },
+  h2: {
+    fontFamily: interFontFamilyBold,
+    fontSize: 24,
+    lineHeight: 32,
+  },
+  h3: {
+    fontFamily: interFontFamilySemiBold,
+    fontSize: 20,
+    lineHeight: 28,
+  },
+  h4: {
+    fontFamily: interFontFamilySemiBold,
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  body: {
+    fontFamily: interFontFamily,
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  small: {
+    fontFamily: interFontFamily,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  xsmall: {
+    fontFamily: interFontFamily,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  fontFamily: interFontFamily,
+  fontFamilyMedium: interFontFamilyMedium,
+  fontFamilySemiBold: interFontFamilySemiBold,
+  fontFamilyBold: interFontFamilyBold,
+  interFontFamily,
+  interFontFamilyMedium,
+  interFontFamilySemiBold,
+  interFontFamilyBold,
+  poppinsFontFamily,
+  poppinsFontFamilyMedium,
+  poppinsFontFamilySemiBold,
+  poppinsFontFamilyBold,
 };
 
-// Type for fontWeight to satisfy React Navigation Theme
-type FontWeight = 'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900';
-
-/**
- * The combined theme object containing colors, spacing, border radius, and typography constants.
- * Used throughout the application for consistent styling.
- */
 export const theme = {
-  dark: false, // Added to conform to NavigationTheme
   colors,
-  fonts: { // ADDED to conform to NavigationTheme
-    regular: {
-      fontFamily: typography.fontFamily, // SpaceGrotesk_400Regular
-      fontWeight: '400' as FontWeight, 
-    },
-    medium: {
-      fontFamily: typography.fontFamily, // Fallback to regular or use bold if medium isn't loaded
-      fontWeight: '500' as FontWeight, 
-    },
-    bold: {
-      fontFamily: typography.fontFamilyBold, // SpaceGrotesk_700Bold
-      fontWeight: '700' as FontWeight, 
-    },
-    heavy: {
-      fontFamily: typography.fontFamilyBold, // Fallback to bold if heavy isn't loaded
-      fontWeight: '800' as FontWeight, 
-    },
-  },
   spacing,
-  borderRadius,
+  radius,
   typography,
 };
-
-export type Theme = typeof theme; 

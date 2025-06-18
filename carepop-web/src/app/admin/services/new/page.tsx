@@ -1,9 +1,13 @@
 import { ServiceForm } from '../components/ServiceForm';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createClient } from '@/utils/supabase/server';
+import { cookies } from 'next/headers';
+import { createService } from '@/lib/actions/service.admin.actions';
+import { redirect } from 'next/navigation';
 
 async function getCategories() {
-    const supabase = await createSupabaseServerClient();
+    const cookieStore = cookies();
+    const supabase = createClient(cookieStore);
     const { data, error } = await supabase
         .from('service_categories')
         .select('id, name')
@@ -20,6 +24,14 @@ async function getCategories() {
 export default async function NewServicePage() {
   const categories = await getCategories();
 
+  async function handleSave(values: any) {
+    'use server';
+    const newService = await createService(values);
+    if (newService?.id) {
+        redirect(`/admin/services/${newService.id}/edit`);
+    }
+  }
+
   return (
     <div className="container mx-auto py-10">
       <Card className="max-w-4xl mx-auto">
@@ -30,7 +42,7 @@ export default async function NewServicePage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ServiceForm categories={categories} />
+          <ServiceForm categories={categories} onSave={handleSave} />
         </CardContent>
       </Card>
     </div>

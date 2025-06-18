@@ -11,13 +11,12 @@ import Link from 'next/link';
 import { ArrowLeft, Save } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import apiClient from '@/lib/apiClient'; // Import the centralized client
 
 export default function AppointmentReportPage() {
   const params = useParams();
   const router = useRouter();
-  const { toast } = useToast();
   const appointmentId = params.appointmentId as string;
 
   const [report, setReport] = useState<Partial<IAppointmentReport>>({});
@@ -75,7 +74,7 @@ export default function AppointmentReportPage() {
       }
 
       if (response.status === 200 || response.status === 201) {
-        toast({ title: "Success!", description: "Report saved successfully." });
+        toast.success("Report saved successfully.");
         router.back();
       } else {
         throw new Error('Failed to save report.');
@@ -85,13 +84,11 @@ export default function AppointmentReportPage() {
       console.error("Failed to save report:", err);
       const errorMessage = err.response?.data?.message || err.message || 'An unknown error occurred.';
       setError(errorMessage);
-      toast({ title: "Error Saving Report", description: errorMessage, variant: "destructive" });
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
   };
-
-  // Render functions (renderInput, renderTextarea) remain the same...
 
   const renderInput = (name: keyof IAppointmentReport, label: string, placeholder = '') => (
     <div>
@@ -120,10 +117,38 @@ export default function AppointmentReportPage() {
   );
   
   if (isLoading) {
-    // Skeleton loading state remains the same...
+    return (
+        <div className="container mx-auto py-10">
+          <div className="flex justify-between items-center mb-6">
+            <Skeleton className="h-10 w-48" />
+            <Skeleton className="h-10 w-36" />
+            <Skeleton className="h-10 w-32" />
+          </div>
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-8 w-1/2" />
+              <Skeleton className="h-4 w-3/4" />
+            </CardHeader>
+            <CardContent className="space-y-8">
+              <div className="p-6 border rounded-lg space-y-6">
+                <Skeleton className="h-6 w-1/4" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-24 w-full" />
+              </div>
+              <div className="p-6 border rounded-lg space-y-6">
+                <Skeleton className="h-6 w-1/4" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      );
   }
-  
-  // The main JSX return structure remains the same...
 
   return (
     <div className="container mx-auto py-10">

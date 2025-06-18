@@ -11,7 +11,7 @@ import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { createInventoryItem, updateInventoryItem } from '@/lib/actions/inventory-item.admin.actions';
 
 const itemFormSchema = z.object({
@@ -46,7 +46,6 @@ interface InventoryItemFormProps {
 
 export function InventoryItemForm({ initialData, suppliers }: InventoryItemFormProps) {
   const router = useRouter();
-  const { toast } = useToast();
   const form = useForm<ItemFormValues>({
     resolver: zodResolver(itemFormSchema),
     defaultValues: initialData || {
@@ -68,12 +67,12 @@ export function InventoryItemForm({ initialData, suppliers }: InventoryItemFormP
         throw new Error(result.message);
       }
 
-      toast({ title: 'Success', description: result.message });
+      toast.success(result.message);
       router.push('/admin/inventory?tab=items');
       router.refresh();
     } catch (err) {
         const message = err instanceof Error ? err.message : 'An unknown error occurred';
-        toast({ title: 'Error', description: message, variant: 'destructive' });
+        toast.error(message);
     }
   };
 

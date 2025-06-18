@@ -7,7 +7,7 @@ import { theme, Button } from '../components';
 import { addMedication } from '../data/api/medication';
 import { HealthBuddyStackParamList } from '../navigation/AppNavigator';
 
-type AddMedicationNavigationProp = NativeStackNavigationProp<HealthBuddyStackParamList, 'AddMedicationScreen'>;
+type AddMedicationNavigationProp = NativeStackNavigationProp<HealthBuddyStackParamList, 'AddMedication'>;
 
 export function AddMedicationScreen() {
     const navigation = useNavigation<AddMedicationNavigationProp>();
@@ -42,6 +42,7 @@ export function AddMedicationScreen() {
                     <TextInput
                         style={styles.input}
                         placeholder="e.g., Lisinopril"
+                        placeholderTextColor={theme.colors.mutedForeground}
                         value={name}
                         onChangeText={setName}
                         autoCapitalize="words"
@@ -53,6 +54,7 @@ export function AddMedicationScreen() {
                     <TextInput
                         style={styles.input}
                         placeholder="e.g., 10mg, once daily"
+                        placeholderTextColor={theme.colors.mutedForeground}
                         value={dosage}
                         onChangeText={setDosage}
                     />
@@ -62,10 +64,8 @@ export function AddMedicationScreen() {
                     title={isSaving ? 'Saving...' : 'Save Medication'}
                     onPress={handleSave}
                     disabled={isSaving}
-                    variant="primary"
-                    styleType="solid"
                     style={styles.saveButton}
-                    icon={isSaving ? <ActivityIndicator color={theme.colors.background} /> : undefined}
+                    icon={isSaving ? <ActivityIndicator color={theme.colors.primaryForeground} /> : undefined}
                 />
             </View>
         </SafeAreaView>
@@ -82,27 +82,26 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     screenTitle: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: theme.colors.text,
+        ...theme.typography.h2,
+        color: theme.colors.foreground,
         marginBottom: 20,
     },
     inputGroup: {
         marginBottom: 15,
     },
     label: {
-        fontSize: 16,
-        color: theme.colors.textMuted,
+        ...theme.typography.body,
+        color: theme.colors.mutedForeground,
         marginBottom: 8,
     },
     input: {
+        ...theme.typography.body,
         backgroundColor: theme.colors.card,
         borderWidth: 1,
         borderColor: theme.colors.border,
-        borderRadius: theme.borderRadius.md,
+        borderRadius: theme.radius.md,
         padding: 12,
-        fontSize: 16,
-        color: theme.colors.text,
+        color: theme.colors.foreground,
     },
     saveButton: {
         marginTop: 20,

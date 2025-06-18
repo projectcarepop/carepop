@@ -1,22 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, FlatList, TouchableOpacity, Alert, ActivityIndicator, TextInput, Modal, Dimensions } from 'react-native';
-import { useNavigation } from '@react-navigation/native'; // Import useNavigation
-import type { NavigationProp } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../components';
-import { Card, Button } from '../components'; // Import Card and Button if needed
-import { MaterialIcons, Ionicons } from '@expo/vector-icons'; // Added Ionicons for more icon choices
+import { Card, Button } from '../components';
+import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import Constants from 'expo-constants';
 import { LineChart, BarChart } from 'react-native-chart-kit';
+import type { HealthBuddyStackParamList, DrawerParamList } from '../navigation/AppNavigator';
+import type { DrawerNavigationProp } from '@react-navigation/drawer';
 
-// Define param list for navigation type safety (if possible)
-// Consider creating a dedicated HealthBuddyStackParamList if not already done
-type HealthBuddyNavigationProp = NavigationProp<{
-  PillTrackerScreen: undefined; // Assuming this is the screen name
-  MensTrackerScreen: undefined; // Assuming this is the screen name
-  LogBloodPressureScreen: undefined; // Assuming this is the screen name
-  // Add routes for Comorbidities and Allergies if screens exist
-}>;
+type HealthBuddyNavigationProp = NativeStackNavigationProp<HealthBuddyStackParamList, 'HealthBuddy'>;
 
 type Mood = 'Happy' | 'Calm' | 'Okay' | 'Anxious' | 'Sad';
 
@@ -42,8 +37,8 @@ const moodToValue = (mood: string): number => {
     return mapping[mood] || 0;
 };
 
-export function HealthBuddyScreen() { // Remove navigation prop if using hook
-  const navigation = useNavigation<HealthBuddyNavigationProp>(); // Use the hook
+export function HealthBuddyScreen() {
+  const navigation = useNavigation<HealthBuddyNavigationProp>();
   const { session } = useAuth();
   const [moodHistory, setMoodHistory] = useState<HealthEntry[]>([]);
   const [bloodPressureHistory, setBloodPressureHistory] = useState<HealthEntry[]>([]);
@@ -53,20 +48,15 @@ export function HealthBuddyScreen() { // Remove navigation prop if using hook
   const [isLoadingActivity, setIsLoadingActivity] = useState(true);
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
 
-  // State for Blood Pressure
   const [showBpModal, setShowBpModal] = useState(false);
   const [systolic, setSystolic] = useState('');
   const [diastolic, setDiastolic] = useState('');
   const [isSavingBp, setIsSavingBp] = useState(false);
 
-  // State for Activity
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [activityMinutes, setActivityMinutes] = useState('');
   const [isSavingActivity, setIsSavingActivity] = useState(false);
 
-  // TODO: Add state and logic for tracking data
-
-  // Helper function to create a section with icon and title
   const renderSectionHeader = (title: string, iconName: keyof typeof MaterialIcons.glyphMap | keyof typeof Ionicons.glyphMap, iconSet: 'MaterialIcons' | 'Ionicons' = 'MaterialIcons') => (
     <View style={styles.cardTitleContainer}>
       {iconSet === 'MaterialIcons' ? (
@@ -78,14 +68,12 @@ export function HealthBuddyScreen() { // Remove navigation prop if using hook
     </View>
   );
 
-  // --- Data Fetching ---
-
   const fetchMoodHistory = useCallback(async () => {
     if (!session) return;
     try {
       const endDate = new Date();
       const startDate = new Date();
-      startDate.setDate(endDate.getDate() - 30); // Last 30 days
+      startDate.setDate(endDate.getDate() - 30);
 
       const backendUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL;
       const response = await fetch(`${backendUrl}/api/v1/public/health-entries?type=MOOD&startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`, {
@@ -149,11 +137,9 @@ export function HealthBuddyScreen() { // Remove navigation prop if using hook
     fetchActivityHistory();
   }, [fetchMoodHistory, fetchBloodPressureHistory, fetchActivityHistory]);
 
-  // --- Event Handlers ---
-
   const handleSelectMood = async (mood: Mood) => {
     if (!session) return;
-    setSelectedMood(mood); // Visually select the mood
+    setSelectedMood(mood);
     
     try {
       const backendUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL;
@@ -170,7 +156,6 @@ export function HealthBuddyScreen() { // Remove navigation prop if using hook
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to save mood.');
       }
-      // Refresh history after successful submission
       fetchMoodHistory();
       Alert.alert('Success', `Your mood has been logged as "${mood}".`);
 
@@ -180,14 +165,7 @@ export function HealthBuddyScreen() { // Remove navigation prop if using hook
   };
 
   const handleSaveBloodPressure = async () => {
-    if (!session) {
-      Alert.alert('Authentication Error', 'You must be logged in to save data.');
-      return;
-    }
-    if (!systolic || !diastolic) {
-      Alert.alert('Incomplete', 'Please enter both systolic and diastolic values.');
-      return;
-    }
+    if (!session || !systolic || !diastolic) return;
     setIsSavingBp(true);
     try {
       const backendUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL;
@@ -200,15 +178,12 @@ export function HealthBuddyScreen() { // Remove navigation prop if using hook
           value_numeric_secondary: parseInt(diastolic, 10)
         }),
       });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to save blood pressure.');
-      }
+      if (!response.ok) throw new Error((await response.json()).message);
       Alert.alert('Success', 'Blood pressure logged successfully!');
       setShowBpModal(false);
       setSystolic('');
       setDiastolic('');
-      fetchBloodPressureHistory(); // Refresh data
+      fetchBloodPressureHistory();
     } catch (error: any) {
       Alert.alert('Error', error.message);
     } finally {
@@ -217,14 +192,7 @@ export function HealthBuddyScreen() { // Remove navigation prop if using hook
   };
 
   const handleSaveActivity = async () => {
-    if (!session) {
-      Alert.alert('Authentication Error', 'You must be logged in to save data.');
-      return;
-    }
-    if (!activityMinutes) {
-      Alert.alert('Incomplete', 'Please enter the duration of your activity.');
-      return;
-    }
+    if (!session || !activityMinutes) return;
     setIsSavingActivity(true);
     try {
       const backendUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL;
@@ -236,14 +204,11 @@ export function HealthBuddyScreen() { // Remove navigation prop if using hook
           value_numeric: parseInt(activityMinutes, 10),
         }),
       });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to save activity.');
-      }
+      if (!response.ok) throw new Error((await response.json()).message);
       Alert.alert('Success', 'Activity logged successfully!');
       setShowActivityModal(false);
       setActivityMinutes('');
-      fetchActivityHistory(); // Refresh data
+      fetchActivityHistory();
     } catch (error: any) {
       Alert.alert('Error', error.message);
     } finally {
@@ -253,12 +218,14 @@ export function HealthBuddyScreen() { // Remove navigation prop if using hook
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <TouchableOpacity onPress={() => (navigation.getParent<DrawerNavigationProp<DrawerParamList>>())?.toggleDrawer()} style={styles.menuButton}>
+        <Ionicons name="menu" size={32} color={theme.colors.foreground} />
+      </TouchableOpacity>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.screenTitle}>Health Buddy</Text>
         <Text style={styles.screenSubtitle}>Trackers and insights to support your well-being.</Text>
 
-        {/* Mood Check-in Card */}
-        <View style={styles.card}>
+        <Card style={styles.card}>
           <Text style={styles.cardTitle}>How are you feeling today?</Text>
           <View style={styles.moodSelector}>
             {moodOptions.map(({ name, icon }) => (
@@ -267,511 +234,323 @@ export function HealthBuddyScreen() { // Remove navigation prop if using hook
                 style={[styles.moodButton, selectedMood === name && styles.moodButtonSelected]} 
                 onPress={() => handleSelectMood(name)}
               >
-                <Ionicons name={icon} size={32} color={selectedMood === name ? theme.colors.primary : theme.colors.textMuted} />
+                <Ionicons name={icon} size={32} color={selectedMood === name ? theme.colors.primary : theme.colors.mutedForeground} />
                 <Text style={[styles.moodText, selectedMood === name && styles.moodTextSelected]}>{name}</Text>
               </TouchableOpacity>
             ))}
           </View>
-        </View>
+        </Card>
 
-        {/* Mood History Card */}
-        <View style={styles.card}>
+        <Card style={styles.card}>
           <Text style={styles.cardTitle}>Your Mood Over Time</Text>
-          {isLoadingMood ? (
-            <ActivityIndicator color={theme.colors.primary} />
-          ) : moodHistory.length > 1 ? (
+          {isLoadingMood ? <ActivityIndicator color={theme.colors.primary} /> : moodHistory.length > 1 ? (
             <LineChart
                 data={{
                     labels: moodHistory.map(e => new Date(e.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })).reverse(),
-                    datasets: [{
-                        data: moodHistory.map(e => moodToValue(e.value_text || '')).reverse(),
-                    }]
+                    datasets: [{ data: moodHistory.map(e => moodToValue(e.value_text || '')).reverse() }]
                 }}
                 width={Dimensions.get('window').width - 60}
                 height={220}
-                yAxisLabel=""
-                yAxisSuffix=""
-                yAxisInterval={1}
                 chartConfig={{
-                    backgroundColor: theme.colors.background,
-                    backgroundGradientFrom: theme.colors.background,
-                    backgroundGradientTo: theme.colors.background,
+                    backgroundColor: theme.colors.card,
+                    backgroundGradientFrom: theme.colors.card,
+                    backgroundGradientTo: theme.colors.card,
                     decimalPlaces: 0,
-                    color: (opacity = 1) => `rgba(20, 36, 116, ${opacity})`, // secondary
-                    labelColor: (opacity = 1) => `rgba(108, 117, 125, ${opacity})`, // textMuted
-                    style: { borderRadius: 16 },
-                    propsForDots: { r: '4', strokeWidth: '2', stroke: theme.colors.primary }
+                    color: (opacity = 1) => `rgba(134, 65, 244, ${opacity})`, // Example color
+                    labelColor: (opacity = 1) => theme.colors.mutedForeground,
+                    style: {
+                        borderRadius: 16
+                    },
+                    propsForDots: {
+                        r: "6",
+                        strokeWidth: "2",
+                        stroke: theme.colors.primary
+                    }
                 }}
                 bezier
-                style={{ marginVertical: 8, borderRadius: 16 }}
+                style={{
+                    marginVertical: 8,
+                    borderRadius: 16
+                }}
             />
-          ) : (
-            <View style={styles.chartPlaceholder}>
-              <Ionicons name="happy-outline" size={48} color={theme.colors.border} />
-              <Text style={styles.placeholderText}>Not enough data to show a chart.</Text>
-              <Text style={styles.placeholderSubText}>Log your mood for a few days to see your trend!</Text>
+          ) : <Text style={styles.emptyChartText}>Log your mood for a few days to see a chart.</Text>}
+        </Card>
+        
+        <Card style={styles.card}>
+            <View style={{...styles.cardTitleContainer, justifyContent: 'space-between'}}>
+                {renderSectionHeader('Blood Pressure', 'blood-pressure-alt', 'MaterialIcons')}
+                <Button title="Log BP" size="sm" variant="outline" onPress={() => setShowBpModal(true)} />
             </View>
-          )}
-        </View>
-
-        {/* Pill Tracker Section - Updated onPress */}
-        <Card style={styles.card}>
-          {renderSectionHeader("Pill Tracker", "medical-services")}
-          <Text style={styles.cardContent}>Stay on top of your medication schedule. Log doses and set reminders.</Text>
-          <Button 
-            title="Manage Pill Tracker"
-            variant="secondary"
-            styleType="solid"
-            onPress={() => navigation.navigate('PillTrackerScreen')} // Navigate to PillTrackerScreen
-            style={styles.cardButton}
-            icon={<MaterialIcons name="arrow-forward" size={16} color={theme.colors.background} />}
-          />
+            {isLoadingBp ? <ActivityIndicator color={theme.colors.primary} /> : bloodPressureHistory.length > 1 ? (
+                <LineChart
+                    data={{
+                        labels: bloodPressureHistory.map(e => new Date(e.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })).reverse(),
+                        datasets: [
+                            { data: bloodPressureHistory.map(e => e.value_numeric || 0).reverse(), color: (opacity = 1) => `rgba(255, 0, 0, ${opacity})`, strokeWidth: 2 }, // Systolic - red
+                            { data: bloodPressureHistory.map(e => e.value_numeric_secondary || 0).reverse(), color: (opacity = 1) => `rgba(0, 0, 255, ${opacity})`, strokeWidth: 2 } // Diastolic - blue
+                        ],
+                        legend: ["Systolic", "Diastolic"]
+                    }}
+                    width={Dimensions.get('window').width - 60}
+                    height={220}
+                    chartConfig={{
+                      backgroundColor: theme.colors.card,
+                      backgroundGradientFrom: theme.colors.card,
+                      backgroundGradientTo: theme.colors.card,
+                      decimalPlaces: 0,
+                      color: (opacity = 1) => theme.colors.primary,
+                      labelColor: (opacity = 1) => theme.colors.mutedForeground,
+                    }}
+                    style={{ marginVertical: 8, borderRadius: 16 }}
+                />
+            ) : <Text style={styles.emptyChartText}>Log your blood pressure to see your trend.</Text>}
         </Card>
 
-        {/* Menstrual Tracker Section - Updated onPress */}
         <Card style={styles.card}>
-          {renderSectionHeader("Menstrual Cycle", "female", "Ionicons")}
-          <Text style={styles.cardContent}>Track your cycle, log symptoms, and view predictions.</Text> 
-          {/* Removed hardcoded date */}
-          <Button 
-            title="Manage Menstrual Tracker"
-            variant="secondary"
-            styleType="solid"
-            onPress={() => navigation.navigate('MensTrackerScreen')} // Navigate to MensTrackerScreen
-            style={styles.cardButton}
-            icon={<MaterialIcons name="arrow-forward" size={16} color={theme.colors.background} />}
-          />
-        </Card>
-
-        {/* ADDED Comorbidities Section */}
-        <Card style={styles.card}>
-          {renderSectionHeader("Comorbidities", "list-alt", "MaterialIcons")}
-          <Text style={styles.cardContent}>Log and manage any existing health conditions.</Text>
-          {/* TODO: Add onPress navigation when screen exists */}
-          <Button 
-            title="Log Comorbidities"
-            variant="secondary"
-            styleType="outline"
-            onPress={() => { Alert.alert('Coming Soon', 'Ability to log comorbidities is under development.'); }}
-            style={styles.cardButton}
-            icon={<Ionicons name="add-circle-outline" size={16} color={theme.colors.secondary} />}
-          />
-        </Card>
-
-        {/* ADDED Allergies Section */}
-        <Card style={styles.card}>
-          {renderSectionHeader("Allergies", "warning-amber", "MaterialIcons")}
-          <Text style={styles.cardContent}>Keep track of your known allergies.</Text>
-          {/* TODO: Add onPress navigation when screen exists */}
-          <Button 
-            title="Log Allergies"
-            variant="secondary"
-            styleType="outline"
-            onPress={() => { Alert.alert('Coming Soon', 'Ability to log allergies is under development.'); }}
-            style={styles.cardButton}
-            icon={<Ionicons name="add-circle-outline" size={16} color={theme.colors.secondary} />}
-          />
-        </Card>
-
-        {/* Blood Pressure Card - Now with Chart */}
-        <View style={styles.card}>
-          {renderSectionHeader('Blood Pressure', 'pulse', 'Ionicons')}
-          {isLoadingBp ? (
-            <ActivityIndicator color={theme.colors.primary} />
-          ) : bloodPressureHistory.length > 1 ? (
-            <LineChart
-                data={{
-                    labels: bloodPressureHistory.map(e => new Date(e.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })).reverse(),
-                    datasets: [
-                        {
-                            data: bloodPressureHistory.map(e => e.value_numeric || 0).reverse(),
-                            color: (opacity = 1) => `rgba(220, 53, 69, ${opacity})`, // Danger color for Systolic
-                            strokeWidth: 2
-                        },
-                        {
-                            data: bloodPressureHistory.map(e => e.value_numeric_secondary || 0).reverse(),
-                            color: (opacity = 1) => `rgba(25, 135, 84, ${opacity})`, // Success color for Diastolic
-                            strokeWidth: 2
-                        },
-                    ],
-                    legend: ['Systolic', 'Diastolic']
-                }}
-                width={Dimensions.get('window').width - 60}
-                height={220}
-                yAxisLabel=""
-                yAxisSuffix=" mmHg"
-                chartConfig={{
-                    backgroundColor: theme.colors.background,
-                    backgroundGradientFrom: theme.colors.background,
-                    backgroundGradientTo: theme.colors.background,
-                    decimalPlaces: 0,
-                    color: (opacity = 1) => `rgba(20, 36, 116, ${opacity})`,
-                    labelColor: (opacity = 1) => `rgba(108, 117, 125, ${opacity})`,
-                    style: { borderRadius: 16 },
-                    propsForDots: { r: '4', strokeWidth: '2' }
-                }}
-                bezier
-                style={{ marginVertical: 8, borderRadius: 16 }}
-            />
-          ) : (
-            <View style={styles.chartPlaceholder}>
-              <Ionicons name="analytics-outline" size={48} color={theme.colors.border} />
-              <Text style={styles.placeholderText}>No blood pressure history yet.</Text>
-              <Text style={styles.placeholderSubText}>Tap the button below to log your first reading!</Text>
+            <View style={{...styles.cardTitleContainer, justifyContent: 'space-between'}}>
+                {renderSectionHeader('Physical Activity', 'fitness-outline', 'Ionicons')}
+                <Button title="Log Activity" size="sm" variant="outline" onPress={() => setShowActivityModal(true)} />
             </View>
-          )}
-          <Button
-            title="Log Blood Pressure"
-            onPress={() => setShowBpModal(true)}
-            icon={<Ionicons name="add-circle-outline" size={20} color={theme.colors.card} style={{ marginRight: 8 }} />}
-            style={{ marginTop: 16 }}
-          />
-        </View>
-
-        {/* Daily Activity Card */}
-        <View style={styles.card}>
-          {renderSectionHeader('Daily Activity', 'fitness-outline', 'Ionicons')}
-           {isLoadingActivity ? (
-            <ActivityIndicator color={theme.colors.primary} />
-          ) : activityHistory.length > 1 ? (
-            <BarChart
-                data={{
-                    labels: activityHistory.map(e => new Date(e.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })).reverse(),
-                    datasets: [{
-                        data: activityHistory.map(e => e.value_numeric || 0).reverse(),
-                    }]
-                }}
-                width={Dimensions.get('window').width - 60}
-                height={220}
-                yAxisLabel=""
-                yAxisSuffix=" min"
-                chartConfig={{
-                    backgroundColor: theme.colors.background,
-                    backgroundGradientFrom: theme.colors.background,
-                    backgroundGradientTo: theme.colors.background,
-                    decimalPlaces: 0,
-                    color: (opacity = 1) => `rgba(25, 135, 84, ${opacity})`, // Success color
-                    labelColor: (opacity = 1) => `rgba(108, 117, 125, ${opacity})`,
-                    style: { borderRadius: 16 },
-                }}
-                style={{ marginVertical: 8, borderRadius: 16 }}
-            />
-            ) : (
-            <View style={styles.chartPlaceholder}>
-                <Ionicons name="bicycle-outline" size={48} color={theme.colors.border} />
-                <Text style={styles.placeholderText}>No activity history yet.</Text>
-                <Text style={styles.placeholderSubText}>Log your activity to see your progress!</Text>
-            </View>
-            )}
-            <Button
-                title="Log Activity"
-                onPress={() => setShowActivityModal(true)}
-                icon={<Ionicons name="add-circle-outline" size={20} color={theme.colors.card} style={{ marginRight: 8 }} />}
-                style={{ marginTop: 16 }}
-            />
-        </View>
-
-        {/* Health Insights Section - Kept as is */}
-        <Card style={styles.card}>
-          {renderSectionHeader("Health Insights", "lightbulb-outline")}
-          {/* Placeholder insights */}
-          <View style={styles.insightItem}>
-            <Ionicons name="checkmark-circle-outline" size={18} color={theme.colors.success} style={styles.insightIcon} />
-            <Text style={styles.insightText}>Placeholder health insight 1.</Text>
-          </View>
-          <View style={styles.insightItem}>
-            <Ionicons name="alert-circle-outline" size={18} color={theme.colors.warning} style={styles.insightIcon} />
-            <Text style={styles.insightText}>Placeholder health insight 2.</Text>
-          </View>
-           <View style={styles.insightItem}>
-            <Ionicons name="information-circle-outline" size={18} color={theme.colors.primary} style={styles.insightIcon} />
-            <Text style={styles.insightText}>Placeholder health insight 3.</Text>
-          </View>
+            {isLoadingActivity ? <ActivityIndicator color={theme.colors.primary} /> : activityHistory.length > 1 ? (
+                <BarChart
+                    data={{
+                        labels: activityHistory.map(e => new Date(e.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })).reverse(),
+                        datasets: [{ data: activityHistory.map(e => e.value_numeric || 0).reverse() }]
+                    }}
+                    width={Dimensions.get('window').width - 60}
+                    height={220}
+                    yAxisSuffix=" min"
+                    chartConfig={{
+                      backgroundColor: theme.colors.card,
+                      backgroundGradientFrom: theme.colors.card,
+                      backgroundGradientTo: theme.colors.card,
+                      decimalPlaces: 0,
+                      color: (opacity = 1) => theme.colors.primary,
+                      labelColor: (opacity = 1) => theme.colors.mutedForeground,
+                    }}
+                    style={{ marginVertical: 8, borderRadius: 16 }}
+                />
+            ) : <Text style={styles.emptyChartText}>Log your activity to see your progress.</Text>}
         </Card>
+
+        <Card style={styles.card}>
+            {renderSectionHeader('Pill & Menstrual Trackers', 'medical-bag', 'MaterialIcons')}
+            <View style={styles.trackersContainer}>
+                <TouchableOpacity style={styles.trackerButton} onPress={() => navigation.navigate('PillTracker')}>
+                    <Ionicons name="medkit-outline" size={24} color={theme.colors.primary} />
+                    <Text style={styles.trackerText}>Pill Tracker</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.trackerButton} onPress={() => navigation.navigate('MensTracker')}>
+                    <Ionicons name="female-outline" size={24} color={theme.colors.primary} />
+                    <Text style={styles.trackerText}>Menstrual Cycle</Text>
+                </TouchableOpacity>
+            </View>
+        </Card>
+        
+        {/* Modals */}
+        <Modal
+            animationType="slide"
+            transparent={true}
+            visible={showBpModal}
+            onRequestClose={() => setShowBpModal(false)}
+        >
+            <View style={styles.modalContainer}>
+                <View style={styles.modalContent}>
+                    <Text style={styles.modalTitle}>Log Blood Pressure</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Systolic (e.g., 120)"
+                        value={systolic}
+                        onChangeText={setSystolic}
+                        keyboardType="number-pad"
+                        placeholderTextColor={theme.colors.mutedForeground}
+                    />
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Diastolic (e.g., 80)"
+                        value={diastolic}
+                        onChangeText={setDiastolic}
+                        keyboardType="number-pad"
+                        placeholderTextColor={theme.colors.mutedForeground}
+                    />
+                    <View style={styles.modalButtonContainer}>
+                        <Button title="Cancel" variant="ghost" onPress={() => setShowBpModal(false)} />
+                        <Button title={isSavingBp ? "Saving..." : "Save"} onPress={handleSaveBloodPressure} disabled={isSavingBp} />
+                    </View>
+                </View>
+            </View>
+        </Modal>
+
+        <Modal
+            animationType="slide"
+            transparent={true}
+            visible={showActivityModal}
+            onRequestClose={() => setShowActivityModal(false)}
+        >
+            <View style={styles.modalContainer}>
+                <View style={styles.modalContent}>
+                    <Text style={styles.modalTitle}>Log Physical Activity</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Minutes of activity"
+                        value={activityMinutes}
+                        onChangeText={setActivityMinutes}
+                        keyboardType="number-pad"
+                        placeholderTextColor={theme.colors.mutedForeground}
+                    />
+                    <View style={styles.modalButtonContainer}>
+                        <Button title="Cancel" variant="ghost" onPress={() => setShowActivityModal(false)} />
+                        <Button title={isSavingActivity ? "Saving..." : "Save"} onPress={handleSaveActivity} disabled={isSavingActivity} />
+                    </View>
+                </View>
+            </View>
+        </Modal>
 
       </ScrollView>
-
-      {/* --- NEW: Blood Pressure Modal --- */}
-      <Modal
-        transparent={true}
-        visible={showBpModal}
-        animationType="fade"
-        onRequestClose={() => setShowBpModal(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Log Blood Pressure</Text>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Systolic (SYS)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g., 120"
-                keyboardType="number-pad"
-                value={systolic}
-                onChangeText={setSystolic}
-              />
-            </View>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Diastolic (DIA)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g., 80"
-                keyboardType="number-pad"
-                value={diastolic}
-                onChangeText={setDiastolic}
-              />
-            </View>
-            <TouchableOpacity style={[styles.primaryButton, isSavingBp && { backgroundColor: theme.colors.disabled }]} onPress={handleSaveBloodPressure} disabled={isSavingBp}>
-              {isSavingBp ? <ActivityIndicator color={theme.colors.card} /> : <Text style={styles.primaryButtonText}>Save Reading</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.secondaryButton} onPress={() => setShowBpModal(false)}>
-              <Text style={styles.secondaryButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* --- NEW: Activity Modal --- */}
-      <Modal
-        transparent={true}
-        visible={showActivityModal}
-        animationType="fade"
-        onRequestClose={() => setShowActivityModal(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Log Daily Activity</Text>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Activity Duration (in minutes)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g., 30"
-                keyboardType="number-pad"
-                value={activityMinutes}
-                onChangeText={setActivityMinutes}
-              />
-            </View>
-            <TouchableOpacity style={[styles.primaryButton, isSavingActivity && { backgroundColor: theme.colors.disabled }]} onPress={handleSaveActivity} disabled={isSavingActivity}>
-              {isSavingActivity ? <ActivityIndicator color={theme.colors.card} /> : <Text style={styles.primaryButtonText}>Save Activity</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.secondaryButton} onPress={() => setShowActivityModal(false)}>
-              <Text style={styles.secondaryButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
 
+
+// --- STYLES ---
+
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  container: {
-    flexGrow: 1, // Use flexGrow for ScrollView content
-    backgroundColor: theme.colors.background,
-    padding: theme.spacing.md,
-    paddingBottom: theme.spacing.xl, 
-  },
-  screenTitle: { // Similar to welcomeText in Dashboard
-    fontSize: theme.typography.subheading + 2, 
-    fontWeight: '600', 
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.sm, // Consistent with Dashboard's welcomeText
-  },
-  screenSubtitle: {
-    fontSize: theme.typography.body,
-    color: theme.colors.textMuted,
-    marginBottom: theme.spacing.lg,
-    paddingHorizontal: theme.spacing.sm,
-  },
-  card: {
-    marginBottom: theme.spacing.lg,
-    padding: theme.spacing.md, 
-    borderRadius: theme.borderRadius.lg, 
-  },
-  cardTitleContainer: { 
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: theme.spacing.md,
-  },
-  cardTitleIcon: { 
-    marginRight: theme.spacing.sm,
-  },
-  cardTitle: { // Consistent with Dashboard
-    fontSize: theme.typography.subheading,
-    fontWeight: 'bold',
-    color: theme.colors.secondary, 
-  },
-  cardContent: { // Consistent with Dashboard
-    fontSize: theme.typography.body,
-    color: theme.colors.textMuted,
-    marginBottom: theme.spacing.md,
-    lineHeight: theme.typography.body * 1.4, // Improved readability
-  },
-  cardContentMuted: { // Consistent with Dashboard
-    fontSize: theme.typography.caption,
-    color: theme.colors.textMuted,
-    marginTop: theme.spacing.sm,
-    marginBottom: theme.spacing.md,
-  },
-  cardButton: { // Consistent with Dashboard
-    marginTop: theme.spacing.sm, 
-    alignSelf: 'flex-start', 
-  },
-  statsContainer: { // From Dashboard
-    flexDirection: 'row',
-    justifyContent: 'space-around', // Or 'flex-start' if preferred with spacing
-    marginBottom: theme.spacing.md, // Space before contentMuted or next element
-  },
-  statItem: { // From Dashboard
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.sm, // Add some padding between items
-  },
-  statValue: { // From Dashboard
-    fontSize: theme.typography.heading - 2, 
-    fontWeight: 'bold',
-    color: theme.colors.primary, // Or theme.colors.secondary for variation
-  },
-  statLabel: { // From Dashboard
-    fontSize: theme.typography.caption,
-    color: theme.colors.textMuted,
-    marginTop: theme.spacing.xs,
-  },
-  insightItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: theme.spacing.sm,
-  },
-  insightIcon: {
-    marginRight: theme.spacing.sm,
-  },
-  insightText: {
-    fontSize: theme.typography.body,
-    color: theme.colors.text,
-    flexShrink: 1, // Allow text to wrap
-  },
-  moodSelector: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'flex-start',
-  },
-  moodButton: {
-    alignItems: 'center',
-    padding: theme.spacing.sm,
-    borderRadius: theme.borderRadius.md,
-    width: 70, // Fixed width for alignment
-  },
-  moodButtonSelected: {
-    backgroundColor: theme.colors.primaryMuted,
-  },
-  moodText: {
-    fontSize: 12,
-    color: theme.colors.textMuted,
-    marginTop: theme.spacing.xs,
-  },
-  moodTextSelected: {
-    color: theme.colors.primary,
-    fontWeight: 'bold',
-  },
-  chartPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: theme.spacing.xl,
-    backgroundColor: theme.colors.background,
-    borderRadius: theme.borderRadius.md,
-  },
-  placeholderText: {
-    fontSize: theme.typography.body,
-    color: theme.colors.textMuted,
-    marginTop: theme.spacing.md,
-    fontWeight: '500',
-  },
-  placeholderSubText: {
-    fontSize: theme.typography.caption,
-    color: theme.colors.textMuted,
-    marginTop: theme.spacing.xs,
-  },
-  primaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.primary,
-    padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    width: '100%',
-  },
-  primaryButtonText: {
-    color: theme.colors.card,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  secondaryButton: {
-    marginTop: theme.spacing.sm,
-    padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    width: '100%',
-    alignItems: 'center',
-  },
-  secondaryButtonText: {
-    color: theme.colors.primary,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  buttonIcon: {
-    marginRight: theme.spacing.sm,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: theme.colors.background,
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.lg,
-    width: '90%',
-    alignItems: 'center',
-  },
-  modalTitle: {
-    fontSize: theme.typography.subheading,
-    fontWeight: 'bold',
-    color: theme.colors.text,
-    marginBottom: theme.spacing.lg,
-  },
-  inputGroup: {
-    width: '100%',
-    marginBottom: theme.spacing.md,
-  },
-  inputLabel: {
-    fontSize: 14,
-    color: theme.colors.textMuted,
-    marginBottom: theme.spacing.xs,
-  },
-  input: {
-    backgroundColor: theme.colors.background,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.md,
-    fontSize: 16,
-    width: '100%',
-  },
-  cardSubtitle: {
-    fontSize: theme.typography.caption,
-    color: theme.colors.textMuted,
-    marginBottom: theme.spacing.md,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: theme.spacing.md,
-  },
-  cardIcon: {
-    marginRight: theme.spacing.sm,
-  },
+    safeArea: {
+        flex: 1,
+        backgroundColor: theme.colors.background,
+    },
+    menuButton: {
+        position: 'absolute',
+        top: theme.spacing.lg,
+        left: theme.spacing.lg,
+        zIndex: 10,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        borderRadius: theme.radius.md,
+        padding: theme.spacing.xs,
+    },
+    container: {
+        padding: theme.spacing.md,
+        paddingBottom: theme.spacing.xl,
+        paddingTop: 60,
+    },
+    screenTitle: {
+        fontSize: 28,
+        fontWeight: 'bold',
+        color: theme.colors.foreground,
+        fontFamily: theme.typography.fontFamilyBold,
+    },
+    screenSubtitle: {
+        fontSize: 16,
+        color: theme.colors.mutedForeground,
+        marginBottom: theme.spacing.lg,
+        fontFamily: theme.typography.fontFamily,
+    },
+    card: {
+        marginBottom: theme.spacing.lg,
+        padding: theme.spacing.md,
+    },
+    cardTitleContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: theme.spacing.md,
+    },
+    cardTitleIcon: {
+        marginRight: theme.spacing.sm,
+    },
+    cardTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: theme.colors.foreground,
+        fontFamily: theme.typography.fontFamilyBold,
+    },
+    moodSelector: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        marginTop: theme.spacing.md,
+    },
+    moodButton: {
+        alignItems: 'center',
+        padding: theme.spacing.sm,
+        borderRadius: theme.radius.lg,
+        borderWidth: 1,
+        borderColor: 'transparent',
+        width: 68,
+    },
+    moodButtonSelected: {
+        backgroundColor: theme.colors.accent,
+        borderColor: theme.colors.primary,
+    },
+    moodText: {
+        marginTop: theme.spacing.xs,
+        fontSize: 12,
+        color: theme.colors.mutedForeground,
+        fontFamily: theme.typography.fontFamily,
+    },
+    moodTextSelected: {
+        color: theme.colors.primary,
+        fontFamily: theme.typography.fontFamilyMedium,
+    },
+    emptyChartText: {
+        textAlign: 'center',
+        marginVertical: 20,
+        color: theme.colors.mutedForeground,
+        fontFamily: theme.typography.fontFamily,
+    },
+    trackersContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        marginTop: theme.spacing.md,
+    },
+    trackerButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: theme.colors.secondary,
+        paddingVertical: theme.spacing.sm,
+        paddingHorizontal: theme.spacing.md,
+        borderRadius: theme.radius.lg,
+    },
+    trackerText: {
+        marginLeft: theme.spacing.sm,
+        color: theme.colors.secondaryForeground,
+        fontWeight: 'bold',
+        fontFamily: theme.typography.fontFamilyMedium,
+    },
+    modalContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+    },
+    modalContent: {
+        width: '85%',
+        backgroundColor: theme.colors.card,
+        borderRadius: theme.radius.xl,
+        padding: theme.spacing.lg,
+        alignItems: 'center',
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: theme.colors.foreground,
+        marginBottom: theme.spacing.lg,
+    },
+    input: {
+        width: '100%',
+        height: 50,
+        backgroundColor: theme.colors.input,
+        borderRadius: theme.radius.md,
+        paddingHorizontal: theme.spacing.md,
+        fontSize: 16,
+        color: theme.colors.foreground,
+        marginBottom: theme.spacing.md,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+    },
+    modalButtonContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        width: '100%',
+        marginTop: theme.spacing.md,
+    },
 }); 

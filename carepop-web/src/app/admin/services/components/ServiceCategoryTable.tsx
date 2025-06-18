@@ -30,14 +30,13 @@ import {
 import { MoreHorizontal, ArrowUpDown } from 'lucide-react';
 import Link from 'next/link';
 import { deleteServiceCategory, getAllServiceCategories } from '@/lib/actions/service-categories.admin.actions';
-import { useToast } from '@/components/ui/use-toast';
 import { AppError } from '@/lib/utils/errors';
 import { TServiceCategory } from '@/lib/types/service-category.types';
 import { Input } from '@/components/ui/input';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
+import { toast } from "sonner";
 
 const ActionsCell = ({ category, onDeleted }: { category: TServiceCategory; onDeleted: () => void }) => {
-  const { toast } = useToast();
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this service category?')) return;
@@ -45,18 +44,11 @@ const ActionsCell = ({ category, onDeleted }: { category: TServiceCategory; onDe
 
     try {
       await deleteServiceCategory(category.id);
-      toast({
-        title: 'Success',
-        description: `Service category "${category.name}" deleted successfully.`,
-      });
+      toast.success(`Service category "${category.name}" deleted successfully.`);
       onDeleted();
     } catch (error) {
       const errorMessage = error instanceof AppError ? error.message : 'An unexpected error occurred.';
-      toast({
-        title: 'Error',
-        description: `Failed to delete category: ${errorMessage}`,
-        variant: 'destructive',
-      });
+      toast.error(`Failed to delete category: ${errorMessage}`);
     }
   };
 

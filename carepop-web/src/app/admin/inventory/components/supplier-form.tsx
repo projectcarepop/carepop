@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { createSupplier, updateSupplier } from '@/lib/actions/supplier.admin.actions';
 
 const supplierFormSchema = z.object({
@@ -29,7 +29,6 @@ interface SupplierFormProps {
 
 export function SupplierForm({ initialData }: SupplierFormProps) {
   const router = useRouter();
-  const { toast } = useToast();
   const form = useForm<SupplierFormValues>({
     resolver: zodResolver(supplierFormSchema),
     defaultValues: initialData || {
@@ -54,13 +53,13 @@ export function SupplierForm({ initialData }: SupplierFormProps) {
         throw new Error(result.message);
       }
       
-      toast({ title: 'Success', description: result.message });
+      toast.success(result.message);
       router.push('/admin/inventory?tab=suppliers');
       router.refresh();
 
     } catch (err) {
         const message = err instanceof Error ? err.message : 'An unknown error occurred';
-        toast({ title: 'Error', description: message, variant: 'destructive' });
+        toast.error(message);
     }
   };
 

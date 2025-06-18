@@ -94,10 +94,8 @@ export function LogSymptomsScreen() {
                     title={isSaving ? 'Saving...' : 'Save Log'}
                     onPress={handleSave}
                     disabled={isSaving}
-                    variant="primary"
-                    styleType="solid"
                     style={styles.saveButton}
-                    icon={isSaving ? <ActivityIndicator color={theme.colors.background} /> : undefined}
+                    icon={isSaving ? <ActivityIndicator color={theme.colors.primaryForeground} /> : undefined}
                 />
             </ScrollView>
         </SafeAreaView>
@@ -107,10 +105,10 @@ export function LogSymptomsScreen() {
 const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: theme.colors.background },
     container: { padding: 20, paddingBottom: 40 },
-    screenTitle: { fontSize: 24, fontWeight: 'bold', color: theme.colors.text, marginBottom: 20, textAlign: 'center' },
+    screenTitle: { ...theme.typography.h2, color: theme.colors.foreground, marginBottom: 20, textAlign: 'center' },
     card: { padding: 15, marginBottom: 20 },
-    cardTitle: { fontSize: 18, fontWeight: '600', color: theme.colors.text, marginBottom: 10 },
-    dateText: { fontSize: 16, color: theme.colors.primary },
+    cardTitle: { ...theme.typography.h4, color: theme.colors.foreground, marginBottom: 10 },
+    dateText: { ...theme.typography.body, color: theme.colors.primary },
     symptomsContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -121,16 +119,16 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     symptomLabel: {
-        fontSize: 16,
+        ...theme.typography.body,
     },
     notesInput: {
-        backgroundColor: theme.colors.card,
+        ...theme.typography.body,
+        backgroundColor: theme.colors.background,
         borderWidth: 1,
         borderColor: theme.colors.border,
-        borderRadius: theme.borderRadius.md,
+        borderRadius: theme.radius.md,
         padding: 12,
-        fontSize: 16,
-        color: theme.colors.text,
+        color: theme.colors.foreground,
         minHeight: 100,
         textAlignVertical: 'top',
     },

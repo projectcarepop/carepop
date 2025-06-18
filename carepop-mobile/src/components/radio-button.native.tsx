@@ -64,15 +64,15 @@ export const RadioButton: React.FC<RadioButtonProps> = ({
   const radioBaseStyle: ViewStyle = {
     width: 22,
     height: 22,
-    borderRadius: theme.borderRadius.full, // Make it perfectly circular
+    borderRadius: theme.radius.full, // Make it perfectly circular
     borderWidth: 1.5,
-    borderColor: disabled ? theme.colors.disabled : theme.colors.primary,
+    borderColor: disabled ? theme.colors.mutedForeground : theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: label ? theme.spacing.sm : 0,
     opacity: disabled ? 0.65 : 1,
     // Ensure a background color when not selected, matching the app background
-    backgroundColor: disabled ? theme.colors.disabledBackground : theme.colors.background,
+    backgroundColor: disabled ? theme.colors.mutedForeground : theme.colors.background,
   };
 
   // Style for the inner dot shown when selected
@@ -80,8 +80,8 @@ export const RadioButton: React.FC<RadioButtonProps> = ({
   const innerDotStyle: ViewStyle = {
     width: 11,
     height: 11,
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: disabled ? theme.colors.disabled : theme.colors.primary,
+    borderRadius: theme.radius.full,
+      backgroundColor: disabled ? theme.colors.mutedForeground : theme.colors.primary,
   };
 
   return (
@@ -113,11 +113,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   label: {
-    fontSize: theme.typography.body,
-    color: theme.colors.text,
+    fontSize: theme.typography.body.fontSize,
+    color: theme.colors.foreground,
     // fontFamily: theme.typography.fontFamily,
   },
   disabledLabel: {
-    color: theme.colors.disabled,
+    color: theme.colors.mutedForeground,
   },
 }); 

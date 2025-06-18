@@ -37,8 +37,6 @@ export function PaymentMethodsScreen({ navigation }: any) {
         title="Remove" 
         onPress={() => handleRemoveMethod(item.id)}
         variant="destructive"
-        size="sm"
-        styleType='outline'
       />
     </View>
   );
@@ -73,16 +71,14 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   title: {
-    fontSize: theme.typography.heading,
-    fontWeight: 'bold',
+    ...theme.typography.h2,
     color: theme.colors.primary,
     textAlign: 'center',
     marginVertical: theme.spacing.lg,
   },
    subTitle: {
-    fontSize: theme.typography.subheading,
-    fontWeight: '600',
-    color: theme.colors.text,
+    ...theme.typography.h4,
+    color: theme.colors.foreground,
     marginHorizontal: theme.spacing.md,
     marginBottom: theme.spacing.md,
   },
@@ -93,11 +89,11 @@ const styles = StyleSheet.create({
   methodItemContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.background, // Use background color
+    backgroundColor: theme.colors.card,
     padding: theme.spacing.md,
     marginHorizontal: theme.spacing.md,
     marginBottom: theme.spacing.sm,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
@@ -106,17 +102,17 @@ const styles = StyleSheet.create({
     marginLeft: theme.spacing.md,
   },
   methodType: {
-    fontSize: theme.typography.body,
-    fontWeight: '500',
-    color: theme.colors.text,
+    ...theme.typography.body,
+    fontFamily: theme.typography.fontFamilyMedium,
+    color: theme.colors.foreground,
   },
   methodExpiry: {
-    fontSize: theme.typography.caption,
-    color: theme.colors.textMuted,
+    ...theme.typography.small,
+    color: theme.colors.mutedForeground,
   },
   placeholderText: {
-    fontSize: theme.typography.body,
-    color: theme.colors.textMuted,
+    ...theme.typography.body,
+    color: theme.colors.mutedForeground,
     textAlign: 'center',
     padding: theme.spacing.md,
   },

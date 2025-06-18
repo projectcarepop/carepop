@@ -1,28 +1,56 @@
+'use client';
+
+import { useAuth } from '@/lib/contexts/AuthContext';
+
 interface FetcherError extends Error {
   info?: unknown;
   status?: number;
 }
 
-export const fetcher = async (url: string) => {
-    // In a real app, you would get the user's auth token here
-    // e.g., const { data } = await supabase.auth.getSession();
-    // const token = data.session?.access_token;
+// This is no longer a simple utility, but a hook factory
+export const useFetcher = () => {
+    const { session } = useAuth();
 
-    const res = await fetch(url, {
-        headers: {
-            'Content-Type': 'application/json',
-            // Authorization: `Bearer ${token}`
+    const fetcher = async (url: string) => {
+        const token = session?.access_token;
+
+        if (!token) {
+            // Depending on the use case, you might want to handle this differently.
+            // For admin sections, throwing an error is appropriate.
+            const error: FetcherError = new Error('Authentication token not found.');
+            error.status = 401;
+            throw error;
         }
-    });
 
-    if (!res.ok) {
-        const error: FetcherError = new Error('An error occurred while fetching the data.');
-        // Attach extra info to the error object.
-        error.info = await res.json();
-        error.status = res.status;
-        throw error;
-    }
+        const res = await fetch(url, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
-    const result = await res.json();
-    return result.data; // Our responseHandler wraps data in a 'data' property
+        if (!res.ok) {
+            const error: FetcherError = new Error('An error occurred while fetching the data.');
+            try {
+                error.info = await res.json();
+            } catch (e) {
+                error.info = { message: res.statusText };
+            }
+            error.status = res.status;
+            throw error;
+        }
+        
+        // Handle cases where the response might be empty (e.g., 204 No Content)
+        if (res.status === 204) {
+            return null;
+        }
+
+        const result = await res.json();
+        // The backend response for lists is { data: [...], count: ... }
+        // For single items, it's { data: {...} }
+        // The SWR hook will get the whole object.
+        return result.data;
+    };
+
+    return fetcher;
 }; 

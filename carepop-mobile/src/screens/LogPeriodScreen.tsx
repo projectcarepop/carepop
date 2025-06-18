@@ -62,8 +62,6 @@ export function LogPeriodScreen() {
                         title={isUpdating ? 'Saving...' : 'Log Period End Today'}
                         onPress={handleEndPeriod}
                         disabled={isUpdating}
-                        variant="primary"
-                        styleType="solid"
                         style={styles.button}
                     />
                 </Card>
@@ -78,8 +76,6 @@ export function LogPeriodScreen() {
                     title={isUpdating ? 'Saving...' : 'Log Period Start Today'}
                     onPress={handleStartPeriod}
                     disabled={isUpdating}
-                    variant="primary"
-                    styleType="solid"
                     style={styles.button}
                 />
             </Card>
@@ -100,9 +96,8 @@ const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: theme.colors.background },
     container: { flex: 1, justifyContent: 'center', padding: 20 },
     screenTitle: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: theme.colors.text,
+        ...theme.typography.h2,
+        color: theme.colors.foreground,
         textAlign: 'center',
         marginBottom: 30,
     },
@@ -111,14 +106,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     cardTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: theme.colors.text,
+        ...theme.typography.h4,
+        color: theme.colors.foreground,
         textAlign: 'center',
     },
     cardSubtitle: {
-        fontSize: 14,
-        color: theme.colors.textMuted,
+        ...theme.typography.body,
+        color: theme.colors.mutedForeground,
         textAlign: 'center',
         marginTop: 5,
         marginBottom: 20,

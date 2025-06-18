@@ -49,4 +49,14 @@ resource "google_cloud_run_v2_service" "carepop_backend" {
     google_project_service.project_services,
     google_service_account.cloud_run_sa
   ]
+}
+
+resource "google_cloud_run_v2_service_iam_binding" "allow_public_access" {
+  provider = google
+  project  = var.gcp_project_id
+  location = google_cloud_run_v2_service.carepop_backend.location
+  name     = google_cloud_run_v2_service.carepop_backend.name
+  
+  role    = "roles/run.invoker"
+  members = ["allUsers"]
 } 

@@ -24,14 +24,13 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   title: {
-    fontSize: theme.typography.heading,
-    fontWeight: 'bold',
+    ...theme.typography.h1,
     marginBottom: theme.spacing.md,
-    color: theme.colors.text,
+    color: theme.colors.foreground,
   },
   subtitle: {
-    fontSize: theme.typography.body,
+    ...theme.typography.body,
     marginBottom: theme.spacing.xl,
-    color: theme.colors.textMuted,
+    color: theme.colors.mutedForeground,
   },
 }); 

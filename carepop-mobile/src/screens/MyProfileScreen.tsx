@@ -1,363 +1,208 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
-import { theme, Card, Button } from '../components'; // Assuming theme is also exported from ../components/index.ts
-import { MaterialIcons, Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../context/AuthContext'; // Import useAuth
-import type { Profile } from '../utils/supabase'; // Import the updated Profile type directly
-import { useNavigation } from '@react-navigation/native'; // Import useNavigation
-import { NativeStackNavigationProp } from '@react-navigation/native-stack'; // Import navigation prop type
-import { MyProfileStackParamList } from '../navigation/AppNavigator'; // Corrected Import Path to AppNavigator
+import React, { useMemo } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  SafeAreaView,
+  TouchableOpacity,
+} from 'react-native';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { type DrawerNavigationProp } from '@react-navigation/drawer';
+import { useAuth } from '../context/AuthContext';
+import { theme } from '../components/theme';
+import { Button } from '../components/button.native';
+import { Card, CardHeader, CardContent, CardTitle } from '../components/card.native';
+import type { ProfileStackParamList } from '../navigation/AppNavigator';
+import { format } from 'date-fns';
+import { Menu } from 'lucide-react-native';
 
-// Data for address pickers - temporary until we decide how to display full names
-import provinceJson from '../data/province.json';
-import cityJson from '../data/city.json';
-import barangayJson from '../data/barangay.json';
+import provinces from '../data/psgc/provinces.json';
+import cities from '../data/psgc/cities-municipalities.json';
+import barangaysData from '../data/psgc/barangays.json';
 
-// Temporary Profile type extension for MyProfileScreen until AuthContext provides full profile
-// This acknowledges that the full profile data might not yet be on the object from AuthContext.
-// interface DisplayProfile extends SupabaseProfileType {
-//   first_name?: string | null;
-//   last_name?: string | null;
-//   avatar_url?: string | null;
-//   date_of_birth?: string | null;
-//   civil_status?: string | null;
-//   religion?: string | null;
-//   occupation?: string | null;
-//   contact_no?: string | null;
-//   street?: string | null;
-//   province_code?: string | null;
-//   city_municipality_code?: string | null;
-//   barangay_code?: string | null;
-//   philhealth_no?: string | null;
-//   // Add any other fields CreateProfileScreen collects
-// }
+interface Barangay { brgy_code: string; brgy_name: string; }
+const barangays = barangaysData as Barangay[];
 
-interface Province {
-  province_code: string;
-  province_name: string;
-}
-interface CityMunicipality {
-  city_code: string;
-  city_name: string;
-}
-interface Barangay {
-  brgy_code: string;
-  brgy_name: string;
-}
-const provinceData: Province[] = provinceJson as Province[];
-const cityData: CityMunicipality[] = cityJson as CityMunicipality[];
-const barangayData: Barangay[] = barangayJson as Barangay[];
+type ProfileScreenNavigationProp = NativeStackNavigationProp<
+  ProfileStackParamList,
+  'MyProfile'
+>;
 
-// Re-add calculateAge function
-/**
- * Calculates age based on a date of birth string.
- * @param {string | null | undefined} dob - The date of birth string (e.g., "YYYY-MM-DD").
- * @returns {number | string} The calculated age, or "N/A" if DOB is invalid.
- */
-const calculateAge = (dob: string | null | undefined): number | string => {
-  if (!dob) return "N/A";
-  const birthDate = new Date(dob);
-  if (isNaN(birthDate.getTime())) return "N/A"; // Invalid date
+const ProfileInfoRow = ({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | null | undefined;
+}) => (
+  <View style={styles.infoRow}>
+    <Text style={styles.label}>{label}</Text>
+    <Text style={styles.value}>{value || 'Not set'}</Text>
+  </View>
+);
 
-  const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const m = today.getMonth() - birthDate.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
-  }
-  return age >= 0 ? age : "N/A";
-};
-
-// Re-add getAddressPartName function
-/**
- * Helper to get the display name for a selected code from a list.
- */
-const getAddressPartName = (
-    code: string | null | undefined,
-    list: any[],
-    codeKey: string,
-    nameKey: string
-): string => {
-    if (!code) return '-'; // Return dash instead of N/A for missing parts
-    const item = list.find(i => i[codeKey] === code);
-    return item?.[nameKey] || code; // Return code if name not found for robustness
-};
-
-/**
- * @description Screen to display the user's profile information.
- * It fetches data from AuthContext and provides navigation to edit the profile.
- */
 export function MyProfileScreen() {
-  const { profile, isLoading, authError, session, signOut } = useAuth();
-  const [isPhilHealthVisible, setIsPhilHealthVisible] = useState(false);
-  // Use the useNavigation hook with the specific stack param list and screen name
-  const navigation = useNavigation<NativeStackNavigationProp<MyProfileStackParamList, 'MyProfileMain'>>();
+  const navigation = useNavigation<ProfileScreenNavigationProp>();
+  const { session, profile, signOut, isLoading, isSaving } = useAuth();
 
-  const navigateToEditProfile = () => {
-    console.log('[MyProfileScreen] Navigating to EditProfile...');
-    navigation.navigate('EditProfile'); // Use the navigation object from the hook
-  };
+  const formattedDob = useMemo(() => {
+    // Ensure profile and date_of_birth are not null or an empty string.
+    if (profile?.date_of_birth && profile.date_of_birth.trim().length > 0) {
+      try {
+        // Supabase returns YYYY-MM-DD string, which is parsed as UTC.
+        // Add time to treat it as local date to prevent off-by-one day issues.
+        return format(new Date(`${profile.date_of_birth}T00:00:00`), 'MMMM d, yyyy');
+      } catch (error) {
+        console.error('Error formatting date:', error);
+        return 'Invalid Date';
+      }
+    }
+    return null;
+  }, [profile?.date_of_birth]);
 
-  if (isLoading) {
+  if (isLoading && !profile) {
     return (
-      <SafeAreaView style={[styles.safeArea, styles.centered]}>
+      <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={styles.loadingText}>Loading Profile...</Text>
-      </SafeAreaView>
-    );
-  }
-
-  if (authError) {
-    return (
-      <SafeAreaView style={[styles.safeArea, styles.centered]}>
-        <MaterialIcons name="error-outline" size={48} color={theme.colors.destructive} />
-        <Text style={styles.errorText}>Error loading profile: {authError.message}</Text>
       </SafeAreaView>
     );
   }
 
   if (!profile) {
     return (
-      <SafeAreaView style={[styles.safeArea, styles.centered]}>
-        <MaterialIcons name="person-off" size={48} color={theme.colors.textMuted} />
-        <Text style={styles.placeholderText}>No profile data found.</Text>
-        <Text style={styles.placeholderSubText}>
-          Please complete your profile or try logging in again.
-        </Text>
+      <SafeAreaView style={styles.loadingContainer}>
+        <Text style={styles.value}>Could not load profile.</Text>
       </SafeAreaView>
     );
   }
 
-  // Calculate display values using helpers
-  const displayAge = calculateAge(profile.date_of_birth);
-  const displayBarangay = getAddressPartName(profile.barangay_code, barangayData, 'brgy_code', 'brgy_name');
-  const displayCity = getAddressPartName(profile.city_municipality_code, cityData, 'city_code', 'city_name');
-  const displayProvince = getAddressPartName(profile.province_code, provinceData, 'province_code', 'province_name');
-
-  // Format date of birth for display
-  const formattedDob = profile.date_of_birth ? new Date(profile.date_of_birth).toLocaleDateString() : 'N/A';
-
-  // Construct full address (basic example)
-  const fullAddress = [
-    profile.street,
-    displayBarangay !== profile.barangay_code ? displayBarangay : null, // Show name if resolved, otherwise it might be shown by code if not found
-    displayCity !== profile.city_municipality_code ? displayCity : null,
-    displayProvince !== profile.province_code ? displayProvince : null,
-  ].filter(Boolean).join(', ') || 'N/A';
-
   return (
     <SafeAreaView style={styles.safeArea}>
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        <TouchableOpacity 
+          onPress={() => navigation.dispatch(DrawerActions.toggleDrawer())} 
+          style={styles.menuButton}
+        >
+            <Menu size={28} color={theme.colors.secondary} />
+        </TouchableOpacity>
+        <Text style={styles.screenTitle}>My Profile</Text>
+        <Text style={styles.screenDescription}>
+          View your personal information and manage your account.
+        </Text>
 
-      <ScrollView style={styles.container}>
-        <View style={styles.profileHeaderContainer}>
-            <Text style={styles.profileName}>{`${profile.first_name || ''} ${profile.last_name || ''}`.trim() || (profile.username || 'User Name')}</Text>
-            {session?.user?.email && <Text style={styles.profileEmail}>{session.user.email}</Text>}
-            <Button 
-                title="Edit Profile"
-                onPress={navigateToEditProfile}
-                variant="primary" // Changed to primary for consistency?
-                styleType="outline" // Keep outline style?
-                style={styles.editButton} // Keep custom style for now
-                // textStyle={styles.editButtonText} // Removed textStyle prop
-            />
-        </View>
+        <Card style={styles.card}>
+          <CardHeader><CardTitle style={styles.cardTitle}>Personal Information</CardTitle></CardHeader>
+          <CardContent>
+            <ProfileInfoRow label="First Name" value={profile.first_name} />
+            <ProfileInfoRow label="Middle Initial" value={profile.middle_initial} />
+            <ProfileInfoRow label="Last Name" value={profile.last_name} />
+            <ProfileInfoRow label="Date of Birth" value={formattedDob} />
+            <ProfileInfoRow label="Age" value={profile.age?.toString()} />
+          </CardContent>
+        </Card>
 
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Personal Information</Text>
-          <InfoRow label="Age:" value={displayAge.toString()} />
-          <InfoRow label="Date of Birth:" value={formattedDob} />
-          <InfoRow label="Middle Initial:" value={profile.middle_initial || 'N/A'} />
-          <InfoRow label="Gender Identity:" value={profile.gender_identity || 'N/A'} />
-          <InfoRow label="Pronouns:" value={profile.pronouns || 'N/A'} />
-          <InfoRow label="Assigned Sex at Birth:" value={profile.assigned_sex_at_birth || 'N/A'} />
-          <InfoRow label="Civil Status:" value={profile.civil_status || 'N/A'} />
-          <InfoRow label="Religion:" value={profile.religion || 'N/A'} />
-          <InfoRow label="Occupation:" value={profile.occupation || 'N/A'} />
-        </View>
-
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Contact Information</Text>
-          {session?.user?.email && (
-            <InfoRow label="Email:" value={session.user.email} />
-          )}
-          <InfoRow label="Phone:" value={profile.contact_no || 'N/A'} />
-        </View>
-
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Address</Text>
-          <InfoRow label="Street:" value={profile.street || 'N/A'} />
-          <InfoRow label="Barangay:" value={displayBarangay} />
-          <InfoRow label="City/Municipality:" value={displayCity} />
-          <InfoRow label="Province:" value={displayProvince} />
-        </View>
+        <Card style={styles.card}>
+          <CardHeader><CardTitle style={styles.cardTitle}>Contact & Address</CardTitle></CardHeader>
+          <CardContent>
+            <ProfileInfoRow label="Email" value={session?.user?.email} />
+            <ProfileInfoRow label="Phone Number" value={profile.contact_no} />
+            <ProfileInfoRow label="Street Address" value={profile.street} />
+            <ProfileInfoRow label="Province" value={provinces.find(p => p.province_code === profile.province_code)?.province_name} />
+            <ProfileInfoRow label="City/Municipality" value={cities.find(c => c.city_code === profile.city_municipality_code)?.city_name} />
+            <ProfileInfoRow label="Barangay" value={barangays.find(b => b.brgy_code === profile.barangay_code)?.brgy_name} />
+          </CardContent>
+        </Card>
         
-        <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Identification</Text>
-            <InfoRow 
-                label="PhilHealth No:" 
-                value={isPhilHealthVisible ? (profile.philhealth_no || 'N/A') : '********'} 
-                trailingIcon={ 
-                    <TouchableOpacity onPress={() => setIsPhilHealthVisible(!isPhilHealthVisible)}>
-                        <Ionicons 
-                            name={isPhilHealthVisible ? 'eye-off-outline' : 'eye-outline'} 
-                            size={20} 
-                            color={theme.colors.textMuted} 
-                        />
-                    </TouchableOpacity>
-                }
-            />
-        </View>
+        <Card style={styles.card}>
+            <CardHeader><CardTitle style={styles.cardTitle}>Identity & Other Info</CardTitle></CardHeader>
+            <CardContent>
+                <ProfileInfoRow label="Gender Identity" value={profile.gender_identity} />
+                <ProfileInfoRow label="Pronouns" value={profile.pronouns} />
+                <ProfileInfoRow label="Assigned Sex at Birth" value={profile.assigned_sex_at_birth} />
+                <ProfileInfoRow label="Civil Status" value={profile.civil_status} />
+                <ProfileInfoRow label="Religion" value={profile.religion} />
+                <ProfileInfoRow label="Occupation" value={profile.occupation} />
+                <ProfileInfoRow label="PhilHealth Number" value={profile.philhealth_no} />
+            </CardContent>
+        </Card>
 
+        <View style={styles.actionsContainer}>
+          <Button
+            title="Edit Profile"
+            variant="default"
+            onPress={() => navigation.navigate('EditProfile')}
+            disabled={isSaving}
+            size="xl"
+          />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-/**
- * Reusable component to display a row of information.
- */
-const InfoRow: React.FC<{ label: string; value: string | number; trailingIcon?: React.ReactNode }> = ({ label, value, trailingIcon }) => (
-  <View style={styles.infoRow}>
-    <Text style={styles.infoLabel}>{label}</Text>
-    <View style={styles.infoValueContainer}>
-        <Text style={styles.infoValue}>{value}</Text>
-        {trailingIcon && <View style={styles.iconContainer}>{trailingIcon}</View>} 
-    </View>
-  </View>
-);
-
 const styles = StyleSheet.create({
+  menuButton: {
+    alignSelf: 'flex-start',
+    marginBottom: theme.spacing.md,
+  },
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background, // Use background color
-  },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between', 
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-    backgroundColor: theme.colors.card, // Or theme.colors.background?
-  },
-  backButton: {
-    padding: theme.spacing.xs,
-  },
-  headerTitle: {
-    fontSize: theme.typography.subheading,
-    fontWeight: 'bold',
-    color: theme.colors.text, // Use default text color or secondary?
+    backgroundColor: theme.colors.background,
   },
   container: {
+    paddingVertical: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.lg,
+    backgroundColor: theme.colors.background,
+    paddingBottom: 40,
+  },
+  loadingContainer: {
     flex: 1,
-  },
-  profileHeaderContainer: {
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: theme.spacing.lg,
-    paddingHorizontal: theme.spacing.md,
-    backgroundColor: theme.colors.card, // Or another suitable background
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-    marginBottom: theme.spacing.md,
+    backgroundColor: theme.colors.background,
   },
-  avatar: { // Style for the avatar image
-    width: 100,
-    height: 100,
-    borderRadius: 50, // Makes it circular
-    marginBottom: theme.spacing.md,
-    backgroundColor: theme.colors.border, // Placeholder background color
+  screenTitle: {
+    ...theme.typography.h1,
+    textAlign: 'center',
+    marginBottom: theme.spacing.sm,
+    color: theme.colors.secondary,
   },
-  profileName: {
-    fontSize: theme.typography.heading, // Corrected: Use heading instead of h2
-    fontWeight: 'bold',
-    color: theme.colors.text, // Use default text color
-    marginBottom: theme.spacing.xs,
-    marginTop: theme.spacing.lg, // Added margin top since avatar is removed
+  screenDescription: {
+    ...theme.typography.body,
+    textAlign: 'center',
+    color: theme.colors.foreground,
+    marginBottom: theme.spacing.xl,
   },
-  profileEmail: {
-    fontSize: theme.typography.body,
-    color: theme.colors.textMuted,
-    marginBottom: theme.spacing.lg, // More space before button
+  card: {
+    marginBottom: theme.spacing.xl,
   },
-  editButton: {
-    marginTop: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs, // Slightly less vertical padding
-    paddingHorizontal: theme.spacing.lg, // Keep horizontal padding
-    borderColor: theme.colors.primary, // Match primary button outline?
-    borderWidth: 1,
-    borderRadius: theme.borderRadius.md, // Consistent rounding
-  },
-  // Removed Card style, using sectionContainer instead
-  sectionContainer: {
-    backgroundColor: theme.colors.card, // Use card background
-    borderRadius: theme.borderRadius.md,
-    marginHorizontal: theme.spacing.md,
-    marginBottom: theme.spacing.lg, // Space between sections
-    padding: theme.spacing.lg, // More padding inside section
-    overflow: 'hidden', // For potential future styling
-  },
-  sectionTitle: {
-    fontSize: theme.typography.subheading,
-    fontWeight: 'bold',
-    color: theme.colors.secondary, // Or primary?
-    marginBottom: theme.spacing.md,
-    // Removed border from section title, section container provides boundary
-    // borderBottomWidth: 1,
-    // borderBottomColor: theme.colors.border,
-    // paddingBottom: theme.spacing.sm,
+  cardTitle: {
+    color: theme.colors.secondary,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: theme.spacing.sm, // Keep vertical padding
-    // borderBottomWidth: 1, // Optional: add subtle separator between rows
-    // borderBottomColor: theme.colors.borderLight, // Use a lighter border color
+    paddingVertical: theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
-  infoLabel: {
-    fontSize: theme.typography.body,
-    color: theme.colors.textMuted,
-    marginRight: theme.spacing.md, // More space after label
+  label: {
+    ...theme.typography.body,
+    color: theme.colors.mutedForeground,
+    flex: 1,
   },
-  infoValueContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexShrink: 1,
-  },
-  infoValue: {
-    fontSize: theme.typography.body,
-    color: theme.colors.text,
+  value: {
+    ...theme.typography.body,
+    fontWeight: '500',
+    color: theme.colors.foreground,
+    flex: 2,
     textAlign: 'right',
   },
-  iconContainer: {
-    marginLeft: theme.spacing.sm,
+  actionsContainer: {
+    marginTop: theme.spacing.lg,
   },
-  placeholderText: {
-    fontSize: theme.typography.body,
-    color: theme.colors.textMuted,
-    textAlign: 'center',
-    marginTop: theme.spacing.md,
-  },
-  placeholderSubText: {
-    fontSize: theme.typography.caption,
-    color: theme.colors.textMuted,
-    textAlign: 'center',
-    marginTop: theme.spacing.xs,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: theme.spacing.lg,
-  },
-  loadingText: {
-    marginTop: theme.spacing.md,
-    color: theme.colors.textMuted,
-  },
-  errorText: {
-    color: theme.colors.destructive,
-    textAlign: 'center',
-    marginTop: theme.spacing.md,
-  },
-}); 
+});

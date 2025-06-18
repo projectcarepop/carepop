@@ -1,0 +1,5 @@
+[db]
+port = 54323
+major_version = 15
+
+[studio] 

@@ -12,8 +12,7 @@ export default function ServicesPage({ searchParams }: ServicesPageProps) {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Services</h1>
-        <Button asChild>
+        <Button>
           <Link href="/admin/services/new">Add New Service</Link>
         </Button>
       </div>

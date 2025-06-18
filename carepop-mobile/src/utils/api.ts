@@ -88,11 +88,13 @@ export interface Appointment {
     start_time: string;
     end_time: string;
     status: 'confirmed' | 'pending_confirmation' | 'cancelled' | 'completed' | 'no_show';
+    notes?: string | null;
     services: { name: string };
     clinics: { name: string; address_line_1: string; };
     providers: { first_name: string; last_name: string; };
     // This field is for the UI, created by combining date and time from the backend
     appointment_datetime: string; 
+    updated_at: string;
 }
 
 export interface MedicalRecord {
@@ -119,24 +121,46 @@ const processAppointments = (appointments: any[]): Appointment[] => {
     }));
 };
 
-export const getUpcomingAppointments = async (): Promise<Appointment[]> => {
-    try {
-        const data = await api.get('/appointments/my/upcoming');
-        return processAppointments(data);
-    } catch (error) {
-        console.error('Error fetching upcoming appointments:', error);
-        throw error;
+// A generic function to fetch appointments, now with optional filters
+const getAppointments = async (status: 'upcoming' | 'past', filters: Record<string, any> = {}): Promise<Appointment[]> => {
+    const endpoint = status === 'upcoming' 
+        ? 'appointments/my/future' 
+        : 'appointments/my/past';
+
+    // Basic query parameter serialization
+    const queryParams = new URLSearchParams(filters).toString();
+    const url = `${endpoint}${queryParams ? `?${queryParams}` : ''}`;
+
+    const { data, error } = await supabase.from('appointments').select(`
+      *,
+      clinic:clinics(*),
+      provider:profiles(*),
+      service:services(*)
+    `).in('status', status === 'upcoming' ? ['confirmed', 'pending'] : ['completed', 'cancelled', 'no_show'])
+     .order('appointment_datetime', { ascending: status === 'upcoming' });
+
+    if (error) {
+        console.error(`Error fetching ${status} appointments:`, error);
+        throw new Error(`Failed to fetch ${status} appointments`);
     }
+
+    // This is a temporary frontend filter until backend is updated.
+    // In a real scenario, the `filters` object would be converted to query params
+    // and sent to a backend that can handle them.
+    if (filters.serviceId && Array.isArray(data)) {
+        return data.filter(appt => appt.service_id === filters.serviceId);
+    }
+    
+    return data || [];
 };
 
-export const getPastAppointments = async (): Promise<Appointment[]> => {
-    try {
-        const data = await api.get('/appointments/my/past');
-        return processAppointments(data);
-    } catch (error) {
-        console.error('Error fetching past appointments:', error);
-        throw error;
-    }
+// Specific functions now use the generic one
+export const getUpcomingAppointments = async (filters: Record<string, any> = {}): Promise<Appointment[]> => {
+    return getAppointments('upcoming', filters);
+};
+
+export const getPastAppointments = async (filters: Record<string, any> = {}): Promise<Appointment[]> => {
+    return getAppointments('past', filters);
 };
 
 export const getMyRecords = async (): Promise<MedicalRecord[]> => {
@@ -157,4 +181,23 @@ export const getRecordSignedUrl = async (recordId: string): Promise<SignedUrlRes
         console.error('Error fetching signed URL for record:', error);
         throw error;
     }
+};
+
+export const getDirections = async (
+  origin: string,
+  destination: string,
+  mode: 'driving' | 'walking'
+) => {
+  try {
+    const data = await api.post('/public/navigation/directions', {
+      origin,
+      destination,
+      mode,
+    });
+    return data;
+  } catch (err: any) {
+    console.error('API call failed for getDirections:', err);
+    // Re-throwing the error so the calling component can handle it (e.g., show a toast)
+    throw err;
+  }
 }; 

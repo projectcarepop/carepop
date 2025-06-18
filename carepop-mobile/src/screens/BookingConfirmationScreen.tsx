@@ -1,79 +1,116 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { theme } from '../components';
 import { useNavigation, useRoute, NavigationProp, RouteProp } from '@react-navigation/native';
-import { AppointmentStackParamList } from '../navigation/AppNavigator';
+import { BookingStackParamList } from '../navigation/AppNavigator';
 import { useAuth } from '../context/AuthContext';
-import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
+import { Ionicons } from '@expo/vector-icons';
+import { format } from 'date-fns';
 
-type BookingConfirmationRouteProp = RouteProp<AppointmentStackParamList, 'BookingConfirmation'>;
-type BookingConfirmationNavigationProp = NavigationProp<AppointmentStackParamList, 'BookingConfirmation'>;
+type BookingConfirmationRouteProp = RouteProp<BookingStackParamList, 'BookingConfirmation'>;
+type BookingConfirmationNavigationProp = NavigationProp<BookingStackParamList, 'BookingConfirmation'>;
 
-// Mock data fetching functions for now
-const fetchServiceDetails = async (serviceId: string, token: string) => {
-    // In a real app, you would fetch this from your backend
-    console.log(`Fetching details for service: ${serviceId}`);
-    // This is mock data
-    const services: {[key: string]: any} = {
-        'e8a4a4b4-4c4a-4b0d-8b0d-4a4c4a4c4a4c': { name: 'Mental Health Consultation', price: '₱1,500' },
-        'f9b5b5c5-5d5b-5c1e-9c1d-5b5c5b5c5b5c': { name: 'Annual Physical Exam', price: '₱2,000' }
-    };
-    return services[serviceId] || { name: 'Unknown Service', price: 'N/A' };
-};
-
-const fetchClinicDetails = async (clinicId: string, token: string) => {
-    // In a real app, you would fetch this from your backend
-    console.log(`Fetching details for clinic: ${clinicId}`);
-    return { name: 'QueerCare Clinic - Manila', address: '123 Taft Avenue, Malate, Manila' };
-};
-
+interface BookingDetails {
+    clinicName: string;
+    serviceName: string;
+    providerName: string;
+}
 
 export const BookingConfirmationScreen = () => {
     const navigation = useNavigation<BookingConfirmationNavigationProp>();
     const route = useRoute<BookingConfirmationRouteProp>();
     const { session } = useAuth();
-    const { clinicId, serviceId, slot } = route.params;
+    const { clinicId, serviceId, providerId, schedule } = route.params;
 
-    const [details, setDetails] = useState({
-        clinicName: '',
-        clinicAddress: '',
-        serviceName: '',
-        price: '',
-    });
+    const [details, setDetails] = useState<BookingDetails | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isBooking, setIsBooking] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // Fetch clinic and service names for display
+    const fetchDetails = useCallback(async () => {
+        // In a real app, you might have a single endpoint to get all booking summary details
+        // For now, we'll assume we can fetch them or we could have passed them
+        // This is a simplified placeholder for fetching names
+        try {
+            // This is where you would fetch clinic, service, and provider names if not passed
+            // For this example, let's pretend we fetched them:
+            setDetails({
+                clinicName: 'Placeholder Clinic Name', // Replace with fetched data
+                serviceName: 'Placeholder Service Name', // Replace with fetched data
+                providerName: 'Placeholder Provider Name', // Replace with fetched data
+            });
+        } catch (e: any) {
+            setError('Could not load appointment details.');
+        } finally {
+            setIsLoading(false);
+        }
+    }, [clinicId, serviceId, providerId]);
 
     useEffect(() => {
-        const loadDetails = async () => {
-            if (!session) return;
-            try {
-                const clinicDetails = await fetchClinicDetails(clinicId, session.access_token);
-                const serviceDetails = await fetchServiceDetails(serviceId, session.access_token);
-                setDetails({
-                    clinicName: clinicDetails.name,
-                    clinicAddress: clinicDetails.address,
-                    serviceName: serviceDetails.name,
-                    price: serviceDetails.price,
-                });
-            } catch (error) {
-                console.error("Failed to load booking details:", error);
-                Alert.alert("Error", "Could not load appointment details.");
-            } finally {
-                setIsLoading(false);
+        fetchDetails();
+    }, [fetchDetails]);
+
+
+    const handleConfirmBooking = async () => {
+        setIsBooking(true);
+        setError(null);
+
+        const backendUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL;
+        if (!backendUrl) {
+            Alert.alert('Error', 'Backend URL not configured.');
+            setIsBooking(false);
+            return;
+        }
+
+        try {
+            // Reformat date and time for backend (e.g., ISO string)
+            const [time, period] = schedule.time.split(' ');
+            let [hours, minutes] = time.split(':').map(Number);
+            if (period === 'PM' && hours < 12) hours += 12;
+            if (period === 'AM' && hours === 12) hours = 0;
+            
+            const appointmentDateTime = new Date(schedule.date);
+            appointmentDateTime.setHours(hours, minutes, 0, 0);
+
+            const response = await fetch(`${backendUrl}/api/v1/public/appointments`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session?.access_token}`,
+                },
+                body: JSON.stringify({
+                    clinic_id: clinicId,
+                    service_id: serviceId,
+                    provider_id: providerId,
+                    appointment_time: appointmentDateTime.toISOString(),
+                }),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.message || 'Failed to create appointment.');
             }
-        };
-        loadDetails();
-    }, [clinicId, serviceId, session]);
 
-    const handleConfirmBooking = () => {
-        // Placeholder for booking logic
-        console.log("Booking confirmed for:", { clinicId, serviceId, slot });
+            // Navigate to success screen with details
+            navigation.reset({
+                index: 0,
+                routes: [{ 
+                    name: 'BookingSuccess', 
+                    params: { appointmentDetails: { ...details, ...schedule } } 
+                }],
+            });
 
-        // On success, navigate to the success screen
-        navigation.navigate('BookingSuccess');
+        } catch (e: any) {
+            Alert.alert('Booking Failed', e.message);
+        } finally {
+            setIsBooking(false);
+        }
     };
 
-    const DetailRow = ({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap, label: string, value: string }) => (
+    const DetailRow = ({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap, label: string, value: string | number }) => (
         <View style={styles.detailRow}>
             <Ionicons name={icon} size={24} color={theme.colors.secondary} style={styles.icon} />
             <View>
@@ -84,11 +121,11 @@ export const BookingConfirmationScreen = () => {
     );
 
     if (isLoading) {
-        return (
-            <View style={styles.centeredContainer}>
-                <ActivityIndicator size="large" color={theme.colors.primary} />
-            </View>
-        );
+        return <View style={styles.centeredContainer}><ActivityIndicator size="large" /></View>;
+    }
+
+    if (error) {
+        return <View style={styles.centeredContainer}><Text style={styles.errorText}>{error}</Text></View>;
     }
 
     return (
@@ -98,18 +135,24 @@ export const BookingConfirmationScreen = () => {
                 
                 <View style={styles.detailsCard}>
                     <Text style={styles.cardHeader}>Appointment Details</Text>
-                    <DetailRow icon="business-outline" label="Clinic" value={details.clinicName} />
-                    <DetailRow icon="location-outline" label="Address" value={details.clinicAddress} />
-                    <DetailRow icon="medkit-outline" label="Service" value={details.serviceName} />
-                    <DetailRow icon="calendar-outline" label="Date & Time" value={slot} />
-                    <DetailRow icon="pricetag-outline" label="Price" value={details.price} />
+                    <DetailRow icon="business-outline" label="Clinic" value={details?.clinicName ?? 'Loading...'} />
+                    <DetailRow icon="medkit-outline" label="Service" value={details?.serviceName ?? 'Loading...'} />
+                    <DetailRow icon="person-outline" label="Provider" value={details?.providerName ?? 'Any Available'} />
+                    <DetailRow icon="calendar-outline" label="Date" value={format(new Date(schedule.date), 'EEEE, MMMM d, yyyy')} />
+                    <DetailRow icon="time-outline" label="Time" value={schedule.time} />
                 </View>
             </ScrollView>
 
             <View style={styles.footer}>
-                <TouchableOpacity style={styles.confirmButton} onPress={handleConfirmBooking}>
-                    <Text style={styles.confirmButtonText}>Confirm & Book Now</Text>
-                    <Ionicons name="checkmark-circle-outline" size={22} color={theme.colors.card} />
+                <TouchableOpacity style={[styles.confirmButton, isBooking && styles.disabledButton]} onPress={handleConfirmBooking} disabled={isBooking}>
+                    {isBooking ? (
+                        <ActivityIndicator color={theme.colors.primaryForeground} />
+                    ) : (
+                        <>
+                            <Text style={styles.confirmButtonText}>Confirm & Book Now</Text>
+                            <Ionicons name="checkmark-circle-outline" size={22} color={theme.colors.primaryForeground} />
+                        </>
+                    )}
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
@@ -117,79 +160,19 @@ export const BookingConfirmationScreen = () => {
 };
 
 const styles = StyleSheet.create({
-    safeArea: {
-        flex: 1,
-        backgroundColor: theme.colors.background,
-    },
-    container: {
-        padding: theme.spacing.md,
-        flexGrow: 1,
-    },
-    centeredContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    header: {
-        fontSize: theme.typography.heading,
-        fontWeight: 'bold',
-        color: theme.colors.text,
-        marginBottom: theme.spacing.lg,
-    },
-    detailsCard: {
-        backgroundColor: theme.colors.card,
-        borderRadius: theme.borderRadius.lg,
-        padding: theme.spacing.md,
-        marginBottom: theme.spacing.lg,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-    },
-    cardHeader: {
-        fontSize: theme.typography.subheading,
-        fontWeight: 'bold',
-        color: theme.colors.secondary,
-        marginBottom: theme.spacing.md,
-        paddingBottom: theme.spacing.sm,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.colors.border,
-    },
-    detailRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: theme.spacing.md,
-    },
-    icon: {
-        marginRight: theme.spacing.md,
-        width: 24, // ensure alignment
-    },
-    detailLabel: {
-        fontSize: 14,
-        color: theme.colors.textMuted,
-        marginBottom: 2,
-    },
-    detailValue: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: theme.colors.text,
-    },
-    footer: {
-        padding: theme.spacing.md,
-        borderTopWidth: 1,
-        borderTopColor: theme.colors.border,
-        backgroundColor: theme.colors.background,
-    },
-    confirmButton: {
-        backgroundColor: theme.colors.primary,
-        padding: theme.spacing.md,
-        borderRadius: theme.borderRadius.md,
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'row',
-    },
-    confirmButtonText: {
-        color: theme.colors.card,
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginRight: theme.spacing.sm,
-    }
+    safeArea: { flex: 1, backgroundColor: theme.colors.background },
+    container: { padding: theme.spacing.md, flexGrow: 1 },
+    centeredContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    header: { ...theme.typography.h1, color: theme.colors.foreground, marginBottom: theme.spacing.lg },
+    detailsCard: { backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, padding: theme.spacing.md, marginBottom: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border },
+    cardHeader: { ...theme.typography.h3, color: theme.colors.secondary, marginBottom: theme.spacing.md, paddingBottom: theme.spacing.sm, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+    detailRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: theme.spacing.md },
+    icon: { marginRight: theme.spacing.md, width: 24, marginTop: 2 },
+    detailLabel: { ...theme.typography.small, color: theme.colors.mutedForeground, marginBottom: 2 },
+    detailValue: { ...theme.typography.body, fontFamily: theme.typography.fontFamilySemiBold, color: theme.colors.foreground, flexShrink: 1 },
+    footer: { padding: theme.spacing.md, borderTopWidth: 1, borderTopColor: theme.colors.border, backgroundColor: theme.colors.background },
+    confirmButton: { backgroundColor: theme.colors.primary, padding: theme.spacing.md, borderRadius: theme.radius.md, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', minHeight: 50 },
+    disabledButton: { backgroundColor: theme.colors.muted },
+    confirmButtonText: { color: theme.colors.primaryForeground, ...theme.typography.h4, marginRight: theme.spacing.sm },
+    errorText: { color: theme.colors.destructive, ...theme.typography.h4 },
 }); 
