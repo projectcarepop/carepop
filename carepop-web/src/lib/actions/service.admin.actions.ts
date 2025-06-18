@@ -39,11 +39,22 @@ export async function updateService(values: ServiceFormValues) {
     const cookieStore = await cookies();
     const supabase = createClient(cookieStore);
 
-    const { id: serviceId, ...updateData } = formSchema.parse(values);
+    const validatedData = formSchema.parse(values);
+    const serviceId = validatedData.id;
 
     if (!serviceId) {
         throw new Error("Service ID is required for an update.");
     }
+
+    // Manually construct the update object to avoid any potential issues with destructuring.
+    const updateData = {
+        name: validatedData.name,
+        description: validatedData.description,
+        cost: validatedData.cost,
+        typical_duration_minutes: validatedData.typical_duration_minutes,
+        category_id: validatedData.category_id,
+        is_active: validatedData.is_active,
+    };
 
     const { data, error } = await supabase
         .from('services')

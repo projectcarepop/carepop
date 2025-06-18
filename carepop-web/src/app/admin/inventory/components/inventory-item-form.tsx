@@ -23,7 +23,6 @@ const itemFormSchema = z.object({
   form: z.string().optional().nullable(),
   strength_dosage: z.string().optional().nullable(),
   packaging: z.string().optional().nullable(),
-  quantity_on_hand: z.coerce.number().int().min(0),
   reorder_level: z.coerce.number().int().min(0).optional().nullable(),
   purchase_cost: z.coerce.number().min(0).optional().nullable(),
   selling_price: z.coerce.number().min(0).optional().nullable(),
@@ -51,7 +50,6 @@ export function InventoryItemForm({ initialData, suppliers }: InventoryItemFormP
     defaultValues: initialData || {
       item_name: '',
       is_active: true,
-      quantity_on_hand: 0,
     },
   });
 
@@ -148,9 +146,6 @@ export function InventoryItemForm({ initialData, suppliers }: InventoryItemFormP
                   )}/>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <FormField name="quantity_on_hand" control={form.control} render={({ field }) => (
-                  <FormItem><FormLabel>Quantity</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
-                )}/>
                 <FormField name="reorder_level" control={form.control} render={({ field }) => (
                   <FormItem><FormLabel>Reorder Level</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                 )}/>

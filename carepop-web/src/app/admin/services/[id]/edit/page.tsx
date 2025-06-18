@@ -5,7 +5,10 @@ import { cookies } from 'next/headers';
 import { updateService } from '@/lib/actions/service.admin.actions';
 import { notFound } from 'next/navigation';
 import { Toaster } from "sonner";
-import { z } from 'zod';
+
+type EditServicePageProps = {
+    params: { id: string };
+};
 
 async function getService(id: string) {
     const cookieStore = await cookies();
@@ -31,7 +34,7 @@ async function getCategories() {
     return data;
 }
 
-export default async function EditServicePage({ params }: { params: { id: string } }) {
+export default async function EditServicePage({ params }: EditServicePageProps) {
     const service = await getService(params.id);
     const categories = await getCategories();
 

@@ -11,6 +11,11 @@ interface AdminUsersPageProps {
 }
 
 export default async function AdminUsersPage({ searchParams }: AdminUsersPageProps) {
+  const page = Number(searchParams?.page ?? 1);
+  const per_page = Number(searchParams?.per_page ?? 10);
+  const sort = searchParams?.sort as string | undefined;
+  const search = searchParams?.search as string | undefined;
+
   return (
     <div className="flex flex-col w-full gap-4">
       <div className="flex justify-between items-center">
@@ -25,12 +30,11 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
         View and manage all registered users in the system.
       </p>
       <Suspense fallback={<div>Loading users...</div>}>
-        <UserTable 
-          // Pass searchParams directly to the table component for validation.
-          page={Number(searchParams?.page ?? 1)}
-          per_page={Number(searchParams?.per_page ?? 10)}
-          sort={searchParams?.sort as string | undefined}
-          search={searchParams?.search as string | undefined}
+        <UserTable
+          page={page}
+          per_page={per_page}
+          sort={sort}
+          search={search}
         />
       </Suspense>
     </div>

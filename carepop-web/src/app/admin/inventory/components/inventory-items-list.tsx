@@ -14,6 +14,7 @@ export type GetInventoryItemsParams = z.infer<typeof inventoryItemSearchSchema>;
 export interface IInventoryItem {
   id: string;
   item_name: string;
+  generic_name?: string | null;
   category?: string | null;
   sku?: string | null;
   quantity_on_hand: number;
@@ -36,6 +37,7 @@ async function getInventoryItems(params: GetInventoryItemsParams) {
     .select(`
         id,
         item_name,
+        generic_name,
         category,
         sku,
         quantity_on_hand,

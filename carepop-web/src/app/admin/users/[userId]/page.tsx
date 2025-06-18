@@ -27,7 +27,7 @@ const UserDetailPage = async ({ params }: UserDetailPageProps) => {
         <h1 className="text-2xl font-bold">{profile.full_name}</h1>
         <p className="text-muted-foreground">User ID: {profile.id}</p>
       </div>
-      <UserDetailTabs profile={profile} userId={params.userId} />
+      <UserDetailTabs profile={profile} userId={userId} />
     </div>
   );
 };

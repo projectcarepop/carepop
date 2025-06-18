@@ -1,5 +1,6 @@
 'use server';
 
+import { cookies } from 'next/headers';
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
@@ -14,7 +15,8 @@ const supplierFormSchema = z.object({
 });
 
 export async function createSupplier(values: z.infer<typeof supplierFormSchema>) {
-    const supabase = createClient();
+    const cookieStore = cookies();
+    const supabase = createClient(cookieStore);
     const validatedData = supplierFormSchema.parse(values);
     const { error } = await supabase.from('suppliers').insert([validatedData]);
     if (error) return { success: false, message: `Failed to create supplier: ${error.message}` };
@@ -23,7 +25,8 @@ export async function createSupplier(values: z.infer<typeof supplierFormSchema>)
 }
 
 export async function updateSupplier(supplierId: string, values: z.infer<typeof supplierFormSchema>) {
-    const supabase = createClient();
+    const cookieStore = cookies();
+    const supabase = createClient(cookieStore);
     const validatedData = supplierFormSchema.parse(values);
     const { error } = await supabase.from('suppliers').update(validatedData).eq('id', supplierId);
     if (error) return { success: false, message: `Failed to update supplier: ${error.message}` };
@@ -32,7 +35,8 @@ export async function updateSupplier(supplierId: string, values: z.infer<typeof 
 }
 
 export async function deleteSupplier(supplierId: string) {
-    const supabase = createClient();
+    const cookieStore = cookies();
+    const supabase = createClient(cookieStore);
     const { error } = await supabase.from('suppliers').delete().eq('id', supplierId);
     if (error) {
         return { success: false, message: 'Failed to delete supplier. It may be linked to inventory items.' };
