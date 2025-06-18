@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "42305f69-4bf4-4559-b9d3-500ad85b7a11"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "carepop.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
+  }
+}
