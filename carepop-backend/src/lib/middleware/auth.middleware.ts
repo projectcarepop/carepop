@@ -14,8 +14,14 @@ declare global {
 }
 
 export const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
+    // --- START DIAGNOSTIC LOGGING ---
+    console.log(`[AUTH MIDDLEWARE] Received ${req.method} request for ${req.path}`);
+    console.log('[AUTH MIDDLEWARE] Headers:', JSON.stringify(req.headers, null, 2));
+    // --- END DIAGNOSTIC LOGGING ---
+    
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        console.log('[AUTH MIDDLEWARE] Failed: No token or malformed header.');
         return res.status(401).json({ message: 'Unauthorized: No token provided or malformed header.' });
     }
 
@@ -26,6 +32,7 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
 
         if (tokenError || !user) {
             console.error('Auth token validation error:', tokenError);
+            console.log('[AUTH MIDDLEWARE] Failed: Invalid or expired token.');
             return res.status(401).json({ message: 'Unauthorized: Invalid or expired token.', details: tokenError?.message });
         }
 
@@ -55,6 +62,7 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
             roles: roles ? roles.map((r: { role: string }) => r.role) : [],
         };
         
+        console.log(`[AUTH MIDDLEWARE] Success: Authenticated user ${req.user.id}`);
         next();
     } catch (error: any) {
         console.error('Unhandled error in auth middleware:', error);
