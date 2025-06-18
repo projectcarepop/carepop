@@ -1,120 +1,95 @@
-"use server"; // Directive to mark all exports as Server Actions
+"use server";
 
-import { revalidatePath } from 'next/cache';
-import { createClient } from '@/utils/supabase/server';
+import { revalidateTag } from 'next/cache';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { UserAppointmentDetails } from "@/lib/types/appointmentTypes";
 
-// Fetch Future Appointments
-export async function getFutureAppointments() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+// This file contains a mix of user-facing and admin-facing server actions.
 
-  if (!user) {
-    return { success: false, message: "Authentication required.", data: [] };
-  }
-
-  const { data, error } = await supabase
-    .from('user_appointments_details')
-    .select('*')
-    .eq('user_id', user.id)
-    .gt('schedule', new Date().toISOString())
-    .order('schedule', { ascending: true });
-
-  if (error) {
-    console.error("Error fetching upcoming appointments:", error);
-    return { success: false, message: "Failed to load upcoming appointments.", data: [] };
-  }
-  
-  return { success: true, data: data as UserAppointmentDetails[] };
-}
-
-// Fetch Past Appointments
-export async function getPastAppointments() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { success: false, message: "Authentication required.", data: [] };
-  }
-
-  const { data, error } = await supabase
-    .from('user_appointments_details')
-    .select('*')
-    .eq('user_id', user.id)
-    .lte('schedule', new Date().toISOString())
-    .order('schedule', { ascending: false });
-
-  if (error) {
-    console.error("Error fetching past appointments:", error);
-    return { success: false, message: "Failed to load past appointments.", data: [] };
-  }
-  
-  return { success: true, data: data as UserAppointmentDetails[] };
-}
-
-// Cancel an Appointment
-export async function cancelAppointment(appointmentId: string, reason?: string) {
-  const supabase = createClient();
-   const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { success: false, message: "Authentication required." };
-  }
-
-  const { error } = await supabase
-    .from('appointments')
-    .update({ status: 'Cancelled', cancellation_reason: reason })
-    .eq('id', appointmentId)
-    .eq('user_id', user.id);
-  
-  if (error) {
-    console.error('Error cancelling appointment:', error);
-    return { success: false, message: 'Failed to cancel appointment.' };
-  }
-  
-  revalidatePath('/dashboard/appointments');
-  return { success: true, message: 'Appointment cancelled successfully.' };
-}
+// =================================================================
+// Admin-Facing Actions (These will BYPASS RLS)
+// =================================================================
 
 // Admin: Confirm an Appointment
 export async function confirmAppointment(appointmentId: string) {
-  const supabase = createClient();
-  const { error } = await supabase
+  const { data: appointment, error: fetchError } = await supabaseAdmin
     .from('appointments')
-    .update({ status: 'Confirmed' })
+    .select('clinic_id')
+    .eq('id', appointmentId)
+    .single();
+
+  if (fetchError || !appointment) {
+    console.error('Error fetching appointment clinic_id for confirm:', fetchError);
+    return { success: false, message: 'Failed to find the appointment to confirm.' };
+  }
+
+  const { error } = await supabaseAdmin
+    .from('appointments')
+    .update({ status: 'confirmed' })
     .eq('id', appointmentId);
 
   if (error) {
     console.error('Error confirming appointment:', error);
-    return { success: false, message: 'Failed to confirm appointment.' };
+    return { success: false, message: `Failed to confirm appointment: ${error.message}` };
   }
 
-  revalidatePath('/admin/appointments');
+  revalidateTag(`admin-appointments-${appointment.clinic_id}`);
   return { success: true, message: 'Appointment confirmed successfully.' };
+}
+
+// Admin: Cancel an Appointment
+export async function cancelAppointmentAsAdmin(appointmentId: string, reason: string) {
+    const { data: appointment, error: fetchError } = await supabaseAdmin
+      .from('appointments')
+      .select('clinic_id')
+      .eq('id', appointmentId)
+      .single();
+
+    if (fetchError || !appointment) {
+      console.error('Error fetching appointment clinic_id for cancel:', fetchError);
+      return { success: false, message: 'Failed to find the appointment to cancel.' };
+    }
+
+    const { error } = await supabaseAdmin
+      .from('appointments')
+      .update({ 
+        status: 'cancelled_by_clinic',
+        notes_clinic: reason 
+      })
+      .eq('id', appointmentId);
+    
+    if (error) {
+      console.error('Error cancelling appointment as admin:', error);
+      return { success: false, message: `Failed to cancel appointment: ${error.message}` };
+    }
+    
+    revalidateTag(`admin-appointments-${appointment.clinic_id}`);
+    return { success: true, message: 'Appointment cancelled successfully.' };
 }
 
 // Admin: Delete an Appointment
 export async function deleteAppointment(appointmentId: string) {
-    const supabase = createClient();
-    const { error } = await supabase
+    const { data: appointment, error: fetchError } = await supabaseAdmin
+        .from('appointments')
+        .select('clinic_id')
+        .eq('id', appointmentId)
+        .single();
+        
+    if (fetchError || !appointment) {
+      console.error('Error fetching appointment clinic_id for delete:', fetchError);
+      return { success: false, message: 'Failed to find the appointment to delete.' };
+    }
+    
+    const { error } = await supabaseAdmin
         .from('appointments')
         .delete()
         .eq('id', appointmentId);
 
     if (error) {
         console.error('Error deleting appointment:', error);
-        return { success: false, message: 'Failed to delete appointment.' };
+        return { success: false, message: `Failed to delete appointment: ${error.message}` };
     }
 
-    revalidatePath('/admin/appointments');
+    revalidateTag(`admin-appointments-${appointment.clinic_id}`);
     return { success: true, message: 'Appointment deleted successfully.' };
 }
-
-// Admin: Reschedule an Appointment (Placeholder)
-export async function rescheduleAppointment(appointmentId: string, newDateTime: string) {
-    // const supabase = createClient(); // Keep this commented out until implemented
-    // TODO: Implement reschedule logic
-    console.log(`Rescheduling ${appointmentId} to ${newDateTime}`);
-    revalidatePath('/admin/appointments');
-    return { success: true, message: 'Appointment reschedule functionality not yet implemented.' };
-} 

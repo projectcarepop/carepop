@@ -1,5 +1,6 @@
 import axios from 'axios';
 import Cookies from 'js-cookie';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 // Basic types to satisfy the linter and improve safety.
 // For a fully shared setup, consider a shared types package.
@@ -25,18 +26,20 @@ const apiClient = axios.create({
     },
 });
 
-apiClient.interceptors.request.use(config => {
+// Use an async interceptor to correctly get the Supabase session
+apiClient.interceptors.request.use(async (config) => {
     try {
-        const sessionString = Cookies.get('session');
-        if (sessionString) {
-            const sessionData = JSON.parse(sessionString);
-            // The access token is nested inside the 'session' object
-            if (sessionData?.session?.access_token) {
-                config.headers.Authorization = `Bearer ${sessionData.session.access_token}`;
+        // We only run this logic on the client-side
+        if (typeof window !== 'undefined') {
+            const supabase = createSupabaseBrowserClient();
+            const { data: { session } } = await supabase.auth.getSession();
+            
+            if (session?.access_token) {
+                config.headers.Authorization = `Bearer ${session.access_token}`;
             }
         }
     } catch (e) {
-        console.error("Could not parse session from cookie:", e);
+        console.error("Error setting auth token in apiClient:", e);
     }
     return config;
 });
@@ -57,4 +60,6 @@ export const api = {
     forgotPassword: (email: string) => apiClient.post('/api/v1/public/auth/forgot-password', { email }),
     resetPassword: (data: ResetPasswordData) => apiClient.post('/api/v1/public/auth/reset-password', data),
     getProfile: (userId: string) => apiClient.get(`/api/v1/public/users/${userId}/profile`),
-}; 
+};
+
+export default apiClient; 

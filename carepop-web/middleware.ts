@@ -1,47 +1,63 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/middleware';
+import { updateSession } from '@/utils/supabase/middleware';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
 export async function middleware(request: NextRequest) {
-  // This function will also refresh the session cookie
-  const { supabase, response } = createClient(request);
-
-  const { data: { session } } = await supabase.auth.getSession();
-  const { pathname } = request.nextUrl;
-
-  // Protect all /admin routes
-  if (pathname.startsWith('/admin')) {
-    if (!session) {
-      // Redirect to login if not authenticated
-      return NextResponse.redirect(new URL('/login', request.url));
+  let response = await updateSession(request);
+  
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          response.cookies.set({ name, value, ...options });
+        },
+        remove(name: string, options: CookieOptions) {
+          response.cookies.set({ name, value: '', ...options });
+        }
+      }
     }
+  );
 
-    // If authenticated, perform a server-side check for the admin role
-    const { data: profile, error } = await supabase
-      .from('profiles')
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (
+    !user &&
+    !request.nextUrl.pathname.startsWith('/login') &&
+    !request.nextUrl.pathname.startsWith('/auth/callback')
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    return NextResponse.redirect(url);
+  }
+
+  if (user) {
+    const { data: roleData, error } = await supabase
+      .from('user_roles')
       .select('role')
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .single();
-    
-    // If there's an error, or the profile doesn't exist, or the role is not admin, deny access.
-    if (error || !profile || profile.role !== 'admin') {
-      // Redirect to a generic 'forbidden' page
-      return NextResponse.redirect(new URL('/forbidden', request.url));
+
+    if (request.nextUrl.pathname.startsWith('/admin')) {
+      if (error || !roleData || roleData.role !== 'admin') {
+        const url = request.nextUrl.clone();
+        url.pathname = '/forbidden';
+        return NextResponse.redirect(url);
+      }
     }
   }
 
-  // For all other routes, or for admins who passed the check, continue with the response.
   return response;
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * Feel free to modify this pattern to include more paths.
-     */
     '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };

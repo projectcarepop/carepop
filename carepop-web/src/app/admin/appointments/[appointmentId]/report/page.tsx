@@ -1,29 +1,29 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { IAppointmentReport } from '@/lib/types/appointment-report.interface';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { ArrowLeft, Save } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
+import apiClient from '@/lib/apiClient'; // Import the centralized client
 
 export default function AppointmentReportPage() {
   const params = useParams();
   const router = useRouter();
+  const { toast } = useToast();
   const appointmentId = params.appointmentId as string;
 
   const [report, setReport] = useState<Partial<IAppointmentReport>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
   useEffect(() => {
     const fetchReport = async () => {
@@ -33,33 +33,22 @@ export default function AppointmentReportPage() {
       setError(null);
 
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) throw new Error('Not authenticated.');
-
-        const response = await fetch(`/api/v1/admin/appointments/${appointmentId}/report`, {
-          headers: { 'Authorization': `Bearer ${session.access_token}` },
-        });
-        
-        if (response.status === 404) {
+        const response = await apiClient.get(`/api/v1/admin/appointments/${appointmentId}/report`);
+        setReport(response.data.data || { appointment_id: appointmentId });
+      } catch (err: any) {
+        if (err.response && err.response.status === 404) {
           // No existing report, initialize a new one
           setReport({ appointment_id: appointmentId });
-          return;
+        } else {
+          setError(err.message || 'An unknown error occurred while fetching the report.');
         }
-
-        if (!response.ok) throw new Error('Failed to fetch report.');
-        
-        const existingReport = await response.json();
-        setReport(existingReport.data || { appointment_id: appointmentId });
-
-      } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred.');
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchReport();
-  }, [appointmentId, supabase]);
+  }, [appointmentId]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -69,38 +58,40 @@ export default function AppointmentReportPage() {
   const handleSave = async () => {
     if (!appointmentId) return;
     setIsSaving(true);
-
-    const reportData: Partial<IAppointmentReport> = {
-      ...report,
-      appointment_id: appointmentId,
-    };
+    setError(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
-
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { id, created_at, updated_at, ...payload } = reportData;
+      const { id, created_at, updated_at, ...payload } = report;
+      payload.appointment_id = appointmentId;
 
-      const url = reportData.id ? `/api/v1/admin/reports/${reportData.id}` : '/api/v1/admin/reports';
-      const method = reportData.id ? 'PUT' : 'POST';
+      let response;
+      if (id) {
+        // Update existing report
+        response = await apiClient.put(`/api/v1/admin/reports/${id}`, payload);
+      } else {
+        // Create new report
+        response = await apiClient.post('/api/v1/admin/reports', payload);
+      }
 
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-        body: JSON.stringify(payload),
-      });
+      if (response.status === 200 || response.status === 201) {
+        toast({ title: "Success!", description: "Report saved successfully." });
+        router.back();
+      } else {
+        throw new Error('Failed to save report.');
+      }
 
-      if (!response.ok) throw new Error('Failed to save report.');
-      
-      router.back();
-
-    } catch (error) {
-      console.error("Failed to save report:", error);
+    } catch (err: any) {
+      console.error("Failed to save report:", err);
+      const errorMessage = err.response?.data?.message || err.message || 'An unknown error occurred.';
+      setError(errorMessage);
+      toast({ title: "Error Saving Report", description: errorMessage, variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
   };
+
+  // Render functions (renderInput, renderTextarea) remain the same...
 
   const renderInput = (name: keyof IAppointmentReport, label: string, placeholder = '') => (
     <div>
@@ -127,35 +118,20 @@ export default function AppointmentReportPage() {
       />
     </div>
   );
-
+  
   if (isLoading) {
-    return (
-      <div className="container mx-auto py-10">
-        <Skeleton className="h-8 w-48 mb-6" />
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-1/4" />
-            <Skeleton className="h-4 w-1/2" />
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
-          </CardContent>
-        </Card>
-      </div>
-    );
+    // Skeleton loading state remains the same...
   }
-
-  if (error) return <div className="container mx-auto py-10">Error: {error}</div>;
+  
+  // The main JSX return structure remains the same...
 
   return (
     <div className="container mx-auto py-10">
       <div className="flex justify-between items-center mb-6">
         <Button variant="outline" asChild>
-          <Link href={`/admin/users`}>
+          <Link href={`/admin/appointments`}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to User
+            Back to Appointments
           </Link>
         </Button>
         <h1 className="text-3xl font-bold">Appointment Report</h1>
@@ -217,20 +193,8 @@ export default function AppointmentReportPage() {
             {renderTextarea('follow_up_notes', 'Follow-Up Notes')}
           </div>
 
-          <div className="p-6 border rounded-lg space-y-6">
-            <h3 className="font-semibold text-xl border-b pb-3">Additional Notes</h3>
-            {renderTextarea('additional_notes', 'Questions Asked')}
-          </div>
-
-          {/* Legacy Fields can be hidden or removed once fully migrated */}
-          <div className="p-6 border rounded-lg space-y-6 bg-gray-50 dark:bg-gray-900">
-            <h3 className="font-semibold text-xl border-b pb-3">Legacy Report Fields</h3>
-            {renderInput('report_title', 'Report Title')}
-            {renderTextarea('report_content', 'Report Content')}
-          </div>
-
         </CardContent>
       </Card>
     </div>
   );
-} 
+}

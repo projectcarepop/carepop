@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useActionState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,9 +24,17 @@ function SubmitButton() {
 }
 
 export default function LoginClientPage() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = React.useState(false);
-  const initialState: LoginFormState = { message: '', errors: {} };
+  const initialState: LoginFormState = { message: '', errors: {}, success: false };
   const [state, formAction] = useActionState(login, initialState);
+
+  // Add this useEffect to handle the redirect
+  useEffect(() => {
+    if (state.success) {
+      router.push('/dashboard');
+    }
+  }, [state.success, router]);
 
   return (
     <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
@@ -116,7 +125,6 @@ export default function LoginClientPage() {
             </div>
           </div>
            <Button variant="outline" className="w-full" disabled>
-             {/* <GoogleIcon className="mr-2 h-4 w-4" /> */}
              Sign in with Google (Coming Soon)
            </Button>
         </CardContent>

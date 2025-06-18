@@ -16,7 +16,7 @@ import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { cancelAppointment } from '@/lib/actions/appointments';
+import { cancelAppointmentAsAdmin } from '@/lib/actions/appointments';
 
 interface CancelAppointmentDialogProps {
   appointmentId: string;
@@ -33,7 +33,7 @@ export function CancelAppointmentDialog({ appointmentId, currentStatus }: Cancel
       return;
     }
     startTransition(async () => {
-      const result = await cancelAppointment(appointmentId, reason);
+      const result = await cancelAppointmentAsAdmin(appointmentId, reason);
       if (result.success) {
         toast.success(result.message);
       } else {

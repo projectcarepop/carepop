@@ -1,6 +1,7 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,22 +23,32 @@ interface ConfirmAppointmentDialogProps {
 }
 
 export function ConfirmAppointmentDialog({ appointmentId, currentStatus }: ConfirmAppointmentDialogProps) {
-  const [isPending, startTransition] = useTransition();
+  const [isOpen, setIsOpen] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const router = useRouter();
 
-  const handleConfirm = () => {
-    startTransition(async () => {
-      const result = await confirmAppointment(appointmentId);
-      if (result.success) {
-        toast.success(result.message);
-      } else {
-        toast.error(result.message);
-      }
-    });
-  };
-  
   if (currentStatus !== 'pending_confirmation') {
-    return null;
+    return null; // Don't show the button if it's not pending confirmation
   }
+  
+  const handleConfirm = async () => {
+    console.log(`[CLIENT] handleConfirm triggered for appointment: ${appointmentId}`);
+    setIsConfirming(true);
+    const result = await confirmAppointment(appointmentId);
+    console.log('[CLIENT] Server action result:', result);
+    if (result.success) {
+      toast.success("Appointment Confirmed!", {
+        description: result.message,
+      });
+      router.refresh(); // This will re-fetch the data for the page
+    } else {
+      toast.error("Error", {
+        description: result.message,
+      });
+    }
+    setIsConfirming(false);
+    setIsOpen(false);
+  };
 
   return (
     <AlertDialog>
@@ -54,9 +65,9 @@ export function ConfirmAppointmentDialog({ appointmentId, currentStatus }: Confi
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleConfirm} disabled={isPending}>
-            {isPending ? 'Confirming...' : 'Confirm'}
+          <AlertDialogCancel disabled={isConfirming}>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleConfirm} disabled={isConfirming}>
+            {isConfirming ? 'Confirming...' : 'Confirm'}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

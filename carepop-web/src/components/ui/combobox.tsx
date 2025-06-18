@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronsUpDown, Loader2 } from "lucide-react"
+import { Check, ChevronsUpDown } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -20,29 +20,27 @@ import {
 } from "@/components/ui/popover"
 
 interface ComboboxProps {
-  options: { value: string; label: string }[];
+  options: { label: string; value: string }[];
   value?: string;
   onChange: (value: string) => void;
   placeholder?: string;
   searchPlaceholder?: string;
-  emptyStateMessage?: string;
+  emptyText?: string;
   disabled?: boolean;
-  isLoading?: boolean;
+  className?: string;
 }
 
 export function Combobox({
   options,
   value,
   onChange,
-  placeholder = "Select option...",
+  placeholder = "Select an option...",
   searchPlaceholder = "Search...",
-  emptyStateMessage = "No option found.",
+  emptyText = "No results found.",
   disabled = false,
-  isLoading = false,
+  className,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
-
-  const displayLabel = options.find((option) => option.value === value)?.label;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -51,33 +49,28 @@ export function Combobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between"
-          disabled={disabled || isLoading}
+          className={cn("w-full justify-between", className)}
+          disabled={disabled}
         >
-          <span className="truncate">
-            {isLoading ? "Loading..." : (displayLabel || placeholder)}
-          </span>
-          {isLoading ? (
-             <Loader2 className="ml-2 h-4 w-4 shrink-0 animate-spin opacity-50" />
-          ) : (
-             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          )}
+          {value
+            ? options.find((option) => option.value === value)?.label
+            : placeholder}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+      <PopoverContent className={cn("w-[--radix-popover-trigger-width] p-0", className)}>
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
-            <CommandEmpty>
-              {isLoading ? "Loading..." : emptyStateMessage}
-            </CommandEmpty>
+            <CommandEmpty>{emptyText}</CommandEmpty>
             <CommandGroup>
-              {!isLoading && options.map((option) => (
+              {options.map((option) => (
                 <CommandItem
                   key={option.value}
                   value={option.label}
-                  onSelect={() => {
-                    onChange(option.value === value ? "" : option.value)
+                  onSelect={(currentLabel) => {
+                    const selectedValue = options.find(opt => opt.label === currentLabel)?.value || "";
+                    onChange(selectedValue === value ? "" : selectedValue);
                     setOpen(false)
                   }}
                 >

@@ -2,7 +2,11 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import ServiceCategoryList from './components/ServiceCategoryList';
 
-export default function ServiceCategoriesPage() {
+interface ServiceCategoriesPageProps {
+  searchParams: { [key: string]: string | string[] | undefined };
+}
+
+export default function ServiceCategoriesPage({ searchParams }: ServiceCategoriesPageProps) {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -11,7 +15,7 @@ export default function ServiceCategoriesPage() {
           <Link href="/admin/services/categories/new">Add New Category</Link>
         </Button>
       </div>
-      <ServiceCategoryList />
+      <ServiceCategoryList search={searchParams.search as string} />
     </div>
   );
-} 
+}

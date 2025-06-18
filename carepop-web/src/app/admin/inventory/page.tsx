@@ -22,8 +22,14 @@ interface InventoryPageProps {
 }
 
 export default function InventoryManagementPage({ searchParams }: InventoryPageProps) {
-  const parsedSearchParams = inventorySearchParamsSchema.parse(searchParams);
-  const { tab, ...listSearchParams } = parsedSearchParams;
+  const tab = searchParams.tab === 'suppliers' ? 'suppliers' : 'items';
+  
+  const listSearchParams = {
+    page: Number(searchParams.page ?? 1),
+    per_page: Number(searchParams.per_page ?? 10),
+    sort: searchParams.sort as string | undefined,
+    search: searchParams.search as string | undefined,
+  };
 
   const getHref = (newTab: 'items' | 'suppliers') => {
     const newParams = new URLSearchParams();

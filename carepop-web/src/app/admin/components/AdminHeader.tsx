@@ -19,7 +19,7 @@ const AdminHeader = () => {
                         <span className="sr-only">Toggle Menu</span>
                     </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="sm:max-w-xs">
+                <SheetContent side="left" className="flex flex-col">
                     <nav className="grid gap-6 text-lg font-medium">
                         <Link
                             href="#"

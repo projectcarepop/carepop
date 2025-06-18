@@ -3,8 +3,9 @@ import Link from 'next/link';
 import { PlusCircle } from 'lucide-react';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import AppointmentPageClient from './components/AppointmentPageClient';
-import { AppointmentTable } from './components/AppointmentTable';
 import { redirect } from 'next/navigation';
+
+export const dynamic = 'force-dynamic';
 
 async function getClinics() {
     const supabase = await createSupabaseServerClient();
@@ -25,73 +26,49 @@ export default async function AdminAppointmentsPage({
 }: {
   searchParams: {
     clinicId?: string;
-    page?: string;
-    per_page?: string;
-    sort?: string;
-    search?: string;
-    [key: string]: string | undefined;
   };
 }) {
-  const {
-    clinicId,
-    page = '1',
-    per_page = '10',
-    sort,
-    search,
-  } = searchParams;
-  const clinics = await getClinics();
-  const selectedClinicId = clinicId ?? (clinics.length > 0 ? clinics[0].id : null);
-  
-  if (clinics.length > 0 && !clinicId) {
-    const newSearchParams = new URLSearchParams({
-      page,
-      per_page,
-    });
-    if (sort) newSearchParams.set('sort', sort);
-    if (search) newSearchParams.set('search', search);
+  const { clinicId } = searchParams;
 
+  const clinics = await getClinics();
+  
+  // Redirect to the first clinic if none is selected in the URL
+  if (clinics.length > 0 && !clinicId) {
+    const newSearchParams = new URLSearchParams();
     newSearchParams.set('clinicId', clinics[0].id);
-    redirect(`/admin/appointments?${newSearchParams.toString()}`);
+    return redirect(`/admin/appointments?${newSearchParams.toString()}`);
   }
 
+  // Handle case where there are no clinics
   if (!clinics || clinics.length === 0) {
     return (
-        <div className="flex flex-col w-full gap-4 items-center text-center">
+        <div className="flex flex-col w-full gap-4 items-center text-center p-8">
             <h1 className="text-2xl font-bold">Appointment Management</h1>
-            <p className="text-muted-foreground">No clinics found.</p>
+            <p className="text-muted-foreground">No clinics have been created yet.</p>
             <Button asChild>
                 <Link href="/admin/clinics/new">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add First Clinic
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Your First Clinic
                 </Link>
             </Button>
         </div>
     )
   }
 
+  const selectedClinicId = clinicId ?? (clinics.length > 0 ? clinics[0].id : null);
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Manage Appointments</h1>
-        <Button asChild>
-          <Link href="/admin/appointments/new">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            New Appointment
-          </Link>
-        </Button>
+      <div className="flex flex-col gap-2">
+          <h1 className="text-2xl font-bold">Appointments Management</h1>
+          <p className="text-muted-foreground">
+              View, manage, and schedule all patient appointments across your clinics.
+          </p>
       </div>
+
       <AppointmentPageClient 
         clinics={clinics} 
         initialClinicId={selectedClinicId}
-        table={
-            <AppointmentTable 
-                clinicId={selectedClinicId!} 
-                page={parseInt(page)}
-                per_page={parseInt(per_page)}
-                sort={sort}
-                search={search}
-            />
-        }
       />
     </div>
   )
-} 
+}

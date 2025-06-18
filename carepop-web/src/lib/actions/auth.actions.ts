@@ -2,7 +2,6 @@
  
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { z } from 'zod';
-import { redirect } from 'next/navigation';
  
 // Zod schema for login
 const LoginSchema = z.object({
@@ -17,6 +16,7 @@ export type LoginFormState = {
         password?: string[];
         server?: string[];
     };
+    success: boolean; // Add success flag
 };
  
 export async function login(
@@ -27,11 +27,11 @@ export async function login(
     Object.fromEntries(formData.entries()),
   );
  
-  // Return validation errors
   if (!validatedFields.success) {
     return {
       message: 'Invalid form data.',
       errors: validatedFields.error.flatten().fieldErrors,
+      success: false,
     };
   }
  
@@ -43,19 +43,23 @@ export async function login(
     password,
   });
  
-  // Return server-side auth errors
   if (error) {
     console.error('Supabase login error:', error.message);
     return {
         message: 'Server error.',
         errors: {
             server: ['Invalid login credentials. Please try again.']
-        }
+        },
+        success: false,
     };
   }
  
-  // On success, redirect to the dashboard
-  return redirect('/dashboard');
+  // Return success state instead of redirecting
+  return {
+      message: 'Login successful.',
+      errors: {},
+      success: true,
+  }
 }
 
 // Zod schema for registration
@@ -65,7 +69,7 @@ const RegisterSchema = z.object({
     confirmPassword: z.string()
 }).refine(data => data.password === data.confirmPassword, {
     message: "Passwords don't match.",
-    path: ["confirmPassword"], // path of error
+    path: ["confirmPassword"],
 });
 
 export type RegisterFormState = {
@@ -76,6 +80,7 @@ export type RegisterFormState = {
         confirmPassword?: string[];
         server?: string[];
     };
+    success: boolean; // Add success flag
 }
 
 export async function register(
@@ -90,6 +95,7 @@ export async function register(
         return {
             message: 'Invalid form data.',
             errors: validatedFields.error.flatten().fieldErrors,
+            success: false,
         };
     }
 
@@ -100,30 +106,30 @@ export async function register(
         email,
         password,
         options: {
-            // This URL is where the user will be redirected after clicking the verification link.
             emailRedirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`,
         },
     });
 
     if (error) {
         console.error('Supabase sign up error:', error.message);
-        // It's possible the user already exists.
         if (error.message.includes('User already registered')) {
              return {
                 message: 'Server error.',
-                errors: {
-                    email: ['A user with this email already exists.']
-                }
+                errors: { email: ['A user with this email already exists.'] },
+                success: false,
             };
         }
         return {
             message: 'Server error.',
-            errors: {
-                server: ['Could not create account. Please try again later.']
-            }
+            errors: { server: ['Could not create account. Please try again later.'] },
+            success: false,
         };
     }
 
-    // On success, redirect to a page that tells the user to check their email.
-    return redirect('/register/check-email');
+    // Return success instead of redirecting
+    return {
+        message: 'Registration successful! Please check your email.',
+        errors: {},
+        success: true,
+    };
 }

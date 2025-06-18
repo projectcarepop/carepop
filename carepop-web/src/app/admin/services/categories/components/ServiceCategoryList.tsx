@@ -1,73 +1,39 @@
-'use client';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { z } from 'zod';
+import { ServiceCategoryTableClient } from './ServiceCategoryTableClient';
 
-import { useState, useMemo } from 'react';
-import useSWR from 'swr';
-import { useDebounce } from '@/hooks/useDebounce';
-import { fetcherWithAuth } from '@/lib/utils';
+const searchSchema = z.object({
+  search: z.string().optional(),
+});
 
-import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Skeleton } from '@/components/ui/skeleton';
+export type SearchParams = z.infer<typeof searchSchema>;
 
-interface ServiceCategory {
-    id: string;
-    name: string;
-    description: string;
+async function getServiceCategories(params: SearchParams) {
+  const supabase = await createSupabaseServerClient();
+  const { search } = params;
+
+  let query = supabase
+    .from('service_categories')
+    .select('*')
+    .order('name', { ascending: true });
+
+  if (search) {
+    query = query.ilike('name', `%${search}%`);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('Error fetching service categories:', error);
+    return { data: [], error: 'Failed to load categories: An unknown error occurred' };
+  }
+
+  return { data: data || [], error: null };
 }
 
-export default function ServiceCategoryList() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const debouncedSearchTerm = useDebounce(searchTerm, 500);
+export default async function ServiceCategoryList(props: SearchParams) {
+  const validatedParams = searchSchema.parse(props);
+  const { data, error } = await getServiceCategories(validatedParams);
 
-  const apiUrl = useMemo(() => {
-    return `/api/v1/admin/service-categories?search=${debouncedSearchTerm}`;
-  }, [debouncedSearchTerm]);
-
-  const { data: result, error, isLoading } = useSWR(apiUrl, fetcherWithAuth);
-
-  const categories: ServiceCategory[] | undefined = result?.data?.data;
-
-  return (
-    <div className="space-y-4">
-      <Input
-        placeholder="Search by category name..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        className="max-w-sm"
-      />
-      
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Description</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading && (
-              Array.from({ length: 5 }).map((_, index) => (
-                <TableRow key={index}>
-                  <TableCell><Skeleton className="h-4 w-full" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-full" /></TableCell>
-                </TableRow>
-              ))
-            )}
-            {error && (
-              <TableRow><TableCell colSpan={2} className="text-center text-red-500">Failed to load categories: {error.message}</TableCell></TableRow>
-            )}
-            {categories && categories.length === 0 && !isLoading && (
-                <TableRow><TableCell colSpan={2} className="text-center">No categories found.</TableCell></TableRow>
-            )}
-            {categories && categories.map((category) => (
-              <TableRow key={category.id}>
-                <TableCell className="font-medium">{category.name}</TableCell>
-                <TableCell>{category.description}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    </div>
-  );
-} 
+  return <ServiceCategoryTableClient data={data} error={error} />;
+}

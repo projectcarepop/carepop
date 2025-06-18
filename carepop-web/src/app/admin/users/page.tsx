@@ -3,14 +3,6 @@ import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { PlusCircle } from "lucide-react";
-import { z } from 'zod';
-
-const searchParamsSchema = z.object({
-  page: z.coerce.number().default(1),
-  per_page: z.coerce.number().default(10),
-  sort: z.string().optional(),
-  search: z.string().optional(),
-});
 
 interface AdminUsersPageProps {
   searchParams: {
@@ -18,9 +10,7 @@ interface AdminUsersPageProps {
   };
 }
 
-export default function AdminUsersPage({ searchParams }: AdminUsersPageProps) {
-  const parsedSearchParams = searchParamsSchema.parse(searchParams);
-
+export default async function AdminUsersPage({ searchParams }: AdminUsersPageProps) {
   return (
     <div className="flex flex-col w-full gap-4">
       <div className="flex justify-between items-center">
@@ -35,8 +25,14 @@ export default function AdminUsersPage({ searchParams }: AdminUsersPageProps) {
         View and manage all registered users in the system.
       </p>
       <Suspense fallback={<div>Loading users...</div>}>
-        <UserTable {...parsedSearchParams} />
+        <UserTable 
+          // Pass searchParams directly to the table component for validation.
+          page={Number(searchParams?.page ?? 1)}
+          per_page={Number(searchParams?.per_page ?? 10)}
+          sort={searchParams?.sort as string | undefined}
+          search={searchParams?.search as string | undefined}
+        />
       </Suspense>
     </div>
   );
-} 
+}

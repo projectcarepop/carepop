@@ -37,6 +37,15 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useDebounce } from 'use-debounce';
+import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export interface Appointment {
   id: string;
@@ -44,81 +53,75 @@ export interface Appointment {
   appointment_datetime: string;
   cancellation_reason?: string | null;
   user: {
-    first_name: string;
-    last_name: string;
+    full_name: string;
     email: string;
   } | null;
   service: {
     name: string;
   } | null;
   provider: {
-    first_name: string;
-    last_name: string;
+    full_name: string;
   } | null;
 }
+
+const StatusBadge = ({ status }: { status: string }) => {
+    const statusVariant = {
+      pending_confirmation: 'secondary',
+      confirmed: 'default',
+      cancelled_by_user: 'destructive',
+      cancelled_by_clinic: 'destructive',
+      completed: 'success',
+      no_show: 'outline',
+    }[status] || 'secondary';
+  
+    return <Badge variant={statusVariant as any}>{status.replace(/_/g, ' ')}</Badge>;
+};
 
 export const columns: ColumnDef<Appointment>[] = [
     {
       accessorKey: "id",
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="-ml-4"
-          >
-            Appt. ID
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        )
-      },
+      header: ({ column }) => (
+        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="-ml-4">
+          Appt. ID
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
       cell: ({ row }) => <div className="truncate w-24">{row.getValue("id")}</div>
     },
     {
-      id: 'patientName',
       header: 'Patient Name',
-      cell: ({ row }) => {
-        const user = row.original.user;
-        return user ? `${user.first_name} ${user.last_name}` : 'N/A';
-      },
+      accessorKey: 'user.full_name',
+      cell: ({ row }) => row.original.user?.full_name ?? 'N/A',
     },
     {
-      id: 'patientEmail',
       header: 'Email',
+      accessorKey: 'user.email',
       cell: ({ row }) => row.original.user?.email ?? 'N/A',
     },
     {
-      id: 'service',
       header: 'Service',
+      accessorKey: 'service.name',
       cell: ({ row }) => row.original.service?.name ?? 'N/A',
     },
     {
-      id: 'provider',
       header: 'Provider',
-      cell: ({ row }) => {
-          const provider = row.original.provider;
-          return provider ? `${provider.first_name} ${provider.last_name}` : 'N/A';
-      }
+      accessorKey: 'provider.full_name',
+       cell: ({ row }) => row.original.provider?.full_name ?? 'N/A',
     },
     {
       accessorKey: "appointment_datetime",
-      header: ({ column }) => {
-          return (
-            <Button
-              variant="ghost"
-              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-              className="-ml-4"
-            >
-              Date/Time
-              <ArrowUpDown className="ml-2 h-4 w-4" />
-            </Button>
-          )
-        },
+      header: ({ column }) => (
+        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="-ml-4">
+          Date/Time
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
       cell: ({ row }) => new Date(row.getValue("appointment_datetime")).toLocaleString(),
     },
     {
       accessorKey: "status",
       header: "Status",
+      cell: ({ row }) => <StatusBadge status={row.getValue("status")} />,
     },
     {
       id: 'actions',
@@ -136,7 +139,10 @@ export const columns: ColumnDef<Appointment>[] = [
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuItem
-                onClick={() => navigator.clipboard.writeText(appointment.id)}
+                onClick={() => {
+                  navigator.clipboard.writeText(appointment.id);
+                  toast.success("Appointment ID copied to clipboard!");
+                }}
               >
                 Copy Appt. ID
               </DropdownMenuItem>
@@ -191,7 +197,6 @@ export function AppointmentTableClient({ data, totalRecords, error }: Appointmen
   // Effect to handle navigation changes for search, sort, and pagination
   React.useEffect(() => {
     const params = new URLSearchParams(searchParams);
-    // Set loading state to true whenever we are about to navigate
     setIsLoading(true);
 
     params.set('page', String(pagination.pageIndex + 1));
@@ -205,11 +210,8 @@ export function AppointmentTableClient({ data, totalRecords, error }: Appointmen
 
     if(debouncedSearch) {
         params.set('search', debouncedSearch);
-        // Reset to first page on a new search
         if (String(pagination.pageIndex + 1) !== '1') {
             params.set('page', '1');
-            // This state update will trigger another re-render, but it's necessary
-            // to keep the table's state in sync with the URL.
             setPagination(prev => ({ ...prev, pageIndex: 0 }));
         }
     } else {
@@ -218,9 +220,7 @@ export function AppointmentTableClient({ data, totalRecords, error }: Appointmen
     
     router.replace(`${pathname}?${params.toString()}`);
 
-    // We can't know exactly when the server will respond, but we can turn off loading
-    // after a short delay to give feedback. The suspense boundary handles initial load.
-    const timer = setTimeout(() => setIsLoading(false), 300); // Adjust delay as needed
+    const timer = setTimeout(() => setIsLoading(false), 300);
     return () => clearTimeout(timer);
 
   }, [pagination, sorting, debouncedSearch, router, pathname, searchParams]);
@@ -255,68 +255,66 @@ export function AppointmentTableClient({ data, totalRecords, error }: Appointmen
     )
   }
 
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(event.target.value);
+  };
+
   return (
-      <div className="w-full">
-        <div className="flex items-center py-4">
+    <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row items-center gap-4">
           <Input
-            placeholder="Search by name, email, service..."
+            placeholder="Search by patient, service, or status..."
             value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
+            onChange={(event) => handleSearchChange(event)}
             className="max-w-sm"
           />
         </div>
-        <div className="rounded-md border overflow-x-auto relative">
-          {isLoading && (
-              <div className="absolute inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center z-10">
-                  <p>Loading...</p>
-              </div>
-          )}
-          <Table>
-            <TableHeader>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => {
-                    return (
-                      <TableHead key={header.id}>
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
-                      </TableHead>
-                    )
-                  })}
-                </TableRow>
-              ))}
-            </TableHeader>
-            <TableBody>
-              {table.getRowModel().rows?.length ? (
-                table.getRowModel().rows.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    data-state={row.getIsSelected() && "selected"}
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
+        <div className="rounded-md border">
+            <Table>
+                <TableHeader>
+                    {table.getHeaderGroups().map((headerGroup) => (
+                        <TableRow key={headerGroup.id}>
+                            {headerGroup.headers.map((header) => {
+                                return (
+                                    <TableHead key={header.id}>
+                                        {header.isPlaceholder
+                                            ? null
+                                            : flexRender(
+                                                header.column.columnDef.header,
+                                                header.getContext()
+                                              )}
+                                    </TableHead>
+                                )
+                            })}
+                        </TableRow>
                     ))}
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={columns.length} className="h-24 text-center">
-                    No results found.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                </TableHeader>
+                <TableBody>
+                    {table.getRowModel().rows?.length ? (
+                        table.getRowModel().rows.map((row) => (
+                            <TableRow
+                                key={row.id}
+                                data-state={row.getIsSelected() && "selected"}
+                                className={isLoading ? 'opacity-50' : ''}
+                            >
+                                {row.getVisibleCells().map((cell) => (
+                                    <TableCell key={cell.id}>
+                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                    </TableCell>
+                                ))}
+                            </TableRow>
+                        ))
+                    ) : (
+                        <TableRow>
+                            <TableCell colSpan={columns.length} className="h-24 text-center">
+                                No results.
+                            </TableCell>
+                        </TableRow>
+                    )}
+                </TableBody>
+            </Table>
         </div>
-        <div className="py-4">
-          <DataTablePagination table={table} />
-        </div>
-      </div>
+        <DataTablePagination table={table} />
+    </div>
   )
 }

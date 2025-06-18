@@ -1,14 +1,6 @@
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ServiceList } from './components/ServiceList';
-import { z } from 'zod';
-
-const searchParamsSchema = z.object({
-  page: z.coerce.number().default(1),
-  per_page: z.coerce.number().default(10),
-  sort: z.string().optional(),
-  search: z.string().optional(),
-});
 
 interface ServicesPageProps {
   searchParams: {
@@ -17,8 +9,6 @@ interface ServicesPageProps {
 }
 
 export default function ServicesPage({ searchParams }: ServicesPageProps) {
-  const parsedSearchParams = searchParamsSchema.parse(searchParams);
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -27,7 +17,12 @@ export default function ServicesPage({ searchParams }: ServicesPageProps) {
           <Link href="/admin/services/new">Add New Service</Link>
         </Button>
       </div>
-      <ServiceList {...parsedSearchParams} />
+      <ServiceList 
+        page={Number(searchParams?.page ?? 1)}
+        per_page={Number(searchParams?.per_page ?? 10)}
+        sort={searchParams?.sort as string | undefined}
+        search={searchParams?.search as string | undefined}
+      />
     </div>
   );
 } 
