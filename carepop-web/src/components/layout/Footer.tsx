@@ -24,7 +24,6 @@ export default function Footer() {
         { href: "/about", label: "About Us" },
         { href: "/download-app", label: "Download App" },
         { href: "/contact", label: "Contact Us" }, // Assuming a contact page might exist or be added
-        { href: "/careers", label: "Careers" }, // Placeholder
       ],
     },
     {
@@ -32,8 +31,7 @@ export default function Footer() {
       links: [
         { href: "/book-service", label: "Book a Service" },
         { href: "/clinic-finder", label: "Find a Clinic" },
-        { href: "/appointments", label: "My Appointments" },
-        { href: "/professionals", label: "For Professionals" }, // Placeholder for professional portal
+        { href: "/dashboard/appointments", label: "My Appointments" },
       ],
     },
     {
