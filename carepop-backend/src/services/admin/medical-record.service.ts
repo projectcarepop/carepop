@@ -129,4 +129,19 @@ export const deleteRecord = async (recordId: string) => {
   }
 
   return { message: 'Record deleted successfully' };
-}; 
+};
+
+export async function getMedicalRecordsByUserId(userId: string, searchTerm?: string) {
+    const { data, error } = await supabase
+        .rpc('search_medical_records', {
+            p_user_id: userId,
+            p_search_term: searchTerm || ''
+        });
+
+    if (error) {
+        console.error('Supabase error fetching medical records:', error);
+        throw new AppError('Failed to fetch medical records from database.', 500);
+    }
+
+    return data;
+} 

@@ -10,7 +10,9 @@ import {
   userIdParamSchema,
   listUsersQuerySchema,
   updateUserRolesSchema,
+  searchSchema
 } from '@/validation/admin/user.validation';
+import { getMedicalRecordsByUserId } from '@/controllers/admin/medical-record.controller';
 
 const router = Router();
 
@@ -26,6 +28,13 @@ router.get('/me', getMyProfile);
 router.route('/:id')
   .get(validateRequest({ params: userIdParamSchema }), getUserById);
   
+// Get medical records for a specific user
+router.route('/:id/medical-records')
+    .get(
+        validateRequest({ params: userIdParamSchema, query: searchSchema }),
+        getMedicalRecordsByUserId
+    );
+
 // Update a specific user's roles
 router.route('/:id/roles')
     .put(validateRequest({ params: userIdParamSchema, body: updateUserRolesSchema }), updateUserRoles);

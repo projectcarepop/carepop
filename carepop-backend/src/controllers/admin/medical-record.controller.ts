@@ -39,4 +39,13 @@ const deleteRecord = asyncHandler(async (req: AuthenticatedRequest, res: Respons
   sendSuccess(res, { message: 'Record deleted successfully.' });
 });
 
+export const getMedicalRecordsByUserId = asyncHandler(async (req, res) => {
+    const { userId } = req.params;
+    const { search } = req.query;
+
+    const records = await medicalRecordService.getMedicalRecordsByUserId(userId, search as string | undefined);
+
+    sendSuccess(res, records);
+});
+
 export { createRecord, getRecordsForUser, updateRecord, deleteRecord }; 

@@ -13,5 +13,9 @@ export const listUsersQuerySchema = z.object({
 });
 
 export const updateUserRolesSchema = z.object({
-    roles: z.array(z.string()).min(1, "User must have at least one role."),
+    roles: z.array(z.string()).nonempty(),
+});
+
+export const searchSchema = z.object({
+  search: z.string().optional(),
 }); 
