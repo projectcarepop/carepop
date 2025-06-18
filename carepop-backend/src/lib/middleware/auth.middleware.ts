@@ -37,30 +37,17 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
         }
 
         const { data: profile, error: profileError } = await serviceSupabase
-            .from('profiles')
+            .from('users_view')
             .select('*')
-            .eq('user_id', user.id)
+            .eq('id', user.id)
             .single();
 
         if (profileError || !profile) {
-            console.error(`Profile fetch error for user ${user.id}:`, profileError);
-            return res.status(404).json({ message: `User profile not found for user ID: ${user.id}`, details: profileError?.message });
+            console.error(`Profile fetch error from users_view for user ${user.id}:`, profileError);
+            return res.status(404).json({ message: `User profile not found in users_view for user ID: ${user.id}`, details: profileError?.message });
         }
 
-        const { data: roles, error: rolesError } = await serviceSupabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', user.id);
-
-        if (rolesError) {
-            console.error(`Roles fetch error for user ${user.id}:`, rolesError);
-            return res.status(500).json({ message: 'Failed to fetch user roles.', details: rolesError?.message });
-        }
-
-        req.user = {
-            ...profile,
-            roles: roles ? roles.map((r: { role: string }) => r.role) : [],
-        };
+        req.user = profile;
         
         console.log(`[AUTH MIDDLEWARE] Success: Authenticated user ${req.user.id}`);
         next();
