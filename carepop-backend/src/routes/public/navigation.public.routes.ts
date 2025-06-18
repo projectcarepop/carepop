@@ -1,5 +1,8 @@
 import { Router } from 'express';
-import * as navigationController from '@/controllers/public/navigationController';
+import { navigationController } from '../../controllers/public/navigation.public.controller';
+import { validate } from '../../lib/middleware/validate';
+import { getDirectionsSchema } from '../../validation/public/navigation.validation';
+import { asyncHandler } from '../../utils/asyncHandler';
 
 const router = Router();
 
@@ -34,6 +37,11 @@ const router = Router();
  *       200:
  *         description: The calculated route
  */
-router.post('/route', navigationController.getRoute);
+
+router.post(
+  '/directions',
+  validate(getDirectionsSchema),
+  asyncHandler(navigationController.getDirections)
+);
 
 export default router; 
