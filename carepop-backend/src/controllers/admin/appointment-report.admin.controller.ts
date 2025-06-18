@@ -24,6 +24,11 @@ export const createOrUpdateReport = asyncHandler(async (req: AuthenticatedReques
         return res.status(400).json(new ApiResponse(400, null, 'Appointment ID is required to save a report.'));
     }
 
-    const result = await reportService.upsertAppointmentReport(reportData, supabase);
+    const adminId = req.user?.id;
+    if (!adminId) {
+        return res.status(401).json(new ApiResponse(401, null, 'Unauthorized: Admin user ID is missing.'));
+    }
+
+    const result = await reportService.upsertAppointmentReport(reportData, adminId, supabase);
     res.status(201).json(new ApiResponse(201, result, 'Report saved successfully.'));
 }); 

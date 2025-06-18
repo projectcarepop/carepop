@@ -134,40 +134,31 @@ export async function findReportByAppointmentId(appointmentId: string, supabase:
  * @param reportData - The data for the report.
  * @returns The created or updated appointment report.
  */
-export async function upsertAppointmentReport(reportData: Partial<IAppointmentReport>, supabase: SupabaseClient): Promise<IAppointmentReport> {
+export async function upsertAppointmentReport(reportData: Partial<IAppointmentReport>, adminId: string, supabase: SupabaseClient): Promise<IAppointmentReport> {
     const reportService = new AppointmentReportAdminService(supabase);
     
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id, created_at, updated_at, ...payload } = reportData;
 
     if (id) {
+        // Update is fine, it doesn't need the admin ID.
         return reportService.updateAppointmentReport(id, payload);
     } else {
-        // The service expects a more complete object for creation.
-        // The created_by_admin_id will be added in the controller from the authenticated user.
-        const createPayload: Omit<IAppointmentReport, 'id' | 'created_at' | 'updated_at'> = {
-            appointment_id: payload.appointment_id!,
-            // Add other non-nullable fields here with default values if necessary
-            purpose_of_visit: payload.purpose_of_visit ?? null,
-            symptoms_reported: payload.symptoms_reported ?? null,
-            vitals_blood_pressure: payload.vitals_blood_pressure ?? null,
-            vitals_temperature: payload.vitals_temperature ?? null,
-            vitals_weight: payload.vitals_weight ?? null,
-            vitals_height: payload.vitals_height ?? null,
-            vitals_other: payload.vitals_other ?? null,
-            findings_summary: payload.findings_summary ?? null,
-            diagnoses: payload.diagnoses ?? null,
-            recommendations_summary: payload.recommendations_summary ?? null,
-            treatment_plan: payload.treatment_plan ?? null,
-            lifestyle_recommendations: payload.lifestyle_recommendations ?? null,
-            medications_prescribed: payload.medications_prescribed ?? null,
-            tests_ordered: payload.tests_ordered ?? null,
-            referrals: payload.referrals ?? null,
-            follow_up_date: payload.follow_up_date ?? null,
-            follow_up_notes: payload.follow_up_notes ?? null,
-            additional_notes: payload.additional_notes ?? null,
-            report_content: payload.report_content ?? null,
-        };
-        return reportService.createAppointmentReport(createPayload);
+        // Create a new report, bypassing the broken service method
+        const { data: newReport, error } = await supabase
+            .from('appointment_reports')
+            .insert({
+                ...payload,
+                appointment_id: payload.appointment_id!,
+                created_by_admin_id: adminId,
+                report_content: payload.report_content || '',
+            })
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Error creating report directly:', error);
+            throw new Error('Could not create appointment report.');
+        }
+        return newReport;
     }
 } 

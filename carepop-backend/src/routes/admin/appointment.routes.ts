@@ -6,6 +6,7 @@ import {
   updateAppointment,
   deleteAppointment,
 } from '@/controllers/admin/appointment.controller';
+import { getReportByAppointmentId } from '@/controllers/admin/appointment-report.admin.controller';
 import { validateRequest } from '@/lib/middleware/validate.middleware';
 import {
   createAppointmentSchema,
@@ -24,5 +25,9 @@ router.route('/:id')
   .get(validateRequest({ params: appointmentIdParamSchema }), getAppointmentById)
   .put(validateRequest({ params: appointmentIdParamSchema, body: updateAppointmentSchema }), updateAppointment)
   .delete(validateRequest({ params: appointmentIdParamSchema }), deleteAppointment);
+
+// Route for fetching a report for a specific appointment
+router.route('/:appointmentId/report')
+  .get(validateRequest({ params: appointmentIdParamSchema }), getReportByAppointmentId);
 
 export default router; 
