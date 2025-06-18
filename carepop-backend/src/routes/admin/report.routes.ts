@@ -1,15 +1,12 @@
 import { Router } from 'express';
 import * as reportController from '@/controllers/admin/appointment-report.admin.controller';
-import { authMiddleware } from '@/lib/middleware/auth.middleware';
-import { authorize } from '@/lib/middleware/role.middleware';
 
 const router = Router();
 
 // This matches the POST /api/v1/admin/reports from the frontend
+// Auth is handled by the main admin router in /routes/admin/index.ts
 router.post(
     '/',
-    authMiddleware,
-    authorize(['admin']),
     reportController.createOrUpdateReport
 );
 
