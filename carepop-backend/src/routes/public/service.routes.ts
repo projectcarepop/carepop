@@ -4,5 +4,6 @@ import * as servicePublicController from '@/controllers/public/service.controlle
 const router = Router();
 
 router.get('/', servicePublicController.listPublicServices);
+router.get('/:serviceId/providers', servicePublicController.listProvidersForService);
 
 export default router; 

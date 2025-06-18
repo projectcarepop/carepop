@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import CancelAppointmentModal from "./CancelAppointmentModal";
+import { CancelAppointmentModal } from "./CancelAppointmentModal";
 import { useRouter } from 'next/navigation'; // For onCancellationSuccess
 
 interface AppointmentCardProps {

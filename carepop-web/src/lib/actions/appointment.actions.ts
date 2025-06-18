@@ -1,7 +1,7 @@
 'use server';
 
 import { z } from 'zod';
-import { supabaseAdmin } from '@/lib/supabase/admin';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
@@ -43,7 +43,8 @@ export async function createAppointment(prevState: any, formData: FormData) {
   
   const { patientId, clinicId, serviceId, providerId, appointmentDateTime, duration, notes } = validatedFields.data;
 
-  const { error } = await supabaseAdmin.from('appointments').insert({
+  const adminClient = getSupabaseAdmin();
+  const { error } = await adminClient.from('appointments').insert({
     user_id: patientId,
     clinic_id: clinicId,
     service_id: serviceId,
@@ -62,4 +63,44 @@ export async function createAppointment(prevState: any, formData: FormData) {
 
   revalidatePath('/admin/appointments');
   redirect('/admin/appointments');
+}
+
+export async function cancelAppointment(appointmentId: string, cancellationReason: string) {
+  'use server';
+  
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, message: 'Authentication Error: You must be logged in.' };
+  }
+
+  // First, verify the user owns the appointment they are trying to cancel
+  const { data: appointment, error: fetchError } = await supabase
+    .from('appointments')
+    .select('id, user_id')
+    .eq('id', appointmentId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (fetchError || !appointment) {
+    return { success: false, message: 'Error: Appointment not found or you do not have permission to cancel it.' };
+  }
+
+  // Now, update the appointment
+  const { error: updateError } = await supabase
+    .from('appointments')
+    .update({ 
+      status: 'cancelled_by_user',
+      cancellation_reason: cancellationReason,
+     })
+    .eq('id', appointmentId);
+
+  if (updateError) {
+    console.error('Database Error:', updateError);
+    return { success: false, message: `Database Error: Failed to cancel appointment. ${updateError.message}` };
+  }
+
+  revalidatePath('/appointments'); // Revalidate the user's appointment list
+  return { success: true, message: 'Appointment cancelled successfully.' };
 } 

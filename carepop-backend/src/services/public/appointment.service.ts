@@ -1,5 +1,6 @@
 import { supabase } from '@/config/supabaseClient';
 import { AppError } from '@/lib/utils/appError';
+import { AuthenticatedRequest } from '@/controllers/public/appointment.controller';
 
 export class AppointmentService {
 
@@ -73,5 +74,60 @@ export class AppointmentService {
         }
 
         return data;
+    }
+
+    public async createAppointment(details: { patientId: string, providerId: string, serviceId: string, startTime: string }) {
+        const { patientId, providerId, serviceId, startTime } = details;
+
+        // 1. Get service duration to calculate end_time
+        const { data: serviceData, error: serviceError } = await supabase
+            .from('services')
+            .select('duration_minutes')
+            .eq('id', serviceId)
+            .single();
+
+        if (serviceError || !serviceData) {
+            throw new AppError('Service not found or duration not set.', 404);
+        }
+
+        const endTime = new Date(new Date(startTime).getTime() + serviceData.duration_minutes * 60000).toISOString();
+
+        // 2. Final availability check (prevent double booking)
+        const { data: existingAppointments, error: existingError } = await supabase
+            .from('appointments')
+            .select('id')
+            .eq('provider_id', providerId)
+            .lt('start_time', endTime)
+            .gt('end_time', startTime)
+            .in('status', ['confirmed', 'pending_confirmation']);
+
+        if(existingError){
+            throw new AppError(`Error checking for existing appointments: ${existingError.message}`, 500);
+        }
+
+        if (existingAppointments && existingAppointments.length > 0) {
+            throw new AppError('This time slot is no longer available. Please select another time.', 409);
+        }
+
+        // 3. Create the appointment
+        const { data: newAppointment, error: createError } = await supabase
+            .from('appointments')
+            .insert({
+                user_id: patientId,
+                provider_id: providerId,
+                service_id: serviceId,
+                appointment_datetime: startTime, // Assuming start_time is the main field
+                start_time: startTime,
+                end_time: endTime,
+                status: 'pending_confirmation', // Or 'confirmed' depending on business logic
+            })
+            .select()
+            .single();
+        
+        if (createError) {
+            throw new AppError(`Could not create appointment: ${createError.message}`, 500);
+        }
+
+        return newAppointment;
     }
 } 

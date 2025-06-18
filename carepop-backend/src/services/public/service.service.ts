@@ -23,4 +23,33 @@ export const getPublicServices = async () => {
 
   cacheService.set(SERVICES_CACHE_KEY, data, CACHE_TTL_SECONDS);
   return data;
-}; 
+};
+
+export const getProvidersForService = async (serviceId: string) => {
+    const { data: providerServiceLinks, error: linkError } = await supabase
+        .from('provider_services')
+        .select('provider_id')
+        .eq('service_id', serviceId);
+
+    if (linkError) {
+        throw new AppError(`Supabase error fetching provider links: ${linkError.message}`, 500);
+    }
+
+    if (!providerServiceLinks || providerServiceLinks.length === 0) {
+        return [];
+    }
+
+    const providerIds = providerServiceLinks.map(link => link.provider_id);
+
+    const { data: providers, error: providerError } = await supabase
+        .from('providers')
+        .select('id, first_name, last_name, specialization, avatar_url')
+        .in('id', providerIds)
+        .eq('is_active', true);
+
+    if (providerError) {
+        throw new AppError(`Supabase error fetching providers: ${providerError.message}`, 500);
+    }
+
+    return providers;
+} 

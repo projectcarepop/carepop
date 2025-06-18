@@ -10,12 +10,14 @@ import menstrualRoutes from './menstrual.routes';
 import navigationRoutes from './navigation.public.routes';
 import medicalRecordRoutes from './medicalRecord.public.routes';
 import healthRoutes from './health.routes';
+import providerRoutes from './provider.routes';
 
 const router = Router();
 
 router.use('/auth', authRoutes);
 router.use('/clinics', clinicRoutes);
 router.use('/services', serviceRoutes);
+router.use('/providers', providerRoutes);
 router.use('/appointments', appointmentRoutes);
 router.use('/users', userRoutes);
 router.use('/health-buddy', healthBuddyRoutes);

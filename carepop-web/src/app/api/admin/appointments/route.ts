@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { z } from 'zod';
 import { appointmentSearchSchema } from '@/lib/validation/appointment.validation';
-import { supabaseAdmin } from '@/lib/supabase/admin';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
 
 
 export async function GET(request: Request) {
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     }
     
     const getAppointmentsFromApi = async (params: z.infer<typeof appointmentSearchSchema>) => {
-        const supabase = supabaseAdmin;
+        const supabase = getSupabaseAdmin();
     
         const { clinicId, searchTerm, page, per_page, sort } = params;
         const [sortBy, sortOrder] = sort.split('.') as [string, 'asc' | 'desc'];
