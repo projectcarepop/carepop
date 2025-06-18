@@ -22,7 +22,7 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
     const token = authHeader.split(' ')[1];
 
     try {
-        const { data: { user }, error: tokenError } = await supabase.auth.getUser(token);
+        const { data: { user }, error: tokenError } = await serviceSupabase.auth.getUser(token);
 
         if (tokenError || !user) {
             console.error('Auth token validation error:', tokenError);
