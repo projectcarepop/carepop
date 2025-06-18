@@ -2,6 +2,9 @@ import { getServices } from '@/lib/api/services';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import Link from 'next/link';
 
+// Opt out of static generation
+export const dynamic = 'force-dynamic';
+
 export default async function ServicesPage() {
     const services = await getServices();
 
