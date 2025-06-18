@@ -23,18 +23,25 @@ app.use(helmet());
 // Configure CORS
 const allowedOrigins = [
     'http://localhost:3000', 
-    'http://localhost:3001', 
+    'http://localhost:3001',
+    'https://carepop.vercel.app', // Production deployment
     process.env.FRONTEND_URL || ''
 ].filter(Boolean);
 
 const corsOptions: cors.CorsOptions = {
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
         // allow requests with no origin (like mobile apps or curl requests)
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
+        if (!origin) {
+            return callback(null, true);
         }
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        // Allow Vercel preview deployments (subdomains of vercel.app)
+        if (new URL(origin).hostname.endsWith('.vercel.app')) {
+            return callback(null, true);
+        }
+        callback(new Error(`Not allowed by CORS: ${origin}`));
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     credentials: true,

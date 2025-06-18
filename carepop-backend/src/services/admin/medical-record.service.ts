@@ -3,6 +3,7 @@ import { serviceSupabase as supabase } from '@/lib/supabase/service-client';
 import { AppError } from '@/lib/utils/appError';
 import { StatusCodes } from 'http-status-codes';
 import { Database } from '@/types/supabase.types';
+import logger from '@/utils/logger';
 
 const MEDICAL_RECORDS_BUCKET = 'medical-records';
 
@@ -132,16 +133,33 @@ export const deleteRecord = async (recordId: string) => {
 };
 
 export async function getMedicalRecordsByUserId(userId: string, searchTerm?: string) {
-    const { data, error } = await supabase
-        .rpc('search_medical_records', {
-            p_user_id: userId,
-            p_search_term: searchTerm || ''
+    logger.info(`[SERVICE] Fetching medical records for user: ${userId} with term: "${searchTerm}"`);
+    try {
+        const { data, error } = await supabase
+            .rpc('search_medical_records', {
+                p_user_id: userId,
+                p_search_term: searchTerm || ''
+            });
+
+        if (error) {
+            logger.error('[SERVICE-ERROR] Supabase RPC returned an error.', {
+                message: error.message,
+                details: error.details,
+                hint: error.hint,
+                code: error.code,
+            });
+            throw new AppError(`Supabase error: ${error.message}`, 500);
+        }
+
+        logger.info(`[SERVICE] Successfully fetched ${data?.length || 0} medical records.`);
+        return data;
+    } catch (e: any) {
+        logger.error('[SERVICE-CATCH] Caught an exception during medical record fetch.', {
+            errorMessage: e.message,
+            stack: e.stack,
+            fullError: e
         });
-
-    if (error) {
-        console.error('Supabase error fetching medical records:', error);
-        throw new AppError('Failed to fetch medical records from database.', 500);
+        // Re-throw the original error or a new AppError
+        throw new AppError('A critical error occurred while fetching medical records.', 500);
     }
-
-    return data;
 } 
