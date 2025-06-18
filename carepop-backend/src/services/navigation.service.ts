@@ -1,4 +1,4 @@
-import config from '../../config/config';
+import config from '../config/config';
 
 class NavigationService {
   private GOOGLE_API_KEY = config.google.apiKey;

@@ -9,10 +9,15 @@ interface KMSConfig {
     keyId: string;
 }
 
+interface GoogleConfig {
+    apiKey: string;
+}
+
 interface AppConfig {
     nodeEnv: string;
     port: number;
     kms: KMSConfig;
+    google: GoogleConfig;
     // Add other configurations here as needed (e.g., Supabase URL, anon key)
     supabaseUrl: string;
     supabaseAnonKey: string;
@@ -27,6 +32,9 @@ const config: AppConfig = {
         locationId: process.env.KMS_LOCATION_ID || 'global', // Default to global if not set
         keyRingId: process.env.KMS_KEY_RING_ID || '',
         keyId: process.env.KMS_KEY_ID || '',
+    },
+    google: {
+        apiKey: process.env.GOOGLE_API_KEY || '',
     },
     supabaseUrl: process.env.SUPABASE_URL || '',
     supabaseAnonKey: process.env.SUPABASE_ANON_KEY || '',
