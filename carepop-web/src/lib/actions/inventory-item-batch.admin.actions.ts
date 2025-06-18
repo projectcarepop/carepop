@@ -3,17 +3,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-
-export const batchFormSchema = z.object({
-  item_id: z.string().uuid(),
-  batch_number: z.string().min(1, 'Batch number is required'),
-  quantity: z.coerce.number().int().min(0, 'Quantity must be a positive number'),
-  expiration_date: z.string().refine((val) => !isNaN(Date.parse(val)), {
-    message: "Invalid date format",
-  }),
-  cost_per_item: z.coerce.number().min(0).optional().nullable(),
-  supplier_id: z.string().uuid().optional().nullable(),
-});
+import { batchFormSchema } from '../validation/inventory-item-batch.validation';
 
 export async function createInventoryItemBatch(values: z.infer<typeof batchFormSchema>) {
     const supabase = createSupabaseServerClient();

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ProviderForm } from '../../components/ProviderForm';
-import { createClient } from '@/utils/supabase/server';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import {
   Card,
@@ -14,8 +14,7 @@ import {
 import { cookies } from 'next/headers';
 
 async function fetchProviderById(id: string) {
-  const cookieStore = cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createSupabaseServerClient();
   const { data: providerData, error } = await supabase
     .from('providers')
     .select('*')
@@ -42,17 +41,18 @@ export default async function EditProviderPage({ params }: EditProviderPageProps
   const providerData = await fetchProviderById(resolvedParams.providerId);
   
   // Transform snake_case to camelCase for the form
+  const pData = providerData as any;
   const initialData = {
-    id: providerData.id,
-    firstName: providerData.first_name,
-    lastName: providerData.last_name,
-    email: providerData.email,
-    phoneNumber: providerData.contact_number,
-    specialization: providerData.specialization,
-    licenseNumber: providerData.license_number,
-    credentials: providerData.credentials,
-    isActive: providerData.is_active,
-    avatarUrl: providerData.avatar_url,
+    id: pData.id,
+    firstName: pData.first_name,
+    lastName: pData.last_name,
+    email: pData.email ?? undefined,
+    phoneNumber: pData.contact_number ?? undefined,
+    specialization: pData.specialization ?? '',
+    licenseNumber: pData.license_number ?? '',
+    credentials: pData.credentials ?? '',
+    isActive: pData.is_active,
+    avatarUrl: pData.avatar_url,
   };
 
   return (

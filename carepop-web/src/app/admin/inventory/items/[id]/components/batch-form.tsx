@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { batchFormSchema, createInventoryItemBatch, updateInventoryItemBatch } from '@/lib/actions/inventory-item-batch.admin.actions';
+import { createInventoryItemBatch, updateInventoryItemBatch } from '@/lib/actions/inventory-item-batch.admin.actions';
 import { useToast } from '@/hooks/use-toast';
 import { ISupplier } from '../page';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -16,6 +16,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { IBatch } from '../page';
+import { batchFormSchema } from '@/lib/validation/inventory-item-batch.validation';
 
 interface BatchFormProps {
     inventoryItemId: string;
