@@ -15,6 +15,7 @@ import appointmentRoutes from './appointment.routes';
 import profileRoutes from './profile.routes';
 import dashboardRoutes from './dashboard.routes';
 import medicalRecordAdminRoutes from './medicalRecord.admin.routes';
+import debugRoutes from './debug.routes';
 
 const adminRouter = Router();
 
@@ -34,6 +35,7 @@ adminRouter.use('/appointments', appointmentRoutes);
 adminRouter.use('/profiles', profileRoutes);
 adminRouter.use('/dashboard', dashboardRoutes);
 adminRouter.use('/medical-records', medicalRecordAdminRoutes);
+adminRouter.use('/debug', debugRoutes);
 
 // Route for creating or updating an appointment report
 adminRouter.post('/reports', createOrUpdateReport);
