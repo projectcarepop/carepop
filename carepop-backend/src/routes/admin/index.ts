@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authMiddleware } from '../../lib/middleware/auth.middleware';
 import { authorize } from '../../lib/middleware/role.middleware';
+import { createOrUpdateReport } from '@/controllers/admin/appointment-report.admin.controller';
 
 // Import modular route handlers
 import inventoryRoutes from './inventory.routes';
@@ -12,7 +13,6 @@ import serviceRoutes from './service.routes';
 import userRoutes from './user.routes';
 import appointmentRoutes from './appointment.routes';
 import profileRoutes from './profile.routes';
-import reportRoutes from './report.routes';
 import dashboardRoutes from './dashboard.routes';
 import medicalRecordAdminRoutes from './medicalRecord.admin.routes';
 
@@ -32,8 +32,10 @@ adminRouter.use('/services', serviceRoutes);
 adminRouter.use('/users', userRoutes);
 adminRouter.use('/appointments', appointmentRoutes);
 adminRouter.use('/profiles', profileRoutes);
-adminRouter.use('/reports', reportRoutes);
 adminRouter.use('/dashboard', dashboardRoutes);
 adminRouter.use('/medical-records', medicalRecordAdminRoutes);
+
+// Route for creating or updating an appointment report
+adminRouter.post('/reports', createOrUpdateReport);
 
 export { adminRouter as adminRoutes }; 
