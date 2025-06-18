@@ -1,4 +1,5 @@
-import { supabase } from '@/config/supabaseClient';
+import { supabase as publicSupabase } from '@/config/supabaseClient';
+import { serviceSupabase as supabase } from '@/lib/supabase/service-client';
 import { Database } from '@/types/supabase.types';
 import { AppError } from '@/lib/utils/appError';
 import { StatusCodes } from 'http-status-codes';

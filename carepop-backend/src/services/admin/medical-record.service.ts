@@ -1,11 +1,10 @@
-import { SupabaseClient } from '@supabase/supabase-js';
+import { supabase as publicSupabase } from '@/config/supabaseClient';
+import { serviceSupabase as supabase } from '@/lib/supabase/service-client';
 import { AppError } from '@/lib/utils/appError';
 import { StatusCodes } from 'http-status-codes';
-import { supabaseServiceRole } from '@/config/supabaseClient';
 import { Database } from '@/types/supabase.types';
 
 const MEDICAL_RECORDS_BUCKET = 'medical-records';
-const supabase: SupabaseClient<Database> = supabaseServiceRole;
 
 const ensureBucketExists = async () => {
   try {
