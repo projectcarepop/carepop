@@ -31,7 +31,6 @@ export const getPublicClinics = async (lat?: number, lon?: number) => {
   const { data, error } = await supabase
     .from('clinics')
     .select('*')
-    .eq('is_active', true)
     .order('name', { ascending: true });
 
   if (error) {

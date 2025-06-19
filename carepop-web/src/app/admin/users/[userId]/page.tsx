@@ -14,9 +14,6 @@ const UserDetailPage = async ({ params }: UserDetailPageProps) => {
     notFound();
   }
 
-  // The 'full_name' and 'id' might not be directly on the UserProfile from AuthContext.
-  // Let's ensure we are accessing properties that exist. The view 'users_view' should provide these.
-
   return (
     <div className="space-y-6">
       <div>

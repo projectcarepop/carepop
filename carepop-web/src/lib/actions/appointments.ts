@@ -1,8 +1,7 @@
 "use server";
 
 import { revalidateTag } from 'next/cache';
-import { getSupabaseAdmin } from '@/lib/supabase/admin';
-import { UserAppointmentDetails } from "@/lib/types/appointmentTypes";
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getAuthToken } from '@/lib/utils/auth';
 import { API_BASE_URL } from '@/lib/config';
 import { Database } from '@/types/supabase'; // Import the main DB type
@@ -17,8 +16,6 @@ type AppointmentStatus = Database['public']['Enums']['appointment_status_enum'];
 
 // Admin: Confirm an Appointment
 export async function confirmAppointment(appointmentId: string) {
-  const supabaseAdmin = getSupabaseAdmin();
-
   const { data: appointment, error: fetchError } = await supabaseAdmin
     .from('appointments')
     .select('clinic_id')
@@ -46,8 +43,6 @@ export async function confirmAppointment(appointmentId: string) {
 
 // Admin: Cancel an Appointment
 export async function cancelAppointmentAsAdmin(appointmentId: string, reason: string) {
-    const supabaseAdmin = getSupabaseAdmin();
-
     const { data: appointment, error: fetchError } = await supabaseAdmin
       .from('appointments')
       .select('clinic_id')
@@ -78,8 +73,6 @@ export async function cancelAppointmentAsAdmin(appointmentId: string, reason: st
 
 // Admin: Delete an Appointment
 export async function deleteAppointment(appointmentId: string) {
-    const supabaseAdmin = getSupabaseAdmin();
-
     const { data: appointment, error: fetchError } = await supabaseAdmin
         .from('appointments')
         .select('clinic_id')
@@ -106,7 +99,6 @@ export async function deleteAppointment(appointmentId: string) {
 }
 
 export async function getFutureAppointmentsForAdmin(clinicId: string) {
-    const supabaseAdmin = getSupabaseAdmin();
     const { data, error } = await supabaseAdmin
         .from('appointments')
         .select('*')
@@ -122,7 +114,6 @@ export async function getFutureAppointmentsForAdmin(clinicId: string) {
 }
 
 export async function getPastAppointmentsForAdmin(clinicId: string) {
-    const supabaseAdmin = getSupabaseAdmin();
     const { data, error } = await supabaseAdmin
         .from('appointments')
         .select('*')
@@ -138,7 +129,6 @@ export async function getPastAppointmentsForAdmin(clinicId: string) {
 }
 
 export async function getAppointmentDetailsForAdmin(appointmentId: string) {
-    const supabaseAdmin = getSupabaseAdmin();
     const { data, error } = await supabaseAdmin
         .from('appointments')
         .select('*')
@@ -153,7 +143,6 @@ export async function getAppointmentDetailsForAdmin(appointmentId: string) {
 }
 
 export async function updateAppointmentStatusAsAdmin(appointmentId: string, status: string, clinicId: string) {
-    const supabaseAdmin = getSupabaseAdmin();
     const { error } = await supabaseAdmin
         .from('appointments')
         .update({ status: status as AppointmentStatus })
@@ -167,7 +156,6 @@ export async function updateAppointmentStatusAsAdmin(appointmentId: string, stat
 }
 
 export async function createAppointmentAsAdmin(formData: FormData) {
-    const supabaseAdmin = getSupabaseAdmin();
     const startTime = formData.get('startTime') as string;
     const DURATION_MINUTES = 30; 
 
@@ -190,7 +178,6 @@ export async function createAppointmentAsAdmin(formData: FormData) {
 }
 
 export async function deleteAppointmentAsAdmin(appointment: { id: string, clinic_id: string }) {
-    const supabaseAdmin = getSupabaseAdmin();
     const { error } = await supabaseAdmin
         .from('appointments')
         .delete()

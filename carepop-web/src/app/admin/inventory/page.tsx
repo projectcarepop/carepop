@@ -5,7 +5,6 @@ import { SuppliersList } from './components/suppliers-list';
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { PlusCircle } from "lucide-react";
-import { z } from "zod";
 
 interface InventoryPageProps {
   searchParams: {

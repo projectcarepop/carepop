@@ -34,7 +34,7 @@ export const useFetcher = () => {
             const error: FetcherError = new Error('An error occurred while fetching the data.');
             try {
                 error.info = await res.json();
-            } catch (e) {
+            } catch {
                 error.info = { message: res.statusText };
             }
             error.status = res.status;

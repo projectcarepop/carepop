@@ -30,8 +30,7 @@ BEGIN
     WHERE
         cp.clinic_id = p_clinic_id
         AND ps.service_id = p_service_id
-        AND p.is_active = TRUE
-        AND cp.is_active = TRUE; -- Ensure the association between clinic and provider is active
+        AND p.is_active = TRUE;
 END;
 $$ LANGUAGE plpgsql;
 

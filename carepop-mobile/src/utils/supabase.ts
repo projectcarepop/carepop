@@ -5,11 +5,11 @@ import { createClient } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
 
 // Ensure your environment variables are configured correctly in app.json -> extra
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 // Retrieve the backend API URL from app.json extra
-const EXPO_PUBLIC_BACKEND_API_URL = process.env.EXPO_PUBLIC_BACKEND_API_URL;
+const EXPO_PUBLIC_BACKEND_API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('**************************************************************************');

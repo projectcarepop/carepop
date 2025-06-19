@@ -2,7 +2,6 @@
 
 // Inspired by react-hot-toast library
 import * as React from "react"
-import { useAuth } from '@/lib/contexts/AuthContext';
 
 import type {
   ToastActionElement,

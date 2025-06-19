@@ -1,14 +1,14 @@
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import React, { useState, useEffect } from 'react';
+import { NavigationContainer, CommonActions } from '@react-navigation/native';
+import { createNativeStackNavigator, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   createDrawerNavigator,
   DrawerContentScrollView,
   DrawerItem,
   DrawerItemList,
 } from '@react-navigation/drawer';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useAuth } from '../context/AuthContext';
 import { theme } from '../components/theme';
@@ -32,7 +32,6 @@ import { CreateProfileScreen } from '../../screens/CreateProfileScreen';
 import { ForgotPasswordScreen } from '../../screens/ForgotPasswordScreen';
 import { BookingScreen } from '../../screens/BookingScreen';
 import { HealthBuddyScreen } from '../screens/HealthBuddyScreen';
-import { ClinicFinderScreen } from '../screens/ClinicFinderScreen';
 import { MyAppointmentsScreen } from '../screens/MyAppointmentsScreen';
 import { MyRecordsScreen } from '../screens/MyRecordsScreen';
 import { AboutUsScreen } from '../screens/AboutUsScreen';
@@ -40,14 +39,25 @@ import { MyProfileScreen } from '../screens/MyProfileScreen';
 import { EditProfileScreen } from '../screens/EditProfileScreen';
 import { BookingFlowScreen } from '../screens/BookingFlowScreen';
 import { AppointmentDetailScreen } from '../screens/AppointmentDetailScreen';
+import { SplashScreen } from '../../screens/Onboarding/SplashScreen';
+import { OnboardingScreenOne } from '../../screens/Onboarding/OnboardingScreenOne';
+import { OnboardingScreenTwo } from '../../screens/Onboarding/OnboardingScreenTwo';
+import { OnboardingScreenThree } from '../../screens/Onboarding/OnboardingScreenThree';
+import { EmailConfirmationScreen } from '../../screens/EmailConfirmationScreen';
 
 
 // --- Param Lists ---
-export type AuthStackParamList = { Login: undefined; Register: undefined; ForgotPassword: undefined; };
+export type AuthStackParamList = {
+  Login: undefined;
+  Register: undefined;
+  ForgotPassword: undefined;
+  EmailConfirmation: undefined;
+};
 
 export type ProfileStackParamList = {
   MyProfile: undefined;
   EditProfile: undefined;
+  BookingFlow: undefined;
 };
 
 export type AppointmentsStackParamList = {
@@ -59,36 +69,63 @@ export type BookingStackParamList = {
   BookingFlow: undefined;
 };
 
-export type TabParamList = {
-  Dashboard: undefined;
-  ClinicFinder: undefined;
-  BookAppointment: { screen: string, params?: object } | undefined;
-  HealthBuddy: undefined;
+export type OnboardingStackParamList = {
+  OnboardingOne: undefined;
+  OnboardingTwo: undefined;
+  OnboardingThree: undefined;
 };
 
 export type DrawerParamList = {
-  Dashboard: undefined; // This will point to the Tab navigator
+  Dashboard: undefined; // This will point to the HomeScreen directly now
   Appointments: undefined;
   Records: undefined;
   'Health Buddy': undefined;
-  'Clinic Finder': undefined;
   'Book a Service': undefined;
   AboutUs: undefined;
   Profile: undefined;
 };
 
-export type RootStackParamList = { Auth: undefined; Main: undefined; CreateProfile: undefined; };
+export type RootStackParamList = {
+  Splash: undefined;
+  Auth: { screen?: string } | undefined; // Allow passing initial screen
+  Onboarding: undefined; 
+  CreateProfile: undefined;
+  Main: undefined; // The Drawer Navigator
+};
 
 
 // --- Navigators ---
-const AuthStack = createNativeStackNavigator<AuthStackParamList>();
+const AuthStackNav = createNativeStackNavigator<AuthStackParamList>();
 const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
 const AppointmentsStackNav = createNativeStackNavigator<AppointmentsStackParamList>();
 const BookingStackNav = createNativeStackNavigator<BookingStackParamList>();
+const OnboardingStack = createNativeStackNavigator<OnboardingStackParamList>();
 const Drawer = createDrawerNavigator<DrawerParamList>();
-const Tab = createBottomTabNavigator<TabParamList>();
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 
+
+// --- Component-Based Navigators ---
+
+function OnboardingNavigator() {
+  return (
+    <OnboardingStack.Navigator screenOptions={{ headerShown: false }}>
+      <OnboardingStack.Screen name="OnboardingOne" component={OnboardingScreenOne} />
+      <OnboardingStack.Screen name="OnboardingTwo" component={OnboardingScreenTwo} />
+      <OnboardingStack.Screen name="OnboardingThree" component={OnboardingScreenThree} />
+    </OnboardingStack.Navigator>
+  );
+}
+
+function AuthNavigator() {
+  return (
+    <AuthStackNav.Navigator screenOptions={{ headerShown: false }}>
+      <AuthStackNav.Screen name="Login" component={LoginScreen} />
+      <AuthStackNav.Screen name="Register" component={RegisterScreen} />
+      <AuthStackNav.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      <AuthStackNav.Screen name="EmailConfirmation" component={EmailConfirmationScreen} />
+    </AuthStackNav.Navigator>
+  );
+}
 
 // --- Booking Flow Stack ---
 function BookingStack() {
@@ -106,58 +143,6 @@ function AppointmentsStack() {
       <AppointmentsStackNav.Screen name="MyAppointments" component={MyAppointmentsScreen} />
       <AppointmentsStackNav.Screen name="AppointmentDetail" component={AppointmentDetailScreen} />
     </AppointmentsStackNav.Navigator>
-  );
-}
-
-
-// --- Floating Tab Navigator (Wrapped for Stability) ---
-function AppTabs() {
-  return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarShowLabel: false,
-        tabBarStyle: {
-          position: 'absolute',
-          // These styles create the floating tab bar
-          bottom: 25, 
-          left: '15%',
-          right: '15%',
-          width: '70%',
-          paddingTop: 10,
-          height: 65,
-          backgroundColor: theme.colors.secondary,
-          borderRadius: theme.radius.lg,
-          overflow: 'hidden',
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 5 },
-          shadowOpacity: 0.12,
-          shadowRadius: 15,
-          elevation: 5,
-        },
-        tabBarActiveTintColor: theme.colors.primaryForeground,
-        tabBarInactiveTintColor: 'rgba(235, 235, 245, 0.6)',
-        tabBarItemStyle: {
-          justifyContent: 'center',
-          paddingBottom: 5, // Adjust icon position
-        },
-      }}
-    >
-      <Tab.Screen name="Dashboard" component={HomeScreen} options={{ tabBarIcon: ({ color, size }) => <LayoutDashboard size={size} color={color} /> }} />
-      <Tab.Screen name="ClinicFinder" component={ClinicFinderScreen} options={{ tabBarIcon: ({ color, size }) => <Map size={size} color={color} /> }} />
-      <Tab.Screen 
-        name="BookAppointment" 
-        component={BookingStack} // Placeholder, navigation is handled by listener
-        options={{ tabBarIcon: ({ color, size }) => <CalendarPlus size={size} color={color} /> }} 
-        listeners={({ navigation }) => ({
-          tabPress: (e) => {
-            e.preventDefault();
-            navigation.getParent()?.navigate('Book a Service');
-          },
-        })}
-      />
-      <Tab.Screen name="HealthBuddy" component={HealthBuddyScreen} options={{ tabBarIcon: ({ color, size }) => <HeartPulse size={size} color={color} /> }} />
-    </Tab.Navigator>
   );
 }
 
@@ -224,14 +209,13 @@ function AppDrawer() {
         drawerStyle: { borderTopRightRadius: theme.radius.lg, borderBottomRightRadius: theme.radius.lg, backgroundColor: theme.colors.background, },
       }}
     >
-      <Drawer.Screen name="Dashboard" component={AppTabs} options={{ drawerIcon: ({ color }) => <LayoutDashboard size={20} color={color} /> }} />
-      <Drawer.Screen name="Appointments" component={AppointmentsStack} options={{ drawerIcon: ({ color }) => <CalendarCheck size={20} color={color} /> }} />
-      <Drawer.Screen name="Records" component={MyRecordsScreen} options={{ drawerIcon: ({ color }) => <FileText size={20} color={color} /> }} />
-      <Drawer.Screen name="Health Buddy" component={HealthBuddyScreen} options={{ drawerIcon: ({ color }) => <HeartPulse size={20} color={color} /> }} />
-      <Drawer.Screen name="Clinic Finder" component={ClinicFinderScreen} options={{ drawerIcon: ({ color }) => <Map size={20} color={color} /> }} />
-      <Drawer.Screen name="Book a Service" component={BookingStack} options={{ drawerIcon: ({ color }) => <CalendarPlus size={20} color={color} /> }} />
-      <Drawer.Screen name="AboutUs" component={AboutUsScreen} options={{ title: 'About Us', drawerIcon: ({ color }) => <Info size={20} color={color} /> }} />
-      <Drawer.Screen name="Profile" component={ProfileStackNavigator} options={{ drawerIcon: ({ color }) => <User size={20} color={color} /> }} />
+      <Drawer.Screen name="Dashboard" component={HomeScreen} options={{ drawerIcon: ({ color }: { color: string }) => <LayoutDashboard size={20} color={color} /> }} />
+      <Drawer.Screen name="Appointments" component={AppointmentsStack} options={{ drawerIcon: ({ color }: { color: string }) => <CalendarCheck size={20} color={color} /> }} />
+      <Drawer.Screen name="Records" component={MyRecordsScreen} options={{ drawerIcon: ({ color }: { color: string }) => <FileText size={20} color={color} /> }} />
+      <Drawer.Screen name="Health Buddy" component={HealthBuddyScreen} options={{ drawerIcon: ({ color }: { color: string }) => <HeartPulse size={20} color={color} /> }} />
+      <Drawer.Screen name="Book a Service" component={BookingStack} options={{ drawerIcon: ({ color }: { color: string }) => <CalendarPlus size={20} color={color} /> }} />
+      <Drawer.Screen name="AboutUs" component={AboutUsScreen} options={{ title: 'About Us', drawerIcon: ({ color }: { color: string }) => <Info size={20} color={color} /> }} />
+      <Drawer.Screen name="Profile" component={ProfileStackNavigator} options={{ drawerIcon: ({ color }: { color: string }) => <User size={20} color={color} /> }} />
     </Drawer.Navigator>
   );
 }
@@ -255,38 +239,38 @@ function ProfileStackNavigator() {
 // --- Auth Flow & Root Navigators ---
 function AuthFlow() {
   return (
-    <AuthStack.Navigator screenOptions={{ headerShown: false }}>
-      <AuthStack.Screen name="Login" component={LoginScreen} />
-      <AuthStack.Screen name="Register" component={RegisterScreen} />
-      <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-    </AuthStack.Navigator>
+    <AuthStackNav.Navigator screenOptions={{ headerShown: false }}>
+      <AuthStackNav.Screen name="Login" component={LoginScreen} />
+      <AuthStackNav.Screen name="Register" component={RegisterScreen} />
+      <AuthStackNav.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      <AuthStackNav.Screen name="EmailConfirmation" component={EmailConfirmationScreen} />
+    </AuthStackNav.Navigator>
   );
 }
 
-function Root() {
-  const { user, profile, isLoading } = useAuth();
-
-  if (isLoading) {
-    return null; // Or a loading spinner
-  }
-
-  return (
-    <RootStack.Navigator screenOptions={{ headerShown: false }}>
-      {!user ? (
-        <RootStack.Screen name="Auth" component={AuthFlow} />
-      ) : !profile?.first_name ? (
-        <RootStack.Screen name="CreateProfile" component={CreateProfileScreen} />
-      ) : (
-        <RootStack.Screen name="Main" component={AppDrawer} />
-      )}
-    </RootStack.Navigator>
-  );
-}
-
+// --- Root Navigator (Handles all top-level nav logic) ---
 export function RootAppNavigator() {
+  const { isLoading, session, profile, isAwaitingEmailConfirmation, hasCompletedOnboarding } = useAuth();
+
   return (
     <NavigationContainer>
-      <Root />
+      <RootStack.Navigator screenOptions={{ headerShown: false }}>
+        {isLoading || hasCompletedOnboarding === null ? (
+          <RootStack.Screen name="Splash" component={SplashScreen} />
+        ) : isAwaitingEmailConfirmation ? (
+           <RootStack.Screen name="Auth" component={AuthNavigator} initialParams={{ screen: 'EmailConfirmation' }} />
+        ) : !session ? (
+            hasCompletedOnboarding ? (
+                <RootStack.Screen name="Auth" component={AuthNavigator} initialParams={{ screen: 'Register' }} />
+            ) : (
+                <RootStack.Screen name="Onboarding" component={OnboardingNavigator} />
+            )
+        ) : !profile?.first_name ? (
+          <RootStack.Screen name="CreateProfile" component={CreateProfileScreen} />
+        ) : (
+          <RootStack.Screen name="Main" component={AppDrawer} />
+        )}
+      </RootStack.Navigator>
     </NavigationContainer>
   );
 }

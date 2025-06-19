@@ -1,8 +1,6 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { AutoForm } from '@/components/ui/auto-form';
@@ -42,9 +40,8 @@ export function EditClinicForm({ clinic }: { clinic: ClinicData }) {
             
             toast.success("Clinic updated successfully!");
             router.push('/admin/clinics');
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-            toast.error(errorMessage);
+        } catch {
+            toast.error("Failed to update clinic.");
         }
     };
 

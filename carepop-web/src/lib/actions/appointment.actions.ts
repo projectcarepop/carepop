@@ -1,7 +1,7 @@
 'use server';
 
 import { z } from 'zod';
-import { getSupabaseAdmin } from '@/lib/supabase/admin';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
@@ -43,8 +43,7 @@ export async function createAppointment(prevState: any, formData: FormData) {
   
   const { patientId, clinicId, serviceId, providerId, appointmentDateTime, duration, notes } = validatedFields.data;
 
-  const adminClient = getSupabaseAdmin();
-  const { error } = await adminClient.from('appointments').insert({
+  const { error } = await supabaseAdmin.from('appointments').insert({
     user_id: patientId,
     clinic_id: clinicId,
     service_id: serviceId,

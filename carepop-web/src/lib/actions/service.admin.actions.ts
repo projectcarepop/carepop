@@ -70,7 +70,7 @@ export async function updateService(values: ServiceFormValues) {
 
     revalidatePath('/admin/services');
     revalidatePath(`/admin/services/${serviceId}`);
-    return { success: true, message: 'Service updated successfully.', data };
+    return data;
 }
 
 export async function deleteService(serviceId: string) {

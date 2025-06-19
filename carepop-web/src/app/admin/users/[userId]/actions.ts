@@ -3,17 +3,18 @@
 import { createClient as createActionClient } from '@/utils/supabase/server';
 import { createPageServerClient } from '@/lib/supabase/page-server';
 import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
 
 export async function getUserDetails(userId: string) {
   const supabase = await createPageServerClient();
 
-  const { data: profile, error } = await supabase
+  const { data: profile } = await supabase
     .from('users_view')
     .select('*')
     .eq('id', userId)
     .single();
 
-  if (error || !profile) {
+  if (!profile) {
     return { profile: null };
   }
 
@@ -21,12 +22,9 @@ export async function getUserDetails(userId: string) {
 }
 
 export async function updateUserRole(userId: string, newRole: string) {
-    const supabase = createActionClient();
+    const cookieStore = cookies();
+    const supabase = createActionClient(cookieStore);
   
-    // We need an authenticated user session to make admin API calls,
-    // but this server action is initiated by an admin who is already logged in.
-    // The server-side Supabase client handles passing the auth context.
-    // However, for calling our OWN backend, we need the token.
     const { data: { session } } = await supabase.auth.getSession();
 
     if (!session) {
@@ -54,7 +52,7 @@ export async function updateUserRole(userId: string, newRole: string) {
         revalidatePath(`/admin/users/${userId}`);
         return { success: true, message: 'User role updated successfully.' };
 
-    } catch (error) {
+    } catch {
         return { success: false, message: 'An unexpected error occurred.' };
     }
 } 

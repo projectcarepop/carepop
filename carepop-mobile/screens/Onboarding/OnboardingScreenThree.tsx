@@ -1,15 +1,16 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, SafeAreaView } from 'react-native';
-import { theme, Button } from '../../src/components';
+import { Button } from '../../src/components/button.native';
+import { theme } from '../../src/components/theme';
+import { PartyPopper } from 'lucide-react-native';
+import { useAuth } from '../../src/context/AuthContext';
 
 // This screen will likely be part of a larger stack that, upon completion,
 // navigates the user to the main app (e.g., Auth or Dashboard).
 // The onComplete prop is a good pattern for this.
-interface OnboardingScreenThreeProps {
-  onComplete: () => void;
-}
+export const OnboardingScreenThree = () => {
+  const { completeOnboarding } = useAuth();
 
-export const OnboardingScreenThree: React.FC<OnboardingScreenThreeProps> = ({ onComplete }) => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
@@ -30,12 +31,12 @@ export const OnboardingScreenThree: React.FC<OnboardingScreenThreeProps> = ({ on
         </View>
 
         <View style={styles.footer}>
-            <Button
-                title="Get Started"
-                size="lg"
-                onPress={onComplete}
-                style={{ flex: 1 }} // Make button take full width of footer
-            />
+          <Button
+            title="Get Started"
+            size="lg"
+            onPress={completeOnboarding}
+            style={{ flex: 1 }} // Make button take full width of footer
+          />
         </View>
       </View>
     </SafeAreaView>

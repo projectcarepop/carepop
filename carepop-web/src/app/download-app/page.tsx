@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download, Smartphone, HeartPulse, CalendarDays, MessageSquareText } from 'lucide-react';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+import { Smartphone, HeartPulse, CalendarDays, MessageSquareText } from 'lucide-react';
 
 // Placeholder for App Store and Google Play logos
 const AppStoreIcon = () => <svg className="h-8 w-8 mr-2" viewBox="0 0 24 24" fill="currentColor"><path d="M19.3 5.4c-.8-.8-1.9-1.3-3-1.3-1.5 0-2.8.6-3.8 1.6-.9-1-2.2-1.6-3.7-1.6-1.2 0-2.3.5-3.1 1.3C4.3 6.9 4 8.5 4 10.1c0 2.6 1.4 4.8 3.5 6.4.5.4 1 .7 1.6.9.6.2 1.2.3 1.9.3s1.3-.1 1.9-.3c.6-.2 1.1-.5 1.6-.9 2.1-1.6 3.5-3.8 3.5-6.4 0-1.6-.3-3.2-1.7-4.7zM12 14.4c-.6 0-1.1-.5-1.1-1.1s.5-1.1 1.1-1.1 1.1.5 1.1 1.1-.5 1.1-1.1 1.1z"/></svg>;

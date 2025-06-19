@@ -1,8 +1,9 @@
 'use server';
 
-import { supabaseAdmin } from '@/lib/supabase/admin';
+import { createAdminClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { cookies } from 'next/headers';
 
 const clinicFormSchema = z.object({
   name: z.string().min(2, { message: "Clinic name must be at least 2 characters." }),
@@ -14,7 +15,8 @@ const clinicFormSchema = z.object({
 });
 
 export async function createClinic(values: z.infer<typeof clinicFormSchema>) {
-    const supabase = supabaseAdmin;
+    const cookieStore = await cookies();
+    const supabase = createAdminClient(cookieStore);
     const validatedData = clinicFormSchema.parse(values);
 
     const { data, error } = await supabase
@@ -35,7 +37,8 @@ export async function createClinic(values: z.infer<typeof clinicFormSchema>) {
 
 
 export async function updateClinic(clinicId: string, values: z.infer<typeof clinicFormSchema>) {
-    const supabase = supabaseAdmin;
+    const cookieStore = await cookies();
+    const supabase = createAdminClient(cookieStore);
     const validatedData = clinicFormSchema.parse(values);
 
     const { data, error } = await supabase
@@ -56,7 +59,8 @@ export async function updateClinic(clinicId: string, values: z.infer<typeof clin
 }
 
 export async function deleteClinic(clinicId: string) {
-    const supabase = supabaseAdmin;
+    const cookieStore = await cookies();
+    const supabase = createAdminClient(cookieStore);
 
     const { error } = await supabase
         .from('clinics')

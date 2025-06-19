@@ -69,7 +69,7 @@ export function NewAppointmentForm({ clinics, patients }: NewAppointmentFormProp
     const selectedClinicId = form.watch('clinicId');
     const selectedProviderId = form.watch('providerId');
     const selectedDate = form.watch('appointmentDateTime');
-    const duration = form.watch('duration');
+    const watchedDuration = form.watch('duration');
 
     const { data: services, isLoading: isLoadingServices } = useSWR<Service[]>(
         selectedClinicId ? `/api/admin/clinics/${selectedClinicId}/services` : null, 
@@ -99,6 +99,7 @@ export function NewAppointmentForm({ clinics, patients }: NewAppointmentFormProp
           const fetchBookedSlots = async () => {
             try {
               const date = new Date(selectedDate).toISOString().split('T')[0];
+              const duration = form.getValues('duration');
               const response = await fetch(`/api/admin/providers/${selectedProviderId}/booked-slots?date=${date}&duration=${duration}`);
               if (response.ok) {
                 const data = await response.json();
@@ -115,7 +116,7 @@ export function NewAppointmentForm({ clinics, patients }: NewAppointmentFormProp
         } else {
           setBookedSlots([]);
         }
-    }, [selectedProviderId, selectedDate, duration]);
+    }, [selectedProviderId, selectedDate, watchedDuration, form]);
 
     const handleClinicChange = (clinicId: string) => {
         form.setValue('clinicId', clinicId);

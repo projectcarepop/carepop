@@ -1,5 +1,4 @@
 import axios from 'axios';
-import Cookies from 'js-cookie';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 // Basic types to satisfy the linter and improve safety.

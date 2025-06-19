@@ -5,6 +5,7 @@ import Constants from 'expo-constants';
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
 import { Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 WebBrowser.maybeCompleteAuthSession(); // Required for web and OAuth redirects
 
@@ -35,7 +36,9 @@ interface AuthContextType {
   authError: Error | null;
   /** True if a user has signed up but is awaiting email confirmation. */
   isAwaitingEmailConfirmation: boolean;
-  /** 
+  /** True if the user has completed the onboarding flow. Null while checking. */
+  hasCompletedOnboarding: boolean | null;
+  /**
    * Signs in a user with their email and password.
    * @param {SignInWithPasswordCredentials} credentials - The user's email and password.
    * @returns {Promise<{ user: User | null; error: Error | null }>} An object containing the user data on success or an error on failure.
@@ -82,11 +85,10 @@ interface AuthContextType {
    * @returns {Promise<boolean>} True on success, false on failure.
    */
   updateProfile: (params: {
-    userId: string;
     updates: Partial<Profile>;
   }) => Promise<boolean>;
   /**
-   * Creates a user's profile data.
+   * Creates or updates a user's profile data.
    * @param {{ userId: string; updates: Partial<Profile> }} params
    * @returns {Promise<boolean>} True on success, false on failure.
    */
@@ -94,6 +96,11 @@ interface AuthContextType {
     userId: string;
     updates: Partial<Profile>;
   }) => Promise<boolean>;
+  /**
+   * Marks the onboarding process as complete.
+   * @returns {Promise<void>}
+   */
+  completeOnboarding: () => Promise<void>;
 }
 
 /**
@@ -130,6 +137,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [authError, setAuthError] = useState<Error | null>(null);
   const [isAwaitingEmailConfirmation, setIsAwaitingEmailConfirmation] = useState(false);
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
 
   const clearAuthError = () => {
     setAuthError(null);
@@ -149,6 +157,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Restore the original useEffect
   useEffect(() => {
+    // Check onboarding status on initial load
+    const checkOnboardingStatus = async () => {
+      try {
+        const value = await AsyncStorage.getItem('@hasCompletedOnboarding');
+        setHasCompletedOnboarding(value === 'true');
+      } catch (e) {
+        setHasCompletedOnboarding(false); // Default to showing onboarding on error
+      }
+    };
+    checkOnboardingStatus();
+    
     console.log('[AuthContext] useEffect init. Initial isLoading state:', isLoading);
     console.log('[AuthContext] Setting up onAuthStateChange listener...');
     
@@ -247,24 +266,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }): Promise<boolean> => {
     setIsSaving(true);
     try {
+      console.log(`[AuthContext] Upserting profile for user ${userId}...`);
+      
       const profileData = {
         user_id: userId,
         ...updates,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       };
 
-      const { error } = await supabase
-        .from('profiles')
-        .upsert(profileData, { onConflict: 'user_id' });
+      const { error } = await supabase.from('profiles').upsert(profileData);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error creating profile:", error);
+        throw error;
+      }
       
-      await refreshUserProfile();
+      console.log("[AuthContext] Profile upserted successfully.");
+      await refreshUserProfile(); // Refresh data from DB to get the latest state
       return true;
     } catch (error) {
-      console.error('Error creating profile:', error);
-      setAuthError(error instanceof Error ? error : new Error('Failed to create profile'));
+      console.error("Error in createProfile function:", error);
+      setAuthError(error instanceof Error ? error : new Error('An unknown error occurred.'));
       return false;
     } finally {
       setIsSaving(false);
@@ -272,35 +293,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const updateProfile = async ({
-    userId,
     updates,
   }: {
-    userId: string;
     updates: Partial<Profile>;
   }): Promise<boolean> => {
     setIsSaving(true);
     try {
-      const updatesToSave = {
-        ...updates,
-        updated_at: new Date().toISOString(),
-      };
-
-      const { error } = await supabase
+       if (!user) {
+        throw new Error('No user session available.');
+      }
+      const { data, error } = await supabase
         .from('profiles')
-        .update(updatesToSave)
-        .eq('user_id', userId);
-
+        .update(updates)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+        
       if (error) {
+        console.error("Error updating profile:", error);
         throw error;
       }
 
-      // Refresh the profile data in the context
-      await refreshUserProfile();
-      Alert.alert('Success', 'Profile updated successfully!');
-      return true;
-    } catch (error: any) {
-      console.error('[AuthContext] Error updating profile:', error);
-      Alert.alert('Error', error.message || 'Failed to update profile.');
+      if (data) {
+        console.log("[AuthContext] Profile updated successfully:", data);
+        setProfile(data as Profile);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Error in updateProfile function:", error);
+      setAuthError(error instanceof Error ? error : new Error('An unknown error occurred during profile update.'));
       return false;
     } finally {
       setIsSaving(false);
@@ -308,6 +330,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const signOut = async () => {
+    console.log("[AuthContext] Signing out...");
     // console.log('[AuthContext] signOut called. Setting isLoading to true.');
     // setIsLoading(true); 
 
@@ -480,7 +503,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  console.log('[AuthContext] Rendering AuthProvider. isLoading:', isLoading, 'Session User:', session?.user?.id || 'null', 'AwaitingConfirm:', isAwaitingEmailConfirmation);
+  const completeOnboarding = async () => {
+    try {
+      await AsyncStorage.setItem('@hasCompletedOnboarding', 'true');
+      setHasCompletedOnboarding(true);
+    } catch (e) {
+      console.error('Failed to save onboarding status.', e);
+      // Decide if you want to set an authError here
+    }
+  };
+
+  console.log('[AuthContext] Rendering AuthProvider. isLoading:', isLoading, 'Session User:', session?.user?.id || 'null', 'AwaitingConfirm:', isAwaitingEmailConfirmation, 'CompletedOnboarding:', hasCompletedOnboarding);
 
   return (
     <AuthContext.Provider
@@ -491,6 +524,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         profile,
         authError,
         isAwaitingEmailConfirmation, 
+        hasCompletedOnboarding,
         signInWithPassword,
         signInWithGoogle,
         signOut,
@@ -500,6 +534,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         manuallySetProfile,
         updateProfile,
         createProfile,
+        completeOnboarding,
         isSaving,
       }}
     >

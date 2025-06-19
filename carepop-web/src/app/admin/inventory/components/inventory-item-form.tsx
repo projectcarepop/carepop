@@ -130,7 +130,6 @@ export function InventoryItemForm({ initialData, suppliers }: InventoryItemFormP
                   <Select onValueChange={field.onChange} defaultValue={field.value ?? ''}>
                     <FormControl><SelectTrigger><SelectValue placeholder="Select a supplier" /></SelectTrigger></FormControl>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
                       {suppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                     </SelectContent>
                   </Select>

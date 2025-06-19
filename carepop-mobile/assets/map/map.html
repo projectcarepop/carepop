@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CarePoP Clinic Finder</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <style>
+    body {
+      padding: 0;
+      margin: 0;
+    }
+    html, body, #map {
+      height: 100%;
+      width: 100vw;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script>
+    const map = L.map('map').setView([14.6760, 121.0437], 12); // Default to Metro Manila
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    const userMarker = L.marker([0,0]).addTo(map);
+    const clinicMarkers = L.layerGroup().addTo(map);
+
+    // Listen for messages from React Native
+    document.addEventListener('message', function(event) {
+      const data = JSON.parse(event.data);
+
+      if (data.type === 'INIT_DATA') {
+        // Set user location
+        if (data.userLocation) {
+          const { latitude, longitude } = data.userLocation;
+          const userLatLng = [latitude, longitude];
+          userMarker.setLatLng(userLatLng).bindPopup('You are here!');
+          map.setView(userLatLng, 14);
+        }
+
+        // Add clinic markers
+        if (data.clinics && Array.isArray(data.clinics)) {
+          clinicMarkers.clearLayers();
+          data.clinics.forEach(clinic => {
+            if (clinic.latitude && clinic.longitude) {
+              const clinicLatLng = [clinic.latitude, clinic.longitude];
+              L.marker(clinicLatLng)
+                .addTo(clinicMarkers)
+                .bindPopup(`<b>${clinic.name}</b><br>${clinic.address || ''}`);
+            }
+          });
+        }
+      }
+    });
+
+    // Notify React Native that the WebView is ready
+    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'WEBVIEW_READY' }));
+  </script>
+</body>
+</html> 

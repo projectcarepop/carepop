@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useBookingContext } from '@/lib/contexts/BookingContext';
 import { getProviderAvailability } from '@/lib/actions/appointments'; // Import the server action
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { DayPicker } from 'react-day-picker';
 import { Loader2, CalendarDays, Clock, Info, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, isSameDay, parseISO, getMonth, getYear, addMonths, subMonths } from 'date-fns';
+import { format, parseISO, addMonths, subMonths } from 'date-fns';
 
 // Custom calendar navigation component that will be displayed at the bottom
 function CalendarNavigation({ month, onMonthChange }: { month: Date; onMonthChange: (date: Date) => void }) {
