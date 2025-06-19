@@ -16,7 +16,7 @@ const getFullUser = async (userId: string) => {
     const { data: roles, error: rolesError } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', userId);
+        .eq('id', userId);
 
     if (rolesError) {
         console.error('Error fetching user roles:', rolesError);

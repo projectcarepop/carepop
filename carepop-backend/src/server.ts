@@ -24,7 +24,8 @@ app.use(helmet());
 const allowedOrigins = [
   /^http:\/\/localhost:\d{4}$/, // Loalhost on any 4-digit port
   /^https:\/\/carepop\.vercel\.app$/, // Production deployment
-  /^https:\/\/.*--carepop\.vercel\.app$/, // Vercel Preview Deployments
+  /^https:\/\/.*--carepop\.vercel\.app$/, // Vercel Preview Deployments (old format)
+  /^https:\/\/carepop-.*\.vercel\.app$/, // Vercel Preview Deployments for Git branches
 ];
 
 const corsOptions: cors.CorsOptions = {
