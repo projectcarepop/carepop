@@ -1,8 +1,8 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { Database } from '@/types/supabase.types';
-import { AppError } from '@/lib/utils/appError';
-import logger from '@/utils/logger';
-import { supabaseServiceRole } from '@/config/supabaseClient';
+import { Database } from '../../types/supabase.types';
+import { AppError } from '../../lib/utils/appError';
+import logger from '../../utils/logger';
+import { supabaseServiceRole } from '../../config/supabaseClient';
 import { StatusCodes } from 'http-status-codes';
 
 // This type now matches the flat structure from our RPC function

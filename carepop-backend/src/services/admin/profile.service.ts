@@ -1,7 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { Database } from '@/types/supabase.types';
-import { supabaseServiceRole } from '@/config/supabaseClient';
-import { AppError } from '@/lib/utils/appError';
+import { Database } from '../../types/supabase.types';
+import { supabaseServiceRole } from '../../config/supabaseClient';
+import { AppError } from '../../lib/utils/appError';
 import { StatusCodes } from 'http-status-codes';
 
 const supabase: SupabaseClient<Database> = supabaseServiceRole;

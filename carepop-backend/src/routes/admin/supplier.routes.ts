@@ -5,14 +5,14 @@ import {
   getSupplierById,
   updateSupplier,
   deleteSupplier,
-} from '@/controllers/admin/supplier.controller';
-import { validateRequest } from '@/lib/middleware/validate.middleware';
+} from '../../controllers/admin/supplier.controller';
+import { validateRequest } from '../../lib/middleware/validate.middleware';
 import {
   createSupplierSchema,
   updateSupplierSchema,
   supplierIdParamSchema,
   listSuppliersQuerySchema,
-} from '@/validation/admin/supplier.validation';
+} from '../../validation/admin/supplier.validation';
 
 const router = Router();
 

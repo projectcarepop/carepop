@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
-import { asyncHandler } from '@/lib/utils/asyncHandler';
-import { sendCreated } from '@/utils/responseHandler';
-import { MedicalRecordAdminService } from '@/services/admin/medicalRecord.admin.service';
-import { AppError } from '@/lib/utils/appError';
+import { asyncHandler } from '../../lib/utils/asyncHandler';
+import { sendCreated } from '../../utils/responseHandler';
+import { MedicalRecordAdminService } from '../../services/admin/medicalRecord.admin.service';
+import { AppError } from '../../lib/utils/appError';
 
 const medicalRecordService = new MedicalRecordAdminService();
 

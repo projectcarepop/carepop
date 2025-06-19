@@ -5,14 +5,14 @@ import {
   getInventoryItemById,
   updateInventoryItem,
   deleteInventoryItem,
-} from '@/controllers/admin/inventory.controller';
-import { validateRequest } from '@/lib/middleware/validate.middleware';
+} from '../../controllers/admin/inventory.controller';
+import { validateRequest } from '../../lib/middleware/validate.middleware';
 import {
   createInventoryItemSchema,
   updateInventoryItemSchema,
   inventoryIdParamSchema,
   listInventoryQuerySchema
-} from '@/validation/admin/inventory.validation';
+} from '../../validation/admin/inventory.validation';
 
 const router = Router();
 

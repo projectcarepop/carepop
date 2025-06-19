@@ -5,14 +5,14 @@ import {
   getProviderById,
   updateProvider,
   deleteProvider,
-} from '@/controllers/admin/provider.controller';
-import { validateRequest } from '@/lib/middleware/validate.middleware';
+} from '../../controllers/admin/provider.controller';
+import { validateRequest } from '../../lib/middleware/validate.middleware';
 import {
   createProviderSchema,
   updateProviderSchema,
   providerIdParamSchema,
   listProvidersQuerySchema,
-} from '@/validation/admin/provider.validation';
+} from '../../validation/admin/provider.validation';
 
 // Nested routes for services associated with a provider
 import providerServicesRoutes from './provider-services.routes';

@@ -5,14 +5,14 @@ import {
   getServiceById,
   updateService,
   deleteService,
-} from '@/controllers/admin/service.controller';
-import { validateRequest } from '@/lib/middleware/validate.middleware';
+} from '../../controllers/admin/service.controller';
+import { validateRequest } from '../../lib/middleware/validate.middleware';
 import {
   createServiceSchema,
   updateServiceSchema,
   serviceIdParamSchema,
   listServicesQuerySchema,
-} from '@/validation/admin/service.validation';
+} from '../../validation/admin/service.validation';
 
 // Nested routes for providers associated with a service
 import serviceProvidersRoutes from './service-providers.routes';

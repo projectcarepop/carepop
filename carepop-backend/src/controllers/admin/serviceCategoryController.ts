@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
-import { serviceCategoryService } from '@/services/admin/serviceCategoryService';
-import { createServiceCategorySchema, updateServiceCategorySchema } from '@/validation/admin/service-category.admin.validation';
-import { commonSchemas } from '@/validation/commonSchemas';
-import { asyncHandler } from '@/utils/asyncHandler';
-import { sendCreated, sendSuccess, sendNoContent } from '@/utils/responseHandler';
+import { serviceCategoryService } from '../../services/admin/serviceCategoryService';
+import { createServiceCategorySchema, updateServiceCategorySchema } from '../../validation/admin/service-category.admin.validation';
+import { commonSchemas } from '../../validation/commonSchemas';
+import { asyncHandler } from '../../utils/asyncHandler';
+import { sendCreated, sendSuccess, sendNoContent } from '../../utils/responseHandler';
 
 export const serviceCategoryController = {
   createCategory: asyncHandler(async (req: Request, res: Response) => {

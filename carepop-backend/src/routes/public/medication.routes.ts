@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { medicationController } from '@/controllers/public/medication.controller';
-import { authMiddleware } from '@/lib/middleware/auth.middleware';
+import { medicationController } from '../../controllers/public/medication.controller';
+import { authMiddleware } from '../../lib/middleware/auth.middleware';
 
 const router = Router();
 

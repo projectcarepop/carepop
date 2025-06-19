@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { getMyMedicalRecords, getMedicalRecordSignedUrl } from '@/controllers/public/medicalRecord.public.controller';
-import { authMiddleware } from '@/lib/middleware/auth.middleware';
+import { getMyMedicalRecords, getMedicalRecordSignedUrl } from '../../controllers/public/medicalRecord.public.controller';
+import { authMiddleware } from '../../lib/middleware/auth.middleware';
 
 const router = Router();
 

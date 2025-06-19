@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { commonSchemas } from '@/validation/commonSchemas';
+import { commonSchemas } from '../commonSchemas';
 
 // Schema for validating path parameters when dealing with a specific clinic
 export const clinicIdParamSchema = z.object({

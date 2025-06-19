@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { commonSchemas } from '@/validation/commonSchemas';
+import { commonSchemas } from '../commonSchemas';
 
 const recordBodyBase = z.object({
   recordTitle: z.string().min(1, 'Record title is required'),

@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
-import { asyncHandler } from '@/lib/utils/asyncHandler';
-import { sendSuccess } from '@/utils/responseHandler';
-import { MedicalRecordPublicService } from '@/services/public/medicalRecord.public.service';
-import { AppError } from '@/lib/utils/appError';
+import { asyncHandler } from '../../lib/utils/asyncHandler';
+import { sendSuccess } from '../../utils/responseHandler';
+import { MedicalRecordPublicService } from '../../services/public/medicalRecord.public.service';
+import { AppError } from '../../lib/utils/appError';
 import { StatusCodes } from 'http-status-codes';
 
 const medicalRecordService = new MedicalRecordPublicService();

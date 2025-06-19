@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import * as dashboardController from '@/controllers/admin/dashboard.controller';
-import { validateRequest } from '@/lib/middleware/validate.middleware';
-import { commonSchemas } from '@/validation/commonSchemas';
+import * as dashboardController from '../../controllers/admin/dashboard.controller';
+import { validateRequest } from '../../lib/middleware/validate.middleware';
+import { commonSchemas } from '../../validation/commonSchemas';
 import { z } from 'zod';
 
 const router = Router();

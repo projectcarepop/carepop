@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
-import { asyncHandler } from '@/lib/utils/asyncHandler';
-import { sendSuccess } from '@/lib/utils/sendSuccess';
-import * as menstrualService from '@/services/public/menstrual.service';
+import { asyncHandler } from '../../lib/utils/asyncHandler';
+import { sendSuccess } from '../../lib/utils/sendSuccess';
+import * as menstrualService from '../../services/public/menstrual.service';
 import { z } from 'zod';
-import { commonSchemas } from '@/validation/commonSchemas';
+import { commonSchemas } from '../../validation/commonSchemas';
 
 // --- Validation Schemas ---
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format.");

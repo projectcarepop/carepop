@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
-import { serviceService } from '@/services/admin/serviceService';
-import { createServiceSchema, updateServiceSchema } from '@/validation/admin/service.admin.validation';
-import { commonSchemas } from '@/validation/commonSchemas';
-import { sendSuccess, sendCreated, sendNoContent } from '@/utils/responseHandler';
-import { asyncHandler } from '@/utils/asyncHandler';
+import { serviceService } from '../../services/admin/serviceService';
+import { createServiceSchema, updateServiceSchema } from '../../validation/admin/service.admin.validation';
+import { commonSchemas } from '../../validation/commonSchemas';
+import { sendSuccess, sendCreated, sendNoContent } from '../../utils/responseHandler';
+import { asyncHandler } from '../../utils/asyncHandler';
 
 export const serviceController = {
   createService: asyncHandler(async (req: Request, res: Response) => {

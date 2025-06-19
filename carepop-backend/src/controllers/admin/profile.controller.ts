@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
-import * as profileService from '@/services/admin/profile.service';
-import { asyncHandler } from '@/lib/utils/asyncHandler';
-import { sendSuccess } from '@/utils/responseHandler';
+import * as profileService from '../../services/admin/profile.service';
+import { asyncHandler } from '../../lib/utils/asyncHandler';
+import { sendSuccess } from '../../utils/responseHandler';
 import { StatusCodes } from 'http-status-codes';
 
 /**

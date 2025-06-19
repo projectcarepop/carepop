@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { menstrualController } from '@/controllers/public/menstrual.controller';
-import { authMiddleware } from '@/lib/middleware/auth.middleware';
+import { menstrualController } from '../../controllers/public/menstrual.controller';
+import { authMiddleware } from '../../lib/middleware/auth.middleware';
 
 const router = Router();
 

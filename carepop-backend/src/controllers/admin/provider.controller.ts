@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
-import { ProviderAdminService } from '@/services/admin/provider.service';
-import { asyncHandler } from '@/lib/utils/asyncHandler';
-import { AppError } from '@/lib/utils/appError';
-import { sendSuccess, sendCreated } from '@/utils/responseHandler';
-import { listProvidersQuerySchema } from '@/validation/admin/provider.validation';
+import { ProviderAdminService } from '../../services/admin/provider.service';
+import { asyncHandler } from '../../lib/utils/asyncHandler';
+import { AppError } from '../../lib/utils/appError';
+import { sendSuccess, sendCreated } from '../../utils/responseHandler';
+import { listProvidersQuerySchema } from '../../validation/admin/provider.validation';
 
 const providerService = new ProviderAdminService();
 

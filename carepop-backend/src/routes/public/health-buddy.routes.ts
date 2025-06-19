@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { healthBuddyController } from '@/controllers/public/healthBuddy.controller';
-import { authMiddleware } from '@/lib/middleware/auth.middleware';
+import { healthBuddyController } from '../../controllers/public/healthBuddy.controller';
+import { authMiddleware } from '../../lib/middleware/auth.middleware';
 
 const router = Router();
 

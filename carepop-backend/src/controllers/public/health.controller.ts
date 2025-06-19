@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
-import { asyncHandler } from '@/lib/utils/asyncHandler';
-import { sendSuccess } from '@/lib/utils/sendSuccess';
-import * as healthService from '@/services/public/health.service';
+import { asyncHandler } from '../../lib/utils/asyncHandler';
+import { sendSuccess } from '../../lib/utils/sendSuccess';
+import * as healthService from '../../services/public/health.service';
 import { z } from 'zod';
 
 const healthEntrySchema = z.object({

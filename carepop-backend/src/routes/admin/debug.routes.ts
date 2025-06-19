@@ -1,8 +1,8 @@
 import { Router } from 'express';
-// import { debugController } from '@/controllers/admin/debug.controller';
-import * as medicalRecordService from '@/services/admin/medical-record.service';
-import logger from '@/utils/logger';
-import { sendSuccess } from '@/lib/utils/sendSuccess';
+// import { debugController } from '../../controllers/admin/debug.controller';
+import * as medicalRecordService from '../../services/admin/medical-record.service';
+import logger from '../../utils/logger';
+import { sendSuccess } from '../../lib/utils/sendSuccess';
 
 const router = Router();
 

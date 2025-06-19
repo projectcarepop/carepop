@@ -1,5 +1,5 @@
-import { supabase } from '@/config/supabaseClient';
-import { AppError } from '@/lib/utils/appError';
+import { supabase } from '../../config/supabaseClient';
+import { AppError } from '../../lib/utils/appError';
 import { v4 as uuidv4 } from 'uuid';
 
 export class MedicalRecordAdminService {

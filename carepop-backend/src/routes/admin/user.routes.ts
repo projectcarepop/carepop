@@ -4,15 +4,15 @@ import {
   getUserById,
   updateUserRoles,
   getMyProfile
-} from '@/controllers/admin/user.controller';
-import { validateRequest } from '@/lib/middleware/validate.middleware';
+} from '../../controllers/admin/user.controller';
+import { validateRequest } from '../../lib/middleware/validate.middleware';
 import {
   userIdParamSchema,
   listUsersQuerySchema,
   updateUserRolesSchema,
   searchSchema
-} from '@/validation/admin/user.validation';
-import { getMedicalRecordsByUserId } from '@/controllers/admin/medical-record.controller';
+} from '../../validation/admin/user.validation';
+import { getMedicalRecordsByUserId } from '../../controllers/admin/medical-record.controller';
 
 const router = Router();
 

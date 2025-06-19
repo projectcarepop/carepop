@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
-import * as dashboardService from '@/services/admin/dashboard.service';
-import { asyncHandler } from '@/lib/utils/asyncHandler';
-import { sendSuccess } from '@/utils/responseHandler';
-import { AppError } from '@/lib/utils/appError';
+import * as dashboardService from '../../services/admin/dashboard.service';
+import { asyncHandler } from '../../lib/utils/asyncHandler';
+import { sendSuccess } from '../../utils/responseHandler';
+import { AppError } from '../../lib/utils/appError';
 import { StatusCodes } from 'http-status-codes';
 
 const getStats = asyncHandler(async (req: Request, res: Response) => {

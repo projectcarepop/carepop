@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
-import { asyncHandler } from '@/lib/utils/asyncHandler';
-import * as healthBuddyService from '@/services/public/healthBuddy.service';
-import { sendSuccess } from '@/lib/utils/sendSuccess';
+import { asyncHandler } from '../../lib/utils/asyncHandler';
+import * as healthBuddyService from '../../services/public/healthBuddy.service';
+import { sendSuccess } from '../../lib/utils/sendSuccess';
 import { z } from 'zod';
 
 const logMoodSchema = z.object({

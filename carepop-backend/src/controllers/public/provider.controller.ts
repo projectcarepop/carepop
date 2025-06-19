@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
-import { asyncHandler } from '@/lib/utils/asyncHandler';
-import * as providerService from '@/services/public/provider.service';
-import { sendSuccess } from '@/lib/utils/sendSuccess';
-import { AppError } from '@/lib/utils/appError';
+import { asyncHandler } from '../../lib/utils/asyncHandler';
+import * as providerService from '../../services/public/provider.service';
+import { sendSuccess } from '../../lib/utils/sendSuccess';
+import { AppError } from '../../lib/utils/appError';
 import { z } from 'zod';
 
 const availabilityQuerySchema = z.object({

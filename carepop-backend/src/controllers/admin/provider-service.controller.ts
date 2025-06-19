@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
-import * as providerService from '@/services/admin/provider-service.service';
-import { asyncHandler } from '@/lib/utils/asyncHandler';
-import { sendCreated, sendSuccess } from '@/utils/responseHandler';
+import * as providerService from '../../services/admin/provider-service.service';
+import { asyncHandler } from '../../lib/utils/asyncHandler';
+import { sendCreated, sendSuccess } from '../../utils/responseHandler';
 import { StatusCodes } from 'http-status-codes';
 
 const getServicesForProvider = asyncHandler(async (req: Request, res: Response) => {

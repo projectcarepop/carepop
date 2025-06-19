@@ -1,9 +1,9 @@
-import { supabase as publicSupabase } from '@/config/supabaseClient';
-import { serviceSupabase as supabase } from '@/lib/supabase/service-client';
-import { AppError } from '@/lib/utils/appError';
+import { supabase as publicSupabase } from '../../config/supabaseClient';
+import { serviceSupabase as supabase } from '../../lib/supabase/service-client';
+import { AppError } from '../../lib/utils/appError';
 import { StatusCodes } from 'http-status-codes';
-import { Database } from '@/types/supabase.types';
-import logger from '@/utils/logger';
+import { Database } from '../../types/supabase.types';
+import logger from '../../utils/logger';
 
 const MEDICAL_RECORDS_BUCKET = 'medical-records';
 

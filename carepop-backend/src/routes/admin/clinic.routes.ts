@@ -5,14 +5,14 @@ import {
   getClinicById,
   updateClinic,
   deleteClinic,
-} from '@/controllers/admin/clinic.controller';
-import { validateRequest } from '@/lib/middleware/validate.middleware';
+} from '../../controllers/admin/clinic.controller';
+import { validateRequest } from '../../lib/middleware/validate.middleware';
 import {
   createClinicSchema,
   updateClinicSchema,
   clinicIdParamSchema,
   listClinicsQuerySchema,
-} from '@/validation/admin/clinic.validation';
+} from '../../validation/admin/clinic.validation';
 
 // Nested routes for providers within a clinic
 import clinicProviderRoutes from './clinic-provider.routes';

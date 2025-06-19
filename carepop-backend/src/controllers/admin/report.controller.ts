@@ -1,8 +1,8 @@
 import { Response } from 'express';
-import { AuthenticatedRequest } from '@/types/authenticated-request.interface';
-import * as reportService from '@/services/admin/report.service';
-import { asyncHandler } from '@/lib/utils/asyncHandler';
-import { sendCreated, sendSuccess } from '@/utils/responseHandler';
+import { AuthenticatedRequest } from '../../types/authenticated-request.interface';
+import * as reportService from '../../services/admin/report.service';
+import { asyncHandler } from '../../lib/utils/asyncHandler';
+import { sendCreated, sendSuccess } from '../../utils/responseHandler';
 
 const createReport = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { appointmentId } = req.params;

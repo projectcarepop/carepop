@@ -1,9 +1,9 @@
 import { Response } from 'express';
-import { AuthenticatedRequest } from '@/types/authenticated-request.interface';
-import * as medicalRecordService from '@/services/admin/medical-record.service';
-import { asyncHandler } from '@/lib/utils/asyncHandler';
-import { sendCreated, sendSuccess } from '@/utils/responseHandler';
-import { AppError } from '@/lib/utils/appError';
+import { AuthenticatedRequest } from '../../types/authenticated-request.interface';
+import * as medicalRecordService from '../../services/admin/medical-record.service';
+import { asyncHandler } from '../../lib/utils/asyncHandler';
+import { sendCreated, sendSuccess } from '../../utils/responseHandler';
+import { AppError } from '../../lib/utils/appError';
 import { StatusCodes } from 'http-status-codes';
 
 const createRecord = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {

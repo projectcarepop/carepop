@@ -1,9 +1,9 @@
-import { supabaseServiceRole } from '@/config/supabaseClient';
-import { Database } from '@/types/supabase.types';
-import { AppError } from '@/lib/utils/appError';
+import { supabaseServiceRole } from '../../config/supabaseClient';
+import { Database } from '../../types/supabase.types';
+import { AppError } from '../../lib/utils/appError';
 import { StatusCodes } from 'http-status-codes';
 import { PostgrestError } from '@supabase/postgrest-js';
-import logger from '@/utils/logger';
+import logger from '../../utils/logger';
 
 type Provider = Database['public']['Tables']['providers']['Row'];
 type CreateProviderDto = Database['public']['Tables']['providers']['Insert'];

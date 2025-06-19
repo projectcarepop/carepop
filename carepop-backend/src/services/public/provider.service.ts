@@ -1,5 +1,5 @@
-import { supabase } from '@/config/supabaseClient';
-import { AppError } from '@/lib/utils/appError';
+import { supabase } from '../../config/supabaseClient';
+import { AppError } from '../../lib/utils/appError';
 import { eachDayOfInterval, format, parseISO, addMinutes, isWithinInterval } from 'date-fns';
 
 export const calculateProviderAvailability = async (providerId: string, serviceId: string, startDate: string, endDate: string) => {

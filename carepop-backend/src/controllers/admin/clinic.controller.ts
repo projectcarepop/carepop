@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
-import { ClinicAdminService } from '@/services/admin/clinic.service';
-import { asyncHandler } from '@/lib/utils/asyncHandler';
-import { AppError } from '@/lib/utils/appError';
-import { sendSuccess, sendCreated } from '@/utils/responseHandler';
-import { listClinicsQuerySchema } from '@/validation/admin/clinic.validation';
+import { ClinicAdminService } from '../../services/admin/clinic.service';
+import { asyncHandler } from '../../lib/utils/asyncHandler';
+import { AppError } from '../../lib/utils/appError';
+import { sendSuccess, sendCreated } from '../../utils/responseHandler';
+import { listClinicsQuerySchema } from '../../validation/admin/clinic.validation';
 
 const clinicService = new ClinicAdminService();
 

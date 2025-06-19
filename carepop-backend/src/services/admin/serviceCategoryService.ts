@@ -1,7 +1,7 @@
-import { supabaseServiceRole } from '@/config/supabaseClient';
-import { createServiceCategorySchema, updateServiceCategorySchema } from '@/validation/admin/service-category.admin.validation';
+import { supabaseServiceRole } from '../../config/supabaseClient';
+import { createServiceCategorySchema, updateServiceCategorySchema } from '../../validation/admin/service-category.admin.validation';
 import { z } from 'zod';
-import { AppError } from '@/utils/errors';
+import { AppError } from '../../utils/errors';
 
 const TABLE_NAME = 'service_categories';
 

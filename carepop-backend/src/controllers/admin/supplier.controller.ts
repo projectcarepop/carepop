@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
-import { SupplierAdminService } from '@/services/admin/supplier.service';
-import { asyncHandler } from '@/lib/utils/asyncHandler';
-import { AppError } from '@/lib/utils/appError';
-import { sendSuccess, sendCreated } from '@/utils/responseHandler';
-import { listSuppliersQuerySchema } from '@/validation/admin/supplier.validation';
+import { SupplierAdminService } from '../../services/admin/supplier.service';
+import { asyncHandler } from '../../lib/utils/asyncHandler';
+import { AppError } from '../../lib/utils/appError';
+import { sendSuccess, sendCreated } from '../../utils/responseHandler';
+import { listSuppliersQuerySchema } from '../../validation/admin/supplier.validation';
 
 const supplierService = new SupplierAdminService();
 

@@ -1,7 +1,7 @@
 import express from 'express';
-import { getAppointments, getAppointmentById } from '@/controllers/admin/appointment.controller';
-// import { createAppointment, updateAppointment, deleteAppointment } from '@/controllers/admin/appointment.controller';
-// import { getReportByAppointmentId } from '@/controllers/admin/appointment-report.admin.controller';
+import { getAppointments, getAppointmentById } from '../../controllers/admin/appointment.controller';
+// import { createAppointment, updateAppointment, deleteAppointment } from '../../controllers/admin/appointment.controller';
+// import { getReportByAppointmentId } from '../../controllers/admin/appointment-report.admin.controller';
 
 const router = express.Router();
 

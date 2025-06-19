@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
-import { ServiceAdminService } from '@/services/admin/service.service';
-import { asyncHandler } from '@/lib/utils/asyncHandler';
-import { AppError } from '@/lib/utils/appError';
-import { sendSuccess, sendCreated } from '@/utils/responseHandler';
-import { listServicesQuerySchema } from '@/validation/admin/service.validation';
+import { ServiceAdminService } from '../../services/admin/service.service';
+import { asyncHandler } from '../../lib/utils/asyncHandler';
+import { AppError } from '../../lib/utils/appError';
+import { sendSuccess, sendCreated } from '../../utils/responseHandler';
+import { listServicesQuerySchema } from '../../validation/admin/service.validation';
 
 const serviceService = new ServiceAdminService();
 

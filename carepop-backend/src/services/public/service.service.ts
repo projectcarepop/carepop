@@ -1,6 +1,6 @@
-import { supabase } from '@/config/supabaseClient';
-import { AppError } from '@/lib/utils/appError';
-import cacheService from '@/lib/services/cache.service';
+import { supabase } from '../../config/supabaseClient';
+import { AppError } from '../../lib/utils/appError';
+import cacheService from '../../lib/services/cache.service';
 
 const SERVICES_CACHE_KEY = 'public_services_list';
 const CACHE_TTL_SECONDS = 3600; // 1 hour

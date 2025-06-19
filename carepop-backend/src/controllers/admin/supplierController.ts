@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
-import { createSupplierSchema } from '@/validation/admin/supplier.admin.validation';
-import { supplierService } from '@/services/admin/supplierService';
-import { asyncHandler } from '@/utils/asyncHandler';
-import { sendCreated, sendSuccess } from '@/utils/responseHandler';
+import { createSupplierSchema } from '../../validation/admin/supplier.admin.validation';
+import { supplierService } from '../../services/admin/supplierService';
+import { asyncHandler } from '../../utils/asyncHandler';
+import { sendCreated, sendSuccess } from '../../utils/responseHandler';
 
 export const supplierController = {
   createSupplier: asyncHandler(async (req: Request, res: Response) => {

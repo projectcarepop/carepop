@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
-import { AppointmentService, createAppointment as createAppointmentService } from '@/services/public/appointment.service';
-import { sendSuccess } from '@/utils/responseHandler';
-import { asyncHandler } from '@/lib/utils/asyncHandler';
+import { AppointmentService, createAppointment as createAppointmentService } from '../../services/public/appointment.service';
+import { sendSuccess } from '../../utils/responseHandler';
+import { asyncHandler } from '../../lib/utils/asyncHandler';
 import { z } from 'zod';
-import { AppError } from '@/lib/utils/appError';
+import { AppError } from '../../lib/utils/appError';
 
 // Define the AuthenticatedRequest type locally
 export interface AuthenticatedRequest extends Request {

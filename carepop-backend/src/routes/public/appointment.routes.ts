@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { getMyFutureAppointments, getMyPastAppointments, cancelMyAppointment, createAppointment } from '@/controllers/public/appointment.controller';
-import { authMiddleware } from '@/lib/middleware/auth.middleware';
+import { getMyFutureAppointments, getMyPastAppointments, cancelMyAppointment, createAppointment } from '../../controllers/public/appointment.controller';
+import { authMiddleware } from '../../lib/middleware/auth.middleware';
 
 const router = Router();
 

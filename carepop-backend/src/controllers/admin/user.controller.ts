@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
-import { UserAdminService } from '@/services/admin/userService';
-import { asyncHandler } from '@/lib/utils/asyncHandler';
-import { AppError } from '@/lib/utils/appError';
-import { sendSuccess } from '@/utils/responseHandler';
-import { listUsersQuerySchema } from '@/validation/admin/user.validation';
+import { UserAdminService } from '../../services/admin/userService';
+import { asyncHandler } from '../../lib/utils/asyncHandler';
+import { AppError } from '../../lib/utils/appError';
+import { sendSuccess } from '../../utils/responseHandler';
+import { listUsersQuerySchema } from '../../validation/admin/user.validation';
 
 const userService = new UserAdminService();
 

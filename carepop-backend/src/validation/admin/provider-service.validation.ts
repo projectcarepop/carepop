@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { commonSchemas } from '@/validation/commonSchemas';
+import { commonSchemas } from '../commonSchemas';
 
 export const providerServiceParams = z.object({
   providerId: commonSchemas.uuid,

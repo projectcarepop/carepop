@@ -1,5 +1,5 @@
-import { serviceSupabase } from '@/lib/supabase/service-client';
-import { AppError } from '@/lib/utils/appError';
+import { serviceSupabase } from '../../lib/supabase/service-client';
+import { AppError } from '../../lib/utils/appError';
 
 // --- Cycle Management ---
 

@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import * as clinicProviderController from '@/controllers/admin/clinic-provider.controller';
-import { validateRequest } from '@/lib/middleware/validate.middleware';
+import * as clinicProviderController from '../../controllers/admin/clinic-provider.controller';
+import { validateRequest } from '../../lib/middleware/validate.middleware';
 import {
   associateProviderSchema,
   disassociateProviderSchema,
   listProvidersForClinicSchema,
-} from '@/validation/admin/clinic-provider.validation';
+} from '../../validation/admin/clinic-provider.validation';
 
 const router = Router({ mergeParams: true });
 

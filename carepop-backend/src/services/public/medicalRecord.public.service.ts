@@ -1,5 +1,5 @@
-import { supabase } from '@/config/supabaseClient';
-import { AppError } from '@/lib/utils/appError';
+import { supabase } from '../../config/supabaseClient';
+import { AppError } from '../../lib/utils/appError';
 
 // The duration for which the signed URL will be valid, in seconds.
 const SIGNED_URL_EXPIRES_IN = 300; // 5 minutes

@@ -1,6 +1,6 @@
-import { supabase } from '@/config/supabaseClient';
-import { AppError } from '@/lib/utils/appError';
-import { AuthenticatedRequest } from '@/controllers/public/appointment.controller';
+import { supabase } from '../../config/supabaseClient';
+import { AppError } from '../../lib/utils/appError';
+import { AuthenticatedRequest } from '../../controllers/public/appointment.controller';
 import { getProviderAvailability } from './availability.service';
 
 export class AppointmentService {

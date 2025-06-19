@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
-import { InventoryAdminService } from '@/services/admin/inventory.service';
-import { asyncHandler } from '@/lib/utils/asyncHandler';
-import { AppError } from '@/lib/utils/appError';
-import { sendSuccess, sendCreated } from '@/utils/responseHandler';
-import { listInventoryQuerySchema } from '@/validation/admin/inventory.validation';
+import { InventoryAdminService } from '../../services/admin/inventory.service';
+import { asyncHandler } from '../../lib/utils/asyncHandler';
+import { AppError } from '../../lib/utils/appError';
+import { sendSuccess, sendCreated } from '../../utils/responseHandler';
+import { listInventoryQuerySchema } from '../../validation/admin/inventory.validation';
 
 const inventoryService = new InventoryAdminService();
 

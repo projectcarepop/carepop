@@ -1,6 +1,6 @@
 import { supabase } from '../../lib/supabase/public-client';
 import { supabaseAdmin } from '../../lib/supabase/admin-client';
-import { AppError } from '@/lib/utils/appError';
+import { AppError } from '../../lib/utils/appError';
 
 const getFullUser = async (userId: string) => {
     const { data: profile, error: profileError } = await supabase

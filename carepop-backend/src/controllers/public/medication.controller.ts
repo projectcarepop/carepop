@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
-import { asyncHandler } from '@/lib/utils/asyncHandler';
-import { sendSuccess } from '@/lib/utils/sendSuccess';
-import * as medicationService from '@/services/public/medication.service';
+import { asyncHandler } from '../../lib/utils/asyncHandler';
+import { sendSuccess } from '../../lib/utils/sendSuccess';
+import * as medicationService from '../../services/public/medication.service';
 import { z } from 'zod';
-import { commonSchemas } from '@/validation/commonSchemas';
+import { commonSchemas } from '../../validation/commonSchemas';
 
 // --- Validation Schemas ---
 const createMedSchema = z.object({

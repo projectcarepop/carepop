@@ -5,14 +5,14 @@ import {
   getServiceCategoryById,
   updateServiceCategory,
   deleteServiceCategory,
-} from '@/controllers/admin/service-category.controller';
-import { validateRequest } from '@/lib/middleware/validate.middleware';
+} from '../../controllers/admin/service-category.controller';
+import { validateRequest } from '../../lib/middleware/validate.middleware';
 import {
   createServiceCategorySchema,
   updateServiceCategorySchema,
   serviceCategoryIdParamSchema,
   listServiceCategoriesQuerySchema,
-} from '@/validation/admin/service-category.validation';
+} from '../../validation/admin/service-category.validation';
 
 const router = Router();
 

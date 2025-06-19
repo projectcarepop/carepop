@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { navigationController } from '@/controllers/public/navigation.public.controller';
-import { validate } from '@/lib/middleware/validate';
-import { getDirectionsSchema } from '@/validation/public/navigation.validation';
+import { navigationController } from '../../controllers/public/navigation.public.controller';
+import { validate } from '../../lib/middleware/validate';
+import { getDirectionsSchema } from '../../validation/public/navigation.validation';
 import { asyncHandler } from '../../utils/asyncHandler';
 
 const router = Router();

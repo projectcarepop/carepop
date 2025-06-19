@@ -1,8 +1,8 @@
 import { Response } from 'express';
-import { AuthenticatedRequest } from '@/types/authenticated-request.interface';
-import * as clinicProviderService from '@/services/admin/clinic-provider.service';
-import { asyncHandler } from '@/lib/utils/asyncHandler';
-import { sendCreated, sendSuccess } from '@/utils/responseHandler';
+import { AuthenticatedRequest } from '../../types/authenticated-request.interface';
+import * as clinicProviderService from '../../services/admin/clinic-provider.service';
+import { asyncHandler } from '../../lib/utils/asyncHandler';
+import { sendCreated, sendSuccess } from '../../utils/responseHandler';
 
 const associateProvider = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { clinicId } = req.params;
