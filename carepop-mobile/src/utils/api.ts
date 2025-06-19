@@ -1,6 +1,11 @@
+import Constants from 'expo-constants';
 import { supabase } from './supabase';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://127.0.0.1:8080/api/v1';
+const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL;
+
+if (!API_URL) {
+    console.error('EXPO_PUBLIC_BACKEND_API_URL is not defined in app.json');
+}
 
 const getHeaders = async () => {
     const { data: { session } } = await supabase.auth.getSession();
