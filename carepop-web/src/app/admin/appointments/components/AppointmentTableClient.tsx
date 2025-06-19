@@ -120,7 +120,7 @@ export const columns: ColumnDef<Appointment>[] = [
       id: 'actions',
       cell: ({ row }) => {
         const appointment = row.original
-   
+          //
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
