@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, FlatList, TouchableOpacity, Alert, ActivityIndicator, TextInput, Modal, Dimensions } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { theme } from '../components';
-import { Card, Button } from '../components';
+import { Card, Button, theme } from '../components';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import Constants from 'expo-constants';
 import { LineChart, BarChart } from 'react-native-chart-kit';
-import type { HealthBuddyStackParamList, DrawerParamList } from '../navigation/AppNavigator';
+import type { DrawerParamList } from '../navigation/AppNavigator';
 import type { DrawerNavigationProp } from '@react-navigation/drawer';
+import { RootStackParamList } from '../navigation/AppNavigator';
 
-type HealthBuddyNavigationProp = NativeStackNavigationProp<HealthBuddyStackParamList, 'HealthBuddy'>;
+type HealthBuddyNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 type Mood = 'Happy' | 'Calm' | 'Okay' | 'Anxious' | 'Sad';
 
@@ -216,14 +216,16 @@ export function HealthBuddyScreen() {
     }
   };
 
+  const chartWidth = Dimensions.get("window").width - (theme.spacing.xl * 2) - (theme.spacing.md * 2);
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <TouchableOpacity onPress={() => (navigation.getParent<DrawerNavigationProp<DrawerParamList>>())?.toggleDrawer()} style={styles.menuButton}>
-        <Ionicons name="menu" size={32} color={theme.colors.foreground} />
-      </TouchableOpacity>
       <ScrollView contentContainerStyle={styles.container}>
+        <TouchableOpacity onPress={() => navigation.dispatch(DrawerActions.toggleDrawer())} style={styles.menuButton}>
+            <Ionicons name="menu" size={32} color={theme.colors.foreground} />
+        </TouchableOpacity>
         <Text style={styles.screenTitle}>Health Buddy</Text>
-        <Text style={styles.screenSubtitle}>Trackers and insights to support your well-being.</Text>
+        <Text style={styles.screenSubtitle}>Trackers & insights to support well-being.</Text>
 
         <Card style={styles.card}>
           <Text style={styles.cardTitle}>How are you feeling today?</Text>
@@ -249,7 +251,7 @@ export function HealthBuddyScreen() {
                     labels: moodHistory.map(e => new Date(e.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })).reverse(),
                     datasets: [{ data: moodHistory.map(e => moodToValue(e.value_text || '')).reverse() }]
                 }}
-                width={Dimensions.get('window').width - 60}
+                width={chartWidth}
                 height={220}
                 chartConfig={{
                     backgroundColor: theme.colors.card,
@@ -278,21 +280,28 @@ export function HealthBuddyScreen() {
         
         <Card style={styles.card}>
             <View style={{...styles.cardTitleContainer, justifyContent: 'space-between'}}>
-                {renderSectionHeader('Blood Pressure', 'blood-pressure-alt', 'MaterialIcons')}
+                {renderSectionHeader('Blood Pressure', 'water-outline', 'Ionicons')}
                 <Button title="Log BP" size="sm" variant="outline" onPress={() => setShowBpModal(true)} />
             </View>
             {isLoadingBp ? <ActivityIndicator color={theme.colors.primary} /> : bloodPressureHistory.length > 1 ? (
                 <LineChart
                     data={{
                         labels: bloodPressureHistory.map(e => new Date(e.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })).reverse(),
-                        datasets: [
-                            { data: bloodPressureHistory.map(e => e.value_numeric || 0).reverse(), color: (opacity = 1) => `rgba(255, 0, 0, ${opacity})`, strokeWidth: 2 }, // Systolic - red
-                            { data: bloodPressureHistory.map(e => e.value_numeric_secondary || 0).reverse(), color: (opacity = 1) => `rgba(0, 0, 255, ${opacity})`, strokeWidth: 2 } // Diastolic - blue
-                        ],
-                        legend: ["Systolic", "Diastolic"]
+                        datasets: [{ 
+                            data: bloodPressureHistory.map(e => e.value_numeric || 0).reverse(),
+                            color: (opacity = 1) => `rgba(255, 77, 109, ${opacity})`, // Systolic
+                            strokeWidth: 2
+                        }, {
+                            data: bloodPressureHistory.map(e => e.value_numeric_secondary || 0).reverse(),
+                            color: (opacity = 1) => `rgba(20, 36, 116, ${opacity})`, // Diastolic
+                            strokeWidth: 2
+                        }]
                     }}
-                    width={Dimensions.get('window').width - 60}
+                    width={chartWidth}
                     height={220}
+                    yAxisLabel=""
+                    yAxisSuffix=" mmHg"
+                    yAxisInterval={1}
                     chartConfig={{
                       backgroundColor: theme.colors.card,
                       backgroundGradientFrom: theme.colors.card,
@@ -314,11 +323,12 @@ export function HealthBuddyScreen() {
             {isLoadingActivity ? <ActivityIndicator color={theme.colors.primary} /> : activityHistory.length > 1 ? (
                 <BarChart
                     data={{
-                        labels: activityHistory.map(e => new Date(e.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })).reverse(),
+                        labels: activityHistory.map(e => new Date(e.created_at).toLocaleDateString('en-US', { day: 'numeric' })).reverse(),
                         datasets: [{ data: activityHistory.map(e => e.value_numeric || 0).reverse() }]
                     }}
-                    width={Dimensions.get('window').width - 60}
+                    width={chartWidth}
                     height={220}
+                    yAxisLabel=""
                     yAxisSuffix=" min"
                     chartConfig={{
                       backgroundColor: theme.colors.card,
@@ -334,19 +344,19 @@ export function HealthBuddyScreen() {
         </Card>
 
         <Card style={styles.card}>
-            {renderSectionHeader('Pill & Menstrual Trackers', 'medical-bag', 'MaterialIcons')}
+            {renderSectionHeader('Pill & Menstrual Trackers', 'medkit-outline', 'Ionicons')}
             <View style={styles.trackersContainer}>
-                <TouchableOpacity style={styles.trackerButton} onPress={() => navigation.navigate('PillTracker')}>
+                <TouchableOpacity style={styles.trackerButton} onPress={() => (navigation.getParent<DrawerNavigationProp<DrawerParamList>>())?.navigate('Health Buddy')}>
                     <Ionicons name="medkit-outline" size={24} color={theme.colors.primary} />
                     <Text style={styles.trackerText}>Pill Tracker</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.trackerButton} onPress={() => navigation.navigate('MensTracker')}>
+                <TouchableOpacity style={styles.trackerButton} onPress={() => (navigation.getParent<DrawerNavigationProp<DrawerParamList>>())?.navigate('Health Buddy')}>
                     <Ionicons name="female-outline" size={24} color={theme.colors.primary} />
                     <Text style={styles.trackerText}>Menstrual Cycle</Text>
                 </TouchableOpacity>
             </View>
         </Card>
-        
+
         {/* Modals */}
         <Modal
             animationType="slide"
@@ -420,35 +430,35 @@ const styles = StyleSheet.create({
         backgroundColor: theme.colors.background,
     },
     menuButton: {
-        position: 'absolute',
-        top: theme.spacing.lg,
-        left: theme.spacing.lg,
-        zIndex: 10,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-        borderRadius: theme.radius.md,
-        padding: theme.spacing.xs,
+        alignSelf: 'flex-start',
+        paddingVertical: theme.spacing.sm,
+        marginBottom: theme.spacing.sm,
     },
     container: {
-        padding: theme.spacing.md,
+        paddingHorizontal: theme.spacing.xl,
         paddingBottom: theme.spacing.xl,
-        paddingTop: 60,
     },
     screenTitle: {
-        fontSize: 28,
-        fontWeight: 'bold',
+        ...theme.typography.h1,
         color: theme.colors.foreground,
-        fontFamily: theme.typography.fontFamilyBold,
+        textAlign: 'left',
+        marginTop: theme.spacing['2xl'],
     },
     screenSubtitle: {
-        fontSize: 16,
+        ...theme.typography.body,
         color: theme.colors.mutedForeground,
-        marginBottom: theme.spacing.lg,
+        textAlign: 'left',
+        marginBottom: theme.spacing.xl*1.5,
         fontFamily: theme.typography.fontFamily,
     },
     card: {
+        backgroundColor: theme.colors.card,
+        borderRadius: theme.radius.md,
+        paddingVertical: theme.spacing.lg,
+        paddingHorizontal: theme.spacing.md,
         marginBottom: theme.spacing.lg,
-        padding: theme.spacing.md,
+        elevation: 1,
+        shadowColor: '#000',
     },
     cardTitleContainer: {
         flexDirection: 'row',
@@ -473,13 +483,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: theme.spacing.sm,
         borderRadius: theme.radius.lg,
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: 'transparent',
         width: 68,
     },
     moodButtonSelected: {
-        backgroundColor: theme.colors.accent,
-        borderColor: theme.colors.primary,
+        // No style needed here anymore
     },
     moodText: {
         marginTop: theme.spacing.xs,
@@ -506,9 +515,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: theme.colors.secondary,
-        paddingVertical: theme.spacing.sm,
-        paddingHorizontal: theme.spacing.md,
-        borderRadius: theme.radius.lg,
+        paddingVertical: theme.spacing.md,
+        paddingHorizontal: theme.spacing.lg,
+        borderRadius: theme.radius.md,
+        flex: 1,
+        justifyContent: 'center',
+        marginHorizontal: theme.spacing.sm,
     },
     trackerText: {
         marginLeft: theme.spacing.sm,
@@ -525,7 +537,7 @@ const styles = StyleSheet.create({
     modalContent: {
         width: '85%',
         backgroundColor: theme.colors.card,
-        borderRadius: theme.radius.xl,
+        borderRadius: theme.radius.lg,
         padding: theme.spacing.lg,
         alignItems: 'center',
     },
@@ -552,5 +564,25 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         width: '100%',
         marginTop: theme.spacing.md,
+    },
+    cardDescription: {
+        marginTop: theme.spacing.md,
+        color: theme.colors.mutedForeground,
+        fontFamily: theme.typography.fontFamily,
+    },
+    modalView: {
+        margin: 20,
+        backgroundColor: "white",
+        borderRadius: theme.radius.lg,
+        padding: theme.spacing.lg,
+        alignItems: "center",
+        shadowColor: "#000",
+        shadowOffset: {
+            width: 0,
+            height: 2
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 5
     },
 }); 

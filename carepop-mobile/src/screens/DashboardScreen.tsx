@@ -26,10 +26,10 @@ import { Button } from '../components/button.native';
 import { theme } from '../components/theme';
 import { useAuth } from '../context/AuthContext';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, DrawerActions } from '@react-navigation/native';
+import { useNavigation, DrawerActions, CommonActions } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { DrawerParamList } from '../navigation/AppNavigator';
-import { Menu, HeartPulse, Stethoscope, Syringe, PersonStanding, Pill, FileText, User } from 'lucide-react-native';
+import { Menu, HeartPulse, Stethoscope, Syringe, PersonStanding, Pill, FileText, User, Droplets, Bell, BookHeart } from 'lucide-react-native';
 
 type DashboardNavigationProp = DrawerNavigationProp<DrawerParamList>;
 type DashboardProps = {};
@@ -44,6 +44,14 @@ interface QuickAction {
 interface HealthService {
   id: string;
   name: string;
+  icon: React.ElementType;
+  screen: keyof DrawerParamList;
+}
+
+interface HealthBuddyTool {
+  id: string;
+  name: string;
+  description: string;
   icon: React.ElementType;
   screen: keyof DrawerParamList;
 }
@@ -96,6 +104,18 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.card,
     borderRadius: theme.radius.lg,
     overflow: 'hidden',
+  },
+  appointmentCard: {
+    borderWidth: 1,
+    borderColor: theme.colors.secondary,
+    backgroundColor: 'transparent',
+  },
+  appointmentCardTitle: {
+    color: theme.colors.secondary,
+  },
+  appointmentCardDescription: {
+    color: theme.colors.foreground,
+    opacity: 0.8,
   },
   appointmentCardHeader: {
     paddingBottom: theme.spacing.lg, // Add space between header and footer
@@ -150,22 +170,60 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamilyMedium,
   },
   healthBuddyCard: {
-    backgroundColor: theme.colors.secondary, // Use a distinct, inviting color
     marginTop: theme.spacing['2xl'],
+    borderWidth: 1,
+    borderColor: theme.colors.secondary,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.lg,
   },
   healthBuddyCardContent: {
     alignItems: 'flex-start',
   },
   healthBuddyTitle: {
     ...theme.typography.h3,
-    color: theme.colors.secondaryForeground,
+    color: theme.colors.secondary,
   },
   healthBuddyDescription: {
     ...theme.typography.body,
-    color: theme.colors.secondaryForeground,
+    color: theme.colors.foreground,
     marginVertical: theme.spacing.md,
     lineHeight: 22,
   },
+  healthToolsContainer: {
+    marginTop: theme.spacing.lg,
+  },
+  healthToolCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    paddingVertical: theme.spacing.sm,
+  },
+  healthToolIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: theme.radius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: theme.spacing.lg,
+  },
+  healthToolTextContainer: {
+    flex: 1,
+  },
+  healthToolTitle: {
+    ...theme.typography.h4,
+    color: theme.colors.foreground,
+    fontFamily: theme.typography.fontFamilySemiBold,
+  },
+  healthToolDescription: {
+    ...theme.typography.small,
+    color: theme.colors.mutedForeground,
+    marginTop: 2,
+  },
+  toolSeparator: {
+    height: 1,
+    backgroundColor: theme.colors.border,
+    marginVertical: theme.spacing.xs,
+  }
 });
 
 export const DashboardScreen: React.FC<DashboardProps> = () => {
@@ -199,12 +257,36 @@ export const DashboardScreen: React.FC<DashboardProps> = () => {
     { id: '5', name: 'Pap Smear', icon: Stethoscope, screen: 'Book a Service' },
   ];
 
+  const healthBuddyTools: HealthBuddyTool[] = [
+    {
+      id: '1',
+      name: 'Menstrual Tracker',
+      description: 'Log your cycle and symptoms',
+      icon: Droplets,
+      screen: 'Health Buddy',
+    },
+    {
+      id: '2',
+      name: 'Medication Reminders',
+      description: 'Never miss a dose again',
+      icon: Bell,
+      screen: 'Health Buddy',
+    },
+    {
+      id: '3',
+      name: 'Symptom Diary',
+      description: 'Keep a log of how you feel',
+      icon: BookHeart,
+      screen: 'Health Buddy',
+    },
+  ];
+
   const displayName = profile?.first_name || 'there';
 
   const renderServiceItem = ({ item }: { item: HealthService }) => (
     <TouchableOpacity
       style={styles.quickActionTouchable}
-      onPress={() => navigation.navigate(item.screen)}
+      onPress={() => navigation.dispatch(CommonActions.navigate({ name: 'App', params: { screen: 'Book a Service' }}))}
       accessible={true}
       accessibilityLabel={item.name}
       accessibilityRole="button"
@@ -212,6 +294,24 @@ export const DashboardScreen: React.FC<DashboardProps> = () => {
       <View style={styles.quickActionItem}>
         <item.icon color={theme.colors.accent} size={32} />
         <Text style={styles.quickActionText}>{item.name}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderHealthToolItem = ({ item }: { item: HealthBuddyTool }) => (
+    <TouchableOpacity
+      style={styles.healthToolCard}
+      onPress={() => navigation.navigate(item.screen)}
+      accessible={true}
+      accessibilityLabel={`${item.name}. ${item.description}`}
+      accessibilityRole="button"
+    >
+      <View style={styles.healthToolIconContainer}>
+        <item.icon color={theme.colors.secondary} size={24} />
+      </View>
+      <View style={styles.healthToolTextContainer}>
+        <Text style={styles.healthToolTitle}>{item.name}</Text>
+        <Text style={styles.healthToolDescription}>{item.description}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -248,15 +348,15 @@ export const DashboardScreen: React.FC<DashboardProps> = () => {
             </Text>
           </View>
 
-          <Card style={styles.card}>
+          <Card style={[styles.card, styles.appointmentCard]}>
             <CardHeader style={styles.appointmentCardHeader}>
-              <CardTitle>Upcoming Appointment</CardTitle>
-              <CardDescription>You have no upcoming appointments.</CardDescription>
+              <CardTitle style={styles.appointmentCardTitle}>Upcoming Appointment</CardTitle>
+              <CardDescription style={styles.appointmentCardDescription}>You have no upcoming appointments.</CardDescription>
             </CardHeader>
             <CardFooter style={styles.appointmentCardFooter}>
               <Button
                 title="Book a Service"
-                onPress={() => navigation.navigate('Book a Service')}
+                onPress={() => navigation.dispatch(CommonActions.navigate({ name: 'App', params: { screen: 'Book a Service' }}))}
                 variant="default"
                 size="lg"
                 accessibilityLabel="Book a new service"
@@ -266,7 +366,7 @@ export const DashboardScreen: React.FC<DashboardProps> = () => {
 
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Our Services</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Book a Service')}>
+            <TouchableOpacity onPress={() => navigation.dispatch(CommonActions.navigate({ name: 'App', params: { screen: 'Book a Service' }}))}>
                 <Text style={styles.seeAllText}>See All</Text>
             </TouchableOpacity>
           </View>
@@ -282,27 +382,27 @@ export const DashboardScreen: React.FC<DashboardProps> = () => {
 
           <Card style={styles.healthBuddyCard}>
             <CardHeader>
-                <View style={styles.healthBuddyCardContent}>
-                    <HeartPulse size={32} color={theme.colors.secondaryForeground} />
-                    <CardTitle style={styles.healthBuddyTitle}>Health Buddy</CardTitle>
-                </View>
+              <View style={styles.healthBuddyCardContent}>
+                <HeartPulse size={32} color={theme.colors.secondary} />
+                <CardTitle style={styles.healthBuddyTitle}>Health Buddy</CardTitle>
+              </View>
             </CardHeader>
             <CardContent>
-                <Text style={styles.healthBuddyDescription}>
-                    Your personal guide to track your health, get reminders, and stay informed.
-                </Text>
+              <Text style={styles.healthBuddyDescription}>
+                Your personal guide to track your health, get reminders, and stay
+                informed.
+              </Text>
+              <View style={styles.healthToolsContainer}>
+                <FlatList
+                  data={healthBuddyTools}
+                  renderItem={renderHealthToolItem}
+                  keyExtractor={(item) => item.id}
+                  scrollEnabled={false} // Disable scroll for this list as it's inside a ScrollView
+                  ItemSeparatorComponent={() => <View style={styles.toolSeparator} />}
+                />
+              </View>
             </CardContent>
-            <CardFooter>
-              <Button
-                title="Explore Health Buddy"
-                onPress={() => navigation.navigate('Health Buddy')}
-                variant="secondary"
-                size="lg"
-                accessibilityLabel="Explore Health Buddy features"
-              />
-            </CardFooter>
           </Card>
-
         </Animated.View>
       </ScrollView>
     </SafeAreaView>

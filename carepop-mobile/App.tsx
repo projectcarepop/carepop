@@ -1,7 +1,8 @@
 import 'react-native-gesture-handler';
-import React from 'react';
-import { AuthProvider } from './src/context/AuthContext';
+import React, { useCallback, useEffect } from 'react';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { RootAppNavigator } from './src/navigation/AppNavigator';
+import * as SplashScreen from 'expo-splash-screen';
 import {
   useFonts,
   Inter_400Regular,
@@ -14,9 +15,15 @@ import {
   SpaceGrotesk_500Medium,
   SpaceGrotesk_700Bold,
 } from '@expo-google-fonts/space-grotesk';
+import { View } from 'react-native';
 
-export default function App() {
-  let [fontsLoaded] = useFonts({
+// Keep the splash screen visible while we fetch resources
+SplashScreen.preventAutoHideAsync();
+
+function AppContent() {
+  const { isLoading } = useAuth();
+  
+  let [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
@@ -26,13 +33,29 @@ export default function App() {
     SpaceGrotesk_700Bold,
   });
 
-  if (!fontsLoaded) {
-    return null; // Or a custom loading screen
+  const onLayoutRootView = useCallback(async () => {
+    if (fontsLoaded && !isLoading) {
+      // This tells the splash screen to hide immediately! If we're loaded,
+      // hide the splash screen.
+      await SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, isLoading]);
+
+  if (!fontsLoaded || isLoading) {
+    return null;
   }
 
   return (
-    <AuthProvider>
+    <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
       <RootAppNavigator />
+    </View>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
     </AuthProvider>
   );
 }
