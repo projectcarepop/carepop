@@ -45,6 +45,7 @@ interface HealthService {
   id: string;
   name: string;
   icon: React.ElementType;
+  screen: keyof DrawerParamList;
 }
 
 const getIconForService = (serviceName: string): React.ElementType => {
@@ -143,6 +144,23 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.md,
     fontFamily: theme.typography.fontFamilyMedium,
   },
+  healthBuddyCard: {
+    backgroundColor: theme.colors.secondary, // Use a distinct, inviting color
+    marginTop: theme.spacing['2xl'],
+  },
+  healthBuddyCardContent: {
+    alignItems: 'flex-start',
+  },
+  healthBuddyTitle: {
+    ...theme.typography.h3,
+    color: theme.colors.secondaryForeground,
+  },
+  healthBuddyDescription: {
+    ...theme.typography.body,
+    color: theme.colors.secondaryForeground,
+    marginVertical: theme.spacing.md,
+    lineHeight: 22,
+  },
 });
 
 export const DashboardScreen: React.FC<DashboardProps> = () => {
@@ -168,16 +186,17 @@ export const DashboardScreen: React.FC<DashboardProps> = () => {
     };
   });
 
-  const quickActions: QuickAction[] = [
-    { id: '1', name: 'Book a Service', icon: Stethoscope, screen: 'Book a Service' },
-    { id: '2', name: 'My Records', icon: FileText, screen: 'Records' },
-    { id: '3', name: 'Health Buddy', icon: HeartPulse, screen: 'Health Buddy' },
-    { id: '4', name: 'My Profile', icon: User, screen: 'Profile' },
+  const services: HealthService[] = [
+    { id: '1', name: 'Family Planning', icon: HeartPulse, screen: 'Book a Service' },
+    { id: '2', name: 'Contraceptives', icon: Pill, screen: 'Book a Service' },
+    { id: '3', name: 'IUD Insertion', icon: Syringe, screen: 'Book a Service' },
+    { id: '4', name: 'Prenatal Care', icon: PersonStanding, screen: 'Book a Service' },
+    { id: '5', name: 'Pap Smear', icon: Stethoscope, screen: 'Book a Service' },
   ];
 
   const displayName = profile?.first_name || 'there';
 
-  const renderQuickActionItem = ({ item }: { item: QuickAction }) => (
+  const renderServiceItem = ({ item }: { item: HealthService }) => (
     <TouchableOpacity
       style={styles.quickActionTouchable}
       onPress={() => navigation.navigate(item.screen)}
@@ -222,35 +241,45 @@ export const DashboardScreen: React.FC<DashboardProps> = () => {
               {profile?.first_name || 'User'}!
             </Text>
           </View>
-          
-          <Card style={styles.card}>
-            <CardHeader>
-              <CardTitle>Upcoming Appointment</CardTitle>
-              <CardDescription>You have no upcoming appointments.</CardDescription>
-            </CardHeader>
-            <CardFooter>
-              <Button
-                title="Book a Service"
-                onPress={() => navigation.navigate('Book a Service')}
-                variant="default"
-                size="lg"
-                accessibilityLabel="Book a new service"
-              />
-            </CardFooter>
-          </Card>
 
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
+            <Text style={styles.sectionTitle}>Our Services</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Book a Service')}>
+                <Text style={styles.seeAllText}>See All</Text>
+            </TouchableOpacity>
           </View>
 
           <FlatList
-            data={quickActions}
-            renderItem={renderQuickActionItem}
+            data={services}
+            renderItem={renderServiceItem}
             keyExtractor={(item) => item.id}
             horizontal
             showsHorizontalScrollIndicator={false}
             ItemSeparatorComponent={() => <View style={{ width: theme.spacing.md }} />}
           />
+
+          <Card style={styles.healthBuddyCard}>
+            <CardHeader>
+                <View style={styles.healthBuddyCardContent}>
+                    <HeartPulse size={32} color={theme.colors.secondaryForeground} />
+                    <CardTitle style={styles.healthBuddyTitle}>Health Buddy</CardTitle>
+                </View>
+            </CardHeader>
+            <CardContent>
+                <Text style={styles.healthBuddyDescription}>
+                    Your personal guide to track your health, get reminders, and stay informed.
+                </Text>
+            </CardContent>
+            <CardFooter>
+              <Button
+                title="Explore Health Buddy"
+                onPress={() => navigation.navigate('Health Buddy')}
+                variant="secondary"
+                size="lg"
+                accessibilityLabel="Explore Health Buddy features"
+              />
+            </CardFooter>
+          </Card>
 
         </Animated.View>
       </ScrollView>
