@@ -8,7 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Info, CheckSquare } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { createAppointmentAction } from '@/lib/actions/appointments';
 
 const ConfirmationStep: React.FC = () => {
   const { state, dispatch } = useBookingContext();
@@ -29,47 +29,24 @@ const ConfirmationStep: React.FC = () => {
 
   const handleSubmitBooking = async () => {
     if (!selectedClinic || !selectedService || !selectedProvider || !selectedDate || !selectedTimeSlot) {
-      // This should ideally not happen if navigation is controlled properly
       dispatch({ type: 'SET_BOOKING_SUBMISSION_ERROR', payload: 'Missing booking information. Please review previous steps.' });
       return;
     }
 
     dispatch({ type: 'SET_BOOKING_SUBMISSION_LOADING', payload: true });
 
-    const supabase = createSupabaseBrowserClient();
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-
-    if (sessionError || !sessionData.session) {
-      console.error("Error getting session or no session:", sessionError);
-      dispatch({ type: 'SET_BOOKING_SUBMISSION_ERROR', payload: 'Your session is invalid. Please log in again.' });
-      dispatch({ type: 'SET_BOOKING_SUBMISSION_LOADING', payload: false });
-      return;
-    }
-    const token = sessionData.session.access_token;
-
-    const bookingData = {
-      clinicId: selectedClinic.id,
-      serviceId: selectedService.id,
-      providerId: selectedProvider.id,
-      startTime: selectedTimeSlot.startTime, // Already in ISO format from backend
-      endTime: selectedTimeSlot.endTime,     // Already in ISO format from backend
-      notes: bookingNotes,
-    };
+    const startTimeISO = `${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlot.startTime}`;
 
     try {
-      // API Call: POST /api/v1/admin/appointments (Backend Integration Guide - Section 4.1)
-      const response = await fetch('/api/v1/admin/appointments', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(bookingData),
-      });
+      const result = await createAppointmentAction(
+        selectedClinic.id,
+        selectedService.id,
+        selectedProvider.id,
+        startTimeISO,
+        bookingNotes
+      );
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         dispatch({ type: 'SET_BOOKING_SUBMISSION_SUCCESS', payload: result.data });
         dispatch({ type: 'SET_CURRENT_STEP', payload: 5 }); // Move to a success/summary step
       } else {

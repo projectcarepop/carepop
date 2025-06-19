@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
-import { AppointmentService } from '@/services/public/appointment.service';
+import { AppointmentService, createAppointment as createAppointmentService } from '@/services/public/appointment.service';
 import { sendSuccess } from '@/utils/responseHandler';
 import { asyncHandler } from '@/lib/utils/asyncHandler';
 import { z } from 'zod';
+import { AppError } from '@/lib/utils/appError';
 
 // Define the AuthenticatedRequest type locally
 export interface AuthenticatedRequest extends Request {
@@ -20,23 +21,34 @@ const createAppointmentSchema = z.object({
     startTime: z.string().datetime(),
 });
 
+const CreateAppointmentSchema = z.object({
+  clinicId: z.string().uuid(),
+  serviceId: z.string().uuid(),
+  providerId: z.string().uuid(),
+  startTime: z.string().datetime(),
+  notes: z.string().optional(),
+});
+
 export const createAppointment = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-    const validation = createAppointmentSchema.safeParse(req.body);
-    if (!validation.success) {
-        throw new Error(`Invalid request body: ${validation.error.message}`);
-    }
-    
-    const patientId = req.user!.id;
-    const { providerId, serviceId, startTime } = validation.data;
+  const validationResult = CreateAppointmentSchema.safeParse(req.body);
+  if (!validationResult.success) {
+    throw new AppError(`Invalid request body: ${validationResult.error.flatten().fieldErrors}`, 400);
+  }
 
-    const newAppointment = await appointmentService.createAppointment({
-        patientId,
-        providerId,
-        serviceId,
-        startTime,
-    });
+  if (!req.user) {
+    throw new AppError('User not found in request. Authentication error.', 401);
+  }
 
-    sendSuccess(res, { data: newAppointment, message: 'Appointment booked successfully.' }, 201);
+  const newAppointment = await createAppointmentService({
+    ...validationResult.data,
+    userId: req.user.id,
+  });
+
+  res.status(201).json({
+    status: 'success',
+    message: 'Appointment created successfully.',
+    data: newAppointment,
+  });
 });
 
 export const getMyFutureAppointments = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {

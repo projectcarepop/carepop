@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 import { useDebounce } from '@/hooks/useDebounce';
-import { fetcher } from '@/lib/utils/fetcher';
+import apiClient from '@/lib/apiClient';
 
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -16,6 +16,8 @@ interface InventoryItem {
     selling_price: number;
     is_active: boolean;
 }
+
+const fetcher = (url: string) => apiClient.get(url).then(res => res.data.data);
 
 export default function InventoryList() {
   const [searchTerm, setSearchTerm] = useState('');

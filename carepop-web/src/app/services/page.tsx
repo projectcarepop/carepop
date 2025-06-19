@@ -2,6 +2,8 @@ import { getServices } from '@/lib/api/services';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import Link from 'next/link';
 
+export const dynamic = 'force-dynamic';
+
 export default async function ServicesPage() {
     const services = await getServices();
 

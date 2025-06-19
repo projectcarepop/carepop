@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useBookingContext } from '@/lib/contexts/BookingContext';
-import { AvailabilitySlot } from '@/lib/types/booking';
+import { getProviderAvailability } from '@/lib/actions/appointments'; // Import the server action
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -61,50 +61,23 @@ const DateTimeSelectionStep: React.FC = () => {
 
   const [currentMonth, setCurrentMonth] = useState<Date>(selectedDate || new Date());
 
-  const fetchAvailability = async (clinicId: string, serviceId: string, providerId: string, month: Date) => {
+  const fetchAvailabilityForDate = async (clinicId: string, serviceId: string, providerId: string, date: Date) => {
     dispatch({ type: 'SET_AVAILABILITY_LOADING', payload: true });
     try {
-      const startDate = format(startOfMonth(month), 'yyyy-MM-dd');
-      const endDate = format(endOfMonth(month), 'yyyy-MM-dd');
+      const dateString = format(date, 'yyyy-MM-dd');
+      const result = await getProviderAvailability(providerId, serviceId, dateString);
 
-      const queryParams = new URLSearchParams({
-        clinicId,
-        serviceId,
-        startDate,
-        endDate,
-      }).toString();
-
-      const res = await fetch(`/api/v1/admin/providers/${providerId}/slots?${queryParams}`);
-      if (!res.ok) {
-        const errorText = res.status === 404 
-          ? 'Availability data could not be found for this provider.' 
-          : `An unexpected error occurred (Code: ${res.status}).`;
-        throw new Error(errorText);
-      }
-
-      const data = await res.json();
-      
-      // Defensive check for different possible API response shapes
-      let rawSlots: { date: string; slots: Array<{ startTime: string; endTime: string; slotId?: string }> }[] = [];
-      if (data && data.success && Array.isArray(data.data)) {
-        rawSlots = data.data; // Standard success response
-      } else if (Array.isArray(data)) {
-        rawSlots = data; // Handle cases where the API returns the array directly
+      if (result.success) {
+        // The API returns simple [{startTime, endTime}] slots, so we map them
+        const fetchedSlots = result.data.map((slot: any) => ({
+          ...slot,
+          // Ensure a unique slotId for the key prop
+          slotId: `${dateString}-${slot.startTime}`, 
+        }));
+        dispatch({ type: 'SET_AVAILABILITY_SUCCESS', payload: fetchedSlots });
       } else {
-        throw new Error(data.message || 'Received malformed data from server.');
+        throw new Error(result.message || 'Failed to fetch availability.');
       }
-
-      const flatSlots: AvailabilitySlot[] = rawSlots.reduce((acc: AvailabilitySlot[], dayGroup) => {
-        if (dayGroup && Array.isArray(dayGroup.slots)) {
-          dayGroup.slots.forEach(slot => {
-            acc.push({ ...slot, slotId: slot.slotId || slot.startTime });
-          });
-        }
-        return acc;
-      }, []);
-
-      dispatch({ type: 'SET_AVAILABILITY_SUCCESS', payload: flatSlots });
-
     } catch (error) {
       console.error("Error fetching availability:", error);
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
@@ -113,25 +86,22 @@ const DateTimeSelectionStep: React.FC = () => {
   };
 
   useEffect(() => {
-    if (selectedProvider && selectedClinic && selectedService) {
-      fetchAvailability(selectedClinic.id, selectedService.id, selectedProvider.id, currentMonth);
+    if (selectedProvider && selectedClinic && selectedService && selectedDate) {
+      fetchAvailabilityForDate(selectedClinic.id, selectedService.id, selectedProvider.id, selectedDate);
     } else {
-      // Clear availability if context is missing
       dispatch({ type: 'SET_AVAILABILITY_SUCCESS', payload: [] });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProvider, selectedClinic, selectedService, currentMonth]);
+  }, [selectedProvider, selectedClinic, selectedService, selectedDate]); // Re-fetch when date changes
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
       dispatch({ type: 'SELECT_DATE', payload: date });
-      if (getMonth(date) !== getMonth(currentMonth) || getYear(date) !== getYear(currentMonth)) {
-        setCurrentMonth(date);
-      }
+      // The useEffect will trigger the fetch for the new date
     }
   };
 
-  const handleTimeSlotSelect = (slot: AvailabilitySlot) => {
+  const handleTimeSlotSelect = (slot: { startTime: string; endTime: string; slotId: string }) => {
     dispatch({ type: 'SELECT_TIME_SLOT', payload: slot });
   };
 
@@ -146,19 +116,16 @@ const DateTimeSelectionStep: React.FC = () => {
   };
 
   const getSlotsForSelectedDate = () => {
-    if (!selectedDate) return [];
-    return availabilitySlots.filter(slot => 
-      isSameDay(parseISO(slot.startTime), selectedDate)
-    ).sort((a, b) => parseISO(a.startTime).getTime() - parseISO(b.startTime).getTime());
+    // Since we fetch per day, all slots in availabilitySlots are for the selectedDate
+    return availabilitySlots.sort((a, b) => a.startTime.localeCompare(b.startTime));
   };
 
   const dailySlots = getSlotsForSelectedDate();
 
-  const highlightDays = availabilitySlots.map(slot => parseISO(slot.startTime));
-  const modifiers = { available: highlightDays };
-  const modifiersClassNames = {
-    available: 'rdp-day_available'
-  };
+  // For highlighting, we would need a different strategy, like fetching a month's availability summary.
+  // For now, we disable it to focus on the core booking flow.
+  const modifiers = {};
+  const modifiersClassNames = {};
 
   if (!selectedProvider || !selectedClinic || !selectedService) {
     return (
@@ -205,7 +172,7 @@ const DateTimeSelectionStep: React.FC = () => {
             <AlertDescription>
               {errors.availabilitySlots}
               <Button 
-                onClick={() => fetchAvailability(selectedClinic.id, selectedService.id, selectedProvider.id, currentMonth)}
+                onClick={() => fetchAvailabilityForDate(selectedClinic.id, selectedService.id, selectedProvider.id, currentMonth)}
                 variant="secondary"
                 size="sm"
                 className="mt-2"
