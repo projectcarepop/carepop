@@ -8,6 +8,7 @@ import logger from '@/utils/logger';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { IAppointmentReport } from '../../types/appointment-report.interface';
 import { AppointmentReportAdminService } from './appointment-report.admin.service';
+import { supabaseServiceRole } from '../../config/supabaseClient';
 
 type Appointment = Database['public']['Tables']['appointments']['Row'];
 type CreateAppointmentDto = Database['public']['Tables']['appointments']['Insert'];
@@ -183,10 +184,9 @@ export const getAppointments = async (page: number, limit: number): Promise<Appo
 };
 
 export const getAppointmentById = async (appointmentId: string): Promise<AppointmentDetail> => {
-    const supabase = getSupabaseAdmin();
     logger.info(`Fetching appointment details for ID: ${appointmentId}`);
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseServiceRole
         .from('appointment_details')
         .select('*')
         .eq('appointment_id', appointmentId)
@@ -205,4 +205,37 @@ export const getAppointmentById = async (appointmentId: string): Promise<Appoint
     }
     
     return data;
+};
+
+export const appointmentService = {
+  
+  /**
+   * Fetches a single appointment by its ID.
+   * This is a simplified function to ensure the build passes.
+   * @param id The ID of the appointment to fetch.
+   */
+  getById: async (id: string) => {
+    console.log(`Fetching appointment with ID: ${id}`);
+    
+    const { data, error } = await supabaseServiceRole
+      .from('appointments')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      console.error(`Error fetching appointment ${id}:`, error);
+      if (error.code === 'PGRST116') {
+        throw new AppError('Appointment not found.', 404);
+      }
+      throw new AppError('Failed to fetch appointment.', 500);
+    }
+
+    if (!data) {
+        throw new AppError(`No data returned for appointment ID ${id}.`, 404);
+    }
+
+    console.log(`Successfully fetched appointment ${id}.`);
+    return data;
+  },
 }; 
