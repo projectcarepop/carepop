@@ -1,10 +1,33 @@
 import Constants from 'expo-constants';
 import { supabase } from './supabase';
 
-const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL;
+// Get the backend URL from app.json for production builds
+const MANIFEST_BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL;
+
+// This function automatically determines the correct API URL
+function getApiUrl() {
+  // __DEV__ is a global variable set by React Native, true in development mode
+  if (__DEV__) {
+    // In development, we need the IP address of the machine running the server.
+    // Expo's 'hostUri' provides this. It looks like '192.168.1.15:8081'.
+    const hostUri = Constants.expoConfig?.hostUri;
+    // We only want the IP address part, not the port.
+    const host = hostUri?.split(':')[0];
+    // We construct the full URL with the backend port (8080)
+    return `http://${host}:8080/api/v1`;
+  } else {
+    // In production (an EAS build), we use the official URL from app.json
+    return MANIFEST_BACKEND_URL;
+  }
+}
+
+const API_URL = getApiUrl();
 
 if (!API_URL) {
-    console.error('EXPO_PUBLIC_BACKEND_API_URL is not defined in app.json');
+  // This is a safeguard
+  console.error(
+    'CRITICAL: API_URL could not be determined. Check network or app.json config.'
+  );
 }
 
 const getHeaders = async () => {
