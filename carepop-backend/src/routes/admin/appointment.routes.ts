@@ -1,34 +1,17 @@
-import { Router } from 'express';
-import {
-  createAppointment,
-  getAppointments,
-  getAppointmentById,
-  updateAppointment,
-  deleteAppointment,
-} from '@/controllers/admin/appointment.controller';
-import { getReportByAppointmentId } from '@/controllers/admin/appointment-report.admin.controller';
-import { validateRequest } from '@/lib/middleware/validate.middleware';
-import {
-  createAppointmentSchema,
-  updateAppointmentSchema,
-  appointmentIdParamSchema,
-  reportAppointmentIdParamSchema,
-  listAppointmentsQuerySchema,
-} from '@/validation/admin/appointment.validation';
+import express from 'express';
+import { getAppointments, getAppointmentById } from '@/controllers/admin/appointment.controller';
+// import { createAppointment, updateAppointment, deleteAppointment } from '@/controllers/admin/appointment.controller';
+// import { getReportByAppointmentId } from '@/controllers/admin/appointment-report.admin.controller';
 
-const router = Router();
+const router = express.Router();
 
-router.route('/')
-  .post(validateRequest({ body: createAppointmentSchema }), createAppointment)
-  .get(validateRequest({ query: listAppointmentsQuerySchema }), getAppointments);
+router.get('/', getAppointments);
+router.get('/:id', getAppointmentById);
+// router.post('/', createAppointment);
+// router.patch('/:id', updateAppointment);
+// router.delete('/:id', deleteAppointment);
 
-router.route('/:id')
-  .get(validateRequest({ params: appointmentIdParamSchema }), getAppointmentById)
-  .put(validateRequest({ params: appointmentIdParamSchema, body: updateAppointmentSchema }), updateAppointment)
-  .delete(validateRequest({ params: appointmentIdParamSchema }), deleteAppointment);
-
-// Route for fetching a report for a specific appointment
-router.route('/:appointmentId/report')
-  .get(validateRequest({ params: reportAppointmentIdParamSchema }), getReportByAppointmentId);
+// Appointment reports
+// router.get('/:appointmentId/report', getReportByAppointmentId);
 
 export default router; 

@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { authMiddleware } from '../../lib/middleware/auth.middleware';
 import { authorize } from '../../lib/middleware/role.middleware';
-import { createOrUpdateReport } from '@/controllers/admin/appointment-report.admin.controller';
+// import { createOrUpdateReport } from '@/controllers/admin/appointment-report.admin.controller';
+// import { validateRequest } from '@/lib/middleware/validate.middleware';
+// import { createOrUpdateReportSchema } from '@/validation/admin/appointment-report.admin.validation';
 
 // Import modular route handlers
 import inventoryRoutes from './inventory.routes';
@@ -36,6 +38,6 @@ adminRouter.use('/dashboard', dashboardRoutes);
 adminRouter.use('/debug', debugRoutes);
 
 // Route for creating or updating an appointment report
-adminRouter.post('/reports', createOrUpdateReport);
+// adminRouter.post('/reports', createOrUpdateReport);
 
 export { adminRouter as adminRoutes }; 
