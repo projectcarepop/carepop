@@ -93,18 +93,25 @@ async function startServer() {
     app.use(errorHandler);
     logger.info('Centralized error handler mounted.');
 
+    // The app is now ready, but we don't call app.listen() here
+    // to make it compatible with serverless environments.
 
-    const PORT = config.port;
-    app.listen(PORT, () => {
-      logger.info(`Server is running on port ${PORT}`);
-      logger.info(`Environment: ${config.nodeEnv}`);
-    });
   } catch (error) {
     logger.error('Failed to start server due to an initialization error:', error);
     process.exit(1);
   }
 }
 
-startServer();
+// This block will only run when you execute "node dist/server.js" (or ts-node) directly.
+// It will not run when imported by Vercel.
+if (require.main === module) {
+  startServer().then(() => {
+    const PORT = config.port;
+    app.listen(PORT, () => {
+      logger.info(`Server is running on port ${PORT}`);
+      logger.info(`Environment: ${config.nodeEnv}`);
+    });
+  });
+}
 
-export default app; 
+export { app, startServer }; 
