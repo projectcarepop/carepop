@@ -44,6 +44,7 @@ import { OnboardingScreenOne } from '../../screens/Onboarding/OnboardingScreenOn
 import { OnboardingScreenTwo } from '../../screens/Onboarding/OnboardingScreenTwo';
 import { OnboardingScreenThree } from '../../screens/Onboarding/OnboardingScreenThree';
 import { EmailConfirmationScreen } from '../../screens/EmailConfirmationScreen';
+import { DashboardScreen } from '../screens/DashboardScreen';
 
 
 // --- Param Lists ---
@@ -209,7 +210,7 @@ function AppDrawer() {
         drawerStyle: { borderTopRightRadius: theme.radius.lg, borderBottomRightRadius: theme.radius.lg, backgroundColor: theme.colors.background, },
       }}
     >
-      <Drawer.Screen name="Dashboard" component={HomeScreen} options={{ drawerIcon: ({ color }: { color: string }) => <LayoutDashboard size={20} color={color} /> }} />
+      <Drawer.Screen name="Dashboard" component={DashboardScreen} options={{ drawerIcon: ({ color }: { color: string }) => <LayoutDashboard size={20} color={color} /> }} />
       <Drawer.Screen name="Appointments" component={AppointmentsStack} options={{ drawerIcon: ({ color }: { color: string }) => <CalendarCheck size={20} color={color} /> }} />
       <Drawer.Screen name="Records" component={MyRecordsScreen} options={{ drawerIcon: ({ color }: { color: string }) => <FileText size={20} color={color} /> }} />
       <Drawer.Screen name="Health Buddy" component={HealthBuddyScreen} options={{ drawerIcon: ({ color }: { color: string }) => <HeartPulse size={20} color={color} /> }} />

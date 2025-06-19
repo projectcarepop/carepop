@@ -64,39 +64,44 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: theme.colors.background },
   container: {
     paddingHorizontal: theme.spacing.xl,
-    paddingTop: 80, // Increased padding to clear the menu button
-    paddingBottom: 64, // Reduced bottom padding
+    paddingTop: theme.spacing.lg, // Adjusted for non-sticky menu
+    paddingBottom: theme.spacing['2xl'],
   },
   menuButton: {
-    position: 'absolute',
-    // top is now set dynamically
-    left: theme.spacing.xl,
-    zIndex: 10,
+    alignSelf: 'flex-start', // Position to the left
+    marginBottom: theme.spacing.lg, // Space between button and header
+    // Removed absolute positioning
     height: 48,
     width: 48,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.background,
   },
   header: {
-    marginBottom: theme.spacing['2xl'],
+    marginBottom: theme.spacing.xl, // Reduced margin a bit
   },
   greetingText: {
     ...theme.typography.body,
     color: theme.colors.mutedForeground,
-    fontSize: 18,
+    fontSize: 20, // Slightly larger
   },
   displayNameText: {
     ...theme.typography.h1,
-    fontSize: 32, // Large, welcoming headline
-    lineHeight: 40,
+    fontSize: 36, // Increased size
+    lineHeight: 44, // Adjusted line height
     color: theme.colors.secondary,
   },
   card: {
+    marginTop: theme.spacing.lg, // Added top margin for spacing
     marginBottom: theme.spacing.xl,
     backgroundColor: theme.colors.card,
     borderRadius: theme.radius.lg,
     overflow: 'hidden',
+  },
+  appointmentCardHeader: {
+    paddingBottom: theme.spacing.lg, // Add space between header and footer
+  },
+  appointmentCardFooter: {
+    paddingTop: 0, // Remove default top padding
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -221,26 +226,43 @@ export const DashboardScreen: React.FC<DashboardProps> = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <TouchableOpacity
-        onPress={() => navigation.dispatch(DrawerActions.toggleDrawer())}
-        style={[styles.menuButton, { top: insets.top + theme.spacing.lg }]}
-        accessible={true}
-        accessibilityLabel="Open menu"
-        accessibilityRole="button"
-      >
-        <Menu size={28} color={theme.colors.foreground} />
-      </TouchableOpacity>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.container}
       >
         <Animated.View style={animatedStyle}>
+          <TouchableOpacity
+            onPress={() => navigation.dispatch(DrawerActions.toggleDrawer())}
+            style={styles.menuButton}
+            accessible={true}
+            accessibilityLabel="Open menu"
+            accessibilityRole="button"
+          >
+            <Menu size={28} color={theme.colors.foreground} />
+          </TouchableOpacity>
+          
           <View style={styles.header}>
             <Text style={styles.greetingText}>Welcome back,</Text>
             <Text style={styles.displayNameText} numberOfLines={1}>
               {profile?.first_name || 'User'}!
             </Text>
           </View>
+
+          <Card style={styles.card}>
+            <CardHeader style={styles.appointmentCardHeader}>
+              <CardTitle>Upcoming Appointment</CardTitle>
+              <CardDescription>You have no upcoming appointments.</CardDescription>
+            </CardHeader>
+            <CardFooter style={styles.appointmentCardFooter}>
+              <Button
+                title="Book a Service"
+                onPress={() => navigation.navigate('Book a Service')}
+                variant="default"
+                size="lg"
+                accessibilityLabel="Book a new service"
+              />
+            </CardFooter>
+          </Card>
 
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Our Services</Text>
