@@ -6,7 +6,7 @@ const getFullUser = async (userId: string) => {
     const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
-        .eq('user_id', userId)
+        .eq('id', userId)
         .single();
 
     if (profileError || !profile) {
