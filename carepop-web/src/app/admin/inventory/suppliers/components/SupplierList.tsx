@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 import { useDebounce } from '@/hooks/useDebounce';
-import { fetcher } from '@/lib/utils/fetcher';
+import apiClient from '@/lib/apiClient';
 
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -13,9 +13,11 @@ interface Supplier {
     id: string;
     name: string;
     contact_person: string;
-    contact_email: string;
+    contact_number: string;
     is_active: boolean;
 }
+
+const fetcher = (url: string) => apiClient.get(url).then(res => res.data.data);
 
 export default function SupplierList() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -61,7 +63,7 @@ export default function SupplierList() {
               <TableRow key={supplier.id}>
                 <TableCell className="font-medium">{supplier.name}</TableCell>
                 <TableCell>{supplier.contact_person}</TableCell>
-                <TableCell>{supplier.contact_email}</TableCell>
+                <TableCell>{supplier.contact_number}</TableCell>
                 <TableCell>{supplier.is_active ? 'Active' : 'Inactive'}</TableCell>
               </TableRow>
             ))}

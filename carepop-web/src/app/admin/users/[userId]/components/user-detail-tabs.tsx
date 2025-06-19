@@ -6,18 +6,6 @@ import { MedicalRecordsList } from './medical-records-list';
 import { AppointmentsList } from './appointments-list';
 import { UserProfile } from "@/lib/contexts/AuthContext";
 
-// Define the interfaces for the props
-interface Profile {
-  id: string;
-  full_name: string | null;
-  first_name: string | null;
-  last_name: string | null;
-  email: string | null;
-  phone: string | null;
-  role: string | null;
-  // Add other profile fields as needed from your actual data structure
-}
-
 interface UserDetailTabsProps {
   profile: UserProfile;
   userId: string;

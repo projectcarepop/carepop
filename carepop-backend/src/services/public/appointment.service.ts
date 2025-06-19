@@ -1,6 +1,7 @@
 import { supabase } from '@/config/supabaseClient';
 import { AppError } from '@/lib/utils/appError';
 import { AuthenticatedRequest } from '@/controllers/public/appointment.controller';
+import { getProviderAvailability } from './availability.service';
 
 export class AppointmentService {
 
@@ -130,4 +131,52 @@ export class AppointmentService {
 
         return newAppointment;
     }
+}
+
+interface ICreateAppointment {
+    clinicId: string;
+    serviceId: string;
+    providerId: string;
+    startTime: string; // e.g., "2025-09-01T10:30:00.000Z"
+    notes?: string;
+    userId: string;
+}
+
+export async function createAppointment(details: ICreateAppointment): Promise<any> {
+    const { clinicId, serviceId, providerId, startTime, notes, userId } = details;
+
+    const appointmentDate = startTime.split('T')[0];
+    const appointmentTime = startTime.split('T')[1].substring(0, 8);
+
+    // 1. Verify the requested slot is actually available
+    const availableSlots = await getProviderAvailability(providerId, serviceId, appointmentDate);
+    const isSlotAvailable = availableSlots.some(slot => slot.startTime === appointmentTime);
+
+    if (!isSlotAvailable) {
+        throw new AppError('The selected appointment slot is no longer available.', 409); // 409 Conflict
+    }
+
+    // 2. TODO: Check for overlapping appointments for the same user.
+
+    // 3. Create the appointment
+    const { data, error } = await supabase
+        .from('appointments')
+        .insert({
+            clinic_id: clinicId,
+            service_id: serviceId,
+            provider_id: providerId,
+            user_id: userId,
+            start_time: startTime,
+            // end_time will be calculated based on service duration later
+            status: 'pending_confirmation', // Or 'confirmed' depending on business logic
+            notes: notes,
+        })
+        .select()
+        .single();
+
+    if (error) {
+        throw new AppError('Failed to create appointment.', 500, error);
+    }
+
+    return data;
 } 

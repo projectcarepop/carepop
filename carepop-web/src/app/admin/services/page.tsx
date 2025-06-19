@@ -79,14 +79,4 @@ export default async function ServicesPage({ searchParams }: ServicesPageProps) 
       />
     </div>
   );
-}
-
-// This type is a workaround for the mismatch between Supabase's return type and the client component's expectation.
-type Service = {
-    id: string;
-    name: string;
-    description: string;
-    cost: number;
-    category: { name: string } | null;
-    is_active: boolean;
 } 

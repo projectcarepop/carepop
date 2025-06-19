@@ -32,11 +32,6 @@ const clinicSchemaForForm = z.object({
 export function EditClinicForm({ clinic }: { clinic: ClinicData }) {
     const router = useRouter();
 
-    const form = useForm({
-        resolver: zodResolver(clinicSchemaForForm),
-        defaultValues: clinic,
-    });
-
     const onSubmit = async (data: any) => {
         try {
             const result = await updateClinic(clinic.id, data);
@@ -49,7 +44,7 @@ export function EditClinicForm({ clinic }: { clinic: ClinicData }) {
             router.push('/admin/clinics');
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-            toast.error("Failed to update clinic.");
+            toast.error(errorMessage);
         }
     };
 

@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/utils/fetcher'; // We will create this fetcher
 import { UserAppointmentDetails } from "@/lib/types/appointmentTypes";

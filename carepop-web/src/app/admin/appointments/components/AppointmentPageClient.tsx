@@ -6,9 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import React, { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { PlusCircle, Loader2 } from 'lucide-react';
+import { PlusCircle } from 'lucide-react';
 import useSWR from 'swr';
-import { AppointmentTableClient, Appointment } from './AppointmentTableClient';
+import { AppointmentTableClient } from './AppointmentTableClient';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface Clinic {

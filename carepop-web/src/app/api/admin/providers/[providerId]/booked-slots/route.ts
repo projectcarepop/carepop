@@ -25,7 +25,7 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid date parameter', details: validation.error.flatten() }, { status: 400 });
   }
 
-  const { date, duration } = validation.data;
+  const { date, duration: _ } = validation.data;
   const targetDate = new Date(date);
   
   // Set to start and end of day in UTC

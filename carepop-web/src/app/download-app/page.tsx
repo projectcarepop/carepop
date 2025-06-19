@@ -1,71 +1,80 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download, Smartphone, Apple, Play } from 'lucide-react';
-import Image from 'next/image';
-import Link from 'next/link';
-import React from 'react';
+import { Download, Smartphone, HeartPulse, CalendarDays, MessageSquareText } from 'lucide-react';
+
+// Placeholder for App Store and Google Play logos
+const AppStoreIcon = () => <svg className="h-8 w-8 mr-2" viewBox="0 0 24 24" fill="currentColor"><path d="M19.3 5.4c-.8-.8-1.9-1.3-3-1.3-1.5 0-2.8.6-3.8 1.6-.9-1-2.2-1.6-3.7-1.6-1.2 0-2.3.5-3.1 1.3C4.3 6.9 4 8.5 4 10.1c0 2.6 1.4 4.8 3.5 6.4.5.4 1 .7 1.6.9.6.2 1.2.3 1.9.3s1.3-.1 1.9-.3c.6-.2 1.1-.5 1.6-.9 2.1-1.6 3.5-3.8 3.5-6.4 0-1.6-.3-3.2-1.7-4.7zM12 14.4c-.6 0-1.1-.5-1.1-1.1s.5-1.1 1.1-1.1 1.1.5 1.1 1.1-.5 1.1-1.1 1.1z"/></svg>;
+const GooglePlayIcon = () => <svg className="h-8 w-8 mr-2" viewBox="0 0 24 24" fill="currentColor"><path d="M3 2v20l18-10L3 2zm6 9H3v2h6v-2z"/></svg>;
 
 const DownloadAppPage = () => {
   return (
-    <div className="bg-white dark:bg-gray-950">
-      {/* Hero Section */}
-      <section className="relative bg-primary/5 dark:bg-primary/10 py-20 md:py-32 text-center">
-        <div className="container mx-auto px-4 z-10 relative">
-          <Smartphone className="mx-auto h-16 w-16 text-primary mb-4" />
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-800 dark:text-white mb-4">
-            Care Right At Your Fingertips
+    <div className="bg-background text-foreground">
+      <section className="py-20 md:py-32">
+        <div className="container mx-auto px-4 text-center">
+          <h1 className="text-4xl md:text-6xl font-bold tracking-tighter mb-6">
+            Your Health, In Your Hands
           </h1>
-          <p className="text-lg md:text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-            Get the full CarePop experience on your mobile device. Book appointments, track your health, and connect with providers, all on the go.
+          <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto mb-10">
+            Download the CarePop app to manage appointments, connect with providers, and take control of your sexual and reproductive health—anytime, anywhere.
           </p>
+          <div className="flex justify-center items-center gap-4 mb-12">
+            <Button size="lg" disabled className="flex items-center">
+              <AppStoreIcon />
+              <span>Coming Soon</span>
+            </Button>
+            <Button size="lg" disabled className="flex items-center">
+              <GooglePlayIcon />
+              <span>Coming Soon</span>
+            </Button>
+          </div>
+          {/* Visual Element Placeholder */}
+          <div className="relative max-w-4xl mx-auto">
+             <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
+                <Smartphone className="h-24 w-24 text-muted-foreground" />
+             </div>
+          </div>
         </div>
       </section>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-16 sm:py-24">
-        <Card className="max-w-4xl mx-auto border-t-4 border-primary shadow-lg">
-          <CardHeader className="text-center">
-            <Download className="mx-auto h-10 w-10 text-gray-400 dark:text-gray-500 mb-2" />
-            <CardTitle className="text-2xl sm:text-3xl">Download the App</CardTitle>
-            <p className="text-muted-foreground pt-2">
-              Available soon for iOS and Android devices.
+      <section className="py-20 md:py-24 bg-primary/5">
+        <div className="container mx-auto px-4">
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Everything you need, in one app.</h2>
+            <p className="mt-4 text-muted-foreground">
+              Our mobile app is designed to be your trusted partner in health, providing seamless access to the care you deserve.
             </p>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6">
-            
-            {/* iOS Card */}
-            <div className="flex flex-col items-center p-6 bg-gray-50 dark:bg-gray-900 rounded-lg text-center transition-all hover:shadow-xl hover:scale-105">
-              <Apple className="h-12 w-12 text-gray-700 dark:text-gray-300 mb-4" />
-              <h3 className="text-2xl font-semibold text-gray-800 dark:text-white mb-2">For Apple iOS</h3>
-              <p className="text-gray-500 dark:text-gray-400 mb-6 flex-grow">
-                Get the app on your iPhone or iPad from the Apple App Store.
-              </p>
-              <Button disabled className="w-full" size="lg">
-                <Download className="mr-2 h-4 w-4" /> Coming Soon
-              </Button>
-            </div>
-
-            {/* Android Card */}
-            <div className="flex flex-col items-center p-6 bg-gray-50 dark:bg-gray-900 rounded-lg text-center transition-all hover:shadow-xl hover:scale-105">
-              <div className="h-12 w-12 flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-500">
-                  <path d="M2.5 7.5L12 2.5L21.5 7.5L12 21.5Z" fill="currentColor" stroke="none"/>
-                  <path d="M2.5 7.5L12 12.5L21.5 7.5" />
-                  <path d="M12 2.5V12.5" />
-                </svg>
-              </div>
-              <h3 className="text-2xl font-semibold text-gray-800 dark:text-white mb-2">For Android</h3>
-              <p className="text-gray-500 dark:text-gray-400 mb-6 flex-grow">
-                Find us on the Google Play Store for all Android devices.
-              </p>
-              <Button disabled className="w-full bg-green-600 hover:bg-green-700" size="lg">
-                <Download className="mr-2 h-4 w-4" /> Coming Soon
-              </Button>
-            </div>
-
-          </CardContent>
-        </Card>
-      </main>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <Card className="bg-background/70 border-none shadow-sm">
+              <CardHeader className="flex items-center text-center">
+                <div className="p-4 bg-primary/10 rounded-full mb-4">
+                    <CalendarDays className="h-8 w-8 text-primary" />
+                </div>
+                <CardTitle>Easy Scheduling</CardTitle>
+                <p className="text-sm text-muted-foreground pt-2">Book and manage your appointments with just a few taps.</p>
+              </CardHeader>
+            </Card>
+            <Card className="bg-background/70 border-none shadow-sm">
+                <CardHeader className="flex items-center text-center">
+                    <div className="p-4 bg-primary/10 rounded-full mb-4">
+                        <MessageSquareText className="h-8 w-8 text-primary" />
+                    </div>
+                    <CardTitle>Secure Messaging</CardTitle>
+                    <p className="text-sm text-muted-foreground pt-2">Communicate directly and securely with your healthcare providers.</p>
+              </CardHeader>
+            </Card>
+            <Card className="bg-background/70 border-none shadow-sm">
+                <CardHeader className="flex items-center text-center">
+                    <div className="p-4 bg-primary/10 rounded-full mb-4">
+                        <HeartPulse className="h-8 w-8 text-primary" />
+                    </div>
+                    <CardTitle>Health Tracking</CardTitle>
+                    <p className="text-sm text-muted-foreground pt-2">Keep track of your health journey, from medications to mood.</p>
+                </CardHeader>
+            </Card>
+          </div>
+        </div>
+      </section>
     </div>
   );
 };

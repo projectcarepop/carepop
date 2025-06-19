@@ -7,14 +7,6 @@ import Link from "next/link";
 import { PlusCircle } from "lucide-react";
 import { z } from "zod";
 
-const inventorySearchParamsSchema = z.object({
-  tab: z.enum(['items', 'suppliers']).default('items'),
-  page: z.coerce.number().default(1),
-  per_page: z.coerce.number().default(10),
-  sort: z.string().optional(),
-  search: z.string().optional(),
-});
-
 interface InventoryPageProps {
   searchParams: {
     [key: string]: string | string[] | undefined;
