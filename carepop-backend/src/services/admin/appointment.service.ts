@@ -1,9 +1,9 @@
-import { supabase as publicSupabase } from '@/config/supabaseClient';
+import { getSupabaseAdmin, getSupabaseAnon } from '@/config/supabaseClient';
 import { serviceSupabase as supabase } from '@/lib/supabase/service-client';
 import { Database } from '@/types/supabase.types';
 import { AppError } from '@/lib/utils/appError';
 import { StatusCodes } from 'http-status-codes';
-import { PostgrestError } from '@supabase/postgrest-js';
+import { PostgrestError, PostgrestResponse } from '@supabase/postgrest-js';
 import logger from '@/utils/logger';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { IAppointmentReport } from '../../types/appointment-report.interface';
@@ -26,6 +26,8 @@ type AppointmentRpcResponse = {
   provider_full_name: string;
 };
 
+type AppointmentWithDetails = Database['public']['Views']['appointments_with_details']['Row'];
+
 const APPOINTMENT_SELECT_QUERY = `
     *,
     user:users_view(*),
@@ -33,6 +35,8 @@ const APPOINTMENT_SELECT_QUERY = `
     clinic:clinics(name),
     provider:providers(full_name)
 `;
+
+type AppointmentDetail = Database['public']['Views']['appointment_details']['Row'];
 
 export class AppointmentAdminService {
   private tableName = 'appointments' as const;
@@ -163,4 +167,42 @@ export async function upsertAppointmentReport(reportData: Partial<IAppointmentRe
         }
         return newReport;
     }
-} 
+}
+
+export const getAppointments = async (page: number, limit: number): Promise<AppointmentWithDetails[]> => {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+        .from('appointments_with_details')
+        .select('*')
+        .range((page - 1) * limit, page * limit - 1);
+
+    if (error) {
+        throw new Error(`Error fetching appointments: ${error.message}`);
+    }
+    return data || [];
+};
+
+export const getAppointmentById = async (appointmentId: string): Promise<AppointmentDetail> => {
+    const supabase = getSupabaseAdmin();
+    logger.info(`Fetching appointment details for ID: ${appointmentId}`);
+
+    const { data, error } = await supabase
+        .from('appointment_details')
+        .select('*')
+        .eq('appointment_id', appointmentId)
+        .single();
+
+    if (error) {
+        logger.error(`Supabase error fetching appointment ${appointmentId}:`, error);
+        throw new AppError(
+            `Appointment with ID ${appointmentId} not found or failed to fetch.`,
+            StatusCodes.NOT_FOUND
+        );
+    }
+
+    if (!data) {
+        throw new AppError(`No data returned for appointment ID ${appointmentId}.`, StatusCodes.NOT_FOUND);
+    }
+    
+    return data;
+}; 

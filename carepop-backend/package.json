@@ -15,6 +15,7 @@
   "description": "",
   "dependencies": {
     "@radix-ui/react-toast": "^1.2.14",
+    "@supabase/postgrest-js": "^1.15.5",
     "@supabase/supabase-js": "^2.50.0",
     "@types/cors": "^2.8.19",
     "@types/helmet": "^0.0.48",

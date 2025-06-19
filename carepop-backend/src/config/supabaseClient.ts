@@ -1,79 +1,40 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { getConfig } from './config';
-// import { SecretManagerServiceClient } from '@google-cloud/secret-manager';
+import dotenv from 'dotenv';
 
-// This file handles the initialization of Supabase clients.
-// It's structured to support both singleton instances and on-demand creation.
+// Load environment variables for local development.
+// In Vercel, these will be set in the project settings.
+dotenv.config();
 
-let supabaseAdmin: SupabaseClient | null = null;
-let supabaseAnon: SupabaseClient | null = null;
-// let secretManagerClient: SecretManagerServiceClient | null = null;
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// const isProduction = process.env.NODE_ENV === 'production';
-
-// --- Helper function to get secrets ---
-/*
-async function getSecret(secretName: string): Promise<string> {
-    if (!secretManagerClient) {
-        secretManagerClient = new SecretManagerServiceClient();
-    }
-    const [version] = await secretManagerClient.accessSecretVersion({
-        name: `projects/${getConfig().kms.projectId}/secrets/${secretName}/versions/latest`,
-    });
-    const payload = version.payload?.data?.toString();
-    if (!payload) {
-        throw new Error(`Secret ${secretName} not found or has no data.`);
-    }
-    return payload;
-}
-*/
-
-// --- Initialization Logic ---
-// This promise will be awaited in server.ts to ensure clients are ready.
-export const supabaseInitializationPromise = (async () => {
-    try {
-        const config = getConfig();
-        const supabaseUrl = config.supabaseUrl;
-        
-        // In production, we'd fetch the keys from Secret Manager.
-        // For this emergency fix, we'll use environment variables directly.
-        const supabaseAnonKey = config.supabaseAnonKey;
-        const supabaseServiceRoleKey = config.supabaseServiceRoleKey;
-
-        if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
-            throw new Error('Supabase URL or keys are not configured in environment variables.');
-        }
-
-        // Initialize clients
-        supabaseAnon = createClient(supabaseUrl, supabaseAnonKey);
-        supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
-
-        console.log('Supabase clients initialized successfully.');
-
-    } catch (error) {
-        console.error('Failed to initialize Supabase clients:', error);
-        // We re-throw the error to ensure the server initialization process fails
-        // if Supabase cannot be initialized. This prevents the server from running
-        // in a broken state.
-        throw error;
-    }
-})();
-
-// --- Getter Functions ---
-// These functions provide access to the initialized clients.
-// They ensure that code trying to use a client will get an error
-// if initialization failed, rather than getting a `null` value.
-
-export function getSupabaseAdmin(): SupabaseClient {
-    if (!supabaseAdmin) {
-        throw new Error('Supabase Admin client has not been initialized.');
-    }
-    return supabaseAdmin;
+if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
+    throw new Error('Supabase environment variables are not fully set. Please check your .env file or Vercel project settings.');
 }
 
-export function getSupabaseAnon(): SupabaseClient {
-    if (!supabaseAnon) {
-        throw new Error('Supabase Anon client has not been initialized.');
-    }
-    return supabaseAnon;
-} 
+// The publicly accessible client (uses anon key)
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// The admin-level client for backend operations (uses service_role key)
+const supabaseServiceRole = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+// This promise is now a simple resolved promise to maintain compatibility with server.ts
+const supabaseInitializationPromise = Promise.resolve();
+
+export {
+  supabase,
+  supabaseServiceRole,
+  supabaseInitializationPromise
+};
+
+// This function is kept for any part of the code that might have used it,
+// but it now simply returns the singleton anon client.
+export const createSupabaseClientWithToken = (accessToken: string): SupabaseClient => {
+  if (!supabaseUrl) {
+    throw new Error('Supabase URL has not been initialized.');
+  }
+  // For server-side, we just return the main client.
+  // The token would be handled by middleware if needed.
+  return supabase;
+}; 
