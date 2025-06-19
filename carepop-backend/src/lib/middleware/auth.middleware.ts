@@ -37,14 +37,14 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
         }
 
         const { data: profile, error: profileError } = await serviceSupabase
-            .from('users_view')
+            .from('profiles')
             .select('*')
             .eq('id', user.id)
             .single();
 
         if (profileError || !profile) {
-            console.error(`Profile fetch error from users_view for user ${user.id}:`, profileError);
-            return res.status(404).json({ message: `User profile not found in users_view for user ID: ${user.id}`, details: profileError?.message });
+            console.error(`Profile fetch error from profiles table for user ${user.id}:`, profileError);
+            return res.status(404).json({ message: `User profile not found in profiles table for user ID: ${user.id}`, details: profileError?.message });
         }
 
         req.user = profile;
