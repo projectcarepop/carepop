@@ -18,8 +18,16 @@ interface ResetPasswordData {
     password: string;
 }
 
+const getApiBaseUrl = () => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!apiUrl) {
+        throw new Error("NEXT_PUBLIC_API_URL is not defined. Please check your environment variables.");
+    }
+    return apiUrl;
+}
+
 const apiClient = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080',
+    baseURL: getApiBaseUrl(),
     headers: {
         'Content-Type': 'application/json',
     },
