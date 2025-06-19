@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from '@/utils/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
@@ -14,7 +14,7 @@ const clinicFormSchema = z.object({
 });
 
 export async function createClinic(values: z.infer<typeof clinicFormSchema>) {
-    const supabase = createClient();
+    const supabase = supabaseAdmin;
     const validatedData = clinicFormSchema.parse(values);
 
     const { data, error } = await supabase
@@ -35,7 +35,7 @@ export async function createClinic(values: z.infer<typeof clinicFormSchema>) {
 
 
 export async function updateClinic(clinicId: string, values: z.infer<typeof clinicFormSchema>) {
-    const supabase = createClient();
+    const supabase = supabaseAdmin;
     const validatedData = clinicFormSchema.parse(values);
 
     const { data, error } = await supabase
@@ -56,7 +56,7 @@ export async function updateClinic(clinicId: string, values: z.infer<typeof clin
 }
 
 export async function deleteClinic(clinicId: string) {
-    const supabase = createClient();
+    const supabase = supabaseAdmin;
 
     const { error } = await supabase
         .from('clinics')

@@ -11,7 +11,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { cookies } from 'next/headers';
 
 async function fetchProviderById(id: string) {
   const supabase = createSupabaseServerClient();

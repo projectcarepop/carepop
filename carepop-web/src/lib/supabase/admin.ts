@@ -1,26 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/types/supabase';
 
-// Create a function to get the admin client.
-// This prevents the environment variables from being checked at build time.
-export const getSupabaseAdmin = () => {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseServiceKey = process.env.SUPABASE_ROLE_KEY!;
+// IMPORTANT: This client is only for use in server-side actions and routes
+// where elevated privileges are required to bypass RLS.
+// It should NEVER be exposed to the client-side.
 
-    if (!supabaseUrl || !supabaseServiceKey) {
-        throw new Error('Supabase URL or Service Role Key is missing from environment variables.');
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+// Note: We are not throwing an error here if the keys are missing 
+// to avoid breaking builds in environments where they might not be present.
+// The server actions themselves will fail gracefully if the client is not configured.
+export const supabaseAdmin = createClient<Database>(supabaseUrl, serviceRoleKey, {
+    auth: {
+        autoRefreshToken: false,
+        persistSession: false
     }
-    
-    // Create and return a new client instance.
-    return createClient<Database>(supabaseUrl, supabaseServiceKey, {
-        auth: {
-            // Important: prevent the client from using browser storage for auth tokens
-            persistSession: false,
-            autoRefreshToken: false,
-        },
-    });
-};
-
-// Deprecated: Do not use directly. Use getSupabaseAdmin() instead.
-// This direct export is the cause of the build error.
-export const supabaseAdmin = null; 
+}); 

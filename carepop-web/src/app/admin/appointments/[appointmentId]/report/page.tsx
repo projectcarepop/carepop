@@ -22,14 +22,12 @@ export default function AppointmentReportPage() {
   const [report, setReport] = useState<Partial<IAppointmentReport>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchReport = async () => {
       if (!appointmentId) return;
 
       setIsLoading(true);
-      setError(null);
 
       try {
         const response = await apiClient.get(`/api/v1/admin/appointments/${appointmentId}/report`);
@@ -39,7 +37,7 @@ export default function AppointmentReportPage() {
           // No existing report, initialize a new one
           setReport({ appointment_id: appointmentId });
         } else {
-          setError(err.message || 'An unknown error occurred while fetching the report.');
+          toast.error(err.message || 'An unknown error occurred while fetching the report.');
         }
       } finally {
         setIsLoading(false);
@@ -57,7 +55,6 @@ export default function AppointmentReportPage() {
   const handleSave = async () => {
     if (!appointmentId) return;
     setIsSaving(true);
-    setError(null);
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -83,7 +80,6 @@ export default function AppointmentReportPage() {
     } catch (err: any) {
       console.error("Failed to save report:", err);
       const errorMessage = err.response?.data?.message || err.message || 'An unknown error occurred.';
-      setError(errorMessage);
       toast.error(errorMessage);
     } finally {
       setIsSaving(false);

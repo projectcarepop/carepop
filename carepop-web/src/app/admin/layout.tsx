@@ -8,10 +8,8 @@ import { Home, Menu } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Toaster as NewToaster } from "@/components/ui/toaster"
 
 const AdminHeader = () => {
-    const [isSheetOpen, setIsSheetOpen] = useState(false);
     return (
         <header className="flex h-16 items-center justify-between gap-4 border-b bg-background px-6">
             <div className="flex items-center gap-3">

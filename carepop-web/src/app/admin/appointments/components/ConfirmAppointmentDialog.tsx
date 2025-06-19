@@ -23,7 +23,6 @@ interface ConfirmAppointmentDialogProps {
 }
 
 export function ConfirmAppointmentDialog({ appointmentId, currentStatus }: ConfirmAppointmentDialogProps) {
-  const [isOpen, setIsOpen] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const router = useRouter();
 
@@ -47,7 +46,6 @@ export function ConfirmAppointmentDialog({ appointmentId, currentStatus }: Confi
       });
     }
     setIsConfirming(false);
-    setIsOpen(false);
   };
 
   return (

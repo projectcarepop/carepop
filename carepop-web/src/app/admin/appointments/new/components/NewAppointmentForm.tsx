@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useActionState, useEffect, useState } from "react";
@@ -69,6 +69,7 @@ export function NewAppointmentForm({ clinics, patients }: NewAppointmentFormProp
     const selectedClinicId = form.watch('clinicId');
     const selectedProviderId = form.watch('providerId');
     const selectedDate = form.watch('appointmentDateTime');
+    const duration = form.watch('duration');
 
     const { data: services, isLoading: isLoadingServices } = useSWR<Service[]>(
         selectedClinicId ? `/api/admin/clinics/${selectedClinicId}/services` : null, 
@@ -81,7 +82,6 @@ export function NewAppointmentForm({ clinics, patients }: NewAppointmentFormProp
     );
 
     const [bookedSlots, setBookedSlots] = useState<{ startTime: string; endTime: string }[]>([]);
-    const [isLoadingBookedSlots, setIsLoadingBookedSlots] = useState(false);
 
     useEffect(() => {
         if (state?.message) {
@@ -97,10 +97,8 @@ export function NewAppointmentForm({ clinics, patients }: NewAppointmentFormProp
     useEffect(() => {
         if (selectedProviderId && selectedDate) {
           const fetchBookedSlots = async () => {
-            setIsLoadingBookedSlots(true);
             try {
               const date = new Date(selectedDate).toISOString().split('T')[0];
-              const duration = form.getValues('duration');
               const response = await fetch(`/api/admin/providers/${selectedProviderId}/booked-slots?date=${date}&duration=${duration}`);
               if (response.ok) {
                 const data = await response.json();
@@ -111,15 +109,13 @@ export function NewAppointmentForm({ clinics, patients }: NewAppointmentFormProp
             } catch (error) {
               console.error('Error fetching booked slots:', error);
               setBookedSlots([]);
-            } finally {
-              setIsLoadingBookedSlots(false);
             }
           };
           fetchBookedSlots();
         } else {
           setBookedSlots([]);
         }
-    }, [selectedProviderId, selectedDate, form.watch('duration'), form]);
+    }, [selectedProviderId, selectedDate, duration]);
 
     const handleClinicChange = (clinicId: string) => {
         form.setValue('clinicId', clinicId);
