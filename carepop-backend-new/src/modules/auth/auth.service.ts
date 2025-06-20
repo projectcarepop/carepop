@@ -26,6 +26,10 @@ async function registerUser(input: RegisterUserInput) {
   const { data: authData, error: signUpError } = await supabase.auth.signUp({
     email,
     password,
+    options: {
+      // This is crucial. It tells Supabase where to send the user after they click the confirmation link.
+      emailRedirectTo: `${env.WEB_APP_URL}/auth/email-confirmed`,
+    },
   });
 
   if (signUpError) {
@@ -52,7 +56,7 @@ async function registerUser(input: RegisterUserInput) {
       'User was created successfully, but failed to create a profile.'
     );
   }
-
+  
   const { error: roleError } = await supabaseAdmin
     .from('user_roles')
     .insert({ user_id: userId, role: 'user' });

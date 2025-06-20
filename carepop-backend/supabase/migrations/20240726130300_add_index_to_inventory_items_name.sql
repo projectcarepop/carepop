@@ -1,2 +1,0 @@
--- Create an index on the item_name column of the inventory_items table for faster searching.
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_inventory_items_item_name ON public.inventory_items (item_name); 

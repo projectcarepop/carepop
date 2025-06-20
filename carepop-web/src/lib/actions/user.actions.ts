@@ -37,9 +37,9 @@ export async function updateUserProfile(
     formData: FormData,
 ): Promise<ProfileFormState> {
     const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { session } } = await supabase.auth.getSession();
 
-    if (!user) {
+    if (!session) {
         return {
             message: 'Authentication error.',
             errors: { server: ['You must be logged in to update your profile.'] },
@@ -65,26 +65,41 @@ export async function updateUserProfile(
         date_of_birth: date_of_birth.toISOString().split('T')[0],
     };
 
-    // WORKAROUND: Cast to `any` to bypass the broken type generation
-    const { error } = await (supabase.from('profiles') as any)
-        .update(dataToUpdate)
-        .eq('id', user.id);
+    try {
+        const apiUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:3000';
+        const response = await fetch(`${apiUrl}/api/v1/profiles/me`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify(dataToUpdate),
+        });
 
-    if (error) {
-        console.error("Supabase profile update error: ", error);
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error("Backend profile update error: ", errorData);
+            return {
+                message: 'Server error.',
+                errors: { server: [errorData.message || 'Failed to update profile. Please try again.'] },
+                success: false,
+            };
+        }
+
+        revalidatePath('/dashboard');
+        revalidatePath('/create-profile');
+        
         return {
-            message: 'Database error.',
-            errors: { server: ['Failed to update profile. Please try again.'] },
+            message: 'Profile updated successfully!',
+            errors: {},
+            success: true,
+        };
+    } catch (error) {
+        console.error("Network or unexpected error updating profile: ", error);
+        return {
+            message: 'Network error.',
+            errors: { server: ['An unexpected error occurred. Please check your connection and try again.'] },
             success: false,
         };
-    }
-
-    revalidatePath('/dashboard');
-    revalidatePath('/create-profile');
-    
-    return {
-        message: 'Profile updated successfully!',
-        errors: {},
-        success: true,
     }
 }

@@ -24,8 +24,7 @@ function SubmitButton() {
 
 export default function RegisterPage() {
     const [showPassword, setShowPassword] = React.useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
-    const initialState: RegisterFormState = { message: '', errors: {} };
+    const initialState: RegisterFormState = { message: '', errors: {}, success: false };
     const [state, formAction] = useActionState(register, initialState);
 
   return (
@@ -84,36 +83,6 @@ export default function RegisterPage() {
                {state.errors?.password && (
                 <p id="password-error" className="text-sm text-destructive">
                   {state.errors.password.join(', ')}
-                </p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  placeholder="••••••••"
-                  required
-                  className="pl-10 pr-10"
-                  aria-describedby="confirmPassword-error"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground hover:text-primary"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  aria-label={showConfirmPassword ? "Hide password" : "Show password"}
-                >
-                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </Button>
-              </div>
-               {state.errors?.confirmPassword && (
-                <p id="confirmPassword-error" className="text-sm text-destructive">
-                  {state.errors.confirmPassword.join(', ')}
                 </p>
               )}
             </div>

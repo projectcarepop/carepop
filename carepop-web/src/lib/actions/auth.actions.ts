@@ -68,10 +68,6 @@ export async function login(
 const RegisterSchema = z.object({
     email: z.string().email({ message: 'Invalid email address.' }),
     password: z.string().min(8, { message: 'Password must be at least 8 characters long.' }),
-    confirmPassword: z.string()
-}).refine(data => data.password === data.confirmPassword, {
-    message: "Passwords don't match.",
-    path: ["confirmPassword"],
 });
 
 export type RegisterFormState = {
@@ -79,7 +75,6 @@ export type RegisterFormState = {
     errors?: {
         email?: string[];
         password?: string[];
-        confirmPassword?: string[];
         server?: string[];
     };
     success: boolean;
@@ -104,27 +99,42 @@ export async function register(
     const { email, password } = validatedFields.data;
 
     try {
-        await api.register({ email, password });
+        await api.signUp({ email, password });
         return {
             message: 'Registration successful! Please check your email.',
             errors: {},
             success: true,
         };
     } catch (error) {
-        console.error('API register error:', error);
-        let errorMessage = 'Could not create account. Please try again later.';
-        if (isAxiosError(error) && error.response?.data?.error) {
-            if (error.response.data.error.includes('already registered')) {
-                 return {
-                    message: 'Server error.',
-                    errors: { email: ['A user with this email already exists.'] },
-                    success: false,
-                };
-            }
-            errorMessage = error.response.data.error;
+        // Enhanced error logging to capture the full server response
+        console.error('API register error (Full Details):', JSON.stringify(error, null, 2));
+        if (isAxiosError(error) && error.response) {
+            console.error('Axios Response Data:', JSON.stringify(error.response.data, null, 2));
         }
+
+        let errorMessage = 'An unexpected error occurred. Please try again later.';
+        
+        // Handle structured Axios errors from our backend
+        if (isAxiosError(error) && error.response?.data?.error) {
+            const errorData = error.response.data.error;
+            // The error from our backend can be a string or an object like { message: '...' }
+            errorMessage = typeof errorData === 'object' && errorData !== null && 'message' in errorData 
+                ? (errorData as { message: string }).message 
+                : String(errorData);
+        }
+        
+        // Provide user-friendly feedback for common, known errors
+        if (errorMessage.includes('already registered')) {
+             return {
+                message: 'Registration Failed',
+                errors: { email: ['A user with this email already exists.'] },
+                success: false,
+            };
+        }
+
+        // Return the specific error message from the server
         return {
-            message: 'Server error.',
+            message: 'Registration Failed',
             errors: { server: [errorMessage] },
             success: false,
         };

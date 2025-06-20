@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useState, useEffect, ReactNode, useContext } from 'react';
-import { Session, User } from '@supabase/supabase-js';
+import { Session } from '@supabase/supabase-js';
 import { createSupabaseBrowserClient } from '../supabase/client';
 import { api } from '../apiClient';
 import { LoginData, ResetPasswordData, SignUpData } from '../types/authActionTypes';
@@ -54,9 +54,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
 
-    const getProfile = async (user: User) => {
+    const getProfile = async () => {
         try {
-            const { data: profile } = await api.getProfile(user.id);
+            const { data: profile } = await api.getProfile();
             return profile;
         } catch (error) {
             console.error("Failed to fetch user profile:", error);
@@ -65,20 +65,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const fetchProfile = async () => {
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        if (authUser) {
-            const profile = await getProfile(authUser);
-            setUser(profile);
-        }
+        const profile = await getProfile();
+        setUser(profile);
     };
 
     useEffect(() => {
+        const initialFetch = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                const profile = await getProfile();
+                setUser(profile);
+                setSession(session);
+            }
+            setLoading(false);
+        }
+        initialFetch();
+
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
                 setLoading(true);
                 if (session && session.user) {
-                    const profile = await getProfile(session.user);
-                    setUser(profile);
+                    const profile = await getProfile();
+                    if (profile) {
+                        setUser(profile);
+                    } else {
+                        setUser({
+                            id: session.user.id,
+                            email: session.user.email,
+                            roles: [],
+                        });
+                    }
                     setSession(session);
                 } else {
                     setUser(null);

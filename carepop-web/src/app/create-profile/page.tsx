@@ -31,15 +31,31 @@ async function getPsgcData() {
 
 export default async function CreateProfilePage() {
     const supabase = await createSupabaseServerClient();
+    const { data: { session } } = await supabase.auth.getSession();
     
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    // Fetch the user's current profile from the server
-    const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user?.id ?? '')
-        .single();
+    let profile = null;
+
+    if (session) {
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:3000';
+            const response = await fetch(`${apiUrl}/api/v1/profiles/me`, {
+                headers: {
+                    Authorization: `Bearer ${session.access_token}`,
+                },
+                // Add cache control to ensure fresh data is fetched
+                cache: 'no-store', 
+            });
+
+            if (response.ok) {
+                profile = await response.json();
+            } else if (response.status !== 404) {
+                // Don't log 404 as an error, it just means no profile exists yet.
+                console.error(`Failed to fetch profile: ${response.status} ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error("Error fetching user profile from backend:", error);
+        }
+    }
         
     const psgcData = await getPsgcData();
         

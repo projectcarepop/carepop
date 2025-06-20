@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { UserProfile } from './contexts/AuthContext';
 
 // A generic type for email/password authentication data.
 interface AuthData {
@@ -39,9 +40,15 @@ apiClient.interceptors.request.use(async (config) => {
 });
 
 export const api = {
-    // These functions now call our new Hono backend
-    register: (data: AuthData) => apiClient.post('/api/v1/auth/register', data),
+    // Auth
+    signUp: (data: AuthData) => apiClient.post('/api/v1/auth/register', data),
     login: (data: AuthData) => apiClient.post('/api/v1/auth/login', data),
+    forgotPassword: (email: string) => apiClient.post('/api/v1/auth/forgot-password', { email }),
+    resetPassword: (data: { token: string, password_confirmation: string, password: string }) => apiClient.post('/api/v1/auth/reset-password', data),
+
+    // Profile Management
+    getProfile: () => apiClient.get<UserProfile>('/api/v1/profiles/me'),
+    updateProfile: (profileData: Partial<UserProfile>) => apiClient.put<UserProfile>('/api/v1/profiles/me', profileData),
 };
 
 export default apiClient; 

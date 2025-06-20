@@ -13,4 +13,5 @@ export interface LoginData {
 export interface ResetPasswordData {
     token: string;
     password: string;
+    password_confirmation: string;
 } 

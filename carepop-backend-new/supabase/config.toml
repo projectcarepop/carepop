@@ -17,7 +17,7 @@ project_id = "carepop-backend-new"
 [auth]
 # This MUST be the URL of your live frontend application.
 # It is used in password reset and email confirmation links.
-site_url = "https://your-production-domain.com"
+site_url = "https://carepop.vercel.app/"
 
 # Email-specific auth settings
 [auth.email]
@@ -32,9 +32,9 @@ port = 587
 user = "resend"
 pass = "env(RESEND_API_KEY)"
 # The email address to use as the sender.
-admin_email = "dev@carepop.co"
+admin_email = "projectcarepop@gmail.com"
 # The display name for the sender.
-sender_name = "CarePoP"
+sender_name = "Carepop"
 
 [inbucket]
 port = 54324

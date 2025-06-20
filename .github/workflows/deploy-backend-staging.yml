@@ -40,14 +40,3 @@ jobs:
         vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
         scope: ${{ secrets.VERCEL_ORG_ID }} # Required for deploying to a specific team/org
 
-    # If you want to tag the deployed revision in Cloud Run with the git commit SHA
-    # This requires granting the Cloud Run Service Agent role to the deployer SA
-    # - name: Tag Cloud Run revision
-    #   run: |-
-    #     gcloud run services update-traffic ${{ env.SERVICE_NAME }} \
-    #       --region=${{ env.GAR_LOCATION }} \
-    #       --update-tags=git-commit-sha=${{ github.sha }}=100
-
-    - name: Output Cloud Run service URL
-      run: |
-        echo "Cloud Run service URL: ${{ steps.deploy.outputs.url }}" 
