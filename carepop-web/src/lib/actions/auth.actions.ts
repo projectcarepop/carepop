@@ -1,7 +1,8 @@
 'use server';
  
-import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { z } from 'zod';
+import { api } from '@/lib/apiClient'; // We can't use the default export because it's a client-side axios instance
+import { isAxiosError } from 'axios';
  
 // Zod schema for login
 const LoginSchema = z.object({
@@ -16,7 +17,8 @@ export type LoginFormState = {
         password?: string[];
         server?: string[];
     };
-    success: boolean; // Add success flag
+    success: boolean;
+    session?: any; // To pass the session back to the client
 };
  
 export async function login(
@@ -36,29 +38,29 @@ export async function login(
   }
  
   const { email, password } = validatedFields.data;
-  const supabase = await createSupabaseServerClient();
  
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
- 
-  if (error) {
-    console.error('Supabase login error:', error.message);
+  try {
+    const response = await api.login({ email, password });
+    // The login now returns the full session from our Hono backend
+    return {
+        message: 'Login successful.',
+        errors: {},
+        success: true,
+        session: response.data, // Pass the session data back
+    }
+  } catch (error) {
+    console.error('API login error:', error);
+    let errorMessage = 'Invalid login credentials. Please try again.';
+    if (isAxiosError(error) && error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+    }
     return {
         message: 'Server error.',
         errors: {
-            server: ['Invalid login credentials. Please try again.']
+            server: [errorMessage]
         },
         success: false,
     };
-  }
- 
-  // Return success state instead of redirecting
-  return {
-      message: 'Login successful.',
-      errors: {},
-      success: true,
   }
 }
 
@@ -80,7 +82,7 @@ export type RegisterFormState = {
         confirmPassword?: string[];
         server?: string[];
     };
-    success: boolean; // Add success flag
+    success: boolean;
 }
 
 export async function register(
@@ -100,36 +102,31 @@ export async function register(
     }
 
     const { email, password } = validatedFields.data;
-    const supabase = await createSupabaseServerClient();
 
-    const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-            emailRedirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`,
-        },
-    });
-
-    if (error) {
-        console.error('Supabase sign up error:', error.message);
-        if (error.message.includes('User already registered')) {
-             return {
-                message: 'Server error.',
-                errors: { email: ['A user with this email already exists.'] },
-                success: false,
-            };
+    try {
+        await api.register({ email, password });
+        return {
+            message: 'Registration successful! Please check your email.',
+            errors: {},
+            success: true,
+        };
+    } catch (error) {
+        console.error('API register error:', error);
+        let errorMessage = 'Could not create account. Please try again later.';
+        if (isAxiosError(error) && error.response?.data?.error) {
+            if (error.response.data.error.includes('already registered')) {
+                 return {
+                    message: 'Server error.',
+                    errors: { email: ['A user with this email already exists.'] },
+                    success: false,
+                };
+            }
+            errorMessage = error.response.data.error;
         }
         return {
             message: 'Server error.',
-            errors: { server: ['Could not create account. Please try again later.'] },
+            errors: { server: [errorMessage] },
             success: false,
         };
     }
-
-    // Return success instead of redirecting
-    return {
-        message: 'Registration successful! Please check your email.',
-        errors: {},
-        success: true,
-    };
 }

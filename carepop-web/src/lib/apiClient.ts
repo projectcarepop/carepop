@@ -1,29 +1,16 @@
 import axios from 'axios';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
-// Basic types to satisfy the linter and improve safety.
-// For a fully shared setup, consider a shared types package.
-interface SignUpData {
+// A generic type for email/password authentication data.
+interface AuthData {
     email: string;
-    password: string;
-}
-
-interface LoginData {
-    email: string;
-    password: string;
-}
-
-interface ResetPasswordData {
-    token: string;
     password: string;
 }
 
 const getApiBaseUrl = () => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    if (!apiUrl) {
-        throw new Error("NEXT_PUBLIC_API_URL is not defined. Please check your environment variables.");
-    }
-    return apiUrl;
+    // For development, we hardcode the new backend URL.
+    // In a real environment, this would come from NEXT_PUBLIC_API_URL.
+    return 'http://localhost:3000';
 }
 
 const apiClient = axios.create({
@@ -52,21 +39,9 @@ apiClient.interceptors.request.use(async (config) => {
 });
 
 export const api = {
-    signUp: async (data: SignUpData) => {
-        try {
-            return await apiClient.post('/api/v1/public/auth/signup', data);
-        } catch (error) {
-            if (axios.isAxiosError(error)) {
-                console.error("Signup Error Response from Backend:", error.response?.data);
-            }
-            throw error;
-        }
-    },
-    login: (data: LoginData) => apiClient.post('/api/v1/public/auth/login', data),
-    loginWithGoogle: (code: string) => apiClient.post('/api/v1/public/auth/login-google', { code }),
-    forgotPassword: (email: string) => apiClient.post('/api/v1/public/auth/forgot-password', { email }),
-    resetPassword: (data: ResetPasswordData) => apiClient.post('/api/v1/public/auth/reset-password', data),
-    getProfile: (userId: string) => apiClient.get(`/api/v1/public/users/${userId}/profile`),
+    // These functions now call our new Hono backend
+    register: (data: AuthData) => apiClient.post('/api/v1/auth/register', data),
+    login: (data: AuthData) => apiClient.post('/api/v1/auth/login', data),
 };
 
 export default apiClient; 

@@ -12,6 +12,7 @@ import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useFormStatus } from 'react-dom';
 import { login, type LoginFormState } from '@/lib/actions/auth.actions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 // SubmitButton component to handle pending state
 function SubmitButton() {
@@ -25,16 +26,28 @@ function SubmitButton() {
 
 export default function LoginClientPage() {
   const router = useRouter();
+  const supabase = createSupabaseBrowserClient();
   const [showPassword, setShowPassword] = React.useState(false);
   const initialState: LoginFormState = { message: '', errors: {}, success: false };
   const [state, formAction] = useActionState(login, initialState);
 
-  // Add this useEffect to handle the redirect
+  // This useEffect hook now handles setting the session on the client
   useEffect(() => {
-    if (state.success) {
-      router.push('/dashboard');
+    if (state.success && state.session) {
+      const setSession = async () => {
+        const { error } = await supabase.auth.setSession(state.session);
+        if (error) {
+          console.error('Failed to set session:', error);
+          // Optionally, you could update the state to show an error here
+        } else {
+          // Refresh the page to update server components and redirect
+          router.refresh();
+          router.push('/dashboard');
+        }
+      };
+      setSession();
     }
-  }, [state.success, router]);
+  }, [state.success, state.session, router, supabase]);
 
   return (
     <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
