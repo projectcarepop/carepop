@@ -24,6 +24,13 @@ jobs:
         cd carepop-backend-new
         npm install
         npm test
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        SUPABASE_JWT_SECRET: ${{ secrets.SUPABASE_JWT_SECRET }}
+        RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        NODE_ENV: test
     
     - name: Deploy to Vercel
       uses: amondnet/vercel-action@v25
