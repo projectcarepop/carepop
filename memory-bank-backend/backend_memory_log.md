@@ -29,15 +29,33 @@ To maintain clarity and consistency, all entries MUST follow the format below.
 
 ## Current Status & Next Steps
 
--   **Current Focus:** Starting the methodical frontend refactoring process, beginning with the User Profile module.
--   **Next Immediate Step:** Begin backend implementation for the `PROFILES-MOD` epic as per the new `FE-BE-INTEGRATION-002` ticket.
--   **Open Questions/Blockers:** None. The refactoring plan is clear and documented.
+-   **Current Focus:** The user profile refactoring is complete and all systems are functional.
+-   **Next Immediate Step:** Await user direction for the next module to be refactored (e.g., Clinics, Appointments, as per `B-REBUILD-07`).
+-   **Open Questions/Blockers:** None.
 
 ---
 
 ## Session Log
 
 *A chronological record of decisions and context from our working sessions.*
+
+### Session Start: 2024-08-25T14:00:00.000Z
+-   **Topic:** End-to-End Refactor of User Profile Flow (`B-REBUILD-06`)
+-   **Decision:** The `carepop-web` frontend has been fully refactored to use the new `carepop-backend-new` API for all user profile management (creation, viewing, updating). Direct Supabase SDK calls for this module have been eliminated from the frontend.
+-   **Reasoning:** This completes a critical step in the backend rebuild initiative, further decoupling the frontend from the database and routing all data access through the new, secure Hono API layer.
+-   **Impact:** The user registration, login, profile creation, and viewing flows are now fully operational using the new system architecture and are deployed on Vercel.
+-   **Detailed Actions & Realizations (Extensive Debugging):**
+    1.  **Initial Refactor:** Modified `user.actions.ts` and `create-profile/page.tsx` to use the new API endpoints. This involved creating a server-side `fetch` call with the user's auth token.
+    2.  **`400 Bad Request` Error:** The initial refactor was met with a persistent `400 Bad Request` on user registration, which required a deep and systematic debugging process.
+    3.  **Root Cause Analysis:**
+        -   **Initial Suspect (Incorrect):** Frontend payload (`confirmPassword` field). We added and then correctly removed this field from the entire stack.
+        -   **Second Suspect (Partially Correct):** A faulty RLS policy on the `profiles` table was preventing the `service_role` from inserting new rows. Created a new migration (`20240822213000_...`) to fix the policy.
+        -   **Third Suspect (The True Root Cause):** A misconfigured or unconfigured SMTP provider in the Supabase project settings. The `supabase.auth.signUp` function was timing out while trying to connect to a non-functional SMTP service (Resend), returning a generic 400 error.
+    4.  **SMTP & Domain Configuration:** Guided the user through purchasing a custom domain (`carepop.online`), connecting it to Vercel, and configuring Resend with the correct DNS records (MX, SPF, DKIM) via their GoDaddy registrar. This was a critical step to enable a production-ready email service.
+    5.  **Race Condition & Blank Page:** After fixing the backend, the email confirmation link led to a blank page.
+        -   **Realization:** The `AuthContext` was trying to fetch a user's profile *before* the backend registration transaction had fully committed it to the database, causing a null reference crash in the frontend.
+        -   **Solution:** Made the `AuthContext` more resilient by adding fallback logic. If a full profile isn't found, it now creates a temporary user object with the basic `id` and `email` from the session, preventing the crash.
+    6.  **Vercel Deployment:** Connected the deployed `carepop-web` project to the `carepop-backend-new` project by setting the `NEXT_PUBLIC_BACKEND_API_URL` environment variable in the Vercel project settings.
 
 ### Session Start: 2024-08-24T09:00:00.000Z
 -   **Topic:** Frontend Refactoring Strategy Formalization

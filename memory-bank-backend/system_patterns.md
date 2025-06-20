@@ -13,6 +13,7 @@
 -   **Language:** TypeScript (strict mode)
 -   **Database:** Supabase PostgreSQL
 -   **Authentication:** Supabase Auth (JWT-based)
+-   **Transactional Email:** Resend (via `carepop.online` domain)
 -   **File Storage:** Supabase Storage
 -   **Validation:** Zod
 
@@ -107,16 +108,22 @@ Each module folder (e.g., `src/modules/auth/`) contains its own `*.routes.ts`, `
 -   Services use the **public Supabase client** for standard, user-facing queries that must respect RLS.
 -   For privileged operations that must bypass RLS (e.g., creating a user's profile during registration), services **must** use the `supabaseAdmin` client, which is initialized with the `SERVICE_ROLE_KEY`.
 
+#### 4.4.4. Domain & Email
+-   **Domain Registrar:** GoDaddy (`carepop.online`)
+-   **DNS Management:** Vercel (for the `carepop.online` domain)
+-   **Transactional Email (SMTP):** Resend is configured as the SMTP provider within Supabase to handle all transactional emails (e.g., email confirmation, password resets).
+-   **Email Forwarding:** `app.improvmx.com` is used for creating and forwarding email aliases (e.g., `support@carepop.online`).
+
 ### 4.5. Deployment (CI/CD)
--   **Pattern Name**: Automated Testing & Deployment to Vercel
--   **Trigger**: Push to the `main` branch affecting `carepop-backend-new/**`.
--   **Workflow File**: `.github/workflows/deploy-backend-staging.yml`
+-   **Pattern Name**: Automated Deployment via Vercel Git Integration
+-   **Trigger**: Push to the `main` branch.
+-   **Workflow**: Vercel's native Git integration with GitHub.
 -   **Process**:
-    1.  **Checkout Code**: The latest code is checked out.
-    2.  **Run Tests**: `npm test` is executed within the `carepop-backend-new` directory.
-    3.  **Environment**: The testing step is injected with `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and other necessary secrets from GitHub Actions Secrets to allow the tests to connect to the database.
-    4.  **Deploy**: On successful test completion, the `vercel-action` deploys the `carepop-backend-new` directory to the configured Vercel project.
--   **Rationale**: This ensures that no code is deployed without passing the full test suite, maintaining the stability of the staging environment. It provides a seamless, automated path from local development to a live, testable environment.
+    1.  **Push to `main`**: A commit is pushed to the `main` branch of the GitHub repository.
+    2.  **Vercel Build**: Vercel automatically detects the push, pulls the latest code, and starts a new deployment.
+    3.  **Environment Variables**: Vercel injects the environment variables configured in the project settings (including Supabase keys).
+    4.  **Deployment**: Vercel builds the Hono application and deploys it as a Serverless Function. On success, the new deployment is promoted to production.
+-   **Rationale**: This leverages Vercel's native, highly-optimized CI/CD pipeline, removing the need for custom GitHub Actions workflows for simple deployments. It's faster and requires less maintenance.
 
 ---
 
@@ -129,7 +136,7 @@ This flow is a critical pattern demonstrating self-contained services and privil
 2.  **Validation:** The route uses `zValidator` to validate the body.
 3.  **Service Call:** The route handler calls `authService.registerUser(input)`.
 4.  **Service Logic (`auth.service.ts`):**
-    a. Calls `supabase.auth.signUp()` using its **local public Supabase client**. This sends the confirmation email.
+    a. Calls `supabase.auth.signUp()` using its **local public Supabase client**. This triggers a transactional email via the configured **Resend** SMTP service.
     b. **On success, it immediately uses the imported `supabaseAdmin` client** (service_role) to perform two privileged actions:
        i.  `INSERT` a new row into `public.profiles`.
        ii. `INSERT` a new row into `public.user_roles` with the default `'user'` role.

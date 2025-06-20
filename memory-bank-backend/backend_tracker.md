@@ -25,9 +25,9 @@ This tracker follows the plan outlined in `backend_rebuild_context.md`.
 -   **Status**: `Done`
 -   **Notes**: `GET /api/v1/profiles/me` and `PATCH /api/v1/profiles/me` are complete and tested.
 
-### [ ] B-REBUILD-06: Refactor Web: Profile Flow
--   **Status**: `Not Started`
--   **Notes**: Next step is to point the frontend profile creation and dashboard pages to the new API endpoints.
+### [x] B-REBUILD-06: Refactor Web: Profile Flow
+-   **Status**: `Done`
+-   **Notes**: End-to-end flow is complete. `carepop-web` now uses the backend API for profile creation, viewing, and updating. This involved extensive debugging of the registration flow, including fixing RLS policies, Supabase SMTP settings, and a race condition in the AuthContext.
 
 ### [ ] B-REBUILD-07: Implement X Module (Backend)
 -   **Status**: `Not Started`
