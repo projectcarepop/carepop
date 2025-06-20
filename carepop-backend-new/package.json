@@ -1,0 +1,25 @@
+{
+  "name": "carepop-backend-new",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "ts-node -r dotenv/config src/index.ts",
+    "dev": "nodemon --watch src --ext ts --exec ts-node -r dotenv/config src/index.ts",
+    "test": "ts-node -r dotenv/config src/modules/auth/auth.test.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.11.2",
+    "@hono/zod-validator": "^0.2.2",
+    "@supabase/ssr": "^0.4.0",
+    "@supabase/supabase-js": "^2.44.4",
+    "dotenv": "^16.4.5",
+    "hono": "^4.5.1",
+    "resend": "^3.5.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "nodemon": "^3.1.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.3"
+  }
+}

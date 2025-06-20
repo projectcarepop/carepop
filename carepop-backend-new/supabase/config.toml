@@ -1,0 +1,49 @@
+# This is the main configuration file for the Supabase CLI.
+# For more information, please see:
+# https://supabase.com/docs/guides/cli/config
+
+# A string used to distinguish different Supabase projects on the same host.
+# Defaults to the working directory name when running `supabase init`.
+project_id = "carepop-backend-new"
+
+# ----------------------------------------------------------------
+# AUTHENTICATION
+# ----------------------------------------------------------------
+# These settings are applied to your live Supabase project when you
+# run `npx supabase config push`.
+#
+# See: https://supabase.com/docs/guides/cli/config#auth-config
+# ----------------------------------------------------------------
+[auth]
+# This MUST be the URL of your live frontend application.
+# It is used in password reset and email confirmation links.
+site_url = "https://your-production-domain.com"
+
+# Email-specific auth settings
+[auth.email]
+# Require users to confirm their email address before they can log in.
+enable_confirmations = true
+
+# Live SMTP settings for sending transactional emails via Resend.
+# The password (API key) is correctly loaded from the .env file.
+[auth.email.smtp]
+host = "smtp.resend.com"
+port = 587
+user = "resend"
+pass = "env(RESEND_API_KEY)"
+# The email address to use as the sender.
+admin_email = "dev@carepop.co"
+# The display name for the sender.
+sender_name = "CarePoP"
+
+[inbucket]
+port = 54324
+
+# In-use extensions can be enabled in the Dashboard.
+# Read more on https://supabase.com/docs/guides/platform/extensions
+# [extensions] 
+
+# To run the dev server, `supabase start` uses this command.
+# The command must listen on the `PORT` environment variable.
+# The default is `deno run --allow-all main.ts`.
+# cmd = "your dev command" 
