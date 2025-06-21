@@ -10,11 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Loader2, Info, MapPin, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useAuth } from '@/lib/contexts/AuthContext';
+import { useAuth } from '@clerk/nextjs';
 
 const ClinicServiceSelectionStep: React.FC = () => {
   const { state, dispatch } = useBookingContext();
-  const { session } = useAuth();
+  const { getToken, isSignedIn } = useAuth();
   const { 
     selectedClinic, 
     selectedService,
@@ -31,15 +31,16 @@ const ClinicServiceSelectionStep: React.FC = () => {
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
 
   const fetchClinics = async () => {
-    if (!session) {
+    if (!isSignedIn) {
       dispatch({ type: 'SET_CLINICS_ERROR', payload: 'You must be logged in to view clinics.' });
       return;
     }
     dispatch({ type: 'SET_CLINICS_LOADING', payload: true });
     try {
+      const token = await getToken();
       const res = await fetch(`${API_BASE_URL}/api/v1/public/clinics`, {
         headers: {
-          'Authorization': `Bearer ${session.access_token}`
+          'Authorization': `Bearer ${token}`
         }
       });
       if (!res.ok) {
@@ -60,15 +61,16 @@ const ClinicServiceSelectionStep: React.FC = () => {
   };
 
   const fetchServicesForClinic = async (clinicId: string) => {
-    if (!session) {
+    if (!isSignedIn) {
       dispatch({ type: 'SET_SERVICES_FOR_CLINIC_ERROR', payload: 'You must be logged in to view services.' });
       return;
     }
     dispatch({ type: 'SET_SERVICES_FOR_CLINIC_LOADING', payload: true });
     try {
+      const token = await getToken();
       const res = await fetch(`${API_BASE_URL}/api/v1/public/clinics/${clinicId}/services`, {
         headers: {
-          'Authorization': `Bearer ${session.access_token}`
+          'Authorization': `Bearer ${token}`
         }
       });
       if (!res.ok) {
@@ -111,20 +113,20 @@ const ClinicServiceSelectionStep: React.FC = () => {
   }, [servicesForClinic]);
 
   useEffect(() => {
-    if (session) {
+    if (isSignedIn) {
       fetchClinics();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  }, [isSignedIn]);
 
   useEffect(() => {
-    if (selectedClinic?.id && session) {
+    if (selectedClinic?.id && isSignedIn) {
       fetchServicesForClinic(selectedClinic.id);
     } else {
       dispatch({ type: 'SET_SERVICES_FOR_CLINIC_SUCCESS', payload: [] });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedClinic, session]);
+  }, [selectedClinic, isSignedIn]);
 
   const handleCategoryClick = (category: string) => {
     setActiveCategory(category);

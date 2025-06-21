@@ -1,14 +1,13 @@
 'use client';
 
 import useSWR from 'swr';
-import { fetcher } from '@/lib/utils/fetcher'; // We will create this fetcher
 import { UserAppointmentDetails } from "@/lib/types/appointmentTypes";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AppointmentCard from "@/components/appointments/AppointmentCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, CalendarClock, CalendarCheck2 } from "lucide-react";
-import { useAuth } from '@/lib/contexts/AuthContext';
+import { useAuth, useUser } from '@clerk/nextjs';
 
 const AppointmentList = ({ appointments, isLoading, error, emptyState }: {
     appointments?: UserAppointmentDetails[];
@@ -56,19 +55,45 @@ const AppointmentList = ({ appointments, isLoading, error, emptyState }: {
 };
 
 export default function MyAppointmentsPage() {
-    const { user, loading: authLoading } = useAuth();
+    const { user, isLoaded: isUserLoaded } = useUser();
+    const { getToken } = useAuth();
     
-    // Using a single SWR call to fetch all appointments
+    const fetcher = async (url: string) => {
+        const token = await getToken();
+        const res = await fetch(url, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!res.ok) {
+            const error = new Error('An error occurred while fetching the data.');
+            // Attach extra info to the error object.
+            try {
+                (error as any).info = await res.json();
+            } catch {
+                (error as any).info = { message: res.statusText };
+            }
+            (error as any).status = res.status;
+            throw error;
+        }
+
+        const result = await res.json();
+        return result.data;
+    };
+
     const { data: appointments, error, isLoading } = useSWR<UserAppointmentDetails[]>(
         user ? `/api/v1/public/users/${user.id}/appointments` : null,
-        fetcher
+        fetcher,
+        { shouldRetryOnError: false } // Optional: prevent retries on auth errors
     );
 
     const now = new Date();
     const futureAppointments = appointments?.filter(a => new Date(a.appointment_time) >= now);
     const pastAppointments = appointments?.filter(a => new Date(a.appointment_time) < now);
 
-    if (authLoading) {
+    if (!isUserLoaded) {
         return (
             <div className="container mx-auto py-10 px-4">
                 <h1 className="text-3xl font-bold mb-6">My Appointments</h1>

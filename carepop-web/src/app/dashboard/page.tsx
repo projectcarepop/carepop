@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth } from '@/lib/contexts/AuthContext';
+import { useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, ReactNode } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -44,25 +44,21 @@ interface CityMunicipality extends PsgcItem { city_code: string; city_name: stri
 interface Province extends PsgcItem { province_code: string; province_name: string; }
 
 export default function DashboardPage() {
-  const { user, loading: authLoading, fetchProfile } = useAuth();
+  const { user, isLoaded } = useUser();
   const router = useRouter();
 
   // State management
-  const [isRefetching, setIsRefetching] = useState(false);
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [citiesMunicipalities, setCitiesMunicipalities] = useState<CityMunicipality[]>([]);
   const [barangays, setBarangays] = useState<Barangay[]>([]);
   const [psgcLoading, setPsgcLoading] = useState(true);
 
-  // Authentication and initial profile fetch logic
+  // Authentication check
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/login');
-    } else if (user && (!user.first_name || !user.last_name) && fetchProfile) {
-      setIsRefetching(true);
-      fetchProfile().finally(() => setIsRefetching(false));
+    if (isLoaded && !user) {
+      router.push('/sign-in');
     }
-  }, [authLoading, user, router, fetchProfile]);
+  }, [isLoaded, user, router]);
   
   // PSGC data fetching
   useEffect(() => {
@@ -103,7 +99,7 @@ export default function DashboardPage() {
   };
 
   // Loading and Access Denied states
-  if (authLoading || psgcLoading || isRefetching) {
+  if (!isLoaded || psgcLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
@@ -123,15 +119,16 @@ export default function DashboardPage() {
                 <CardContent>
                     <p className="text-muted-foreground">You must be logged in to view this page.</p>
                     <Button asChild className="mt-6 w-full">
-                        <Link href="/login">Go to Login</Link>
+                        <Link href="/sign-in">Go to Sign In</Link>
                     </Button>
                 </CardContent>
             </Card>
         </div>
     );
   }
-
-  const profileComplete = user && user.first_name && user.last_name && user.date_of_birth;
+  
+  const unsafeMetadata = user.unsafeMetadata || {};
+  const profileComplete = user.firstName && user.lastName && unsafeMetadata.date_of_birth;
 
   return (
     <div className="bg-gray-50 dark:bg-gray-900 min-h-screen font-sans">
@@ -140,7 +137,7 @@ export default function DashboardPage() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-200">
-              Welcome, {user?.first_name || 'User'}!
+              Welcome, {user.firstName || 'User'}!
             </h1>
             <p className="text-gray-500 dark:text-gray-400">Here is your personal dashboard.</p>
           </div>
@@ -184,12 +181,12 @@ export default function DashboardPage() {
                     description="Your basic identification and contact details."
                   />
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                    <InfoField label="First Name" value={user.first_name} />
-                    <InfoField label="Last Name" value={user.last_name} />
-                    <InfoField label="Middle Initial" value={user.middle_initial} />
-                    <InfoField label="Email Address" value={user.email} />
-                    <InfoField label="Contact Number" value={user.contact_no} />
-                    <InfoField label="PhilHealth No." value={user.philhealth_no} />
+                    <InfoField label="First Name" value={user.firstName} />
+                    <InfoField label="Last Name" value={user.lastName} />
+                    <InfoField label="Middle Initial" value={unsafeMetadata.middle_initial as string} />
+                    <InfoField label="Email Address" value={user.emailAddresses[0]?.emailAddress} />
+                    <InfoField label="Contact Number" value={unsafeMetadata.contact_no as string} />
+                    <InfoField label="PhilHealth No." value={unsafeMetadata.philhealth_no as string} />
                   </div>
                 </div>
 
@@ -203,12 +200,12 @@ export default function DashboardPage() {
                     description="Details about your personal background."
                   />
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                    <InfoField label="Date of Birth" value={formatDate(user.date_of_birth)} />
-                    <InfoField label="Age" value={user.age} />
-                    <InfoField label="Gender Identity" value={user.gender_identity} />
-                    <InfoField label="Pronouns" value={user.pronouns} />
-                    <InfoField label="Civil Status" value={user.civil_status} />
-                    <InfoField label="Occupation" value={user.occupation} />
+                    <InfoField label="Date of Birth" value={formatDate(unsafeMetadata.date_of_birth as string)} />
+                    <InfoField label="Age" value={unsafeMetadata.age as number} />
+                    <InfoField label="Gender Identity" value={unsafeMetadata.gender_identity as string} />
+                    <InfoField label="Pronouns" value={unsafeMetadata.pronouns as string} />
+                    <InfoField label="Civil Status" value={unsafeMetadata.civil_status as string} />
+                    <InfoField label="Occupation" value={unsafeMetadata.occupation as string} />
                   </div>
                 </div>
 
@@ -222,10 +219,10 @@ export default function DashboardPage() {
                     description="Your primary residential address."
                   />
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                    <InfoField label="Street Address" value={user.street} />
-                    <InfoField label="Barangay" value={getBarangayName(user.barangay_code)} />
-                    <InfoField label="City / Municipality" value={getCityName(user.city_municipality_code)} />
-                    <InfoField label="Province" value={getProvinceName(user.province_code)} />
+                    <InfoField label="Street Address" value={unsafeMetadata.street as string} />
+                    <InfoField label="Barangay" value={getBarangayName(unsafeMetadata.barangay_code as string)} />
+                    <InfoField label="City / Municipality" value={getCityName(unsafeMetadata.city_municipality_code as string)} />
+                    <InfoField label="Province" value={getProvinceName(unsafeMetadata.province_code as string)} />
                   </div>
                 </div>
               </CardContent>
