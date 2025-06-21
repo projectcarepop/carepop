@@ -70,18 +70,16 @@ async function registerUser(input: RegisterUserInput) {
     );
   }
 
-  // Step 3: Send a welcome email using our custom email service.
-  try {
-    await emailService.sendEmail({
+  // Step 3: Send a welcome email (fire-and-forget to avoid function timeout).
+  emailService
+    .sendEmail({
       to: email,
-      subject: 'Welcome to CarePoP!',
-      html: '<h1>Welcome!</h1><p>Thank you for registering.</p>',
+      subject: 'Welcome to CarePoP! 🎉',
+      html: '<h1>Welcome!</h1><p>Thank you for registering with CarePoP.</p>',
+    })
+    .catch((err) => {
+      console.error('Failed to send welcome email:', err);
     });
-  } catch (emailError) {
-    // Log the error but don't block the user's registration.
-    // Email delivery is secondary to account creation.
-    console.error('Failed to send welcome email:', emailError);
-  }
 
   return authData;
 }
