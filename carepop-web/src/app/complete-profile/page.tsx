@@ -23,11 +23,6 @@ export default async function CompleteProfilePage() {
     redirect('/sign-in');
   }
 
-  // If the user has already completed the profile, redirect them to the dashboard.
-  if (user.publicMetadata?.profileComplete) {
-    redirect('/dashboard');
-  }
-
   const psgc = await getPsgcData();
 
   return (
