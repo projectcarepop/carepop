@@ -72,7 +72,6 @@ export async function logout() {
 
 // Zod schema for registration
 const RegisterSchema = z.object({
-  fullName: z.string().min(1, 'Full name is required'),
   email: z.string().email('Invalid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters long'),
 })
@@ -80,7 +79,6 @@ const RegisterSchema = z.object({
 export interface RegisterFormState {
   message: string
   errors?: {
-    fullName?: string[]
     email?: string[]
     password?: string[]
     server?: string[]
@@ -106,42 +104,48 @@ export async function register(
     }
   }
 
-  const { fullName, email, password } = validatedFields.data
-  const origin = (await headers()).get('origin')!
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
+  const { email, password } = validatedFields.data
 
-  const { error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo: `${origin}/auth/callback?next=/auth/email-confirmed`,
-      data: {
-        full_name: fullName,
-      },
-    },
-  })
+  try {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/auth/register`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+        // No credentials needed; registration is public
+      }
+    )
 
-  if (error) {
-    if (error.message.includes('already registered')) {
+    const data = await res.json()
+
+    if (!res.ok) {
+      // Backend returns { error: 'message' } or validation array – normalize
+      const errorMsg = data?.error || 'Registration failed.'
+      const duplicate = errorMsg.toLowerCase().includes('already')
+
       return {
         message: 'Registration Failed',
-        errors: { email: ['A user with this email already exists.'] },
+        errors: duplicate
+          ? { email: ['A user with this email already exists.'] }
+          : { server: [errorMsg] },
         success: false,
       }
     }
+
+    return {
+      message:
+        'Registration successful! Please check your email to confirm your account.',
+      errors: {},
+      success: true,
+    }
+  } catch (error) {
+    console.error('Register action error:', error)
     return {
       message: 'Registration Failed',
-      errors: { server: ['Could not sign up user. Please try again.'] },
+      errors: { server: ['Unexpected error occurred. Please try again.'] },
       success: false,
     }
-  }
-
-  return {
-    message:
-      'Registration successful! Please check your email to confirm your account.',
-    errors: {},
-    success: true,
   }
 }
 
