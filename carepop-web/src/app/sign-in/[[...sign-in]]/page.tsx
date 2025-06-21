@@ -8,10 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Icons } from "@/components/icons";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Page() {
   const { isLoaded, signIn, setActive } = useSignIn();
   const router = useRouter();
+  const { toast } = useToast();
   const [emailAddress, setEmailAddress] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(false);
@@ -30,6 +32,11 @@ export default function Page() {
       console.error(cause);
       const message = (cause as any).errors?.[0]?.message || "Something went wrong.";
       setError(message);
+      toast({
+        variant: "destructive",
+        title: "Error signing in",
+        description: message,
+      })
     }
   }
 
