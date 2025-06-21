@@ -1,3 +1,9 @@
-import app from '../src/app';
+import app from '../src/app'
+import { handle } from 'hono/vercel'
 
-export default app; 
+// Edge runtime is recommended; remove if using node.
+export const config = {
+  runtime: 'edge',
+}
+
+export default handle(app) 
