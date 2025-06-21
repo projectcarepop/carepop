@@ -6,7 +6,7 @@ import { LayoutDashboard, Hospital, Stethoscope, Users, CalendarCheck, LogOut, C
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { useAuth } from '@/lib/contexts/AuthContext';
+import { useAuth, useUser } from '@clerk/nextjs';
 
 const navItems = [
     { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
@@ -34,7 +34,8 @@ const NavLink = ({ href, label, icon: Icon, isActive }: { href: string; label: s
 
 export default function AdminSidebar() {
     const pathname = usePathname();
-    const { user, signOut } = useAuth();
+    const { user } = useUser();
+    const { signOut } = useAuth();
 
     if (!user) {
         return null; 
@@ -61,7 +62,7 @@ export default function AdminSidebar() {
                       <Button variant="ghost" className="flex items-center justify-start gap-3 w-full">
                           <CircleUser className="h-6 w-6" />
                           <div className="text-left">
-                              <p className="text-sm font-medium">{user.email}</p>
+                              <p className="text-sm font-medium">{user.emailAddresses[0]?.emailAddress}</p>
                           </div>
                       </Button>
                   </DropdownMenuTrigger>
@@ -72,14 +73,14 @@ export default function AdminSidebar() {
                                   My Account
                               </p>
                               <p className="text-xs leading-none text-muted-foreground">
-                                  {user.email}
+                                  {user.emailAddresses[0]?.emailAddress}
                               </p>
                           </div>
                       </DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => signOut()}>
                           <LogOut className="mr-2 h-4 w-4" />
-                          <button onClick={signOut} className="w-full text-left">Log out</button>
+                          <span>Log out</span>
                       </DropdownMenuItem>
                   </DropdownMenuContent>
               </DropdownMenu>
