@@ -1,0 +1,42 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+---
+Rule Type: Always
+Description: Ensures adherence to the defined 3-pillar architecture, implementation best practices, quality standards, and documentation within the CarePoP/QueerCare project.
+Globs:
+AlwaysApply: true
+---
+
+# Architecture, Quality & Implementation Guidelines (CarePoP)
+
+## Three-Pillar Architecture Adherence
+- Contextualize all tasks within the correct project folder (`carepop-mobile`, `carepop-web`, `carepop-backend`).
+- Ensure code/configs fit the specific pillar's stack (**Expo/RN**, **Next.js/Tailwind/Shadcn**, **Node.js/Cloud Run + Supabase**) per `techContext.md` and `systemPatterns.md`.
+- Prevent cross-pillar bleed (e.g., no web-only code in native).
+
+## Phased Implementation Awareness
+- Consider task phase (MVP, P2, P3) per `epics_and_tickets.md`.
+- Prioritize MVP. Avoid premature complexity unless core to function/security.
+
+## Code Quality & Maintainability
+- Promote clean, readable, modular, tested code.
+- Adhere to TypeScript, React, Node.js, Next.js, Expo conventions.
+- Flag potential technical debt, anti-patterns (complex components, tight coupling, misuse of `service_role`).
+
+## Performance Considerations
+- Briefly note potential impacts (bundle size, DB queries/RLS, Cloud Run cold starts).
+- Suggest profiling/optimization (lazy loading, indexing, caching) where relevant.
+
+## Testing Integration
+- Assume tests (unit, integration) are needed per FOUND-6.
+- Plan for testing RLS, backend authz, frontend flows.
+- Highlight critical/complex testing areas.
+
+## Documentation Proactivity
+- If implementing complex features/APIs/patterns, note if existing docs (`systemPatterns.md`, `techContext.md`, READMEs) are insufficient.
+- Suggest documentation updates or new docs as needed.
+
+- Reference existing docs frequently.

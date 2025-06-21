@@ -1,0 +1,69 @@
+﻿Project Overview: Integrated Healthcare Platform (CarePoP/QueerCare)
+Project Name(s): CarePoP / QueerCare (referring to the same integrated healthcare platform project)
+Vision: To enhance healthcare accessibility and efficiency, particularly for diverse and underserved communities in the Philippines, through a secure, user-friendly, and inclusive digital platform.
+Objective: Develop and implement a cross-platform web and mobile application providing key healthcare services and tools, focusing on online appointment and scheduling, AI-assisted health assessment and tracking, medication management, and secure patient interaction.
+Client/Partner: Family Planning Organization of the Philippines (FPOP)
+Target Audience: Individuals from diverse communities in Quezon City, including those seeking family planning, sexual and reproductive health (SRH) services, general consultations, and those identifying as LGBTQIA+, extending to a broader underserved population.
+Core Challenges Addressed (as per original document):
+* Inefficient, manual healthcare workflows.
+* Lack of digital integration and tech literacy gaps.
+* Fragmented service access and difficulty finding providers.
+* Misinformation and stigma related to sensitive health topics.
+* Limited access to comprehensive health data for both patients and providers.
+Solution Approach: Develop an integrated digital platform designed with a user-centered philosophy, ensuring accessibility, security, and inclusivity. Utilize an iterative development process and rigorous testing.
+________________
+
+
+Proposed Modules & Features
+The integrated platform will comprise the following core modules and features, accessible via a unified cross-platform application built with React Native:
+1. User Management Module:
+   * Functionality: Allows new users to register (Sign Up) and existing users to securely log in (Sign In).
+   * Includes user profiles where individuals can view and edit their personal information.
+   * Enables password management (change password).
+   * Allows users to view their comprehensive interactions with the platform.
+   * Integration: Within this module or accessible through it, users will have dedicated sections to view:
+      * Their detailed Health Records, including past assessments and consultations.
+      * Their Lab Results / Clinical Outcomes as recorded by healthcare providers (integrated into their medical record).
+      * Their Transaction History for services accessed via the platform (even if donation-based or tied to payments).
+2. Appointment Scheduling Module:
+   * Functionality: A secure system enabling users to book appointments online for consultations with healthcare providers.
+   * Allows users to browse a directory of healthcare providers (Doctors, Specialists) and select based on needs and availability.
+   * Providers and staff can manage their schedules and view appointments.
+   * Patients receive reminders for upcoming appointments.
+   * Supports confirming and cancelling appointments.
+   * Integration: Integrate Google Maps display within the appointment details, showing the precise location of the scheduled consultation or clinic, and potentially offering navigation assistance.
+3. AI-Assisted Health Assessment, Tracking & Medication Module:
+   * Functionality: An AI-powered tool for health assessment and self-monitoring.
+   * Users can input symptoms, medical history, and lifestyle data for analysis using NLP and prescriptive analytics.
+   * Provides personalized health recommendations and preliminary guidance.
+   * Functions as a personal health tracker, allowing users to monitor general health progress (e.g., weight, sleep as shown in existing UIs) and track health information.
+   * Pill Tracker Integration: Includes a dedicated Pill Tracker feature to help users monitor medication intake. Users can log doses taken, set schedules, and receive automated reminders for medication schedules. This assists with treatment adherence and provides users with a tool to actively manage their prescribed treatments.
+   * Integration: Includes a specific Menstrual Tracker sub-feature designed for female users to log and monitor their menstrual cycles, associated symptoms, and related health data within the broader health tracking capabilities.
+   * Accessible to users for self-management.
+   * Providers and staff can access and update relevant patient health information here, potentially viewing medication adherence patterns.
+4. Healthcare Provider & Location Directory Module:
+   * Functionality: A curated directory of healthcare professionals (Doctors, Staff) and facilities (Clinics, Healthcare Centers) in Metro Manila (initially Quezon City focus).
+   * Enables users to search for providers and locations based on specialty, location, or other preferences.
+   * Provides location-based support with mapping and navigation features (already mentioned, enhanced by integration in appointment module).
+   * Allows admin to manage and update provider and facility information.
+5. Medicine Inventory Management Module:
+   * Functionality: A system accessible to administrative users for real-time tracking and monitoring of available medical supplies and medications.
+   * Allows admins to add, edit, remove, and track stock levels of inventory items (including testing kits).
+   * Helps track expiring medicines and manage resource allocation efficiently.
+   * Integrates with the workflow to ensure timely access to prescribed treatments, potentially linking to the Pill Tracker to monitor availability vs. patient prescriptions.
+6. Reporting Module:
+   * Functionality: Enables administrative users to generate, view, and export various reports related to platform usage, appointment statistics, inventory levels, user demographics, health assessment summaries, and other relevant data.
+   * Potential Integration: Reports could include summaries related to medication adherence tracked via the Pill Tracker and menstrual cycle patterns (anonymized for population-level insights if relevant to public health goals).
+   * Supports data-driven decision making for FPOP management.
+7. Security & Confidentiality Features:
+   * Functionality: Implement robust security protocols, including AES encryption and a dual-database structure separating general and sensitive information.
+   * Ensure HIPAA compliance for data handling and protection.
+   * Secure login mechanisms and in-app payment options (where applicable).
+   * Core Principle: Prioritize data privacy, trust, and confidentiality across all interactions and modules, including sensitive data logged in the Pill Tracker and Menstrual Tracker, and health records/results.
+Role-Based Access Control:
+The platform is designed with explicit role-based permissions. Access to specific modules, features, and data will be strictly governed by user roles (Patient/General User, Healthcare Provider/Doctor/Staff, Administrator). This ensures users only access functionalities and information relevant and permitted for their role, reinforcing security and maintaining appropriate levels of access (as confirmed by FDDs, Use Cases, and Admin's "Manage User Permissions" capability in the original document). This applies to all modules and features, including access to individual Health Records, Lab Results, Transaction History, managing the Pill Tracker and Menstrual Tracker (user-specific access), and viewing aggregate/anonymized data in Reports (admin access).
+________________
+
+
+Cross-Platform Benefit: Utilizing React Native for both web and mobile interfaces offers significant advantages in development speed, maintenance, and ensuring feature parity across platforms, directly addressing the goal of accessibility via both web and mobile applications mentioned in the original document.
+________________

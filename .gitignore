@@ -1,18 +1,5 @@
 node_modules
-.cursor\rules
-memory-bank/
-context/
-
-.cursor/
-.cursor\rules
-
 .expo
-
-# Terraform temporary files and providers
-.terraform/
-terraform.tfstate
-terraform.tfstate.backup
-.terraform.lock.hcl
 
 # testing
 /coverage
@@ -28,6 +15,3 @@ yarn-debug.log*
 yarn-error.log*
 .idea/
 .vscode/
-
-# memory bank
-memory-bank-backend/
