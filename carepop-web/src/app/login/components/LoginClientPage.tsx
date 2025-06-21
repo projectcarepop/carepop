@@ -13,6 +13,7 @@ import { useFormStatus } from 'react-dom';
 import { login, type LoginFormState } from '@/lib/actions/auth.actions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { GoogleIcon } from '@/components/icons/GoogleIcon';
 
 // SubmitButton component to handle pending state
 function SubmitButton() {
@@ -31,23 +32,19 @@ export default function LoginClientPage() {
   const initialState: LoginFormState = { message: '', errors: {}, success: false };
   const [state, formAction] = useActionState(login, initialState);
 
-  // This useEffect hook now handles setting the session on the client
   useEffect(() => {
-    if (state.success && state.session) {
-      const setSession = async () => {
-        const { error } = await supabase.auth.setSession(state.session);
-        if (error) {
-          console.error('Failed to set session:', error);
-          // Optionally, you could update the state to show an error here
-        } else {
-          // Refresh the page to update server components and redirect
-          router.refresh();
-          router.push('/dashboard');
-        }
-      };
-      setSession();
-    }
-  }, [state.success, state.session, router, supabase]);
+    // This effect no longer handles redirection. 
+    // The server action 'login' now handles it.
+  }, [state, router, supabase]);
+
+  const handleGoogleLogin = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+  };
 
   return (
     <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
@@ -137,8 +134,9 @@ export default function LoginClientPage() {
               </span>
             </div>
           </div>
-           <Button variant="outline" className="w-full" disabled>
-             Sign in with Google (Coming Soon)
+           <Button variant="outline" className="w-full" onClick={handleGoogleLogin}>
+             <GoogleIcon className="mr-2 h-5 w-5" />
+             Sign in with Google
            </Button>
         </CardContent>
         <CardFooter className="flex flex-col items-center space-y-2 text-sm">

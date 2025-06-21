@@ -43,6 +43,7 @@ export const api = {
     // Auth
     signUp: (data: AuthData) => apiClient.post('/api/v1/auth/register', data),
     login: (data: AuthData) => apiClient.post('/api/v1/auth/login', data),
+    logout: () => apiClient.post('/api/v1/auth/logout'),
     forgotPassword: (email: string) => apiClient.post('/api/v1/auth/forgot-password', { email }),
     resetPassword: (data: { token: string, password_confirmation: string, password: string }) => apiClient.post('/api/v1/auth/reset-password', data),
 

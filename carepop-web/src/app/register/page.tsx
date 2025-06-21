@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 import { useFormStatus } from 'react-dom';
 import { register, type RegisterFormState } from '@/lib/actions/auth.actions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -35,69 +35,79 @@ export default function RegisterPage() {
           <CardDescription className="text-center">Enter your details to get started.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={formAction} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  required
-                  className="pl-10"
-                  aria-describedby="email-error"
-                />
+          {state.success ? (
+            <Alert variant="success">
+              <CheckCircle className="h-4 w-4" />
+              <AlertTitle>Success!</AlertTitle>
+              <AlertDescription>
+                {state.message}
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <form action={formAction} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    placeholder="you@example.com"
+                    required
+                    className="pl-10"
+                    aria-describedby="email-error"
+                  />
+                </div>
+                {state.errors?.email && (
+                  <p id="email-error" className="text-sm text-destructive">
+                    {state.errors.email.join(', ')}
+                  </p>
+                )}
               </div>
-              {state.errors?.email && (
-                <p id="email-error" className="text-sm text-destructive">
-                  {state.errors.email.join(', ')}
-                </p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="••••••••"
-                  required
-                  className="pl-10 pr-10"
-                  aria-describedby="password-error"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground hover:text-primary"
-                  onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </Button>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    required
+                    className="pl-10 pr-10"
+                    aria-describedby="password-error"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground hover:text-primary"
+                    onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </Button>
+                </div>
+                 {state.errors?.password && (
+                  <p id="password-error" className="text-sm text-destructive">
+                    {state.errors.password.join(', ')}
+                  </p>
+                )}
               </div>
-               {state.errors?.password && (
-                <p id="password-error" className="text-sm text-destructive">
-                  {state.errors.password.join(', ')}
-                </p>
+              {state.errors?.server && (
+                   <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Registration Failed</AlertTitle>
+                      <AlertDescription>
+                          {state.errors.server.join(', ')}
+                      </AlertDescription>
+                  </Alert>
               )}
-            </div>
-            {state.errors?.server && (
-                 <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Registration Failed</AlertTitle>
-                    <AlertDescription>
-                        {state.errors.server.join(', ')}
-                    </AlertDescription>
-                </Alert>
-            )}
-           
-            <SubmitButton />
-          </form>
+             
+              <SubmitButton />
+            </form>
+          )}
         </CardContent>
         <CardFooter className="flex flex-col items-center space-y-2 text-sm">
           <p>

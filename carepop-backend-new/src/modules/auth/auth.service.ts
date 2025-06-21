@@ -102,7 +102,15 @@ async function loginUser(input: LoginUserInput) {
   return data;
 }
 
+async function logoutUser() {
+  // Here we can use the admin client if we need to perform cleanup,
+  // but for just signing out, the regular client is fine as it will
+  // use the user's JWT from the request to invalidate the correct session.
+  return supabase.auth.signOut();
+}
+
 export const authService = {
   registerUser,
   loginUser,
+  logoutUser,
 }; 

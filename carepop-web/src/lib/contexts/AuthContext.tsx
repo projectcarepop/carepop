@@ -1,10 +1,8 @@
 'use client';
 
-import React, { createContext, useState, useEffect, ReactNode, useContext } from 'react';
-import { Session } from '@supabase/supabase-js';
-import { createSupabaseBrowserClient } from '../supabase/client';
+import React, { createContext, useState, useEffect, ReactNode, useContext, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { api } from '../apiClient';
-import { LoginData, ResetPasswordData, SignUpData } from '../types/authActionTypes';
 
 // More specific user profile type
 export interface UserProfile {
@@ -35,108 +33,57 @@ export interface UserProfile {
 
 interface AuthContextType {
     user: UserProfile | null;
-    session: Session | null;
-    fetchProfile: () => Promise<void>;
-    login: (data: LoginData) => Promise<void>;
-    signUp: (data: SignUpData) => Promise<{ data: { message: string } }>;
-    loginWithGoogle: (code: string) => Promise<void>;
-    forgotPassword: (email: string) => Promise<{ data: { message: string } }>;
-    resetPassword: (data: ResetPasswordData) => Promise<{ data: { message: string } }>;
+    // We no longer manage the session object on the client. It's handled by httpOnly cookies.
+    fetchUser: () => Promise<void>;
     signOut: () => Promise<void>;
     loading: boolean;
+    isAuthenticated: boolean;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-    const supabase = createSupabaseBrowserClient();
+    const router = useRouter();
     const [user, setUser] = useState<UserProfile | null>(null);
-    const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
 
-    const getProfile = async () => {
+    const fetchUser = useCallback(async () => {
+        setLoading(true);
         try {
             const { data: profile } = await api.getProfile();
-            return profile;
-        } catch (error) {
-            console.error("Failed to fetch user profile:", error);
-            return null;
-        }
-    };
-
-    const fetchProfile = async () => {
-        const profile = await getProfile();
-        setUser(profile);
-    };
-
-    useEffect(() => {
-        const initialFetch = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                const profile = await getProfile();
-                setUser(profile);
-                setSession(session);
-            }
+            setUser(profile);
+        } catch {
+            // This is expected if the user is not logged in (e.g., API returns 401)
+            setUser(null);
+        } finally {
             setLoading(false);
         }
-        initialFetch();
+    }, []);
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (event, session) => {
-                setLoading(true);
-                if (session && session.user) {
-                    const profile = await getProfile();
-                    if (profile) {
-                        setUser(profile);
-                    } else {
-                        setUser({
-                            id: session.user.id,
-                            email: session.user.email,
-                            roles: [],
-                        });
-                    }
-                    setSession(session);
-                } else {
-                    setUser(null);
-                    setSession(null);
-                }
-                setLoading(false);
-            }
-        );
+    useEffect(() => {
+        fetchUser();
+    }, [fetchUser]);
 
-        return () => {
-            subscription.unsubscribe();
-        };
-    }, [supabase]);
-
-    const login = async (data: LoginData) => {
-        const { error } = await supabase.auth.signInWithPassword(data);
-        if (error) throw error;
-    };
-
-    const loginWithGoogle = async (code: string) => {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) throw error;
-    };
-
-    const signUp = async (data: SignUpData) => {
-        return await api.signUp(data);
-    };
-
-    const forgotPassword = async (email: string) => {
-        return await api.forgotPassword(email);
-    };
-
-    const resetPassword = async (data: ResetPasswordData) => {
-        return await api.resetPassword(data);
-    };
-    
     const signOut = async () => {
-        await supabase.auth.signOut();
+        try {
+            // This will call a new backend endpoint that handles cookie invalidation
+            await api.logout(); 
+            setUser(null);
+            // Redirect to login page after signing out
+            router.push('/login');
+        } catch (error) {
+            console.error("Sign out failed", error);
+        }
     };
 
     return (
-        <AuthContext.Provider value={{ user, session, login, signUp, loginWithGoogle, forgotPassword, resetPassword, signOut, loading, fetchProfile }}>
+        <AuthContext.Provider value={{ 
+            user, 
+            loading, 
+            isAuthenticated: !!user, // Derived state for convenience
+            fetchUser, 
+            signOut 
+        }}>
             {children}
         </AuthContext.Provider>
     );

@@ -1,8 +1,10 @@
 'use server';
  
 import { z } from 'zod';
-import { api } from '@/lib/apiClient'; // We can't use the default export because it's a client-side axios instance
-import { isAxiosError } from 'axios';
+import { cookies, headers } from 'next/headers';
+import { createClient } from '@/utils/supabase/server';
+import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
  
 // Zod schema for login
 const LoginSchema = z.object({
@@ -18,7 +20,6 @@ export type LoginFormState = {
         server?: string[];
     };
     success: boolean;
-    session?: any; // To pass the session back to the client
 };
  
 export async function login(
@@ -38,105 +39,133 @@ export async function login(
   }
  
   const { email, password } = validatedFields.data;
+  const cookieStore = await cookies()
+  const supabase = await createClient(cookieStore)
  
-  try {
-    const response = await api.login({ email, password });
-    // The login now returns the full session from our Hono backend
-    return {
-        message: 'Login successful.',
-        errors: {},
-        success: true,
-        session: response.data, // Pass the session data back
-    }
-  } catch (error) {
-    console.error('API login error:', error);
-    let errorMessage = 'Invalid login credentials. Please try again.';
-    if (isAxiosError(error) && error.response?.data?.error) {
-        errorMessage = error.response.data.error;
-    }
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  })
+
+  if (error) {
     return {
         message: 'Server error.',
         errors: {
-            server: [errorMessage]
+            server: ['Could not authenticate user. Please check your credentials.']
         },
         success: false,
     };
   }
+
+  // On success, we revalidate the whole app to refresh user state
+  // and redirect to the dashboard.
+  revalidatePath('/', 'layout');
+  redirect('/dashboard');
+}
+
+export async function logout() {
+    const cookieStore = await cookies()
+    const supabase = await createClient(cookieStore)
+    await supabase.auth.signOut()
+    redirect('/login');
 }
 
 // Zod schema for registration
 const RegisterSchema = z.object({
-    email: z.string().email({ message: 'Invalid email address.' }),
-    password: z.string().min(8, { message: 'Password must be at least 8 characters long.' }),
-});
+  fullName: z.string().min(1, 'Full name is required'),
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters long'),
+})
 
-export type RegisterFormState = {
-    message: string;
-    errors?: {
-        email?: string[];
-        password?: string[];
-        server?: string[];
-    };
-    success: boolean;
+export interface RegisterFormState {
+  message: string
+  errors?: {
+    fullName?: string[]
+    email?: string[]
+    password?: string[]
+    server?: string[]
+  }
+  success: boolean
 }
 
 export async function register(
-    prevState: RegisterFormState,
-    formData: FormData
+  prevState: RegisterFormState,
+  formData: FormData
 ): Promise<RegisterFormState> {
-    const validatedFields = RegisterSchema.safeParse(
-        Object.fromEntries(formData.entries())
-    );
+  'use server'
 
-    if (!validatedFields.success) {
-        return {
-            message: 'Invalid form data.',
-            errors: validatedFields.error.flatten().fieldErrors,
-            success: false,
-        };
+  const validatedFields = RegisterSchema.safeParse(
+    Object.fromEntries(formData.entries())
+  )
+
+  if (!validatedFields.success) {
+    return {
+      message: 'Invalid form data.',
+      errors: validatedFields.error.flatten().fieldErrors,
+      success: false,
     }
+  }
 
-    const { email, password } = validatedFields.data;
+  const { fullName, email, password } = validatedFields.data
+  const origin = (await headers()).get('origin')!
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
 
-    try {
-        await api.signUp({ email, password });
-        return {
-            message: 'Registration successful! Please check your email.',
-            errors: {},
-            success: true,
-        };
-    } catch (error) {
-        // Enhanced error logging to capture the full server response
-        console.error('API register error (Full Details):', JSON.stringify(error, null, 2));
-        if (isAxiosError(error) && error.response) {
-            console.error('Axios Response Data:', JSON.stringify(error.response.data, null, 2));
-        }
+  const { error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: `${origin}/auth/callback?next=/auth/email-confirmed`,
+      data: {
+        full_name: fullName,
+      },
+    },
+  })
 
-        let errorMessage = 'An unexpected error occurred. Please try again later.';
-        
-        // Handle structured Axios errors from our backend
-        if (isAxiosError(error) && error.response?.data?.error) {
-            const errorData = error.response.data.error;
-            // The error from our backend can be a string or an object like { message: '...' }
-            errorMessage = typeof errorData === 'object' && errorData !== null && 'message' in errorData 
-                ? (errorData as { message: string }).message 
-                : String(errorData);
-        }
-        
-        // Provide user-friendly feedback for common, known errors
-        if (errorMessage.includes('already registered')) {
-             return {
-                message: 'Registration Failed',
-                errors: { email: ['A user with this email already exists.'] },
-                success: false,
-            };
-        }
-
-        // Return the specific error message from the server
-        return {
-            message: 'Registration Failed',
-            errors: { server: [errorMessage] },
-            success: false,
-        };
+  if (error) {
+    if (error.message.includes('already registered')) {
+      return {
+        message: 'Registration Failed',
+        errors: { email: ['A user with this email already exists.'] },
+        success: false,
+      }
     }
+    return {
+      message: 'Registration Failed',
+      errors: { server: ['Could not sign up user. Please try again.'] },
+      success: false,
+    }
+  }
+
+  return {
+    message:
+      'Registration successful! Please check your email to confirm your account.',
+    errors: {},
+    success: true,
+  }
+}
+
+export async function loginWithGoogle() {
+  'use server'
+  const origin = (await headers()).get('origin')!
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${origin}/auth/callback?next=/dashboard`,
+    },
+  })
+
+  if (error) {
+    console.error('Google login error:', error)
+    return redirect('/login?error=Could not authenticate with Google')
+  }
+
+  if (data.url) {
+    return redirect(data.url)
+  }
+
+  return redirect('/login?error=Could not get Google authentication URL')
 }

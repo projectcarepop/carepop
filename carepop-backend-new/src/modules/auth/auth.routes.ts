@@ -3,22 +3,31 @@ import { zValidator } from '@hono/zod-validator';
 import { registerUserSchema, loginUserSchema } from './auth.validation';
 import { authService } from './auth.service';
 
-const authRoutes = new Hono();
+const app = new Hono()
+    .post(
+        '/register',
+        zValidator('json', registerUserSchema),
+        async (c) => {
+            const body = c.req.valid('json');
+            const data = await authService.registerUser(body);
+            return c.json(data, 201);
+        }
+    )
+    .post(
+        '/login',
+        zValidator('json', loginUserSchema),
+        async (c) => {
+            const body = c.req.valid('json');
+            const data = await authService.loginUser(body);
+            return c.json(data);
+        }
+    )
+    .post('/logout', async (c) => {
+        const { error } = await authService.logoutUser();
+        if (error) {
+            console.error('Supabase signout error:', error);
+        }
+        return c.json({ message: 'Logged out successfully' }, 200);
+    });
 
-// We will add routes for register, login, etc. here.
-authRoutes.post('/register', zValidator('json', registerUserSchema), async (c) => {
-  const userInput = c.req.valid('json');
-  const authData = await authService.registerUser(userInput);
-  return c.json({
-    message: 'Registration successful. Please check your email to confirm your account.',
-    user: authData.user,
-  }, 201);
-});
-
-authRoutes.post('/login', zValidator('json', loginUserSchema), async (c) => {
-  const loginInput = c.req.valid('json');
-  const sessionData = await authService.loginUser(loginInput);
-  return c.json(sessionData, 200);
-});
-
-export default authRoutes; 
+export default app; 
