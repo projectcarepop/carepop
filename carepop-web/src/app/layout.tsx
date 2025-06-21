@@ -20,18 +20,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <ClerkProvider
-      appearance={{
-        variables: {
-          colorPrimary: 'hsl(349 100% 65%)',
-          colorText: 'hsl(210 11% 15%)',
-          colorBackground: 'hsl(0 0% 100%)',
-          colorInputBackground: 'hsl(0 0% 100%)',
-          colorInputText: 'hsl(210 11% 15%)',
-          borderRadius: '0.5rem',
-        },
-      }}
-    >
+    <ClerkProvider>
       <html lang="en" className={`${spaceGrotesk.variable} ${inter.variable} h-full`}>
         <body className="flex flex-col min-h-full bg-background text-foreground antialiased">
             <Header />
