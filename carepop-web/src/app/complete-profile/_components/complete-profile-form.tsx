@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useTransition } from 'react';
+import { useUser } from '@clerk/nextjs';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useActionState } from 'react';
 import { useForm, FieldName } from 'react-hook-form';
@@ -73,6 +75,8 @@ function FinalSubmitButton({ isPending, onClick }: { isPending: boolean, onClick
 }
 
 export function CompleteProfileForm({ userProfile, psgc }: CompleteProfileFormProps) {
+    const router = useRouter();
+    const { user } = useUser();
     const [currentStep, setCurrentStep] = useState(0);
     const [direction, setDirection] = useState(1);
     const [isPending, startTransition] = useTransition();
@@ -123,15 +127,23 @@ export function CompleteProfileForm({ userProfile, psgc }: CompleteProfileFormPr
     }, [debouncedValues]);
 
     useEffect(() => {
-        if (state.success) {
-            toast({
-                title: "Profile Complete!",
-                description: state.message,
-            });
-            localStorage.removeItem(FORM_STORAGE_KEY);
-            setSubmissionSuccess(true);
-        } else if (state.errors) {
-             for (const [field, messages] of Object.entries(state.errors)) {
+        const handleSuccess = async () => {
+            if (state.success && user) {
+                toast({
+                    title: "Profile Complete!",
+                    description: state.message,
+                });
+                localStorage.removeItem(FORM_STORAGE_KEY);
+                await user.reload(); // Force a session refresh
+                setSubmissionSuccess(true);
+            }
+        };
+        handleSuccess();
+    }, [state.success, state.message, user, toast, router]);
+
+    useEffect(() => {
+        if (state.errors) {
+            for (const [field, messages] of Object.entries(state.errors)) {
                 if (messages && messages.length > 0) {
                     form.setError(field as FieldName<ProfileFormValues>, {
                         type: 'server',
@@ -139,14 +151,14 @@ export function CompleteProfileForm({ userProfile, psgc }: CompleteProfileFormPr
                     });
                 }
             }
-        } else if (state.message) {
-            toast({
+        } else if (state.message && !state.success) {
+             toast({
                 variant: "destructive",
                 title: "An error occurred",
                 description: state.message,
             });
         }
-    }, [state, toast, form]);
+    }, [state.errors, state.message, state.success, form, toast]);
 
     const provinceOptions = useMemo(() => psgc.provinces.map(p => ({ value: p.province_code, label: p.province_name })), [psgc.provinces]);
     const selectedProvince = form.watch('province_code');
