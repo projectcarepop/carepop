@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 import { useDebounce } from '@/hooks/useDebounce';
-import { useFetcher } from '@/lib/utils/fetcher';
+import { useAuth } from '@clerk/nextjs';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -26,7 +26,30 @@ interface MedicalRecordsListProps {
 export function MedicalRecordsList({ userId }: MedicalRecordsListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
-  const fetcher = useFetcher();
+  const { getToken } = useAuth();
+
+  const fetcher = async (url: string) => {
+    const token = await getToken();
+    const res = await fetch(url, {
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        }
+    });
+
+    if (!res.ok) {
+        const error = new Error('An error occurred while fetching the data.');
+        try {
+            (error as any).info = await res.json();
+        } catch {
+            (error as any).info = { message: res.statusText };
+        }
+        (error as any).status = res.status;
+        throw error;
+    }
+    const result = await res.json();
+    return result.data;
+  };
 
   const apiUrl = `/api/v1/admin/users/${userId}/medical-records?search=${debouncedSearchTerm}`;
   const { data: records, error, isLoading } = useSWR<MedicalRecord[]>(apiUrl, fetcher);

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 import { useDebounce } from '@/hooks/useDebounce';
-import { useFetcher } from '@/lib/utils/fetcher';
+import { useAuth } from '@clerk/nextjs';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -28,7 +28,30 @@ interface AppointmentsListProps {
 export function AppointmentsList({ userId }: AppointmentsListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
-  const fetcher = useFetcher();
+  const { getToken } = useAuth();
+
+  const fetcher = async (url: string) => {
+    const token = await getToken();
+    const res = await fetch(url, {
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        }
+    });
+
+    if (!res.ok) {
+        const error = new Error('An error occurred while fetching the data.');
+        try {
+            (error as any).info = await res.json();
+        } catch {
+            (error as any).info = { message: res.statusText };
+        }
+        (error as any).status = res.status;
+        throw error;
+    }
+    const result = await res.json();
+    return result.data;
+  };
 
   const apiUrl = `/api/v1/admin/appointments?user_id=${userId}&search=${debouncedSearchTerm}`;
   const { data: appointments, error, isLoading } = useSWR<Appointment[]>(apiUrl, fetcher);
