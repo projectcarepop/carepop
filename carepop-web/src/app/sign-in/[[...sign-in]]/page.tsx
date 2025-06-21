@@ -127,11 +127,14 @@ export default function Page() {
                     </Link>
                 </div>
               </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Signing in..." : "Sign in"}
-            </Button>
-            {error && <p className="text-sm text-red-500 text-center">{error}</p>}
-        </form>
+
+              <div id="clerk-captcha"></div>
+
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? "Signing in..." : "Continue"}
+              </Button>
+              {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+          </form>
         <div className="relative">
             <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />

@@ -1,9 +1,10 @@
 'use client';
 
+import * as React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+import { SignedIn, SignedOut, UserButton, useUser } from "@clerk/nextjs";
 import { ArrowRight, ChevronDown, Menu } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
@@ -12,10 +13,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { userButtonAppearance } from "@/config/clerk-user-button-theme";
 
 export default function Header() {
+  const { user } = useUser();
+
   return (
-    <header className="bg-background text-foreground sticky top-0 z-50">
+    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <nav className="container mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
         <Link href="/" className="flex items-center">
           <Image 
@@ -85,10 +89,18 @@ export default function Header() {
             </Button>
           </SignedOut>
           <SignedIn>
-            <Link href="/dashboard" className="flex items-center text-sm font-medium text-secondary hover:text-primary px-3 py-2 rounded-md focus:outline-none">
-              Dashboard
-            </Link>
-            <UserButton afterSignOutUrl="/"/>
+            <div className="flex items-center space-x-4">
+              {user && <p className="text-sm font-medium text-gray-700">{user.primaryEmailAddress?.emailAddress}</p>}
+              <UserButton 
+                afterSignOutUrl="/" 
+                userProfileUrl="/dashboard"
+                appearance={userButtonAppearance}
+              >
+                <UserButton.MenuItems>
+                  <UserButton.Action label="signOut" />
+                </UserButton.MenuItems>
+              </UserButton>
+            </div>
           </SignedIn>
         </div>
 

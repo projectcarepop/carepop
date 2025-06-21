@@ -1,7 +1,7 @@
 // This file will contain the middleware to verify JWTs and check user roles.
 
 import { type MiddlewareHandler } from 'hono';
-import { createClerkClient, sessions } from '@clerk/backend';
+import { createClerkClient, verifyToken } from '@clerk/backend';
 import { env } from '../config';
 import { ApiError } from '../lib/errors';
 
@@ -33,7 +33,7 @@ export const authMiddleware = (): MiddlewareHandler<AuthContext> => {
     }
 
     try {
-      const claims = await clerkClient.verifyToken(token);
+      const claims = await verifyToken(token, { secretKey: env.CLERK_SECRET_KEY });
       
       c.set('auth', {
         sessionId: claims.sid,

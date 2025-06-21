@@ -121,23 +121,17 @@ export default function Page() {
                   required
                   className="mt-1"
                 />
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute bottom-1 right-1 h-7 w-7"
-                    onClick={() => setShowPassword(!showPassword)}
-                >
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="focus:outline-none">
                     {showPassword ? (
-                        <Icons.eyeOff className="h-4 w-4" />
+                      <Icons.eyeOff className="h-5 w-5 text-gray-400" />
                     ) : (
-                        <Icons.eye className="h-4 w-4" />
+                      <Icons.eye className="h-5 w-5 text-gray-400" />
                     )}
-                    <span className="sr-only">
-                        {showPassword ? "Hide password" : "Show password"}
-                    </span>
-                </Button>
+                  </button>
+                </div>
               </div>
+              <div id="clerk-captcha"></div>
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Creating account..." : "Create account"}
               </Button>
