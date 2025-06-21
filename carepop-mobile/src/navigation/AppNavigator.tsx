@@ -10,7 +10,7 @@ import {
 import { View, Text, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { useAuth } from '../context/AuthContext';
+import { useAuth, useUser } from '@clerk/clerk-expo';
 import { theme } from '../components/theme';
 import {
   LayoutDashboard,
@@ -25,9 +25,10 @@ import {
 } from 'lucide-react-native';
 
 // --- Screen Imports ---
-import { HomeScreen } from '../screens/HomeScreen';
-import { LoginScreen } from '../../screens/LoginScreen';
-import { RegisterScreen } from '../../screens/RegisterScreen';
+// No HomeScreen exists, so we remove the import.
+// import { HomeScreen } from '../screens/HomeScreen'; 
+// The Login and Register screens are now effectively handled by Clerk's UI
+// We will create new screens to host Clerk's components.
 import { CreateProfileScreen } from '../../screens/CreateProfileScreen';
 import { ForgotPasswordScreen } from '../../screens/ForgotPasswordScreen';
 import { BookingScreen } from '../../screens/BookingScreen';
@@ -45,12 +46,14 @@ import { OnboardingScreenTwo } from '../../screens/Onboarding/OnboardingScreenTw
 import { OnboardingScreenThree } from '../../screens/Onboarding/OnboardingScreenThree';
 import { EmailConfirmationScreen } from '../../screens/EmailConfirmationScreen';
 import { DashboardScreen } from '../screens/DashboardScreen';
+import { SignInScreen } from '../screens/SignInScreen';
+import { SignUpScreen } from '../screens/SignUpScreen';
 
 
 // --- Param Lists ---
 export type AuthStackParamList = {
-  Login: undefined;
-  Register: undefined;
+  SignIn: undefined;
+  SignUp: undefined;
   ForgotPassword: undefined;
   EmailConfirmation: undefined;
 };
@@ -120,10 +123,8 @@ function OnboardingNavigator() {
 function AuthNavigator() {
   return (
     <AuthStackNav.Navigator screenOptions={{ headerShown: false }}>
-      <AuthStackNav.Screen name="Login" component={LoginScreen} />
-      <AuthStackNav.Screen name="Register" component={RegisterScreen} />
-      <AuthStackNav.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-      <AuthStackNav.Screen name="EmailConfirmation" component={EmailConfirmationScreen} />
+      <AuthStackNav.Screen name="SignIn" component={SignInScreen} />
+      <AuthStackNav.Screen name="SignUp" component={SignUpScreen} />
     </AuthStackNav.Navigator>
   );
 }
@@ -150,7 +151,8 @@ function AppointmentsStack() {
 
 // --- Custom Drawer Content ---
 function CustomDrawerContent(props: any) {
-  const { signOut, profile, user } = useAuth();
+  const { signOut } = useAuth();
+  const { user } = useUser();
   const drawerStyles = createDrawerStyles();
   return (
     <DrawerContentScrollView {...props} contentContainerStyle={drawerStyles.container}>
@@ -159,8 +161,8 @@ function CustomDrawerContent(props: any) {
           <User size={28} color={theme.colors.secondary} />
         </View>
         <View style={drawerStyles.profileTextContainer}>
-          <Text style={drawerStyles.profileName} numberOfLines={1}>{profile?.first_name} {profile?.last_name}</Text>
-          <Text style={drawerStyles.profileEmail} numberOfLines={1}>{user?.email}</Text>
+          <Text style={drawerStyles.profileName} numberOfLines={1}>{user?.fullName}</Text>
+          <Text style={drawerStyles.profileEmail} numberOfLines={1}>{user?.primaryEmailAddress?.emailAddress}</Text>
         </View>
       </View>
       <View style={drawerStyles.menuGroup}>
@@ -171,7 +173,7 @@ function CustomDrawerContent(props: any) {
           label="Log Out" 
           labelStyle={drawerStyles.logoutLabel} 
           icon={() => <LogOut size={20} color={theme.colors.secondary} />} 
-          onPress={signOut} 
+          onPress={() => signOut()}
         />
       </View>
     </DrawerContentScrollView>
@@ -241,35 +243,42 @@ function ProfileStackNavigator() {
 function AuthFlow() {
   return (
     <AuthStackNav.Navigator screenOptions={{ headerShown: false }}>
-      <AuthStackNav.Screen name="Login" component={LoginScreen} />
-      <AuthStackNav.Screen name="Register" component={RegisterScreen} />
-      <AuthStackNav.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-      <AuthStackNav.Screen name="EmailConfirmation" component={EmailConfirmationScreen} />
+      <AuthStackNav.Screen name="SignIn" component={SignInScreen} />
+      <AuthStackNav.Screen name="SignUp" component={SignUpScreen} />
     </AuthStackNav.Navigator>
   );
 }
 
 // --- Root Navigator (Handles all top-level nav logic) ---
 export function RootAppNavigator() {
-  const { isLoading, session, profile, isAwaitingEmailConfirmation, hasCompletedOnboarding } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
+  const [hasOnboarded, setHasOnboarded] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      const value = await AsyncStorage.getItem('hasOnboarded');
+      setHasOnboarded(value === 'true');
+    };
+    checkOnboarding();
+  }, []);
+
+  if (!isLoaded || hasOnboarded === null) {
+    return <SplashScreen />;
+  }
 
   return (
     <NavigationContainer>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {isLoading || hasCompletedOnboarding === null ? (
-          <RootStack.Screen name="Splash" component={SplashScreen} />
-        ) : isAwaitingEmailConfirmation ? (
-           <RootStack.Screen name="Auth" component={AuthNavigator} initialParams={{ screen: 'EmailConfirmation' }} />
-        ) : !session ? (
-            hasCompletedOnboarding ? (
-                <RootStack.Screen name="Auth" component={AuthNavigator} initialParams={{ screen: 'Register' }} />
-            ) : (
-                <RootStack.Screen name="Onboarding" component={OnboardingNavigator} />
-            )
-        ) : !profile?.first_name ? (
-          <RootStack.Screen name="CreateProfile" component={CreateProfileScreen} />
-        ) : (
+        {isSignedIn ? (
           <RootStack.Screen name="Main" component={AppDrawer} />
+        ) : (
+          <>
+            {!hasOnboarded ? (
+              <RootStack.Screen name="Onboarding" component={OnboardingNavigator} />
+            ) : (
+              <RootStack.Screen name="Auth" component={AuthNavigator} />
+            )}
+          </>
         )}
       </RootStack.Navigator>
     </NavigationContainer>

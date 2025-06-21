@@ -22,7 +22,8 @@ const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
 async function registerUser(input: RegisterUserInput) {
   const { email, password } = input;
 
-  // Step 1: Create the user in Supabase Auth
+  // Step 1: Create the user in Supabase Auth. The on_auth_user_created trigger
+  // will now handle creating the profile and assigning the role.
   const { data: authData, error: signUpError } = await supabase.auth.signUp({
     email,
     password,
@@ -40,37 +41,8 @@ async function registerUser(input: RegisterUserInput) {
     throw new ApiError(500, 'User not found after registration.');
   }
 
-  // Step 2: Use the admin client to create the profile and assign a role.
-  // This is the defined pattern for the new Hono backend.
-  const userId = authData.user.id;
-
-  const { error: profileError } = await supabaseAdmin
-    .from('profiles')
-    .insert({ id: userId });
-
-  if (profileError) {
-    // In a real-world scenario, you might want to clean up the created auth user here.
-    console.error('Failed to create profile for user:', userId, profileError);
-    throw new ApiError(
-      500,
-      'User was created successfully, but failed to create a profile.'
-    );
-  }
-  
-  const { error: roleError } = await supabaseAdmin
-    .from('user_roles')
-    .insert({ user_id: userId, role: 'user' });
-
-  if (roleError) {
-    // In a real-world scenario, you might want to clean up the created auth user here.
-    console.error('Failed to assign role to user:', userId, roleError);
-    throw new ApiError(
-      500,
-      'User was created successfully, but failed to assign a user role.'
-    );
-  }
-
-  // Step 3: Send a welcome email (fire-and-forget to avoid function timeout).
+  // The trigger now handles profile and role creation, so no further action is needed here.
+  // We can still send a welcome email if desired.
   emailService
     .sendEmail({
       to: email,

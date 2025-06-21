@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useAuth } from '@/lib/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { LogOut, ArrowRight, ChevronDown, Menu } from 'lucide-react';
+import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+import { ArrowRight, ChevronDown, Menu } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
   DropdownMenu,
@@ -14,8 +14,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export default function Header() {
-  const { user, signOut } = useAuth();
-
   return (
     <header className="bg-background text-foreground sticky top-0 z-50">
       <nav className="container mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
@@ -62,42 +60,36 @@ export default function Header() {
         </div>
 
         {/* Desktop Action Buttons */}
-        <div className="hidden md:flex items-center space-x-1 lg:space-x-2">
-          {user ? (
-            <>
-              <Link href="/dashboard" className="flex items-center text-sm font-medium text-secondary hover:text-primary px-3 py-2 rounded-md focus:outline-none">
-                <span className="hidden md:inline">Dashboard</span>
+        <div className="hidden md:flex items-center space-x-4">
+          <SignedOut>
+            <Button variant="outline" asChild className="text-secondary rounded-full hover:text-primary hover:border-primary hover:bg-background px-4 py-2 text-sm font-medium focus:outline-none">
+              <Link href="/download-app">Download our App</Link>
+            </Button>
+            <Button variant="default" asChild className="bg-primary text-background rounded-full px-4 py-2 text-sm font-medium focus:outline-none">
+              <Link href="/sign-up" className="flex items-center group">
+                Get Started
+                <motion.span
+                  animate={{ x: [0, 5, 0] }}
+                  transition={{
+                    duration: 1.5,
+                    repeat: Infinity,
+                    repeatType: "loop",
+                    ease: "easeInOut",
+                    delay: 2
+                  }}
+                  className="ml-2 bg-background text-primary rounded-full p-1 flex items-center justify-center"
+                >
+                  <ArrowRight className="h-4 w-4" />
+                </motion.span>
               </Link>
-              <Button variant="outline" onClick={signOut} className="flex items-center text-sm font-medium focus:outline-none">
-                <LogOut className="h-4 w-4 md:mr-1" />
-                <span className="hidden md:inline">Sign Out</span>
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="outline" asChild className="text-secondary rounded-full hover:text-primary hover:border-primary hover:bg-background px-4 py-2 text-sm font-medium focus:outline-none">
-                <Link href="/download-app">Download our App</Link>
-              </Button>
-              <Button variant="default" asChild className="bg-primary text-background rounded-full px-4 py-2 text-sm font-medium focus:outline-none">
-                <Link href="/login" className="flex items-center group">
-                  Get Started
-                  <motion.span
-                    animate={{ x: [0, 5, 0] }}
-                    transition={{
-                      duration: 1.5,
-                      repeat: Infinity,
-                      repeatType: "loop",
-                      ease: "easeInOut",
-                      delay: 2
-                    }}
-                    className="ml-2 bg-background text-primary rounded-full p-1 flex items-center justify-center"
-                  >
-                    <ArrowRight className="h-4 w-4" />
-                  </motion.span>
-                </Link>
-              </Button>
-            </>
-          )}
+            </Button>
+          </SignedOut>
+          <SignedIn>
+            <Link href="/dashboard" className="flex items-center text-sm font-medium text-secondary hover:text-primary px-3 py-2 rounded-md focus:outline-none">
+              Dashboard
+            </Link>
+            <UserButton afterSignOutUrl="/"/>
+          </SignedIn>
         </div>
 
         {/* Mobile Menu Button */}
@@ -120,33 +112,27 @@ export default function Header() {
                 <Link href="/contact">Contact Us</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild className="hover:bg-transparent focus:bg-transparent hover:text-primary focus:text-primary font-medium">
-                <Link href="/appointments">Appointments</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild className="hover:bg-transparent focus:bg-transparent hover:text-primary focus:text-primary font-medium">
                 <Link href="/book-service">Book a Service</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild className="hover:bg-transparent focus:bg-transparent hover:text-primary focus:text-primary font-medium">
                 <Link href="/clinic-finder">Find a Clinic</Link>
               </DropdownMenuItem>
-              {user ? (
-                <>
+              
+              <SignedIn>
                   <DropdownMenuItem asChild className="hover:bg-transparent focus:bg-transparent hover:text-primary focus:text-primary font-medium">
                     <Link href="/dashboard">Dashboard</Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild className="hover:bg-transparent focus:bg-transparent hover:text-primary focus:text-primary font-medium">
                     <Link href="/appointments">My Appointments</Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={signOut} className="hover:bg-transparent focus:bg-transparent hover:text-primary focus:text-primary font-medium">
-                    Sign Out
-                  </DropdownMenuItem>
-                </>
-              ) : (
-                <>
+              </SignedIn>
+
+              <SignedOut>
                   <DropdownMenuItem asChild className="hover:bg-transparent focus:bg-transparent text-secondary hover:text-primary focus:text-primary font-medium rounded-md">
                     <Link href="/download-app">Download our App</Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild className="bg-primary text-primary-foreground hover:bg-primary/90 focus:bg-primary/90 font-semibold rounded-md">
-                    <Link href="/login" className="flex items-center justify-between w-full group">
+                    <Link href="/sign-up" className="flex items-center justify-between w-full group">
                       <span>Get Started</span>
                       <motion.span
                         animate={{ x: [0, 5, 0] }}
@@ -162,8 +148,7 @@ export default function Header() {
                       </motion.span>
                     </Link>
                   </DropdownMenuItem>
-                </>
-              )}
+              </SignedOut>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

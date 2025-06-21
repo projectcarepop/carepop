@@ -14,6 +14,7 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string(),
   SUPABASE_JWT_SECRET: z.string(),
   RESEND_API_KEY: z.string(),
+  CLERK_SECRET_KEY: z.string(),
 });
 
 export const env = envSchema.parse(process.env); 

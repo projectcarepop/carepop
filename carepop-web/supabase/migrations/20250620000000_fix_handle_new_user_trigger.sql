@@ -10,8 +10,14 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-  insert into public.profiles (id, email)
-  values (new.id, new.email);
+  -- Insert a new profile for the new user
+  insert into public.profiles (id)
+  values (new.id);
+  
+  -- Assign the default 'user' role to the new user
+  insert into public.user_roles (user_id, role)
+  values (new.id, 'user');
+  
   return new;
 end;
 $$;

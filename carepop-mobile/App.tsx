@@ -1,29 +1,37 @@
 import 'react-native-gesture-handler';
-import React, { useCallback, useEffect } from 'react';
-import { AuthProvider, useAuth } from './src/context/AuthContext';
+import React from 'react';
+import { ClerkProvider } from '@clerk/clerk-expo';
+import * as SecureStore from 'expo-secure-store';
+import Constants from 'expo-constants';
 import { RootAppNavigator } from './src/navigation/AppNavigator';
-import * as SplashScreen from 'expo-splash-screen';
-import {
-  useFonts,
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-} from '@expo-google-fonts/inter';
-import {
-  SpaceGrotesk_400Regular,
-  SpaceGrotesk_500Medium,
-  SpaceGrotesk_700Bold,
-} from '@expo-google-fonts/space-grotesk';
-import { View } from 'react-native';
+import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
+import { SpaceGrotesk_400Regular, SpaceGrotesk_500Medium, SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk';
 
-// Keep the splash screen visible while we fetch resources
-SplashScreen.preventAutoHideAsync();
+const tokenCache = {
+  async getToken(key: string) {
+    try {
+      return SecureStore.getItemAsync(key);
+    } catch (err) {
+      return null;
+    }
+  },
+  async saveToken(key: string, value: string) {
+    try {
+      return SecureStore.setItemAsync(key, value);
+    } catch (err) {
+      return;
+    }
+  },
+};
 
-function AppContent() {
-  const { isLoading } = useAuth();
-  
-  let [fontsLoaded, fontError] = useFonts({
+const publishableKey = Constants.expoConfig?.extra?.clerkPublishableKey;
+
+if (!publishableKey) {
+  throw new Error('Missing Clerk Publishable Key. Please set it in your app.json');
+}
+
+export default function App() {
+  let [fontsLoaded] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
@@ -33,29 +41,16 @@ function AppContent() {
     SpaceGrotesk_700Bold,
   });
 
-  const onLayoutRootView = useCallback(async () => {
-    if (fontsLoaded && !isLoading) {
-      // This tells the splash screen to hide immediately! If we're loaded,
-      // hide the splash screen.
-      await SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded, isLoading]);
-
-  if (!fontsLoaded || isLoading) {
+  if (!fontsLoaded) {
     return null;
   }
 
   return (
-    <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+    <ClerkProvider
+      tokenCache={tokenCache}
+      publishableKey={publishableKey}
+    >
       <RootAppNavigator />
-    </View>
-  );
-}
-
-export default function App() {
-  return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    </ClerkProvider>
   );
 }
