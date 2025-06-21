@@ -1,4 +1,6 @@
 node_modules
+
+
 .expo
 
 # testing
@@ -15,3 +17,5 @@ yarn-debug.log*
 yarn-error.log*
 .idea/
 .vscode/
+# memory bank
+memory-bank-backend/
