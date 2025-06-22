@@ -25,8 +25,8 @@ export default function Page() {
     try {
       await signIn.authenticateWithRedirect({
         strategy: provider,
-        redirectUrl: '/sso-callback',
-        redirectUrlComplete: '/',
+        redirectUrl: '/sign-in',
+        redirectUrlComplete: '/dashboard',
       });
     } catch (cause) {
       console.error(cause);
