@@ -13,7 +13,7 @@ import usersRoutes from './modules/users/users.routes';
 import clinicRoutes from './modules/clinics/clinics.routes';
 import mobileRoutes from './modules/mobile/mobile.routes';
 
-const app = new Hono().basePath('/api/v1');
+const app = new Hono();
 
 // --- Middleware ---
 app.use('*', logger());
@@ -24,23 +24,29 @@ app.use(
     origin: '*', // In production, you should restrict this to your frontend's domain
   })
 );
-app.use('*', clerkAuthMiddleware());
+
+// --- API v1 Router ---
+const apiV1 = new Hono();
 
 // --- Public Routes ---
-const publicRoutes = new Hono();
-publicRoutes.get('/', (c) => {
-  return c.text('CarePoP API is running!');
-});
-publicRoutes.route('/auth', authRoutes);
-publicRoutes.route('/users', usersRoutes);
-app.route('/', publicRoutes);
+// These routes do not require authentication
+const publicApi = new Hono();
+publicApi.get('/', (c) => c.text('CarePoP API is running!'));
+publicApi.route('/auth', authRoutes); // e.g., for webhooks or login initiation
+apiV1.route('/', publicApi);
 
 // --- Protected Routes ---
-const protectedRoutes = new Hono();
-protectedRoutes.route('/profiles', profilesRoutes);
-protectedRoutes.route('/clinics', clinicRoutes);
-protectedRoutes.route('/mobile', mobileRoutes);
-app.route('/', protectedRoutes);
+// These routes are protected by the Clerk auth middleware
+const protectedApi = new Hono();
+protectedApi.use('*', clerkAuthMiddleware()); // Middleware applied only to this group
+protectedApi.route('/users', usersRoutes);
+protectedApi.route('/profiles', profilesRoutes);
+protectedApi.route('/clinics', clinicRoutes);
+protectedApi.route('/mobile', mobileRoutes);
+apiV1.route('/', protectedApi);
+
+// Register the v1 API router to the main app
+app.route('/api/v1', apiV1);
 
 // --- Error Handler ---
 app.onError(errorHandler);

@@ -72,11 +72,17 @@ export async function updateUserMetadata(
         return { message: 'Invalid date of birth provided.', success: false };
     }
 
+    const age = new Date(new Date().getTime() - dob.getTime()).getUTCFullYear() - 1970;
+
     const dataForBackend = {
         ...profileData,
         date_of_birth: dob.toISOString().split('T')[0],
+        age: age,
     };
 
+    // Use a dedicated server-side environment variable, with a fallback for local development.
+    const backendApiUrl = `${process.env.INTERNAL_API_BASE_URL || 'http://localhost:3000'}/api/v1/profiles`;
+    
     // Get the auth token to pass to the backend
     const { getToken } = await auth();
     const token = await getToken();
@@ -85,7 +91,6 @@ export async function updateUserMetadata(
         return { message: 'Authentication token is missing. Cannot save profile.', success: false };
     }
 
-    const backendApiUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/profiles`;
     const response = await fetch(backendApiUrl, {
         method: 'POST',
         headers: {

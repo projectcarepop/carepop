@@ -143,7 +143,7 @@ export const CreateProfileScreen = () => {
                 gender_identity: genderIdentity,
                 pronouns: pronouns,
                 assigned_sex_at_birth: assignedSexAtBirth,
-                age: new Date().getFullYear() - dateOfBirth.getFullYear(),
+                age: new Date(new Date().getTime() - dateOfBirth.getTime()).getUTCFullYear() - 1970,
             };
             
             // This now uses the refactored `api.post` which handles Clerk auth.

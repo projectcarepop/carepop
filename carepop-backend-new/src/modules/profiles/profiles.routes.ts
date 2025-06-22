@@ -6,6 +6,19 @@ import { clerkAuthMiddleware, getAuth } from '../../middleware/auth.middleware';
 import { ApiError } from '../../lib/errors';
 
 const profilesRoutes = new Hono()
+  .post(
+    '/',
+    zValidator('json', updateProfileSchema),
+    async (c) => {
+        const auth = getAuth(c);
+        if (!auth?.userId) {
+            throw new ApiError(401, 'User not authenticated');
+        }
+        const validatedJson = c.req.valid('json');
+        const profile = await profilesService.upsertProfile(auth.userId, validatedJson);
+        return c.json(profile, 201); // 201 Created or 200 OK is fine.
+    }
+  )
   .get('/', async (c) => {
     // This could be an admin-only route in the future
     return c.json({ message: 'GET all profiles placeholder' });
@@ -31,7 +44,7 @@ const profilesRoutes = new Hono()
         throw new ApiError(401, 'User not authenticated');
       }
       const validatedJson = c.req.valid('json');
-      const updatedProfile = await profilesService.updateProfile(
+      const updatedProfile = await profilesService.upsertProfile(
         auth.userId,
         validatedJson
       );

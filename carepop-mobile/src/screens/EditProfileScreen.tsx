@@ -203,7 +203,7 @@ export const EditProfileScreen = () => {
                 gender_identity: genderIdentity,
                 pronouns: pronouns,
                 assigned_sex_at_birth: assignedSexAtBirth,
-                age: dateOfBirth ? new Date().getFullYear() - dateOfBirth.getFullYear() : null,
+                age: dateOfBirth ? new Date(new Date().getTime() - dateOfBirth.getTime()).getUTCFullYear() - 1970 : null,
             };
 
             await api.post('/profiles', profileData, getToken);

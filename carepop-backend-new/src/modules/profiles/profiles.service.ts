@@ -62,4 +62,5 @@ async function upsertProfile(userId: string, input: UpdateProfileInput) {
 export const profilesService = {
   getProfile,
   updateProfile: upsertProfile,
+  upsertProfile,
 }; 
