@@ -1,10 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, SafeAreaView } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, CommonActions } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Button } from '../../src/components/button.native';
 import { theme } from '../../src/components/theme';
-import { RootStackParamList } from '../../src/navigation/AppNavigator';
+import { RootStackParamList, AuthOnboardingStackParamList } from '../../src/navigation/AppNavigator';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 type OnboardingNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Onboarding'>;
@@ -13,15 +13,17 @@ type OnboardingNavigationProp = NativeStackNavigationProp<RootStackParamList, 'O
 // navigates the user to the main app (e.g., Auth or Dashboard).
 // The onComplete prop is a good pattern for this.
 export const OnboardingScreenThree = () => {
-  const navigation = useNavigation<OnboardingNavigationProp>();
+  const navigation = useNavigation<NativeStackNavigationProp<AuthOnboardingStackParamList>>();
 
   const handleGetStarted = async () => {
     try {
-      await AsyncStorage.setItem('hasOnboarded', 'true');
+      await AsyncStorage.setItem('hasCompletedOnboarding', 'true');
+      navigation.navigate('Register');
     } catch (e) {
       console.error('Failed to save onboarding status', e);
+      // Even if it fails, navigate the user.
+      navigation.navigate('Register');
     }
-    navigation.navigate('Auth');
   };
 
   return (

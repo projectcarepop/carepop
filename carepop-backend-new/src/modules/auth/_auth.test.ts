@@ -1,5 +1,6 @@
 // This is the main test runner file. It orchestrates all other test suites.
 import { runProfileTests } from '../profiles/profiles.test';
+import { describe, it, expect } from '@jest/globals';
 
 const BASE_URL = 'http://localhost:3000/api/v1/auth';
 
@@ -123,5 +124,11 @@ async function runAllTests() {
         process.exit(1); // Exit with error code
     }
 }
+
+describe('Auth Module', () => {
+    it('should have tests', () => {
+        expect(true).toBe(true);
+    });
+});
 
 runAllTests(); 

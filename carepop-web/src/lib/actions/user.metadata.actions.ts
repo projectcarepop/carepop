@@ -1,7 +1,8 @@
 'use server';
 
-import { clerkClient, currentUser, auth } from '@clerk/nextjs/server';
+import { currentUser, auth } from '@clerk/nextjs/server';
 import { z } from 'zod';
+import { revalidatePath } from 'next/cache';
 
 const profileFormSchema = z.object({
   first_name: z.string().min(1, 'First name is required'),
@@ -106,17 +107,9 @@ export async function updateUserMetadata(
         return { message: `An error occurred while saving your profile: ${errorBody.message || response.statusText}`, success: false };
     }
     
-    const clerkApi = await clerkClient();
-    await clerkApi.users.updateUser(user.id, {
-      firstName: dataForBackend.first_name,
-      lastName: dataForBackend.last_name,
-      publicMetadata: {
-        ...user.publicMetadata,
-        profileComplete: true,
-      },
-    });
+    revalidatePath('/dashboard');
 
-    return { message: 'Welcome aboard! Your profile has been set up successfully.', success: true };
+    return { message: 'Your profile has been updated successfully.', success: true };
   } catch (error) {
     console.error('Error in updateUserMetadata action:', error);
     const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';

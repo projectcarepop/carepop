@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../../lib/supabase';
 import { ApiError } from '../../lib/errors';
 import { type UpdateProfileInput } from './profiles.validation';
+import { clerkClient } from '../../lib/clerk';
 
 async function getProfile(userId: string) {
   const { data, error } = await supabaseAdmin
@@ -39,7 +40,7 @@ async function upsertProfile(userId: string, input: UpdateProfileInput) {
         barangay_code: input.barangay_code,
     };
 
-    const { data, error } = await supabaseAdmin
+    const { data: dbProfile, error } = await supabaseAdmin
       .from('profiles')
       .upsert(profileDataForDb, { onConflict: 'clerk_id' })
       .select()
@@ -50,7 +51,59 @@ async function upsertProfile(userId: string, input: UpdateProfileInput) {
       throw new ApiError(500, `Could not upsert profile: ${error.message}`);
     }
 
-    return data;
+    // --- Start Clerk Sync with extra logging ---
+    try {
+      // Age must be calculated on the backend using the definitive date of birth
+      // from the database to ensure it's always correct.
+      const age = dbProfile.date_of_birth
+        ? new Date(new Date().getTime() - new Date(dbProfile.date_of_birth).getTime()).getUTCFullYear() - 1970
+        : 0;
+
+      const metadataToSync = {
+        profileComplete: true,
+        middle_initial: dbProfile.middle_initial ?? '',
+        date_of_birth: dbProfile.date_of_birth ?? '',
+        contact_no: dbProfile.contact_no ?? '',
+        gender_identity: dbProfile.gender_identity ?? '',
+        pronouns: dbProfile.pronouns ?? '',
+        assigned_sex_at_birth: dbProfile.assigned_sex_at_birth ?? '',
+        civil_status: dbProfile.civil_status ?? '',
+        religion: dbProfile.religion ?? '',
+        occupation: dbProfile.occupation ?? '',
+        philhealth_no: dbProfile.philhealth_no ?? '',
+        street: dbProfile.street ?? '',
+        province_code: dbProfile.province_code ?? '',
+        city_municipality_code: dbProfile.city_municipality_code ?? '',
+        barangay_code: dbProfile.barangay_code ?? '',
+        age: age,
+      };
+
+      console.log('--- Clerk Sync Data ---');
+      console.log('User ID:', userId);
+      console.log('Metadata to Sync:', JSON.stringify(metadataToSync, null, 2));
+      console.log('First Name:', dbProfile.first_name ?? '');
+      console.log('Last Name:', dbProfile.last_name ?? '');
+      console.log('-----------------------');
+
+      // We MUST await this call in a serverless environment to ensure it completes
+      // before the function execution is terminated.
+      await clerkClient.users.updateUser(userId, {
+        firstName: dbProfile.first_name ?? '',
+        lastName: dbProfile.last_name ?? '',
+        publicMetadata: metadataToSync,
+      });
+
+      console.log('Clerk sync successful for user:', userId);
+
+    } catch (clerkError) {
+      // If the Clerk sync fails, we log it but do not throw an error to the client.
+      // This is a trade-off: the primary data is saved, but the UI might be stale
+      // until the next successful sync. This is better than failing the whole operation.
+      console.error('!!! CRITICAL: Clerk sync failed!', clerkError);
+    }
+    // --- End Clerk Sync ---
+
+    return dbProfile;
   } catch (error) {
     if (error instanceof ApiError) throw error;
     console.error('Unexpected error in upsertProfile:', error);

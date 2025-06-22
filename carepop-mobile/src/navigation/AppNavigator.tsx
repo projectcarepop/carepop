@@ -79,6 +79,14 @@ export type OnboardingStackParamList = {
   OnboardingThree: undefined;
 };
 
+export type AuthOnboardingStackParamList = {
+  OnboardingOne: undefined;
+  OnboardingTwo: undefined;
+  OnboardingThree: undefined;
+  Login: undefined;
+  Register: undefined;
+};
+
 export type DrawerParamList = {
   Dashboard: undefined; // This will point to the HomeScreen directly now
   Appointments: undefined;
@@ -93,6 +101,7 @@ export type RootStackParamList = {
   Splash: undefined;
   Auth: { screen?: string } | undefined; // Allow passing initial screen
   Onboarding: undefined; 
+  AuthOnboarding: undefined;
   CreateProfile: undefined;
   Main: undefined; // The Drawer Navigator
   EditProfile: undefined;
@@ -105,19 +114,22 @@ const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
 const AppointmentsStackNav = createNativeStackNavigator<AppointmentsStackParamList>();
 const BookingStackNav = createNativeStackNavigator<BookingStackParamList>();
 const OnboardingStack = createNativeStackNavigator<OnboardingStackParamList>();
+const AuthOnboardingStack = createNativeStackNavigator<AuthOnboardingStackParamList>();
 const Drawer = createDrawerNavigator<DrawerParamList>();
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 
 
 // --- Component-Based Navigators ---
 
-function OnboardingNavigator() {
+function AuthOnboardingNavigator() {
   return (
-    <OnboardingStack.Navigator screenOptions={{ headerShown: false }}>
-      <OnboardingStack.Screen name="OnboardingOne" component={OnboardingScreenOne} />
-      <OnboardingStack.Screen name="OnboardingTwo" component={OnboardingScreenTwo} />
-      <OnboardingStack.Screen name="OnboardingThree" component={OnboardingScreenThree} />
-    </OnboardingStack.Navigator>
+    <AuthOnboardingStack.Navigator screenOptions={{ headerShown: false }}>
+      <AuthOnboardingStack.Screen name="OnboardingOne" component={OnboardingScreenOne} />
+      <AuthOnboardingStack.Screen name="OnboardingTwo" component={OnboardingScreenTwo} />
+      <AuthOnboardingStack.Screen name="OnboardingThree" component={OnboardingScreenThree} />
+      <AuthOnboardingStack.Screen name="Login" component={LoginScreen} />
+      <AuthOnboardingStack.Screen name="Register" component={RegisterScreen} />
+    </AuthOnboardingStack.Navigator>
   );
 }
 
@@ -235,57 +247,48 @@ function ProfileStackNavigator() {
   );
 }
 
-// --- Auth Flow & Root Navigators ---
-function AuthFlow() {
-  return (
-    <AuthStackNav.Navigator screenOptions={{ headerShown: false }}>
-      <AuthStackNav.Screen name="Login" component={LoginScreen} />
-      <AuthStackNav.Screen name="Register" component={RegisterScreen} />
-    </AuthStackNav.Navigator>
-  );
-}
-
 // --- Root Navigator (Handles all top-level nav logic) ---
 export function RootAppNavigator() {
   const { isLoaded, isSignedIn } = useAuth();
   const { user } = useUser();
-  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
-  const [isCheckingOnboarding, setIsCheckingOnboarding] = useState(true);
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
 
   useEffect(() => {
     const checkOnboarding = async () => {
-      const value = await AsyncStorage.getItem('hasCompletedOnboarding');
-      setHasCompletedOnboarding(value === 'true');
-      setIsCheckingOnboarding(false);
+      try {
+        const value = await AsyncStorage.getItem('hasCompletedOnboarding');
+        setHasCompletedOnboarding(value === 'true');
+      } catch (e) {
+        setHasCompletedOnboarding(false);
+      }
     };
-
     checkOnboarding();
   }, []);
 
-  if (!isLoaded || isCheckingOnboarding) {
+  if (!isLoaded || hasCompletedOnboarding === null) {
     return <SplashScreen />;
   }
-
-  // Determine if the profile is complete from Clerk's metadata
-  const isProfileComplete = user?.publicMetadata?.profileComplete === true;
 
   return (
     <NavigationContainer>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         {isSignedIn ? (
-          isProfileComplete ? (
-            <RootStack.Screen name="Main" component={AppDrawer} />
+          user?.publicMetadata?.profileComplete === true ? (
+            <>
+              <RootStack.Screen name="Main" component={AppDrawer} />
+              <RootStack.Screen 
+                name="EditProfile" 
+                component={EditProfileScreen} 
+                options={{ presentation: 'modal' }} 
+              />
+            </>
           ) : (
             <RootStack.Screen name="CreateProfile" component={CreateProfileScreen} />
           )
+        ) : hasCompletedOnboarding ? (
+          <RootStack.Screen name="Auth" component={AuthNavigator} />
         ) : (
-          <>
-            {hasCompletedOnboarding ? (
-              <RootStack.Screen name="Auth" component={AuthNavigator} />
-            ) : (
-              <RootStack.Screen name="Onboarding" component={OnboardingNavigator} />
-            )}
-          </>
+          <RootStack.Screen name="AuthOnboarding" component={AuthOnboardingNavigator} />
         )}
       </RootStack.Navigator>
     </NavigationContainer>

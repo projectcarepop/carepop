@@ -12,6 +12,8 @@ import { profilesRoutes } from './modules/profiles/profiles.routes'; // This one
 import usersRoutes from './modules/users/users.routes';
 import clinicRoutes from './modules/clinics/clinics.routes';
 import mobileRoutes from './modules/mobile/mobile.routes';
+//import appointments from './modules/appointments/appointments.routes';
+import services from './modules/services/services.routes';
 
 const app = new Hono();
 
@@ -43,6 +45,8 @@ protectedApi.route('/users', usersRoutes);
 protectedApi.route('/profiles', profilesRoutes);
 protectedApi.route('/clinics', clinicRoutes);
 protectedApi.route('/mobile', mobileRoutes);
+//protectedApi.route('/appointments', appointments);
+protectedApi.route('/services', services);
 apiV1.route('/', protectedApi);
 
 // Register the v1 API router to the main app

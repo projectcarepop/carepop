@@ -5,6 +5,7 @@ import {
   boolean,
   decimal,
   timestamp,
+  integer,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
@@ -83,7 +84,27 @@ export const clinicProviders = pgTable('clinic_providers', {
     providerId: uuid('provider_id').notNull().references(() => providers.id, { onDelete: 'cascade' }),
 });
 
+export const specializations = pgTable('specializations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  description: text('description'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const services = pgTable('services', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  description: text('description'),
+  specializationId: uuid('specialization_id').references(() => specializations.id),
+  price: decimal('price', { precision: 10, scale: 2 }),
+  durationMinutes: integer('duration_minutes'),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const clinicServices = pgTable('clinic_services', {
     clinicId: uuid('clinic_id').notNull().references(() => clinics.id, { onDelete: 'cascade' }),
-    serviceId: uuid('service_id').notNull() // Assumes a `services` table exists
+    serviceId: uuid('service_id').notNull().references(() => services.id, { onDelete: 'cascade' }),
 }); 

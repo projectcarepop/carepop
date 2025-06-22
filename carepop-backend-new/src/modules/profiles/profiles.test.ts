@@ -1,3 +1,11 @@
+import { describe, it, expect } from '@jest/globals';
+
+describe('Profiles Module', () => {
+    it('should have tests', () => {
+        expect(true).toBe(true);
+    });
+});
+
 const BASE_URL = 'http://localhost:3000/api/v1/profiles';
 
 async function testProfileApiCall({

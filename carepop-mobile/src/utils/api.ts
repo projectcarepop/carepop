@@ -13,8 +13,8 @@ function getApiUrl() {
     const hostUri = Constants.expoConfig?.hostUri;
     // We only want the IP address part, not the port.
     const host = hostUri?.split(':')[0];
-    // We construct the full URL with the backend port (3000)
-    return `http://${host}:3000/api/v1`;
+    // We construct the full URL with the backend port (3001)
+    return `http://${host}:3001/api/v1`;
   } else {
     // In production (an EAS build), we use the official URL from app.json
     return MANIFEST_BACKEND_URL;
@@ -233,7 +233,7 @@ export const getDirections = async (
       origin,
       destination,
       mode,
-    });
+    }, async () => null); // Pass a dummy getToken for public endpoints
     return data;
   } catch (err: any) {
     console.error('API call failed for getDirections:', err);
