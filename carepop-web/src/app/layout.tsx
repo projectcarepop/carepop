@@ -21,16 +21,16 @@ export default function RootLayout({
 }) {
   return (
     <ClerkProvider>
-    <html lang="en" className={`${spaceGrotesk.variable} ${inter.variable} h-full`}>
-        <body className="flex flex-col min-h-full bg-background text-foreground antialiased">
-            <Header />
-                <main className="flex-grow">
-                    {children}
-                </main>
-            <Toaster />
-                <ConditionalFooter />
-        </body>
-    </html>
+      <html lang="en" className={`${spaceGrotesk.variable} ${inter.variable} h-full`}>
+          <body className="flex flex-col min-h-full bg-background text-foreground antialiased">
+              <Header />
+                  <main className="flex-grow">
+                      {children}
+                  </main>
+              <Toaster />
+                  <ConditionalFooter />
+          </body>
+      </html>
     </ClerkProvider>
   )
 }

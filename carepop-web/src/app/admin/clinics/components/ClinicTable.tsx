@@ -1,20 +1,12 @@
-import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { z } from 'zod';
+import { auth } from "@clerk/nextjs/server";
+import { unstable_noStore as noStore } from 'next/cache';
 import { ClinicTableClient } from './ClinicTableClient';
 
-const clinicSearchSchema = z.object({
-  page: z.coerce.number().default(1),
-  per_page: z.coerce.number().default(10),
-  sort: z.string().optional(),
-  search: z.string().optional(),  
-});
-
-export type GetClinicsParams = z.infer<typeof clinicSearchSchema>;
-
+// This type can be simplified as we get all data now
 export interface Clinic {
   id: string;
   name: string;
-  full_address?: string | null;
+  street_address?: string | null;
   locality?: string | null;
   region?: string | null;
   contact_phone?: string | null;
@@ -23,38 +15,50 @@ export interface Clinic {
   updated_at: string;
 }
 
-async function getClinics(params: GetClinicsParams) {
-  const supabase = await createSupabaseServerClient();
-  const { page, per_page, sort, search } = params;
+async function getClinics(): Promise<Clinic[]> {
+  noStore();
+  const { getToken } = await auth();
+  const token = await getToken();
 
-  const [sortField, sortOrder] = sort?.split('.') || ['name', 'asc'];
-  const offset = (page - 1) * per_page;
-
-  let query = supabase
-    .from('clinics')
-    .select(`
-        id, name, full_address, locality, region, contact_phone, is_active, created_at, updated_at
-    `, { count: 'exact' })
-    .range(offset, offset + per_page - 1)
-    .order(sortField, { ascending: sortOrder === 'asc' });
-
-  if (search) {
-    query = query.or(`name.ilike.%${search}%,locality.ilike.%${search}%,region.ilike.%${search}%`);
+  if (!token) {
+    throw new Error("Unauthorized: No token found.");
   }
 
-  const { data, error, count } = await query;
-
-  if (error) {
-    console.error('Error fetching clinics:', error);
-    return { data: [], totalRecords: 0 };
+  const backendApiUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL;
+  if (!backendApiUrl) {
+    throw new Error("Backend API URL is not configured.");
   }
 
-  return { data: data as Clinic[], totalRecords: count ?? 0 };
+  const response = await fetch(`${backendApiUrl}/api/v1/clinics`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    console.error("Error response from backend:", errorBody);
+    throw new Error(`Failed to fetch clinics: ${response.statusText}`);
+  }
+
+  const clinics: Clinic[] = await response.json();
+  return clinics;
 }
 
-export async function ClinicTable(props: GetClinicsParams) {
-  const validatedParams = clinicSearchSchema.parse(props);
-  const { data, totalRecords } = await getClinics(validatedParams);
-
-  return <ClinicTableClient data={data} totalRecords={totalRecords} />;
+export async function ClinicTable() {
+  try {
+    const clinics = await getClinics();
+    return <ClinicTableClient data={clinics} />;
+  } catch (error) {
+    console.error("Failed to fetch and render clinics:", error);
+    // Render an error state or an empty table
+    return (
+        <div className="p-4 rounded-md border border-destructive bg-destructive/10">
+            <h3 className="font-semibold text-destructive">Failed to load clinics</h3>
+            <p className="text-sm text-destructive/80">
+                There was an error fetching clinic data from the server. Please try again later.
+            </p>
+        </div>
+    );
+  }
 } 

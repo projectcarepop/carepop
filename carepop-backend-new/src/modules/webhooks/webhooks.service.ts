@@ -1,31 +1,38 @@
 import { WebhookEvent } from '@clerk/backend';
 import { supabaseAdmin } from '../../lib/supabase';
 import { ApiError } from '../../lib/errors';
+import { type UserJSON } from '@clerk/backend';
 
-type UserData = {
-    id: string;
-    email_addresses: { email_address: string; }[];
-    first_name: string | null;
-    last_name: string | null;
-    image_url: string;
-    public_metadata: {
-        role?: 'admin' | 'user';
+async function upsertProfile(userData: UserJSON) {
+    const metadata = userData.public_metadata || {};
+    const profileData = {
+        clerk_id: userData.id,
+        first_name: (metadata.first_name as string) || userData.first_name,
+        last_name: (metadata.last_name as string) || userData.last_name,
+        avatar_url: userData.image_url,
+        middle_initial: metadata.middle_initial as string,
+        date_of_birth: metadata.date_of_birth as string,
+        contact_no: metadata.contact_no as string,
+        gender_identity: metadata.gender_identity as string,
+        pronouns: metadata.pronouns as string,
+        assigned_sex_at_birth: metadata.assigned_sex_at_birth as string,
+        civil_status: metadata.civil_status as string,
+        religion: metadata.religion as string,
+        occupation: metadata.occupation as string,
+        philhealth_no: metadata.philhealth_no as string,
+        street: metadata.street as string,
+        province_code: metadata.province_code as string,
+        city_municipality_code: metadata.city_municipality_code as string,
+        barangay_code: metadata.barangay_code as string,
     };
-};
 
-async function upsertProfile(userData: UserData) {
     const { data, error } = await supabaseAdmin
         .from('profiles')
-        .upsert({
-            id: userData.id,
-            email: userData.email_addresses[0]?.email_address,
-            first_name: userData.first_name,
-            last_name: userData.last_name,
-            avatar_url: userData.image_url,
-        }, { onConflict: 'id' });
+        .upsert(profileData, { onConflict: 'clerk_id' });
 
     if (error) {
-        throw new ApiError(500, `Error upserting profile: ${error.message}`);
+        console.error('Webhook profile upsert error:', error);
+        throw new ApiError(500, `Error upserting profile via webhook: ${error.message}`);
     }
     return data;
 }
@@ -45,17 +52,14 @@ async function upsertUserRole(userId: string, role: 'admin' | 'user') {
 }
 
 export async function handleWebhookEvent(event: WebhookEvent) {
-    const userData = event.data as UserData;
+    if (event.type === 'user.created' || event.type === 'user.updated') {
+        const userData = event.data;
+        await upsertProfile(userData);
 
-    switch (event.type) {
-        case 'user.created':
-        case 'user.updated':
-            await upsertProfile(userData);
-            const role = userData.public_metadata.role || 'user';
-            await upsertUserRole(userData.id, role);
-            console.log(`Processed ${event.type} for user ${userData.id}`);
-            break;
-        default:
-            console.log(`Received unhandled event type: ${event.type}`);
+        const role = (userData.public_metadata?.role as 'admin' | 'user') || 'user';
+        await upsertUserRole(userData.id, role);
+        console.log(`Processed ${event.type} for user ${userData.id}`);
+    } else {
+        console.log(`Received unhandled event type: ${event.type}`);
     }
 } 

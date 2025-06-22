@@ -18,6 +18,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Users, ChevronLeft, ChevronRight, Briefcase, HeartPulse } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+const eighteenYearsAgo = new Date();
+eighteenYearsAgo.setFullYear(eighteenYearsAgo.getFullYear() - 18);
 
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: currentYear - 1919 }, (_, i) => String(currentYear - i));
@@ -38,7 +42,7 @@ const profileFormSchema = z.object({
   birth_year: z.string({ required_error: 'Year is required' }),
   birth_month: z.string({ required_error: 'Month is required' }),
   birth_day: z.string({ required_error: 'Day is required' }),
-  contact_no: z.string().min(10, 'Must be a valid phone number').optional().nullable(),
+  contact_no: z.union([z.string().length(0), z.string().min(10, 'Must be a valid 10-digit phone number')]).optional().nullable().transform(e => e === "" ? null : e),
   gender_identity: z.string().min(1, 'Gender identity is required'),
   pronouns: z.string().min(1, 'Pronouns are required'),
   assigned_sex_at_birth: z.string().min(1, 'This field is required'),
@@ -72,8 +76,8 @@ interface StepConfig {
 }
 
 const stepsConfig: StepConfig[] = [
-  { name: 'Demographics', icon: Users, description: "Help us understand you better.", fields: ['first_name', 'last_name', 'middle_initial', 'birth_year', 'birth_month', 'birth_day', 'contact_no', 'gender_identity', 'pronouns', 'assigned_sex_at_birth', 'civil_status', 'religion'] },
-  { name: 'Professional & Address', icon: Briefcase, description: "Your work, health coverage, and location.", fields: ['occupation', 'philhealth_no', 'street', 'province_code', 'city_municipality_code', 'barangay_code'] },
+  { name: 'Demographics', icon: Users, description: "Help us understand you better.", fields: ['first_name', 'last_name', 'middle_initial', 'birth_year', 'birth_month', 'birth_day', 'contact_no', 'gender_identity', 'pronouns', 'assigned_sex_at_birth'] },
+  { name: 'Professional & Address', icon: Briefcase, description: "Your work, health coverage, and location.", fields: ['occupation', 'philhealth_no', 'street', 'province_code', 'city_municipality_code', 'barangay_code', 'civil_status', 'religion'] },
 ];
 
 const FORM_STORAGE_KEY = 'complete-profile-form';
@@ -257,16 +261,81 @@ export function CompleteProfileForm({ userProfile, psgc }: CompleteProfileFormPr
                                 <div className="grid md:grid-cols-2 gap-x-6 gap-y-4">
                                      <FormField control={form.control} name="first_name" render={({ field }) => (<FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                                      <FormField control={form.control} name="last_name" render={({ field }) => (<FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                                     <FormField control={form.control} name="middle_initial" render={({ field }) => (<FormItem><FormLabel>Middle Initial</FormLabel><FormControl><Input {...field} value={field.value ?? ''} placeholder="G" /></FormControl><FormMessage /></FormItem>)} />
                                      
-                                     <FormItem>
+                                     <FormField 
+                                        control={form.control} 
+                                        name="middle_initial" 
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Middle Initial</FormLabel>
+                                                <FormControl><Input {...field} value={field.value ?? ''} placeholder="G" /></FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )} 
+                                     />
+                                     
+                                    <div>
                                         <FormLabel>Date of Birth</FormLabel>
-                                        <div className="flex gap-2">
-                                            <FormField control={form.control} name="birth_month" render={({ field }) => (<FormItem className="col-span-3"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Month" /></SelectTrigger></FormControl><SelectContent>{months.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-                                            <FormField control={form.control} name="birth_day" render={({ field }) => (<FormItem className="col-span-1"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Day" /></SelectTrigger></FormControl><SelectContent>{days.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-                                            <FormField control={form.control} name="birth_year" render={({ field }) => (<FormItem className="col-span-1"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Year" /></SelectTrigger></FormControl><SelectContent>{years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                                        <div className="flex gap-2 mt-2">
+                                            <FormField
+                                                control={form.control}
+                                                name="birth_month"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <Select onValueChange={field.onChange} value={field.value}>
+                                                            <FormControl>
+                                                                <SelectTrigger><SelectValue placeholder="Month" /></SelectTrigger>
+                                                            </FormControl>
+                                                            <SelectContent>
+                                                                <ScrollArea className="h-72">
+                                                                    {months.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                                                                </ScrollArea>
+                                                            </SelectContent>
+                                                        </Select>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                            <FormField
+                                                control={form.control}
+                                                name="birth_day"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                            <FormControl>
+                                                                <SelectTrigger><SelectValue placeholder="Day" /></SelectTrigger>
+                                                            </FormControl>
+                                                            <SelectContent>
+                                                                <ScrollArea className="h-72">
+                                                                    {days.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                                                                </ScrollArea>
+                                                            </SelectContent>
+                                                        </Select>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                            <FormField
+                                                control={form.control}
+                                                name="birth_year"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                            <FormControl>
+                                                                <SelectTrigger><SelectValue placeholder="Year" /></SelectTrigger>
+                                                            </FormControl>
+                                                            <SelectContent>
+                                                                <ScrollArea className="h-72">
+                                                                    {years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                                                                </ScrollArea>
+                                                            </SelectContent>
+                                                        </Select>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
                                         </div>
-                                     </FormItem>
+                                    </div>
 
                                      <FormField control={form.control} name="contact_no" render={({ field }) => (<FormItem><FormLabel>Contact Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''} placeholder="09xxxxxxxxx" /></FormControl><FormMessage /></FormItem>)} />
                                      
@@ -431,6 +500,19 @@ export function CompleteProfileForm({ userProfile, psgc }: CompleteProfileFormPr
                                             <FormMessage />
                                         </FormItem>
                                     )} />
+                                    <FormField
+                                        control={form.control}
+                                        name="religion"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Religion (Optional)</FormLabel>
+                                                <FormControl>
+                                                    <Input {...field} value={field.value ?? ''} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
                                 </div>
                             )}
                         </motion.div>

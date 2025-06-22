@@ -25,8 +25,8 @@ export default function Page() {
     try {
       await signUp.authenticateWithRedirect({
         strategy: provider,
-        redirectUrl: '/sso-callback',
-        redirectUrlComplete: '/',
+        redirectUrl: '/sign-up',
+        redirectUrlComplete: '/complete-profile',
       });
     } catch (cause) {
       console.error(cause);

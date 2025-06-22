@@ -1,0 +1,89 @@
+import {
+  pgTable,
+  uuid,
+  text,
+  boolean,
+  decimal,
+  timestamp,
+} from 'drizzle-orm/pg-core';
+import { relations } from 'drizzle-orm';
+
+// ============== USERS & PROFILES ==============
+// The `profiles` table is the core user data table, linked to Clerk.
+export const profiles = pgTable('profiles', {
+  // The new primary key is an independent, auto-generated UUID.
+  id: uuid('id').primaryKey().defaultRandom(),
+  // The `clerk_id` is the definitive link to the Clerk user record.
+  clerkId: text('clerk_id').unique().notNull(),
+  // The old Supabase Auth ID is kept for historical reference.
+  supabaseAuthUserIdOld: text('supabase_auth_user_id_old'),
+
+  // Personal Details
+  firstName: text('first_name'),
+  lastName: text('last_name'),
+  middleInitial: text('middle_initial'),
+  dateOfBirth: text('date_of_birth'),
+  contactNo: text('contact_no'),
+  avatarUrl: text('avatar_url'),
+  genderIdentity: text('gender_identity'),
+  pronouns: text('pronouns'),
+  assignedSexAtBirth: text('assigned_sex_at_birth'),
+  civilStatus: text('civil_status'),
+  religion: text('religion'),
+  occupation: text('occupation'),
+  philhealthNo: text('philhealth_no'),
+  street: text('street'),
+  barangayCode: text('barangay_code'),
+  cityMunicipalityCode: text('city_municipality_code'),
+  provinceCode: text('province_code'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// The `providers` table extends a profile with professional details.
+export const providers = pgTable('providers', {
+  // Independent UUID primary key.
+  id: uuid('id').primaryKey().defaultRandom(),
+  // Foreign key linking back to the core profile.
+  profileId: uuid('profile_id').references(() => profiles.id, { onDelete: 'cascade' }),
+  licenseNumber: text('license_number').unique(),
+  bio: text('bio'),
+  acceptingNewPatients: boolean('accepting_new_patients').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+
+// ============== CLINICS ==============
+export const clinics = pgTable('clinics', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  isActive: boolean('is_active').notNull().default(true),
+  streetAddress: text('street_address'),
+  locality: text('locality'),
+  region: text('region'),
+  postalCode: text('postal_code'),
+  countryCode: text('country_code').default('PH'),
+  latitude: decimal('latitude', { precision: 9, scale: 6 }),
+  longitude: decimal('longitude', { precision: 9, scale: 6 }),
+  contactPhone: text('contact_phone'),
+  contactEmail: text('contact_email'),
+  operationDays: text('operation_days').array(),
+  operationHours: text('operation_hours'),
+  fpopChapterAffiliation: text('fpop_chapter_affiliation'),
+  additionalNotes: text('additional_notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+
+// ============== JOIN TABLES ==============
+export const clinicProviders = pgTable('clinic_providers', {
+    clinicId: uuid('clinic_id').notNull().references(() => clinics.id, { onDelete: 'cascade' }),
+    providerId: uuid('provider_id').notNull().references(() => providers.id, { onDelete: 'cascade' }),
+});
+
+export const clinicServices = pgTable('clinic_services', {
+    clinicId: uuid('clinic_id').notNull().references(() => clinics.id, { onDelete: 'cascade' }),
+    serviceId: uuid('service_id').notNull() // Assumes a `services` table exists
+}); 

@@ -46,14 +46,14 @@ import { OnboardingScreenTwo } from '../../screens/Onboarding/OnboardingScreenTw
 import { OnboardingScreenThree } from '../../screens/Onboarding/OnboardingScreenThree';
 import { EmailConfirmationScreen } from '../../screens/EmailConfirmationScreen';
 import { DashboardScreen } from '../screens/DashboardScreen';
-import { SignInScreen } from '../screens/SignInScreen';
-import { SignUpScreen } from '../screens/SignUpScreen';
+import { LoginScreen } from '../../screens/LoginScreen';
+import { RegisterScreen } from '../../screens/RegisterScreen';
 
 
 // --- Param Lists ---
 export type AuthStackParamList = {
-  SignIn: undefined;
-  SignUp: undefined;
+  Login: undefined;
+  Register: undefined;
   ForgotPassword: undefined;
   EmailConfirmation: undefined;
 };
@@ -95,6 +95,7 @@ export type RootStackParamList = {
   Onboarding: undefined; 
   CreateProfile: undefined;
   Main: undefined; // The Drawer Navigator
+  EditProfile: undefined;
 };
 
 
@@ -123,8 +124,8 @@ function OnboardingNavigator() {
 function AuthNavigator() {
   return (
     <AuthStackNav.Navigator screenOptions={{ headerShown: false }}>
-      <AuthStackNav.Screen name="SignIn" component={SignInScreen} />
-      <AuthStackNav.Screen name="SignUp" component={SignUpScreen} />
+      <AuthStackNav.Screen name="Login" component={LoginScreen} />
+      <AuthStackNav.Screen name="Register" component={RegisterScreen} />
     </AuthStackNav.Navigator>
   );
 }
@@ -151,8 +152,8 @@ function AppointmentsStack() {
 
 // --- Custom Drawer Content ---
 function CustomDrawerContent(props: any) {
-  const { signOut } = useAuth();
-  const { user } = useUser();
+  // REMOVED: useAuth and useUser hooks to prevent context timing issues.
+  // The user's info and logout functionality will be handled on the profile screen.
   const drawerStyles = createDrawerStyles();
   return (
     <DrawerContentScrollView {...props} contentContainerStyle={drawerStyles.container}>
@@ -161,21 +162,17 @@ function CustomDrawerContent(props: any) {
           <User size={28} color={theme.colors.secondary} />
         </View>
         <View style={drawerStyles.profileTextContainer}>
-          <Text style={drawerStyles.profileName} numberOfLines={1}>{user?.fullName}</Text>
-          <Text style={drawerStyles.profileEmail} numberOfLines={1}>{user?.primaryEmailAddress?.emailAddress}</Text>
+          <Text style={drawerStyles.profileName} numberOfLines={1}>CarePoP User</Text>
+          <Text style={drawerStyles.profileEmail} numberOfLines={1}>Navigate to Profile</Text>
         </View>
       </View>
       <View style={drawerStyles.menuGroup}>
         <DrawerItemList {...props} />
       </View>
-      <View style={drawerStyles.footer}>
-        <DrawerItem 
-          label="Log Out" 
-          labelStyle={drawerStyles.logoutLabel} 
-          icon={() => <LogOut size={20} color={theme.colors.secondary} />} 
-          onPress={() => signOut()}
-        />
-      </View>
+      {/* 
+        REMOVED: Logout button is moved to the MyProfileScreen for better context and to 
+        resolve the useAuth hook issue within the drawer's initial render cycle.
+      */}
     </DrawerContentScrollView>
   );
 }
@@ -218,22 +215,21 @@ function AppDrawer() {
       <Drawer.Screen name="Health Buddy" component={HealthBuddyScreen} options={{ drawerIcon: ({ color }: { color: string }) => <HeartPulse size={20} color={color} /> }} />
       <Drawer.Screen name="Book a Service" component={BookingStack} options={{ drawerIcon: ({ color }: { color: string }) => <CalendarPlus size={20} color={color} /> }} />
       <Drawer.Screen name="AboutUs" component={AboutUsScreen} options={{ title: 'About Us', drawerIcon: ({ color }: { color: string }) => <Info size={20} color={color} /> }} />
-      <Drawer.Screen name="Profile" component={ProfileStackNavigator} options={{ drawerIcon: ({ color }: { color: string }) => <User size={20} color={color} /> }} />
+      <Drawer.Screen name="Profile" component={MyProfileScreen} options={{ drawerIcon: ({ color }: { color: string }) => <User size={20} color={color} /> }} />
     </Drawer.Navigator>
   );
 }
 
 // --- Profile Stack Navigator ---
+// This will be part of the root stack to be presented modally
 function ProfileStackNavigator() {
   return (
     <ProfileStack.Navigator
       screenOptions={{
-        headerShown: true,
-        headerTitle: '',
-        headerShadowVisible: false,
+        headerShown: false, // We will control headers in the screens themselves
       }}
     >
-      <ProfileStack.Screen name="MyProfile" component={MyProfileScreen} options={{ headerShown: false }} />
+      <ProfileStack.Screen name="MyProfile" component={MyProfileScreen} />
       <ProfileStack.Screen name="EditProfile" component={EditProfileScreen} />
     </ProfileStack.Navigator>
   );
@@ -243,8 +239,8 @@ function ProfileStackNavigator() {
 function AuthFlow() {
   return (
     <AuthStackNav.Navigator screenOptions={{ headerShown: false }}>
-      <AuthStackNav.Screen name="SignIn" component={SignInScreen} />
-      <AuthStackNav.Screen name="SignUp" component={SignUpScreen} />
+      <AuthStackNav.Screen name="Login" component={LoginScreen} />
+      <AuthStackNav.Screen name="Register" component={RegisterScreen} />
     </AuthStackNav.Navigator>
   );
 }
@@ -252,35 +248,66 @@ function AuthFlow() {
 // --- Root Navigator (Handles all top-level nav logic) ---
 export function RootAppNavigator() {
   const { isLoaded, isSignedIn } = useAuth();
+  const { user } = useUser();
   const [hasOnboarded, setHasOnboarded] = useState<boolean | null>(null);
+  const [isProfileComplete, setIsProfileComplete] = useState<boolean | null>(null);
 
   useEffect(() => {
     const checkOnboarding = async () => {
-      const value = await AsyncStorage.getItem('hasOnboarded');
-      setHasOnboarded(value === 'true');
+      try {
+        const value = await AsyncStorage.getItem('hasOnboarded');
+        setHasOnboarded(value === 'true');
+      } catch (e) {
+        console.error("Failed to fetch onboarding status", e);
+        setHasOnboarded(false); // Default to not onboarded on error
+      }
     };
+
     checkOnboarding();
   }, []);
 
-  if (!isLoaded || hasOnboarded === null) {
+  useEffect(() => {
+    if (user) {
+      // Use the flag from Clerk's metadata
+      const profileComplete = !!user.publicMetadata?.profileComplete;
+      setIsProfileComplete(profileComplete);
+    }
+  }, [user]); // Re-run when user object changes
+
+  if (!isLoaded || hasOnboarded === null || (isSignedIn && isProfileComplete === null)) {
     return <SplashScreen />;
   }
 
   return (
     <NavigationContainer>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {isSignedIn ? (
-          <RootStack.Screen name="Main" component={AppDrawer} />
-        ) : (
+        {!isSignedIn ? (
           <>
-            {!hasOnboarded ? (
-              <RootStack.Screen name="Onboarding" component={OnboardingNavigator} />
+            {hasOnboarded ? (
+              <RootStack.Screen name="Auth" component={AuthFlow} />
             ) : (
-              <RootStack.Screen name="Auth" component={AuthNavigator} />
+              <RootStack.Screen name="Onboarding" component={OnboardingNavigator} />
             )}
           </>
+        ) : !isProfileComplete ? (
+          <RootStack.Screen name="CreateProfile" component={CreateProfileScreen} />
+        ) : (
+          <RootStack.Screen name="Main" component={AppDrawer} />
         )}
+         {/* Add EditProfile as a modal screen in the root */}
+         <RootStack.Screen 
+            name="EditProfile" 
+            component={EditProfileScreen} 
+            options={{ presentation: 'modal' }}
+        />
       </RootStack.Navigator>
     </NavigationContainer>
   );
 }
+
+const LoadingIndicator = () => (
+  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+    {/* You can use an ActivityIndicator or a custom loading component here */}
+    <Text>Loading...</Text>
+  </View>
+);

@@ -13,8 +13,8 @@ function getApiUrl() {
     const hostUri = Constants.expoConfig?.hostUri;
     // We only want the IP address part, not the port.
     const host = hostUri?.split(':')[0];
-    // We construct the full URL with the backend port (8080)
-    return `http://${host}:8080/api/v1`;
+    // We construct the full URL with the backend port (3000)
+    return `http://${host}:3000/api/v1`;
   } else {
     // In production (an EAS build), we use the official URL from app.json
     return MANIFEST_BACKEND_URL;
@@ -40,6 +40,23 @@ const getHeaders = async () => {
     return headers;
 };
 
+// THIS IS THE NEW CLERK AUTH HEADER FUNCTION.
+// It takes a `getToken` function directly from the `useAuth` hook.
+export const getClerkHeaders = async (getToken: () => Promise<string | null>) => {
+    const token = await getToken();
+    
+    if (!token) {
+        // This will happen if the user's session expires or if there's a network issue connecting to Clerk.
+        // We throw a specific error here to prevent sending an unauthorized request to our backend.
+        throw new Error('Authentication token could not be retrieved. Your session may have expired or there may be a network issue. Please try logging out and in again.');
+    }
+
+    const headers = new Headers();
+    headers.append('Content-Type', 'application/json');
+    headers.append('Authorization', `Bearer ${token}`);
+    return headers;
+};
+
 const api = {
     get: async (endpoint: string, params?: Record<string, any>) => {
         const headers = await getHeaders();
@@ -53,7 +70,7 @@ const api = {
         });
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.message || 'API request failed');
+            throw new Error(error.error || 'API request failed');
         }
         return response.json();
     },
@@ -66,12 +83,23 @@ const api = {
         });
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.message || 'API request failed');
+            throw new Error(error.error || 'API request failed');
         }
         return response.json();
     },
-    patch: async (endpoint: string, body: any) => {
-        const headers = await getHeaders();
+    put: async (endpoint: string, body: any, headers: Headers) => {
+        const response = await fetch(`${API_URL}${endpoint}`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify(body),
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'API request failed');
+        }
+        return response.json();
+    },
+    patch: async (endpoint: string, body: any, headers: Headers) => {
         const response = await fetch(`${API_URL}${endpoint}`, {
             method: 'PATCH',
             headers,
@@ -79,7 +107,7 @@ const api = {
         });
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.message || 'API request failed');
+            throw new Error(error.error || 'API request failed');
         }
         return response.json();
     },
@@ -93,7 +121,7 @@ const api = {
             // DELETE may not return a body, so handle that case
             if (response.headers.get('content-type')?.includes('application/json')) {
                 const error = await response.json();
-                throw new Error(error.message || 'API request failed');
+                throw new Error(error.error || 'API request failed');
             } else {
                  throw new Error(`API request failed with status ${response.status}`);
             }

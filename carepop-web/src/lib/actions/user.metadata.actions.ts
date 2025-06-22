@@ -87,12 +87,15 @@ export async function updateUserMetadata(
     const age = calculateAge(dateOfBirthString);
 
     const dataToUpdate = {
+      first_name,
+      last_name,
       ...metadata,
       age,
       date_of_birth: dob.toISOString().split('T')[0], // format as YYYY-MM-DD
       profileComplete: true,
     };
-
+    
+    // We are now ONLY updating Clerk. The webhook will handle the DB sync.
     const clerkApi = await clerkClient();
     await clerkApi.users.updateUser(user.id, {
       firstName: first_name,
@@ -105,7 +108,7 @@ export async function updateUserMetadata(
 
     return { message: 'Welcome aboard! Your profile has been set up successfully.', success: true };
   } catch (error) {
-    console.error('Error updating user metadata:', error);
-    return { message: 'An unexpected error occurred.', success: false };
+    console.error('Error updating user metadata in Clerk:', error);
+    return { message: 'An unexpected error occurred while updating your profile.', success: false };
   }
 } 

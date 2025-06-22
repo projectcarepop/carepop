@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,11 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useSignIn, useOAuth } from "@clerk/clerk-expo";
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Eye, EyeOff, AlertCircle, Mail } from 'lucide-react-native';
 import { AntDesign } from '@expo/vector-icons';
 
-import { useAuth } from '../src/context/AuthContext';
 import {
   Button,
   Input,
@@ -29,6 +29,13 @@ const GoogleSignInButton: React.FC<{ onPress: () => void; disabled?: boolean }> 
     </TouchableOpacity>
 );
 
+const AppleSignInButton: React.FC<{ onPress: () => void; disabled?: boolean }> = ({ onPress, disabled }) => (
+    <TouchableOpacity onPress={onPress} disabled={disabled} style={[styles.socialButton, styles.appleButton, disabled && styles.disabledButton]}>
+        <AntDesign name="apple1" size={24} color={theme.colors.background} style={styles.socialIcon} />
+        <Text style={[styles.socialButtonText, styles.appleButtonText]}>Sign in with Apple</Text>
+    </TouchableOpacity>
+);
+
 type LoginScreenNavigationProp = NativeStackNavigationProp<
   AuthStackParamList,
   'Login'
@@ -36,21 +43,61 @@ type LoginScreenNavigationProp = NativeStackNavigationProp<
 
 export const LoginScreen: React.FC = () => {
   const navigation = useNavigation<LoginScreenNavigationProp>();
-  const { signInWithPassword, signInWithGoogle, isLoading, authError } = useAuth();
+  const { signIn, setActive, isLoaded } = useSignIn();
 
-  const [email, setEmail] = useState('');
+  const [emailAddress, setEmailAddress] = useState('');
   const [password, setPassword] = useState('');
-  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isOAuthLoading, setIsOAuthLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = () => {
-    if (email && password) {
-      signInWithPassword({ email, password });
+  const { startOAuthFlow: startGoogleOAuthFlow } = useOAuth({ strategy: 'oauth_google' });
+  const { startOAuthFlow: startAppleOAuthFlow } = useOAuth({ strategy: 'oauth_apple' });
+
+  // Clear error when user starts typing
+  useEffect(() => {
+    if (error) {
+      setError(null);
+    }
+  }, [emailAddress, password]);
+
+  const onSignInPress = async () => {
+    if (!isLoaded) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const completeSignIn = await signIn.create({
+        identifier: emailAddress,
+        password,
+      });
+      await setActive({ session: completeSignIn.createdSessionId });
+    } catch (err: any) {
+      console.error(JSON.stringify(err, null, 2));
+      setError(err.errors?.[0]?.message || 'An error occurred during login.');
+    } finally {
+      setIsLoading(false);
     }
   };
   
-  const handleGoogleSignIn = async () => {
-      await signInWithGoogle();
-  };
+  const handleSignInWithProvider = React.useCallback(async (strategy: 'google' | 'apple') => {
+    const oauthFlow = strategy === 'google' ? startGoogleOAuthFlow : startAppleOAuthFlow;
+    setIsOAuthLoading(true);
+    try {
+      const { createdSessionId, setActive } = await oauthFlow();
+
+      if (createdSessionId) {
+        setActive?.({ session: createdSessionId });
+      } else {
+        // Use signIn or signUp for next steps such as MFA
+      }
+    } catch (err) {
+      console.error('OAuth error', err);
+      setError('An error occurred during social login.');
+    } finally {
+      setIsOAuthLoading(false);
+    }
+  }, [startGoogleOAuthFlow, startAppleOAuthFlow]);
 
   return (
     <KeyboardAvoidingView
@@ -73,24 +120,24 @@ export const LoginScreen: React.FC = () => {
         </View>
 
         <View style={styles.formContainer}>
-            {authError && (
+            {error && (
               <View style={styles.errorContainer}>
                 <AlertCircle
                   size={20}
                   color={theme.colors.destructive}
                 />
-                <Text style={styles.errorText}>{authError.message}</Text>
+                <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
 
             <Input
               placeholder="you@example.com"
-              value={email}
-              onChangeText={setEmail}
+              value={emailAddress}
+              onChangeText={setEmailAddress}
               keyboardType="email-address"
               autoCapitalize="none"
               label="Email"
-              editable={!isLoading}
+              editable={!isLoading && !isOAuthLoading}
               icon={<Mail size={20} color={theme.colors.mutedForeground} />}
             />
             <View>
@@ -98,14 +145,14 @@ export const LoginScreen: React.FC = () => {
               placeholder="Enter your password"
               value={password}
               onChangeText={setPassword}
-              secureTextEntry={!isPasswordVisible}
+              secureTextEntry={!showPassword}
               label="Password"
-              editable={!isLoading}
+              editable={!isLoading && !isOAuthLoading}
               icon={
                 <TouchableOpacity
-                  onPress={() => setIsPasswordVisible((prev) => !prev)}
+                  onPress={() => setShowPassword((prev) => !prev)}
                 >
-                      {isPasswordVisible ? (
+                      {showPassword ? (
                         <EyeOff size={22} color={theme.colors.mutedForeground} />
                        ) : (
                         <Eye size={22} color={theme.colors.mutedForeground} />
@@ -120,9 +167,9 @@ export const LoginScreen: React.FC = () => {
 
             <Button
               title="Log In"
-              onPress={handleLogin}
+              onPress={onSignInPress}
               isLoading={isLoading}
-              disabled={isLoading}
+              disabled={isLoading || isOAuthLoading}
               size="lg"
               fullWidth
             />
@@ -135,7 +182,8 @@ export const LoginScreen: React.FC = () => {
         </View>
 
         <View style={styles.socialLoginContainer}>
-          <GoogleSignInButton onPress={handleGoogleSignIn} disabled={isLoading} />
+          <GoogleSignInButton onPress={() => handleSignInWithProvider('google')} disabled={isLoading || isOAuthLoading} />
+          <AppleSignInButton onPress={() => handleSignInWithProvider('apple')} disabled={isLoading || isOAuthLoading} />
         </View>
 
         <View style={styles.footer}>
@@ -229,6 +277,7 @@ const styles = StyleSheet.create({
   },
   socialLoginContainer: {
       width: '100%',
+      gap: theme.spacing.md,
   },
   socialButton: {
       flexDirection: 'row',
@@ -241,6 +290,10 @@ const styles = StyleSheet.create({
       borderRadius: theme.radius.md,
       width: '100%',
   },
+  appleButton: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
   socialIcon: {
       marginRight: theme.spacing.md,
   },
@@ -249,8 +302,11 @@ const styles = StyleSheet.create({
       fontWeight: 'bold',
       color: theme.colors.secondary,
   },
+  appleButtonText: {
+    color: '#FFFFFF',
+  },
   disabledButton: {
-      opacity: 0.6,
+      opacity: 0.5,
   },
   footer: {
     flexDirection: 'row',

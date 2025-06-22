@@ -9,6 +9,8 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
+  getFilteredRowModel,
+  ColumnFiltersState,
 } from '@tanstack/react-table';
 import { MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -36,68 +38,20 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
 import { User } from './user-table'; // Import the User type
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useDebouncedCallback } from 'use-debounce';
 import { useTransition } from 'react';
 import { toast } from 'sonner';
 import { updateUserRole } from '@/lib/actions/user.admin.actions';
 
 interface UserTableClientProps {
     data: User[];
-    totalRecords: number;
 }
 
-export function UserTableClient({ data, totalRecords }: UserTableClientProps) {
-  const searchParams = useSearchParams();
-  const pathname = usePathname();
-  const { replace } = useRouter();
+export function UserTableClient({ data }: UserTableClientProps) {
   const [isPending, startTransition] = useTransition();
-
-  const currentPage = Number(searchParams.get('page')) || 1;
-  const currentPerPage = Number(searchParams.get('per_page')) || 10;
-  const currentSearch = searchParams.get('search') || '';
-  const currentSort = searchParams.get('sort') || 'createdAt.desc';
-
-  const [sorting, setSorting] = React.useState<SortingState>([
-    { id: currentSort.split('.')[0], desc: currentSort.split('.')[1] === 'desc' },
-  ]);
-
-   const createQueryString = React.useCallback(
-    (params: Record<string, string | number | null>) => {
-      const newSearchParams = new URLSearchParams(searchParams?.toString());
-      for (const [key, value] of Object.entries(params)) {
-        if (value === null) {
-          newSearchParams.delete(key);
-        } else {
-          newSearchParams.set(key, String(value));
-        }
-      }
-      return newSearchParams.toString();
-    },
-    [searchParams]
+  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    []
   );
-
-  const handleSearch = useDebouncedCallback((term: string) => {
-    replace(`${pathname}?${createQueryString({ search: term || null, page: 1 })}`);
-  }, 300);
-
-  const handlePageChange = (pageIndex: number) => {
-    replace(`${pathname}?${createQueryString({ page: pageIndex + 1 })}`);
-  };
-
-  const handlePageSizeChange = (pageSize: number) => {
-    replace(`${pathname}?${createQueryString({ per_page: pageSize, page: 1 })}`);
-  };
-
-   React.useEffect(() => {
-    if (sorting.length > 0) {
-      const sort = sorting[0];
-      const sortString = `${sort.id}.${sort.desc ? 'desc' : 'asc'}`;
-      if (sortString !== currentSort) {
-        replace(`${pathname}?${createQueryString({ sort: sortString, page: 1 })}`);
-      }
-    }
-  }, [sorting, pathname, replace, createQueryString, currentSort]);
 
   const handleRoleChange = (userId: string, newRole: 'admin' | 'user') => {
       startTransition(async () => {
@@ -112,11 +66,11 @@ export function UserTableClient({ data, totalRecords }: UserTableClientProps) {
 
   const columns: ColumnDef<User>[] = [
     {
-      accessorKey: 'lastName',
+      accessorKey: 'last_name',
       header: 'Name',
       cell: ({ row }) => {
         const user = row.original;
-        const name = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+        const name = `${user.first_name || ''} ${user.last_name || ''}`.trim();
         return <div className="font-medium">{name || 'N/A'}</div>;
       },
     },
@@ -133,9 +87,9 @@ export function UserTableClient({ data, totalRecords }: UserTableClientProps) {
       },
     },
     {
-      accessorKey: 'createdAt',
+      accessorKey: 'created_at',
       header: 'Date Joined',
-      cell: ({ row }) => new Date(row.getValue('createdAt') as string).toLocaleDateString(),
+      cell: ({ row }) => new Date(row.getValue('created_at') as string).toLocaleDateString(),
     },
     {
       id: 'actions',
@@ -180,38 +134,25 @@ export function UserTableClient({ data, totalRecords }: UserTableClientProps) {
     data,
     columns,
     onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    onPaginationChange: (updater) => {
-        if (typeof updater === 'function') {
-            const newPaginationState = updater({ pageIndex: currentPage - 1, pageSize: currentPerPage });
-            if (newPaginationState.pageIndex !== currentPage - 1) {
-                handlePageChange(newPaginationState.pageIndex);
-            }
-            if (newPaginationState.pageSize !== currentPerPage) {
-                handlePageSizeChange(newPaginationState.pageSize);
-            }
-        }
-    },
+    getFilteredRowModel: getFilteredRowModel(),
     state: {
       sorting,
-      pagination: {
-        pageIndex: currentPage - 1,
-        pageSize: currentPerPage,
-      },
+      columnFilters,
     },
-    manualPagination: true,
-    manualSorting: true,
-    pageCount: Math.ceil(totalRecords / currentPerPage),
   });
 
   return (
     <div className="w-full space-y-4">
        <Input
-          placeholder="Search by name or email..."
-          defaultValue={currentSearch}
-          onChange={(e) => handleSearch(e.target.value)}
+          placeholder="Search by email..."
+          value={(table.getColumn('email')?.getFilterValue() as string) ?? ''}
+          onChange={(event) =>
+            table.getColumn('email')?.setFilterValue(event.target.value)
+          }
           className="max-w-sm"
         />
       <div className="rounded-md border overflow-x-auto">

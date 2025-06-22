@@ -1,36 +1,50 @@
+import 'dotenv/config';
 import { Hono } from 'hono';
 import { logger } from 'hono/logger';
 import { cors } from 'hono/cors';
-import authRoutes from './modules/auth/auth.routes';
-import profileRoutes from './modules/profiles/profiles.routes';
-import webhookRoutes from './modules/webhooks/webhooks.routes';
+import { secureHeaders } from 'hono/secure-headers';
+import { clerkAuthMiddleware } from './middleware/auth.middleware';
 import errorHandler from './middleware/error.middleware';
+
+// --- Route Imports (Corrected based on error logs) ---
+import authRoutes from './modules/auth/auth.routes';
+import { profilesRoutes } from './modules/profiles/profiles.routes'; // This one is named
+import usersRoutes from './modules/users/users.routes';
+import webhookRoutes from './modules/webhooks/webhooks.routes';
+import clinicRoutes from './modules/clinics/clinics.routes';
+import mobileRoutes from './modules/mobile/mobile.routes';
 
 const app = new Hono().basePath('/api/v1');
 
 // --- Middleware ---
 app.use('*', logger());
-// Apply CORS to all routes
+app.use('*', secureHeaders());
 app.use(
   '*',
   cors({
     origin: '*', // In production, you should restrict this to your frontend's domain
   })
 );
+app.use('*', clerkAuthMiddleware());
 
-// --- Routes ---
-app.get('/', (c) => {
+// --- Public Routes ---
+const publicRoutes = new Hono();
+publicRoutes.get('/', (c) => {
   return c.text('CarePoP API is running!');
 });
+publicRoutes.route('/auth', authRoutes);
+publicRoutes.route('/webhooks', webhookRoutes);
+publicRoutes.route('/users', usersRoutes);
+app.route('/', publicRoutes);
 
-// Auth routes are public and do not need auth middleware
-app.route('/auth', authRoutes);
-app.route('/webhooks', webhookRoutes);
-
-// Profile routes are protected and require a valid token
-app.route('/profiles', profileRoutes);
+// --- Protected Routes ---
+const protectedRoutes = new Hono();
+protectedRoutes.route('/profiles', profilesRoutes);
+protectedRoutes.route('/clinics', clinicRoutes);
+protectedRoutes.route('/mobile', mobileRoutes);
+app.route('/', protectedRoutes);
 
 // --- Error Handler ---
 app.onError(errorHandler);
 
-export default app; 
+export default app;

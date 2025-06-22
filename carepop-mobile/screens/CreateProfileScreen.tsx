@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, SafeAreaView, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, DimensionValue } from "react-native";
+import { View, Text, SafeAreaView, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, DimensionValue, TextInput as RNTextInput } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { MotiView, AnimatePresence } from 'moti';
-import { useAuth } from '../src/context/AuthContext';
+import { useUser, useAuth } from '@clerk/clerk-expo';
 import { Button } from '../src/components/button.native';
 import { theme } from '../src/components/theme';
-import { Input as TextInput } from '../src/components/text-input.native';
+import { Input as CustomInput } from '../src/components/text-input.native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Check, Search } from 'lucide-react-native';
 import { Card, CardHeader, CardContent, CardTitle } from '../src/components/card.native';
 import type { RootStackParamList } from '../src/navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import api, { getClerkHeaders } from '../src/utils/api';
 
 // Import location data
 import provinceJson from '../src/data/psgc/provinces.json';
@@ -66,12 +67,13 @@ const CustomPicker = ({ visible, onClose, children, height = '80%' }: { visible:
 
 // --- Main Component ---
 export const CreateProfileScreen = () => {
-    const { user, isSaving, createProfile } = useAuth();
+    const { user } = useUser();
+    const { getToken } = useAuth();
     const navigation = useNavigation<CreateProfileScreenNavigationProp>();
     
     // Form State
-    const [firstName, setFirstName] = useState('');
-    const [lastName, setLastName] = useState('');
+    const [firstName, setFirstName] = useState(user?.firstName || '');
+    const [lastName, setLastName] = useState(user?.lastName || '');
     const [middleInitial, setMiddleInitial] = useState('');
     const [dateOfBirth, setDateOfBirth] = useState<Date | null>(null);
     const [contactNo, setContactNo] = useState('');
@@ -97,6 +99,7 @@ export const CreateProfileScreen = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [tempSelectedItem, setTempSelectedItem] = useState<PickerItem | null>(null);
     const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
+    const [isSaving, setIsSaving] = useState(false);
     
     const provinces: PickerItem[] = useMemo(() => Array.isArray(provinceJson) ? provinceJson.map((p: any) => ({ name: p.province_name, code: p.province_code })) : [], []);
     const cities: PickerItem[] = useMemo(() => Array.isArray(cityJson) ? cityJson.map((c: any) => ({ name: c.city_name, code: c.city_code })) : [], []);
@@ -112,33 +115,58 @@ export const CreateProfileScreen = () => {
             showToast("Please fill in all required fields.", "error");
             return;
         }
+    
         if (!user) {
-            showToast("You must be logged in to create a profile.", "error");
+            showToast("Authentication error. Please try again.", "error");
             return;
         }
-        const success = await createProfile({
-            userId: user.id,
-            updates: {
-                first_name: firstName, last_name: lastName, middle_initial: middleInitial,
+    
+        setIsSaving(true);
+        try {
+            // This is the final, correct method.
+            // We call our own backend, which then calls the Clerk Backend SDK.
+            // This aligns with the architecture of carepop-web.
+            const profileData = {
+                first_name: firstName,
+                last_name: lastName,
+                middle_initial: middleInitial,
                 date_of_birth: dateOfBirth.toISOString().split('T')[0],
-                contact_no: contactNo, street: street,
+                contact_no: contactNo,
+                street: street,
                 province_code: provinces.find(p => p.name === selectedProvince)?.code || null,
                 city_municipality_code: cities.find(c => c.name === selectedCity)?.code || null,
                 barangay_code: barangays.find(b => b.name === selectedBarangay)?.code || null,
-                civil_status: civilStatus, religion: religion, occupation: occupation,
-                philhealth_no: philhealthNo, gender_identity: genderIdentity, pronouns: pronouns,
+                civil_status: civilStatus,
+                religion: religion,
+                occupation: occupation,
+                philhealth_no: philhealthNo,
+                gender_identity: genderIdentity,
+                pronouns: pronouns,
                 assigned_sex_at_birth: assignedSexAtBirth,
                 age: new Date().getFullYear() - dateOfBirth.getFullYear(),
-            }
-        });
-        if (success) {
+            };
+            
+            const headers = await getClerkHeaders(getToken);
+            await api.put('/users/me/complete-profile', profileData, headers);
+            
+            // We must also reload the user object to get the latest data
+            await user.reload();
+
             showToast("Profile created successfully!", 'success');
-            setTimeout(() => navigation.navigate('Main'), 1000);
-        } else {
-            showToast("Failed to create profile. Please try again.", 'error');
+            
+            // The navigation will automatically reset now that the AppNavigator
+            // is watching the user.publicMetadata.profileComplete flag.
+            // So we can remove the explicit navigation.reset() call.
+
+        } catch (error) {
+            console.error("Failed to create profile:", error);
+            // Let's provide a more specific error if possible
+            const errorMessage = error instanceof Error ? error.message : "Please try again.";
+            showToast(`Failed to create profile: ${errorMessage}`, 'error');
+        } finally {
+            setIsSaving(false);
         }
     };
-    
     // --- Picker Logic ---
     const showDatePicker = () => { setTempDate(dateOfBirth || new Date()); setDatePickerVisibility(true); };
     const handleTempDateChange = (_: DateTimePickerEvent, selectedDate?: Date) => { if (selectedDate) setTempDate(selectedDate); };
@@ -195,12 +223,12 @@ export const CreateProfileScreen = () => {
                     <Card style={styles.card}>
                         <CardHeader><CardTitle style={styles.cardTitle}>Personal Information</CardTitle></CardHeader>
                         <CardContent>
-                            <TextInput label="First Name" value={firstName} onChangeText={setFirstName} required helperText="Your legal first name." />
-                            <TextInput label="Middle Initial" value={middleInitial} onChangeText={setMiddleInitial} maxLength={5} />
-                            <TextInput label="Last Name" value={lastName} onChangeText={setLastName} required helperText="Your legal last name." />
+                            <CustomInput label="First Name" value={firstName} onChangeText={setFirstName} required helperText="Your legal first name." editable={!isSaving} />
+                            <CustomInput label="Middle Initial" value={middleInitial} onChangeText={setMiddleInitial} maxLength={5} editable={!isSaving} />
+                            <CustomInput label="Last Name" value={lastName} onChangeText={setLastName} required helperText="Your legal last name." editable={!isSaving} />
                             <View style={styles.pickerWrapper}>
                                 <PickerLabel required>Date of Birth</PickerLabel>
-                                <TouchableOpacity onPress={showDatePicker} style={styles.pickerButton}><Text style={styles.pickerText}>{dateOfBirth ? dateOfBirth.toLocaleDateString() : 'Select Date of Birth'}</Text></TouchableOpacity>
+                                <TouchableOpacity onPress={showDatePicker} style={styles.pickerButton} disabled={isSaving}><Text style={styles.pickerText}>{dateOfBirth ? dateOfBirth.toLocaleDateString() : 'Select Date of Birth'}</Text></TouchableOpacity>
                                 <Text style={styles.helperText}>Your date of birth will be used to calculate your age.</Text>
                             </View>
                         </CardContent>
@@ -209,19 +237,19 @@ export const CreateProfileScreen = () => {
                     <Card style={styles.card}>
                         <CardHeader><CardTitle style={styles.cardTitle}>Contact & Address</CardTitle></CardHeader>
                         <CardContent>
-                            <TextInput label="Contact No." value={contactNo} onChangeText={setContactNo} keyboardType="phone-pad" required helperText="A valid phone number where we can reach you." />
-                            <TextInput label="Street Address" value={street} onChangeText={setStreet} required helperText="House number, street name, and subdivision." />
+                            <CustomInput label="Contact No." value={contactNo} onChangeText={setContactNo} keyboardType="phone-pad" required helperText="A valid phone number where we can reach you." editable={!isSaving} />
+                            <CustomInput label="Street Address" value={street} onChangeText={setStreet} required helperText="House number, street name, and subdivision." editable={!isSaving} />
                             <View style={styles.pickerWrapper}>
                                 <PickerLabel required>Province</PickerLabel>
-                                <TouchableOpacity onPress={() => openPicker('province')} style={styles.pickerButton}><Text style={styles.pickerText}>{selectedProvince || 'Select Province'}</Text></TouchableOpacity>
+                                <TouchableOpacity onPress={() => openPicker('province')} style={styles.pickerButton} disabled={isSaving}><Text style={styles.pickerText}>{selectedProvince || 'Select Province'}</Text></TouchableOpacity>
                             </View>
                             <View style={styles.pickerWrapper}>
                                 <PickerLabel required>City/Municipality</PickerLabel>
-                                <TouchableOpacity onPress={() => openPicker('city')} style={styles.pickerButton} disabled={!selectedProvince}><Text style={styles.pickerText}>{selectedCity || 'Select City/Municipality'}</Text></TouchableOpacity>
+                                <TouchableOpacity onPress={() => openPicker('city')} style={styles.pickerButton} disabled={isSaving || !selectedProvince}><Text style={styles.pickerText}>{selectedCity || 'Select City/Municipality'}</Text></TouchableOpacity>
                             </View>
                              <View style={styles.pickerWrapper}>
                                 <PickerLabel required>Barangay</PickerLabel>
-                                <TouchableOpacity onPress={() => openPicker('barangay')} style={styles.pickerButton} disabled={!selectedCity}><Text style={styles.pickerText}>{selectedBarangay || 'Select Barangay'}</Text></TouchableOpacity>
+                                <TouchableOpacity onPress={() => openPicker('barangay')} style={styles.pickerButton} disabled={isSaving || !selectedCity}><Text style={styles.pickerText}>{selectedBarangay || 'Select Barangay'}</Text></TouchableOpacity>
                             </View>
                         </CardContent>
                     </Card>
@@ -229,13 +257,13 @@ export const CreateProfileScreen = () => {
                      <Card style={styles.card}>
                         <CardHeader><CardTitle style={styles.cardTitle}>Identity & Other Info</CardTitle></CardHeader>
                         <CardContent>
-                            <View style={styles.pickerWrapper}><PickerLabel>Civil Status</PickerLabel><TouchableOpacity onPress={() => openPicker('civilStatus')} style={styles.pickerButton}><Text style={styles.pickerText}>{civilStatus || 'Select Civil Status'}</Text></TouchableOpacity></View>
-                            <View style={styles.pickerWrapper}><PickerLabel>Gender Identity</PickerLabel><TouchableOpacity onPress={() => openPicker('genderIdentity')} style={styles.pickerButton}><Text style={styles.pickerText}>{genderIdentity || 'Select Gender Identity'}</Text></TouchableOpacity></View>
-                            <View style={styles.pickerWrapper}><PickerLabel>Pronouns</PickerLabel><TouchableOpacity onPress={() => openPicker('pronouns')} style={styles.pickerButton}><Text style={styles.pickerText}>{pronouns || 'Select Pronouns'}</Text></TouchableOpacity></View>
-                            <View style={styles.pickerWrapper}><PickerLabel>Assigned Sex at Birth</PickerLabel><TouchableOpacity onPress={() => openPicker('assignedSex')} style={styles.pickerButton}><Text style={styles.pickerText}>{assignedSexAtBirth || 'Select Assigned Sex at Birth'}</Text></TouchableOpacity></View>
-                            <TextInput label="Religion" value={religion} onChangeText={setReligion} />
-                            <TextInput label="Occupation" value={occupation} onChangeText={setOccupation} />
-                            <TextInput label="PhilHealth No." value={philhealthNo} onChangeText={setPhilhealthNo} helperText="Optional. Used for insurance claims." />
+                            <View style={styles.pickerWrapper}><PickerLabel>Civil Status</PickerLabel><TouchableOpacity onPress={() => openPicker('civilStatus')} style={styles.pickerButton} disabled={isSaving}><Text style={styles.pickerText}>{civilStatus || 'Select Civil Status'}</Text></TouchableOpacity></View>
+                            <View style={styles.pickerWrapper}><PickerLabel>Gender Identity</PickerLabel><TouchableOpacity onPress={() => openPicker('genderIdentity')} style={styles.pickerButton} disabled={isSaving}><Text style={styles.pickerText}>{genderIdentity || 'Select Gender Identity'}</Text></TouchableOpacity></View>
+                            <View style={styles.pickerWrapper}><PickerLabel>Pronouns</PickerLabel><TouchableOpacity onPress={() => openPicker('pronouns')} style={styles.pickerButton} disabled={isSaving}><Text style={styles.pickerText}>{pronouns || 'Select Pronouns'}</Text></TouchableOpacity></View>
+                            <View style={styles.pickerWrapper}><PickerLabel>Assigned Sex at Birth</PickerLabel><TouchableOpacity onPress={() => openPicker('assignedSex')} style={styles.pickerButton} disabled={isSaving}><Text style={styles.pickerText}>{assignedSexAtBirth || 'Select Assigned Sex at Birth'}</Text></TouchableOpacity></View>
+                            <CustomInput label="Religion" value={religion} onChangeText={setReligion} editable={!isSaving} />
+                            <CustomInput label="Occupation" value={occupation} onChangeText={setOccupation} editable={!isSaving} />
+                            <CustomInput label="PhilHealth No." value={philhealthNo} onChangeText={setPhilhealthNo} helperText="Optional. Used for insurance claims." editable={!isSaving} />
                         </CardContent>
                     </Card>
                      <Button title={isSaving ? "Creating..." : "Create Profile"} onPress={handleCreateProfile} disabled={isSaving} size="xl" style={{marginTop: 8}}/>
@@ -244,7 +272,16 @@ export const CreateProfileScreen = () => {
             
             <CustomPicker visible={isPickerVisible} onClose={() => setPickerVisible(false)} height="50%">
                 <Text style={styles.modalHeader}>Select {pickerTitle}</Text>
-                <View style={styles.searchInputContainer}><Search color={theme.colors.mutedForeground} size={20} style={styles.searchIcon} /><TextInput placeholder="Search..." value={searchTerm} onChangeText={setSearchTerm} style={styles.searchInput} /></View>
+                <View style={styles.searchInputContainer}>
+                  <Search color={theme.colors.mutedForeground} size={20} style={styles.searchIcon} />
+                  <RNTextInput
+                    placeholder="Search..."
+                    value={searchTerm}
+                    onChangeText={setSearchTerm}
+                    style={styles.searchInput}
+                    placeholderTextColor={theme.colors.mutedForeground}
+                  />
+                </View>
                 <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
                     {pickerData.filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
                         <PickerRow key={item.name} label={item.name} isSelected={tempSelectedItem?.name === item.name} onPress={() => handleTempPickerSelect(item)} />
@@ -281,7 +318,12 @@ const styles = StyleSheet.create({
     grabber: { width: 48, height: 5, backgroundColor: theme.colors.border, borderRadius: theme.radius.full, alignSelf: 'center', marginTop: theme.spacing.sm, marginBottom: theme.spacing.lg },
     modalHeader: { ...theme.typography.h3, marginBottom: 15, textAlign: 'center', fontFamily: theme.typography.fontFamilySemiBold },
     searchInputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.card, borderRadius: theme.radius.full, paddingHorizontal: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border, marginBottom: 16 },
-    searchInput: { flex: 1, borderWidth: 0, backgroundColor: 'transparent', paddingVertical: 14, fontSize: 16 },
+    searchInput: {
+      flex: 1,
+      height: 40,
+      fontSize: 16,
+      color: theme.colors.foreground,
+    },
     searchIcon: { marginRight: theme.spacing.sm },
     pickerItem: { flexDirection: 'row', alignItems: 'center', padding: theme.spacing.md, borderRadius: theme.radius.md, marginBottom: theme.spacing.sm },
     pickerItemSelected: { backgroundColor: 'rgba(255, 77, 109, 0.1)' },

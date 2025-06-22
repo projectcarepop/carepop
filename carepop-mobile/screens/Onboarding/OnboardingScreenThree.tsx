@@ -1,15 +1,28 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, SafeAreaView } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Button } from '../../src/components/button.native';
 import { theme } from '../../src/components/theme';
-import { PartyPopper } from 'lucide-react-native';
-import { useAuth } from '../../src/context/AuthContext';
+import { RootStackParamList } from '../../src/navigation/AppNavigator';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
+type OnboardingNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Onboarding'>;
 
 // This screen will likely be part of a larger stack that, upon completion,
 // navigates the user to the main app (e.g., Auth or Dashboard).
 // The onComplete prop is a good pattern for this.
 export const OnboardingScreenThree = () => {
-  const { completeOnboarding } = useAuth();
+  const navigation = useNavigation<OnboardingNavigationProp>();
+
+  const handleGetStarted = async () => {
+    try {
+      await AsyncStorage.setItem('hasOnboarded', 'true');
+    } catch (e) {
+      console.error('Failed to save onboarding status', e);
+    }
+    navigation.navigate('Auth');
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -34,7 +47,7 @@ export const OnboardingScreenThree = () => {
           <Button
             title="Get Started"
             size="lg"
-            onPress={completeOnboarding}
+            onPress={handleGetStarted}
             style={{ flex: 1 }} // Make button take full width of footer
           />
         </View>

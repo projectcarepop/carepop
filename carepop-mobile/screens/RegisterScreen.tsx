@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Eye, EyeOff, AlertCircle, Mail, Check, Circle } from 'lucide-react-native';
 import { AntDesign } from '@expo/vector-icons';
 
-import { useAuth } from '../src/context/AuthContext';
+import { useSignUp, useOAuth } from "@clerk/clerk-expo";
 import {
   Button,
   Input,
@@ -33,6 +33,13 @@ const GoogleSignInButton: React.FC<{ onPress: () => void; disabled?: boolean }> 
     <TouchableOpacity onPress={onPress} disabled={disabled} style={[styles.socialButton, disabled && styles.disabledButton]}>
         <AntDesign name="google" size={24} color={theme.colors.secondary} style={styles.socialIcon} />
         <Text style={styles.socialButtonText}>Sign up with Google</Text>
+    </TouchableOpacity>
+);
+
+const AppleSignInButton: React.FC<{ onPress: () => void; disabled?: boolean }> = ({ onPress, disabled }) => (
+    <TouchableOpacity onPress={onPress} disabled={disabled} style={[styles.socialButton, styles.appleButton, disabled && styles.disabledButton]}>
+        <AntDesign name="apple1" size={24} color={theme.colors.background} style={styles.socialIcon} />
+        <Text style={[styles.socialButtonText, styles.appleButtonText]}>Sign up with Apple</Text>
     </TouchableOpacity>
 );
 
@@ -70,38 +77,112 @@ const usePasswordStrength = (password: string) => {
 
 export const RegisterScreen: React.FC = () => {
   const navigation = useNavigation<RegisterScreenNavigationProp>();
-  const { signUpWithEmail, signInWithGoogle, isLoading, authError } = useAuth();
+  const { isLoaded, signUp, setActive } = useSignUp();
 
-  const [email, setEmail] = useState('');
+  const [emailAddress, setEmailAddress] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isOAuthLoading, setIsOAuthLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pendingVerification, setPendingVerification] = useState(false);
+  const [code, setCode] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
-  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-  const [showConfirmation, setShowConfirmation] = useState(false);
-  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+
+  const { startOAuthFlow: startGoogleOAuthFlow } = useOAuth({ strategy: 'oauth_google' });
+  const { startOAuthFlow: startAppleOAuthFlow } = useOAuth({ strategy: 'oauth_apple' });
 
   const { checks, isStrong } = usePasswordStrength(password);
 
+  // Clear error when user starts typing
+  useEffect(() => {
+    if (error) {
+      setError(null);
+    }
+  }, [emailAddress, password, code]);
+
   const handleRegister = async () => {
-    if (!isStrong || !termsAccepted) return;
-    const { user } = await signUpWithEmail({ email, password });
-    if (user) setShowConfirmation(true);
+    if (!isLoaded || !isStrong || !termsAccepted) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await signUp.create({
+        emailAddress,
+        password,
+      });
+
+      // start the email verification process
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+
+      // setPendingVerification to true to show the verification code input field
+      setPendingVerification(true);
+    } catch (err: any) {
+      console.error(JSON.stringify(err, null, 2));
+      setError(err.errors?.[0]?.message || 'An error occurred during sign up.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const onPressVerify = async () => {
+    if (!isLoaded) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const completeSignUp = await signUp.attemptEmailAddressVerification({
+        code,
+      });
+      await setActive({ session: completeSignUp.createdSessionId });
+    } catch (err: any) {
+      console.error(JSON.stringify(err, null, 2));
+      setError(err.errors?.[0]?.message || 'An error occurred during verification.');
+    } finally {
+      setIsLoading(false);
+    }
   };
   
-  const handleGoogleSignIn = async () => {
-    await signInWithGoogle();
-  };
+  const handleSignUpWithProvider = React.useCallback(async (strategy: 'google' | 'apple') => {
+    const oauthFlow = strategy === 'google' ? startGoogleOAuthFlow : startAppleOAuthFlow;
+    setIsOAuthLoading(true);
+    try {
+      const { createdSessionId, setActive } = await oauthFlow();
+
+      if (createdSessionId) {
+        setActive?.({ session: createdSessionId });
+      } else {
+        // Use signIn or signUp for next steps such as MFA
+      }
+    } catch (err) {
+      console.error('OAuth error', err);
+      setError('An error occurred during social sign up.');
+    } finally {
+      setIsOAuthLoading(false);
+    }
+  }, [startGoogleOAuthFlow, startAppleOAuthFlow]);
 
   const handleOpenLink = (url: string) => Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
 
-  if (showConfirmation) {
+  if (pendingVerification) {
     return (
         <View style={styles.confirmationContainer}>
             <Mail size={48} color={theme.colors.primary} />
             <Text style={styles.title}>Check your email</Text>
             <Text style={styles.description}>
-              We&apos;ve sent a confirmation link to {email}. Please click the link to activate your account.
+              We&apos;ve sent a verification code to {emailAddress}. Please enter it below.
             </Text>
-            <Button title="Back to Login" onPress={() => navigation.navigate('Login')} fullWidth size="lg" style={{marginTop: theme.spacing.xl}} />
+            <Input
+              placeholder="Enter verification code"
+              value={code}
+              onChangeText={setCode}
+              keyboardType="numeric"
+              style={{marginTop: theme.spacing.lg}}
+            />
+            {error && <Text style={styles.errorText}>{error}</Text>}
+            <Button title="Verify Email" onPress={onPressVerify} fullWidth size="lg" style={{marginTop: theme.spacing.md}} isLoading={isLoading} />
       </View>
     );
   }
@@ -127,21 +208,21 @@ export const RegisterScreen: React.FC = () => {
         </View>
 
         <View style={styles.formContainer}>
-            {authError && (
+            {error && (
               <View style={styles.errorContainer}>
                 <AlertCircle size={20} color={theme.colors.destructive} />
-                <Text style={styles.errorText}>{authError.message}</Text>
+                <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
 
             <Input
               placeholder="you@example.com"
-              value={email}
-              onChangeText={setEmail}
+              value={emailAddress}
+              onChangeText={setEmailAddress}
               keyboardType="email-address"
               autoCapitalize="none"
               label="Email"
-              editable={!isLoading}
+              editable={!isLoading && !isOAuthLoading}
               icon={<Mail size={20} color={theme.colors.mutedForeground} />}
             />
             <View>
@@ -149,14 +230,14 @@ export const RegisterScreen: React.FC = () => {
               placeholder="Create a strong password"
               value={password}
               onChangeText={setPassword}
-              secureTextEntry={!isPasswordVisible}
+              secureTextEntry={!showPassword}
               label="Password"
-              editable={!isLoading}
-                  onFocus={() => setIsPasswordFocused(true)}
-                  onBlur={() => setIsPasswordFocused(false)}
+              editable={!isLoading && !isOAuthLoading}
+              onFocus={() => setShowPassword(true)}
+              onBlur={() => setShowPassword(false)}
               icon={
-                <TouchableOpacity onPress={() => setIsPasswordVisible(p => !p)}>
-                      {isPasswordVisible ? (
+                <TouchableOpacity onPress={() => setShowPassword(p => !p)}>
+                      {showPassword ? (
                           <EyeOff size={22} color={theme.colors.mutedForeground} />
                       ) : (
                           <Eye size={22} color={theme.colors.mutedForeground} />
@@ -165,7 +246,7 @@ export const RegisterScreen: React.FC = () => {
               }
             />
             </View>
-            {isPasswordFocused && (
+            {password.length > 0 && (
             <View style={styles.strengthContainer}>
               <StrengthIndicator label="At least 8 characters" isValid={checks.length} />
               <StrengthIndicator label="An uppercase letter" isValid={checks.uppercase} />
@@ -179,7 +260,7 @@ export const RegisterScreen: React.FC = () => {
               <Checkbox
                 checked={termsAccepted}
                 onChange={setTermsAccepted}
-                disabled={isLoading}
+                disabled={isLoading || isOAuthLoading}
               />
               <Text style={styles.termsText}>
                 I agree to the{' '}
@@ -197,7 +278,7 @@ export const RegisterScreen: React.FC = () => {
               title="Create Account"
               onPress={handleRegister}
               isLoading={isLoading}
-              disabled={isLoading || !isStrong || !termsAccepted}
+              disabled={isLoading || isOAuthLoading || !isStrong || !termsAccepted}
               size="lg"
               fullWidth
             />
@@ -210,7 +291,8 @@ export const RegisterScreen: React.FC = () => {
         </View>
 
         <View style={styles.socialLoginContainer}>
-          <GoogleSignInButton onPress={handleGoogleSignIn} disabled={isLoading} />
+          <GoogleSignInButton onPress={() => handleSignUpWithProvider('google')} disabled={isLoading || isOAuthLoading} />
+          <AppleSignInButton onPress={() => handleSignUpWithProvider('apple')} disabled={isLoading || isOAuthLoading} />
         </View>
 
         <View style={styles.footer}>
@@ -326,6 +408,8 @@ const styles = StyleSheet.create({
   },
   socialLoginContainer: {
       width: '100%',
+      gap: theme.spacing.md,
+      marginBottom: theme.spacing.lg,
   },
   socialButton: {
       flexDirection: 'row',
@@ -338,6 +422,10 @@ const styles = StyleSheet.create({
       borderRadius: theme.radius.md,
       width: '100%',
   },
+  appleButton: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
   socialIcon: {
       marginRight: theme.spacing.md,
   },
@@ -346,8 +434,11 @@ const styles = StyleSheet.create({
       fontWeight: 'bold',
       color: theme.colors.secondary,
   },
+  appleButtonText: {
+    color: '#FFFFFF',
+  },
   disabledButton: {
-      opacity: 0.6,
+      opacity: 0.5,
   },
   footer: {
     flexDirection: 'row',

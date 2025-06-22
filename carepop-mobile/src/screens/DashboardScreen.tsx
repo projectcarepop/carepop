@@ -24,7 +24,7 @@ import {
 } from '../components/card.native';
 import { Button } from '../components/button.native';
 import { theme } from '../components/theme';
-import { useAuth } from '../context/AuthContext';
+import { useUser } from '@clerk/clerk-expo';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions, CommonActions } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
 });
 
 export const DashboardScreen: React.FC<DashboardProps> = () => {
-  const { profile, isLoading: isAuthLoading } = useAuth();
+  const { user, isLoaded } = useUser();
   const navigation = useNavigation<DashboardNavigationProp>();
   const insets = useSafeAreaInsets();
 
@@ -281,8 +281,6 @@ export const DashboardScreen: React.FC<DashboardProps> = () => {
     },
   ];
 
-  const displayName = profile?.first_name || 'there';
-
   const renderServiceItem = ({ item }: { item: HealthService }) => (
     <TouchableOpacity
       style={styles.quickActionTouchable}
@@ -316,96 +314,94 @@ export const DashboardScreen: React.FC<DashboardProps> = () => {
     </TouchableOpacity>
   );
 
-  if (isAuthLoading) {
+  if (isLoaded) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.container}
+        >
+          <Animated.View style={animatedStyle}>
+            <TouchableOpacity
+              onPress={() => navigation.dispatch(DrawerActions.toggleDrawer())}
+              style={styles.menuButton}
+              accessible={true}
+              accessibilityLabel="Open menu"
+              accessibilityRole="button"
+            >
+              <Menu size={28} color={theme.colors.foreground} />
+            </TouchableOpacity>
+            
+            <View style={styles.header}>
+              <Text style={styles.greetingText}>Welcome back,</Text>
+              <Text style={styles.displayNameText}>{user?.fullName || 'User'}</Text>
+            </View>
+
+            <Card style={[styles.card, styles.appointmentCard]}>
+              <CardHeader style={styles.appointmentCardHeader}>
+                <CardTitle style={styles.appointmentCardTitle}>Upcoming Appointment</CardTitle>
+                <CardDescription style={styles.appointmentCardDescription}>You have no upcoming appointments.</CardDescription>
+              </CardHeader>
+              <CardFooter style={styles.appointmentCardFooter}>
+                <Button
+                  title="Book a Service"
+                  onPress={() => navigation.dispatch(CommonActions.navigate({ name: 'App', params: { screen: 'Book a Service' }}))}
+                  variant="default"
+                  size="lg"
+                  accessibilityLabel="Book a new service"
+                />
+              </CardFooter>
+            </Card>
+
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Our Services</Text>
+              <TouchableOpacity onPress={() => navigation.dispatch(CommonActions.navigate({ name: 'App', params: { screen: 'Book a Service' }}))}>
+                  <Text style={styles.seeAllText}>See All</Text>
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={services}
+              renderItem={renderServiceItem}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              ItemSeparatorComponent={() => <View style={{ width: theme.spacing.md }} />}
+            />
+
+            <Card style={styles.healthBuddyCard}>
+              <CardHeader>
+                <View style={styles.healthBuddyCardContent}>
+                  <HeartPulse size={32} color={theme.colors.secondary} />
+                  <CardTitle style={styles.healthBuddyTitle}>Health Buddy</CardTitle>
+                </View>
+              </CardHeader>
+              <CardContent>
+                <Text style={styles.healthBuddyDescription}>
+                  Your personal guide to track your health, get reminders, and stay
+                  informed.
+                </Text>
+                <View style={styles.healthToolsContainer}>
+                  <FlatList
+                    data={healthBuddyTools}
+                    renderItem={renderHealthToolItem}
+                    keyExtractor={(item) => item.id}
+                    scrollEnabled={false} // Disable scroll for this list as it's inside a ScrollView
+                    ItemSeparatorComponent={() => <View style={styles.toolSeparator} />}
+                  />
+                </View>
+              </CardContent>
+            </Card>
+          </Animated.View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  } else {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
-
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.container}
-      >
-        <Animated.View style={animatedStyle}>
-          <TouchableOpacity
-            onPress={() => navigation.dispatch(DrawerActions.toggleDrawer())}
-            style={styles.menuButton}
-            accessible={true}
-            accessibilityLabel="Open menu"
-            accessibilityRole="button"
-          >
-            <Menu size={28} color={theme.colors.foreground} />
-          </TouchableOpacity>
-          
-          <View style={styles.header}>
-            <Text style={styles.greetingText}>Welcome back,</Text>
-            <Text style={styles.displayNameText} numberOfLines={1}>
-              {profile?.first_name || 'User'}!
-            </Text>
-          </View>
-
-          <Card style={[styles.card, styles.appointmentCard]}>
-            <CardHeader style={styles.appointmentCardHeader}>
-              <CardTitle style={styles.appointmentCardTitle}>Upcoming Appointment</CardTitle>
-              <CardDescription style={styles.appointmentCardDescription}>You have no upcoming appointments.</CardDescription>
-            </CardHeader>
-            <CardFooter style={styles.appointmentCardFooter}>
-              <Button
-                title="Book a Service"
-                onPress={() => navigation.dispatch(CommonActions.navigate({ name: 'App', params: { screen: 'Book a Service' }}))}
-                variant="default"
-                size="lg"
-                accessibilityLabel="Book a new service"
-              />
-            </CardFooter>
-          </Card>
-
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Our Services</Text>
-            <TouchableOpacity onPress={() => navigation.dispatch(CommonActions.navigate({ name: 'App', params: { screen: 'Book a Service' }}))}>
-                <Text style={styles.seeAllText}>See All</Text>
-            </TouchableOpacity>
-          </View>
-
-          <FlatList
-            data={services}
-            renderItem={renderServiceItem}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            ItemSeparatorComponent={() => <View style={{ width: theme.spacing.md }} />}
-          />
-
-          <Card style={styles.healthBuddyCard}>
-            <CardHeader>
-              <View style={styles.healthBuddyCardContent}>
-                <HeartPulse size={32} color={theme.colors.secondary} />
-                <CardTitle style={styles.healthBuddyTitle}>Health Buddy</CardTitle>
-              </View>
-            </CardHeader>
-            <CardContent>
-              <Text style={styles.healthBuddyDescription}>
-                Your personal guide to track your health, get reminders, and stay
-                informed.
-              </Text>
-              <View style={styles.healthToolsContainer}>
-                <FlatList
-                  data={healthBuddyTools}
-                  renderItem={renderHealthToolItem}
-                  keyExtractor={(item) => item.id}
-                  scrollEnabled={false} // Disable scroll for this list as it's inside a ScrollView
-                  ItemSeparatorComponent={() => <View style={styles.toolSeparator} />}
-                />
-              </View>
-            </CardContent>
-          </Card>
-        </Animated.View>
-      </ScrollView>
-    </SafeAreaView>
-  );
 };
 

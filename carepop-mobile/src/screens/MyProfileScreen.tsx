@@ -11,11 +11,11 @@ import {
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { type DrawerNavigationProp } from '@react-navigation/drawer';
-import { useAuth } from '../context/AuthContext';
+import { useUser, useAuth } from '@clerk/clerk-expo';
 import { theme } from '../components/theme';
 import { Button } from '../components/button.native';
 import { Card, CardHeader, CardContent, CardTitle } from '../components/card.native';
-import type { ProfileStackParamList } from '../navigation/AppNavigator';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 import { format } from 'date-fns';
 import { Menu } from 'lucide-react-native';
 
@@ -27,8 +27,8 @@ interface Barangay { brgy_code: string; brgy_name: string; }
 const barangays = barangaysData as Barangay[];
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<
-  ProfileStackParamList,
-  'MyProfile'
+  RootStackParamList,
+  'Main'
 >;
 
 const ProfileInfoRow = ({
@@ -46,24 +46,32 @@ const ProfileInfoRow = ({
 
 export function MyProfileScreen() {
   const navigation = useNavigation<ProfileScreenNavigationProp>();
-  const { session, profile, signOut, isLoading, isSaving } = useAuth();
+  const { user, isLoaded } = useUser();
+  const { signOut } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      // The RootAppNavigator will automatically handle navigating to the Auth flow.
+    } catch (e) {
+      console.error('Failed to sign out', e);
+    }
+  };
 
   const formattedDob = useMemo(() => {
-    // Ensure profile and date_of_birth are not null or an empty string.
-    if (profile?.date_of_birth && profile.date_of_birth.trim().length > 0) {
+    const dob = user?.publicMetadata?.date_of_birth as string | undefined;
+    if (dob && dob.trim().length > 0) {
       try {
-        // Supabase returns YYYY-MM-DD string, which is parsed as UTC.
-        // Add time to treat it as local date to prevent off-by-one day issues.
-        return format(new Date(`${profile.date_of_birth}T00:00:00`), 'MMMM d, yyyy');
+        return format(new Date(`${dob}T00:00:00`), 'MMMM d, yyyy');
       } catch (error) {
         console.error('Error formatting date:', error);
         return 'Invalid Date';
       }
     }
     return null;
-  }, [profile?.date_of_birth]);
+  }, [user?.publicMetadata?.date_of_birth]);
 
-  if (isLoading && !profile) {
+  if (!isLoaded) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -71,13 +79,16 @@ export function MyProfileScreen() {
     );
   }
 
-  if (!profile) {
+  if (!user) {
+    // This case should ideally not be reached if the screen is protected by the navigator
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <Text style={styles.value}>Could not load profile.</Text>
+        <Text style={styles.value}>Could not load user profile.</Text>
       </SafeAreaView>
     );
   }
+
+  const publicMetadata = user.publicMetadata || {};
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -96,36 +107,35 @@ export function MyProfileScreen() {
         <Card style={styles.card}>
           <CardHeader><CardTitle style={styles.cardTitle}>Personal Information</CardTitle></CardHeader>
           <CardContent>
-            <ProfileInfoRow label="First Name" value={profile.first_name} />
-            <ProfileInfoRow label="Middle Initial" value={profile.middle_initial} />
-            <ProfileInfoRow label="Last Name" value={profile.last_name} />
+            <ProfileInfoRow label="First Name" value={user.firstName} />
+            <ProfileInfoRow label="Last Name" value={user.lastName} />
             <ProfileInfoRow label="Date of Birth" value={formattedDob} />
-            <ProfileInfoRow label="Age" value={profile.age?.toString()} />
+            <ProfileInfoRow label="Age" value={(publicMetadata.age as number)?.toString()} />
           </CardContent>
         </Card>
 
         <Card style={styles.card}>
           <CardHeader><CardTitle style={styles.cardTitle}>Contact & Address</CardTitle></CardHeader>
           <CardContent>
-            <ProfileInfoRow label="Email" value={session?.user?.email} />
-            <ProfileInfoRow label="Phone Number" value={profile.contact_no} />
-            <ProfileInfoRow label="Street Address" value={profile.street} />
-            <ProfileInfoRow label="Province" value={provinces.find(p => p.province_code === profile.province_code)?.province_name} />
-            <ProfileInfoRow label="City/Municipality" value={cities.find(c => c.city_code === profile.city_municipality_code)?.city_name} />
-            <ProfileInfoRow label="Barangay" value={barangays.find(b => b.brgy_code === profile.barangay_code)?.brgy_name} />
+            <ProfileInfoRow label="Email" value={user.primaryEmailAddress?.emailAddress} />
+            <ProfileInfoRow label="Phone Number" value={publicMetadata.contact_no as string} />
+            <ProfileInfoRow label="Street Address" value={publicMetadata.street as string} />
+            <ProfileInfoRow label="Province" value={provinces.find(p => p.province_code === publicMetadata.province_code)?.province_name} />
+            <ProfileInfoRow label="City/Municipality" value={cities.find(c => c.city_code === publicMetadata.city_municipality_code)?.city_name} />
+            <ProfileInfoRow label="Barangay" value={barangays.find(b => b.brgy_code === publicMetadata.barangay_code)?.brgy_name} />
           </CardContent>
         </Card>
         
         <Card style={styles.card}>
             <CardHeader><CardTitle style={styles.cardTitle}>Identity & Other Info</CardTitle></CardHeader>
             <CardContent>
-                <ProfileInfoRow label="Gender Identity" value={profile.gender_identity} />
-                <ProfileInfoRow label="Pronouns" value={profile.pronouns} />
-                <ProfileInfoRow label="Assigned Sex at Birth" value={profile.assigned_sex_at_birth} />
-                <ProfileInfoRow label="Civil Status" value={profile.civil_status} />
-                <ProfileInfoRow label="Religion" value={profile.religion} />
-                <ProfileInfoRow label="Occupation" value={profile.occupation} />
-                <ProfileInfoRow label="PhilHealth Number" value={profile.philhealth_no} />
+                <ProfileInfoRow label="Gender Identity" value={publicMetadata.gender_identity as string} />
+                <ProfileInfoRow label="Pronouns" value={publicMetadata.pronouns as string} />
+                <ProfileInfoRow label="Assigned Sex at Birth" value={publicMetadata.assigned_sex_at_birth as string} />
+                <ProfileInfoRow label="Civil Status" value={publicMetadata.civil_status as string} />
+                <ProfileInfoRow label="Religion" value={publicMetadata.religion as string} />
+                <ProfileInfoRow label="Occupation" value={publicMetadata.occupation as string} />
+                <ProfileInfoRow label="PhilHealth Number" value={publicMetadata.philhealth_no as string} />
             </CardContent>
         </Card>
 
@@ -134,8 +144,16 @@ export function MyProfileScreen() {
             title="Edit Profile"
             variant="default"
             onPress={() => navigation.navigate('EditProfile')}
-            disabled={isSaving}
+            disabled={!isLoaded}
             size="xl"
+          />
+          <Button
+            title="Log Out"
+            variant="destructive"
+            onPress={handleLogout}
+            disabled={!isLoaded}
+            size="xl"
+            style={{ marginTop: theme.spacing.md }}
           />
         </View>
       </ScrollView>
