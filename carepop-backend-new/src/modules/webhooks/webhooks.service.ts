@@ -25,15 +25,19 @@ async function upsertProfile(userData: UserJSON) {
         city_municipality_code: metadata.city_municipality_code as string,
         barangay_code: metadata.barangay_code as string,
     };
+    
+    console.log('Attempting to upsert profile with data:', JSON.stringify(profileData, null, 2));
 
     const { data, error } = await supabaseAdmin
         .from('profiles')
         .upsert(profileData, { onConflict: 'clerk_id' });
 
     if (error) {
-        console.error('Webhook profile upsert error:', error);
+        console.error('Webhook profile upsert database error:', error);
         throw new ApiError(500, `Error upserting profile via webhook: ${error.message}`);
     }
+    
+    console.log('Successfully upserted profile data:', data);
     return data;
 }
 
