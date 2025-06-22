@@ -15,6 +15,7 @@ const envSchema = z.object({
   SUPABASE_JWT_SECRET: z.string(),
   RESEND_API_KEY: z.string(),
   CLERK_SECRET_KEY: z.string(),
+  CLERK_WEBHOOK_SECRET: z.string(),
 });
 
 export const env = envSchema.parse(process.env); 

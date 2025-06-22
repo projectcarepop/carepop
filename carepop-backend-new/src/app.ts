@@ -3,6 +3,7 @@ import { logger } from 'hono/logger';
 import { cors } from 'hono/cors';
 import authRoutes from './modules/auth/auth.routes';
 import profileRoutes from './modules/profiles/profiles.routes';
+import webhookRoutes from './modules/webhooks/webhooks.routes';
 import errorHandler from './middleware/error.middleware';
 
 const app = new Hono().basePath('/api/v1');
@@ -24,6 +25,7 @@ app.get('/', (c) => {
 
 // Auth routes are public and do not need auth middleware
 app.route('/auth', authRoutes);
+app.route('/webhooks', webhookRoutes);
 
 // Profile routes are protected and require a valid token
 app.route('/profiles', profileRoutes);
