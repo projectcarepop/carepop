@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useTransition } from 'react';
 import { useUser } from '@clerk/nextjs';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useActionState } from 'react';
 import { useForm, FieldName } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -18,9 +18,7 @@ import DatePicker from '@/components/date-picker';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, ChevronLeft, ChevronRight, Briefcase, HeartPulse } from 'lucide-react';
-import { Textarea } from '@/components/ui/textarea';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Users, ChevronLeft, ChevronRight, Briefcase, HeartPulse, CheckCircle } from 'lucide-react';
 
 const profileFormSchema = z.object({
   first_name: z.string().min(1, 'First name is required'),
@@ -76,7 +74,6 @@ function FinalSubmitButton({ isPending, onClick }: { isPending: boolean, onClick
 }
 
 export function CompleteProfileForm({ userProfile, psgc }: CompleteProfileFormProps) {
-    const router = useRouter();
     const { user } = useUser();
     const [currentStep, setCurrentStep] = useState(0);
     const [direction, setDirection] = useState(1);
@@ -130,12 +127,11 @@ export function CompleteProfileForm({ userProfile, psgc }: CompleteProfileFormPr
         const handleSuccess = async () => {
             if (state.success && user) {
                 localStorage.removeItem(FORM_STORAGE_KEY);
-                await user.reload(); // Force a session refresh
-                router.push('/dashboard'); // Programmatically redirect
+                await user.reload(); // Force a session refresh to update client-side auth state
             }
         };
         handleSuccess();
-    }, [state.success, user, router]);
+    }, [state.success, user]);
 
     useEffect(() => {
         if (state.errors) {
@@ -204,163 +200,176 @@ export function CompleteProfileForm({ userProfile, psgc }: CompleteProfileFormPr
     
     const variants = {
         enter: (direction: number) => ({ x: direction > 0 ? 500 : -500, y: 0, opacity: 0 }),
-        center: { x: 0, y: 0, opacity: 1 },
+        center: { zIndex: 1, x: 0, y: 0, opacity: 1 },
         exit: (direction: number) => ({ zIndex: 0, x: direction < 0 ? 500 : -500, y: 0, opacity: 0 }),
     };
 
-    return (
-        <div className="w-full max-w-2xl bg-white dark:bg-slate-800 rounded-2xl shadow-xl">
-            <div className="p-8 border-b border-gray-200 dark:border-slate-700">
-                <Form {...form}>
-                    <form className="flex flex-col justify-between" style={{ minHeight: '520px' }}>
-                        <AnimatePresence initial={false} custom={direction}>
-                            <motion.div
-                                key={currentStep}
-                                custom={direction}
-                                variants={variants}
-                                initial="enter"
-                                animate="center"
-                                exit="exit"
-                                transition={{ x: { type: 'spring', stiffness: 300, damping: 30 }, opacity: { duration: 0.2 } }}
-                            >
-                                <div className="mb-8">
-                                    <div className="space-y-6">
-                                        <div>
-                                            <HeartPulse className="h-8 w-8 text-primary mb-3" />
-                                            <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Tell us more about you</h1>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                                This information helps us personalize your CarePop experience.
-                                            </p>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <div className="relative h-1 w-full bg-gray-200 dark:bg-gray-700 rounded-full">
-                                                <motion.div 
-                                                    className="absolute top-0 left-0 h-1 bg-primary rounded-full"
-                                                    animate={{ width: `${((currentStep) / (stepsConfig.length - 1)) * 100}%` }}
-                                                    transition={{ ease: "easeInOut", duration: 0.5 }}
-                                                />
-                                            </div>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                                                Step {currentStep + 1} of {stepsConfig.length}: <span className="font-medium text-gray-700 dark:text-gray-300">{stepsConfig[currentStep].name}</span>
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                {currentStep === 0 && (
-                                    <div className="grid md:grid-cols-2 gap-x-6 gap-y-4">
-                                         <FormField control={form.control} name="first_name" render={({ field }) => (<FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                                         <FormField control={form.control} name="last_name" render={({ field }) => (<FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                                        <FormField control={form.control} name="middle_initial" render={({ field }) => (<FormItem><FormLabel>Middle Initial</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
-                                        <FormField control={form.control} name="date_of_birth" render={({ field }) => (<FormItem><FormLabel>Date of Birth</FormLabel><FormControl><DatePicker value={field.value} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>)} />
-                                        <FormField control={form.control} name="contact_no" render={({ field }) => (<FormItem><FormLabel>Contact Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
-                                        <FormField control={form.control} name="gender_identity" render={({ field }) => (<FormItem><FormLabel>Gender Identity</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="Male">Male</SelectItem><SelectItem value="Female">Female</SelectItem><SelectItem value="Non-binary">Non-binary</SelectItem><SelectItem value="Prefer to self-describe">Prefer to self-describe</SelectItem><SelectItem value="Prefer not to say">Prefer not to say</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
-                                        <FormField control={form.control} name="pronouns" render={({ field }) => (<FormItem><FormLabel>Pronouns</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="he/him">he/him</SelectItem><SelectItem value="she/her">she/her</SelectItem><SelectItem value="they/them">they/them</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
-                                        <FormField control={form.control} name="assigned_sex_at_birth" render={({ field }) => (<FormItem><FormLabel>Assigned Sex at Birth</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="Male">Male</SelectItem><SelectItem value="Female">Female</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
-                                        <FormField control={form.control} name="civil_status" render={({ field }) => (<FormItem><FormLabel>Civil Status</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="Single">Single</SelectItem><SelectItem value="Married">Married</SelectItem><SelectItem value="Divorced">Divorced</SelectItem><SelectItem value="Widowed">Widowed</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
-                                        <FormField control={form.control} name="religion" render={({ field }) => (<FormItem><FormLabel>Religion</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
-                                    </div>
-                                )}
-                                {currentStep === 1 && (
-                                    <div className="grid md:grid-cols-2 gap-x-6 gap-y-4">
-                                        <FormField control={form.control} name="occupation" render={({ field }) => (<FormItem><FormLabel>Occupation</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                                        <FormField control={form.control} name="philhealth_no" render={({ field }) => (<FormItem><FormLabel>PhilHealth No. (Optional)</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
-                                        <FormField control={form.control} name="street" render={({ field }) => (<FormItem className="md:col-span-2"><FormLabel>Street Address</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                                        <FormField
-                                            control={form.control}
-                                            name="province_code"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Province</FormLabel>
-                                                    <FormControl>
-                                                        <Combobox
-                                                            name={field.name}
-                                                            options={provinceOptions}
-                                                            value={field.value}
-                                                            onChange={(value) => {
-                                                                field.onChange(value);
-                                                                form.setValue('city_municipality_code', '');
-                                                                form.setValue('barangay_code', '');
-                                                            }}
-                                                            placeholder="Select province..."
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={form.control}
-                                            name="city_municipality_code"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>City/Municipality</FormLabel>
-                                                    <FormControl>
-                                                        <Combobox
-                                                            name={field.name}
-                                                            options={cityOptions}
-                                                            value={field.value}
-                                                            onChange={(value) => {
-                                                                field.onChange(value);
-                                                                form.setValue('barangay_code', '');
-                                                            }}
-                                                            placeholder="Select city..."
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={form.control}
-                                            name="barangay_code"
-                                            render={({ field }) => (
-                                                <FormItem className="md:col-span-2">
-                                                    <FormLabel>Barangay</FormLabel>
-                                                    <FormControl>
-                                                        <Combobox
-                                                            name={field.name}
-                                                            options={barangayOptions}
-                                                            value={field.value}
-                                                            onChange={field.onChange}
-                                                            placeholder="Select barangay..."
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
-                                )}
-                            </motion.div>
-                        </AnimatePresence>
+    if (state.success) {
+        return (
+            <div className="w-full max-w-2xl bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-8 flex flex-col items-center justify-center text-center" style={{ minHeight: '520px' }}>
+                <CheckCircle className="h-16 w-16 text-green-500 mb-4" />
+                <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Profile Updated!</h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 mb-6">
+                    Welcome aboard! Your profile has been set up successfully.
+                </p>
+                <Link href="/dashboard" passHref>
+                    <Button>Go to Dashboard</Button>
+                </Link>
+            </div>
+        );
+    }
 
-                        <div className="mt-auto pt-8">
-                             <div className="flex justify-between items-center">
-                                <div>
-                                    {currentStep > 0 && (
-                                        <Button type="button" variant="ghost" onClick={prevStep}>
-                                            <ChevronLeft className="w-4 h-4 mr-2" />
-                                            Back
-                                        </Button>
-                                    )}
-                                </div>
-                                <div>
-                                    {currentStep < stepsConfig.length - 1 && (
-                                        <Button type="button" onClick={nextStep}>
-                                            Next
-                                            <ChevronRight className="w-4 h-4 ml-2" />
-                                        </Button>
-                                    )}
-                                    {currentStep === stepsConfig.length - 1 && (
-                                        <FinalSubmitButton isPending={isPending} onClick={handleFinalSubmit} />
-                                    )}
+    return (
+        <div className="w-full max-w-2xl bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-8 overflow-hidden">
+            <Form {...form}>
+                <form className="flex flex-col justify-between" style={{ minHeight: '520px' }}>
+                    <AnimatePresence initial={false} custom={direction}>
+                        <motion.div
+                            key={currentStep}
+                            custom={direction}
+                            variants={variants}
+                            initial="enter"
+                            animate="center"
+                            exit="exit"
+                            transition={{ x: { type: 'spring', stiffness: 300, damping: 30 }, opacity: { duration: 0.2 } }}
+                        >
+                            <div className="mb-8">
+                                <div className="space-y-6">
+                                    <div>
+                                        <HeartPulse className="h-8 w-8 text-primary mb-3" />
+                                        <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Tell us more about you</h1>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                            This information helps us personalize your CarePop experience.
+                                        </p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="relative h-1 w-full bg-gray-200 dark:bg-gray-700 rounded-full">
+                                            <motion.div 
+                                                className="absolute top-0 left-0 h-1 bg-primary rounded-full"
+                                                animate={{ width: `${((currentStep) / (stepsConfig.length - 1)) * 100}%` }}
+                                                transition={{ ease: "easeInOut", duration: 0.5 }}
+                                            />
+                                        </div>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                            Step {currentStep + 1} of {stepsConfig.length}: <span className="font-medium text-gray-700 dark:text-gray-300">{stepsConfig[currentStep].name}</span>
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
+                            
+                            {currentStep === 0 && (
+                                <div className="grid md:grid-cols-2 gap-x-6 gap-y-4">
+                                     <FormField control={form.control} name="first_name" render={({ field }) => (<FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                                     <FormField control={form.control} name="last_name" render={({ field }) => (<FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                                    <FormField control={form.control} name="middle_initial" render={({ field }) => (<FormItem><FormLabel>Middle Initial</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                                    <FormField control={form.control} name="date_of_birth" render={({ field }) => (<FormItem><FormLabel>Date of Birth</FormLabel><FormControl><DatePicker value={field.value} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>)} />
+                                    <FormField control={form.control} name="contact_no" render={({ field }) => (<FormItem><FormLabel>Contact Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                                    <FormField control={form.control} name="gender_identity" render={({ field }) => (<FormItem><FormLabel>Gender Identity</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="Male">Male</SelectItem><SelectItem value="Female">Female</SelectItem><SelectItem value="Non-binary">Non-binary</SelectItem><SelectItem value="Prefer to self-describe">Prefer to self-describe</SelectItem><SelectItem value="Prefer not to say">Prefer not to say</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+                                    <FormField control={form.control} name="pronouns" render={({ field }) => (<FormItem><FormLabel>Pronouns</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="he/him">he/him</SelectItem><SelectItem value="she/her">she/her</SelectItem><SelectItem value="they/them">they/them</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+                                    <FormField control={form.control} name="assigned_sex_at_birth" render={({ field }) => (<FormItem><FormLabel>Assigned Sex at Birth</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="Male">Male</SelectItem><SelectItem value="Female">Female</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+                                    <FormField control={form.control} name="civil_status" render={({ field }) => (<FormItem><FormLabel>Civil Status</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="Single">Single</SelectItem><SelectItem value="Married">Married</SelectItem><SelectItem value="Divorced">Divorced</SelectItem><SelectItem value="Widowed">Widowed</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+                                    <FormField control={form.control} name="religion" render={({ field }) => (<FormItem><FormLabel>Religion</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                                </div>
+                            )}
+                            {currentStep === 1 && (
+                                <div className="grid md:grid-cols-2 gap-x-6 gap-y-4">
+                                    <FormField control={form.control} name="occupation" render={({ field }) => (<FormItem><FormLabel>Occupation</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                                    <FormField control={form.control} name="philhealth_no" render={({ field }) => (<FormItem><FormLabel>PhilHealth No. (Optional)</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                                    <FormField control={form.control} name="street" render={({ field }) => (<FormItem className="md:col-span-2"><FormLabel>Street Address</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                                    <FormField
+                                        control={form.control}
+                                        name="province_code"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Province</FormLabel>
+                                                <FormControl>
+                                                    <Combobox
+                                                        name={field.name}
+                                                        options={provinceOptions}
+                                                        value={field.value}
+                                                        onChange={(value) => {
+                                                            field.onChange(value);
+                                                            form.setValue('city_municipality_code', '');
+                                                            form.setValue('barangay_code', '');
+                                                        }}
+                                                        placeholder="Select province..."
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="city_municipality_code"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>City/Municipality</FormLabel>
+                                                <FormControl>
+                                                    <Combobox
+                                                        name={field.name}
+                                                        options={cityOptions}
+                                                        value={field.value}
+                                                        onChange={(value) => {
+                                                            field.onChange(value);
+                                                            form.setValue('barangay_code', '');
+                                                        }}
+                                                        placeholder="Select city..."
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="barangay_code"
+                                        render={({ field }) => (
+                                            <FormItem className="md:col-span-2">
+                                                <FormLabel>Barangay</FormLabel>
+                                                <FormControl>
+                                                    <Combobox
+                                                        name={field.name}
+                                                        options={barangayOptions}
+                                                        value={field.value}
+                                                        onChange={field.onChange}
+                                                        placeholder="Select barangay..."
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+                            )}
+                        </motion.div>
+                    </AnimatePresence>
+
+                    <div className="mt-auto pt-8">
+                         <div className="flex justify-between items-center">
+                            <div>
+                                {currentStep > 0 && (
+                                    <Button type="button" variant="ghost" onClick={prevStep}>
+                                        <ChevronLeft className="w-4 h-4 mr-2" />
+                                        Back
+                                    </Button>
+                                )}
+                            </div>
+                            <div>
+                                {currentStep < stepsConfig.length - 1 && (
+                                    <Button type="button" onClick={nextStep}>
+                                        Next
+                                        <ChevronRight className="w-4 h-4 ml-2" />
+                                    </Button>
+                                )}
+                                {currentStep === stepsConfig.length - 1 && (
+                                    <FinalSubmitButton isPending={isPending} onClick={handleFinalSubmit} />
+                                )}
+                            </div>
                         </div>
-                    </form>
-                </Form>
-            </div>
+                    </div>
+                </form>
+            </Form>
         </div>
     );
 } 
