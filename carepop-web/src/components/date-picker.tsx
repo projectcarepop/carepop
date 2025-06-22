@@ -16,11 +16,15 @@ import {
 interface DatePickerProps {
   value?: Date;
   onChange?: (date?: Date) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  month?: Date;
+  onMonthChange?: (month: Date) => void;
 }
 
-export default function DatePicker({ value, onChange }: DatePickerProps) {
+export default function DatePicker({ value, onChange, open, onOpenChange, month, onMonthChange }: DatePickerProps) {
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant={"outline"}
@@ -38,6 +42,8 @@ export default function DatePicker({ value, onChange }: DatePickerProps) {
           mode="single"
           selected={value}
           onSelect={onChange}
+          month={month}
+          onMonthChange={onMonthChange}
           initialFocus
           captionLayout="dropdown"
           fromYear={1960}

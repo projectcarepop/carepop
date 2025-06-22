@@ -25,9 +25,15 @@ export default async function CompleteProfilePage() {
 
   const psgc = await getPsgcData();
 
+  const userProfile = {
+    firstName: user.firstName,
+    lastName: user.lastName,
+    ...user.publicMetadata,
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center p-4">
-        <CompleteProfileForm userProfile={user.publicMetadata} psgc={psgc} />
+        <CompleteProfileForm userProfile={userProfile} psgc={psgc} />
     </div>
   );
 } 

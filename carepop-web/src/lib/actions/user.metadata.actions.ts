@@ -3,12 +3,24 @@
 import { clerkClient, currentUser } from '@clerk/nextjs/server';
 import { z } from 'zod';
 
+function calculateAge(dobString: string): number {
+  const dob = new Date(dobString);
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const monthDifference = today.getMonth() - dob.getMonth();
+  if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < dob.getDate())) {
+    age--;
+  }
+  return age;
+}
+
 const profileFormSchema = z.object({
   first_name: z.string().min(1, 'First name is required'),
   last_name: z.string().min(1, 'Last name is required'),
   middle_initial: z.string().max(2, 'Max 2 characters').optional().nullable(),
-  date_of_birth: z.coerce.date({ required_error: 'Date of birth is required' })
-    .max(new Date(), { message: "Date of birth cannot be in the future." }),
+  birth_year: z.string({ required_error: 'Year is required' }),
+  birth_month: z.string({ required_error: 'Month is required' }),
+  birth_day: z.string({ required_error: 'Day is required' }),
   contact_no: z.string()
     .min(10, 'Must be a valid phone number')
     .regex(/^(09|\+639)\d{9}$/, { message: "Please enter a valid Philippine mobile number (e.g., 09xxxxxxxxx)." })
@@ -62,11 +74,22 @@ export async function updateUserMetadata(
   }
   
   try {
-    const { first_name, last_name, ...metadata } = validatedFields.data;
+    const { first_name, last_name, birth_day, birth_month, birth_year, ...metadata } = validatedFields.data;
+
+    const dateOfBirthString = `${birth_year}-${birth_month}-${birth_day}`;
+    
+    // Final check for a valid date
+    const dob = new Date(dateOfBirthString);
+    if (isNaN(dob.getTime()) || dob > new Date()) {
+        return { message: 'Invalid date of birth provided.', success: false };
+    }
+
+    const age = calculateAge(dateOfBirthString);
 
     const dataToUpdate = {
       ...metadata,
-      date_of_birth: metadata.date_of_birth.toISOString().split('T')[0], // format as YYYY-MM-DD
+      age,
+      date_of_birth: dob.toISOString().split('T')[0], // format as YYYY-MM-DD
       profileComplete: true,
     };
 
