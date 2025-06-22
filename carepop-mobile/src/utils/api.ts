@@ -58,8 +58,8 @@ export const getClerkHeaders = async (getToken: () => Promise<string | null>) =>
 };
 
 const api = {
-    get: async (endpoint: string, params?: Record<string, any>) => {
-        const headers = await getHeaders();
+    get: async (endpoint: string, getToken: () => Promise<string | null>, params?: Record<string, any>) => {
+        const headers = await getClerkHeaders(getToken);
         const url = new URL(`${API_URL}${endpoint}`);
         if (params) {
             Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
@@ -74,8 +74,8 @@ const api = {
         }
         return response.json();
     },
-    post: async (endpoint: string, body: any) => {
-        const headers = await getHeaders();
+    post: async (endpoint: string, body: any, getToken: () => Promise<string | null>) => {
+        const headers = await getClerkHeaders(getToken);
         const response = await fetch(`${API_URL}${endpoint}`, {
             method: 'POST',
             headers,
@@ -83,11 +83,12 @@ const api = {
         });
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.error || 'API request failed');
+            throw new Error(error.message || 'API request failed');
         }
         return response.json();
     },
-    put: async (endpoint: string, body: any, headers: Headers) => {
+    put: async (endpoint: string, body: any, getToken: () => Promise<string | null>) => {
+        const headers = await getClerkHeaders(getToken);
         const response = await fetch(`${API_URL}${endpoint}`, {
             method: 'PUT',
             headers,
@@ -95,11 +96,12 @@ const api = {
         });
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.error || 'API request failed');
+            throw new Error(error.message || 'API request failed');
         }
         return response.json();
     },
-    patch: async (endpoint: string, body: any, headers: Headers) => {
+    patch: async (endpoint: string, body: any, getToken: () => Promise<string | null>) => {
+        const headers = await getClerkHeaders(getToken);
         const response = await fetch(`${API_URL}${endpoint}`, {
             method: 'PATCH',
             headers,
@@ -107,12 +109,12 @@ const api = {
         });
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.error || 'API request failed');
+            throw new Error(error.message || 'API request failed');
         }
         return response.json();
     },
-    delete: async (endpoint: string) => {
-        const headers = await getHeaders();
+    delete: async (endpoint: string, getToken: () => Promise<string | null>) => {
+        const headers = await getClerkHeaders(getToken);
         const response = await fetch(`${API_URL}${endpoint}`, {
             method: 'DELETE',
             headers,
@@ -178,50 +180,32 @@ const processAppointments = (appointments: any[]): Appointment[] => {
 };
 
 // A generic function to fetch appointments, now with optional filters
-const getAppointments = async (status: 'upcoming' | 'past', filters: Record<string, any> = {}): Promise<Appointment[]> => {
+const getAppointments = async (getToken: () => Promise<string | null>, status: 'upcoming' | 'past', filters: Record<string, any> = {}): Promise<Appointment[]> => {
     const endpoint = status === 'upcoming' 
-        ? 'appointments/my/future' 
-        : 'appointments/my/past';
-
-    // Basic query parameter serialization
-    const queryParams = new URLSearchParams(filters).toString();
-    const url = `${endpoint}${queryParams ? `?${queryParams}` : ''}`;
-
-    const { data, error } = await supabase.from('appointments').select(`
-      *,
-      clinic:clinics(*),
-      provider:profiles(*),
-      service:services(*)
-    `).in('status', status === 'upcoming' ? ['confirmed', 'pending'] : ['completed', 'cancelled', 'no_show'])
-     .order('appointment_datetime', { ascending: status === 'upcoming' });
-
-    if (error) {
+        ? '/appointments/my/future' 
+        : '/appointments/my/past';
+    
+    try {
+        const data = await api.get(endpoint, getToken, filters);
+        return processAppointments(data.appointments || []); // Assuming the API returns { appointments: [] }
+    } catch (error) {
         console.error(`Error fetching ${status} appointments:`, error);
         throw new Error(`Failed to fetch ${status} appointments`);
     }
-
-    // This is a temporary frontend filter until backend is updated.
-    // In a real scenario, the `filters` object would be converted to query params
-    // and sent to a backend that can handle them.
-    if (filters.serviceId && Array.isArray(data)) {
-        return data.filter(appt => appt.service_id === filters.serviceId);
-    }
-    
-    return data || [];
 };
 
 // Specific functions now use the generic one
-export const getUpcomingAppointments = async (filters: Record<string, any> = {}): Promise<Appointment[]> => {
-    return getAppointments('upcoming', filters);
+export const getUpcomingAppointments = async (getToken: () => Promise<string | null>, filters: Record<string, any> = {}): Promise<Appointment[]> => {
+    return getAppointments(getToken, 'upcoming', filters);
 };
 
-export const getPastAppointments = async (filters: Record<string, any> = {}): Promise<Appointment[]> => {
-    return getAppointments('past', filters);
+export const getPastAppointments = async (getToken: () => Promise<string | null>, filters: Record<string, any> = {}): Promise<Appointment[]> => {
+    return getAppointments(getToken, 'past', filters);
 };
 
-export const getMyRecords = async (): Promise<MedicalRecord[]> => {
+export const getMyRecords = async (getToken: () => Promise<string | null>): Promise<MedicalRecord[]> => {
     try {
-        const data = await api.get('/medical-records/my');
+        const data = await api.get('/medical-records/my', getToken);
         return data as MedicalRecord[];
     } catch (error) {
         console.error('Error fetching medical records:', error);
@@ -229,9 +213,9 @@ export const getMyRecords = async (): Promise<MedicalRecord[]> => {
     }
 };
 
-export const getRecordSignedUrl = async (recordId: string): Promise<SignedUrlResponse> => {
+export const getRecordSignedUrl = async (getToken: () => Promise<string | null>, recordId: string): Promise<SignedUrlResponse> => {
     try {
-        const data = await api.get(`/medical-records/my/${recordId}/signed-url`);
+        const data = await api.get(`/medical-records/my/${recordId}/signed-url`, getToken);
         return data as SignedUrlResponse;
     } catch (error) {
         console.error('Error fetching signed URL for record:', error);

@@ -206,8 +206,7 @@ export const EditProfileScreen = () => {
                 age: dateOfBirth ? new Date().getFullYear() - dateOfBirth.getFullYear() : null,
             };
 
-            const headers = await getClerkHeaders(getToken);
-            await api.put('/mobile/me/complete-profile', profileData, headers);
+            await api.post('/profiles', profileData, getToken);
 
             await user?.reload(); // Reload user data to reflect changes
             showToast("Profile updated successfully!", 'success');

@@ -249,57 +249,44 @@ function AuthFlow() {
 export function RootAppNavigator() {
   const { isLoaded, isSignedIn } = useAuth();
   const { user } = useUser();
-  const [hasOnboarded, setHasOnboarded] = useState<boolean | null>(null);
-  const [isProfileComplete, setIsProfileComplete] = useState<boolean | null>(null);
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
+  const [isCheckingOnboarding, setIsCheckingOnboarding] = useState(true);
 
   useEffect(() => {
     const checkOnboarding = async () => {
-      try {
-        const value = await AsyncStorage.getItem('hasOnboarded');
-        setHasOnboarded(value === 'true');
-      } catch (e) {
-        console.error("Failed to fetch onboarding status", e);
-        setHasOnboarded(false); // Default to not onboarded on error
-      }
+      const value = await AsyncStorage.getItem('hasCompletedOnboarding');
+      setHasCompletedOnboarding(value === 'true');
+      setIsCheckingOnboarding(false);
     };
 
     checkOnboarding();
   }, []);
 
-  useEffect(() => {
-    if (user) {
-      // Use the flag from Clerk's metadata
-      const profileComplete = !!user.publicMetadata?.profileComplete;
-      setIsProfileComplete(profileComplete);
-    }
-  }, [user]); // Re-run when user object changes
-
-  if (!isLoaded || hasOnboarded === null || (isSignedIn && isProfileComplete === null)) {
+  if (!isLoaded || isCheckingOnboarding) {
     return <SplashScreen />;
   }
+
+  // Determine if the profile is complete from Clerk's metadata
+  const isProfileComplete = user?.publicMetadata?.profileComplete === true;
 
   return (
     <NavigationContainer>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {!isSignedIn ? (
+        {isSignedIn ? (
+          isProfileComplete ? (
+            <RootStack.Screen name="Main" component={AppDrawer} />
+          ) : (
+            <RootStack.Screen name="CreateProfile" component={CreateProfileScreen} />
+          )
+        ) : (
           <>
-            {hasOnboarded ? (
-              <RootStack.Screen name="Auth" component={AuthFlow} />
+            {hasCompletedOnboarding ? (
+              <RootStack.Screen name="Auth" component={AuthNavigator} />
             ) : (
               <RootStack.Screen name="Onboarding" component={OnboardingNavigator} />
             )}
           </>
-        ) : !isProfileComplete ? (
-          <RootStack.Screen name="CreateProfile" component={CreateProfileScreen} />
-        ) : (
-          <RootStack.Screen name="Main" component={AppDrawer} />
         )}
-         {/* Add EditProfile as a modal screen in the root */}
-         <RootStack.Screen 
-            name="EditProfile" 
-            component={EditProfileScreen} 
-            options={{ presentation: 'modal' }}
-        />
       </RootStack.Navigator>
     </NavigationContainer>
   );

@@ -1,6 +1,6 @@
 'use server';
 
-import { clerkClient, currentUser } from '@clerk/nextjs/server';
+import { clerkClient, currentUser, auth } from '@clerk/nextjs/server';
 import { z } from 'zod';
 
 const profileFormSchema = z.object({
@@ -77,11 +77,20 @@ export async function updateUserMetadata(
         date_of_birth: dob.toISOString().split('T')[0],
     };
 
+    // Get the auth token to pass to the backend
+    const { getToken } = await auth();
+    const token = await getToken();
+
+    if (!token) {
+        return { message: 'Authentication token is missing. Cannot save profile.', success: false };
+    }
+
     const backendApiUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/profiles`;
     const response = await fetch(backendApiUrl, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`, // Pass the token to the backend
         },
         body: JSON.stringify(dataForBackend),
     });

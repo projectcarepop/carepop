@@ -146,8 +146,9 @@ export const CreateProfileScreen = () => {
                 age: new Date().getFullYear() - dateOfBirth.getFullYear(),
             };
             
-            const headers = await getClerkHeaders(getToken);
-            await api.put('/users/me/complete-profile', profileData, headers);
+            // This now uses the refactored `api.post` which handles Clerk auth.
+            // The endpoint /profiles is our new upsert endpoint.
+            await api.post('/profiles', profileData, getToken);
             
             // We must also reload the user object to get the latest data
             await user.reload();
