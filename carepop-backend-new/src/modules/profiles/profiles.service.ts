@@ -6,7 +6,7 @@ async function getProfile(userId: string) {
   const { data, error } = await supabaseAdmin
     .from('profiles')
     .select('*')
-    .eq('clerkId', userId)
+    .eq('clerk_id', userId)
     .single();
 
   if (error && error.code !== 'PGRST116') {
@@ -17,43 +17,43 @@ async function getProfile(userId: string) {
   return data;
 }
 
-async function updateProfile(userId: string, input: UpdateProfileInput) {
+async function upsertProfile(userId: string, input: UpdateProfileInput) {
   try {
     const profileDataForDb = {
-        firstName: input.first_name,
-        lastName: input.last_name,
-        middleInitial: input.middle_initial,
-        dateOfBirth: input.date_of_birth,
-        contactNo: input.contact_no,
-        genderIdentity: input.gender_identity,
+        clerk_id: userId,
+        first_name: input.first_name,
+        last_name: input.last_name,
+        middle_initial: input.middle_initial,
+        date_of_birth: input.date_of_birth,
+        contact_no: input.contact_no,
+        gender_identity: input.gender_identity,
         pronouns: input.pronouns,
-        assignedSexAtBirth: input.assigned_sex_at_birth,
-        civilStatus: input.civil_status,
+        assigned_sex_at_birth: input.assigned_sex_at_birth,
+        civil_status: input.civil_status,
         religion: input.religion,
         occupation: input.occupation,
-        philhealthNo: input.philhealth_no,
+        philhealth_no: input.philhealth_no,
         street: input.street,
-        provinceCode: input.province_code,
-        cityMunicipalityCode: input.city_municipality_code,
-        barangayCode: input.barangay_code,
+        province_code: input.province_code,
+        city_municipality_code: input.city_municipality_code,
+        barangay_code: input.barangay_code,
     };
 
     const { data, error } = await supabaseAdmin
       .from('profiles')
-      .update(profileDataForDb)
-      .eq('clerkId', userId)
+      .upsert(profileDataForDb, { onConflict: 'clerk_id' })
       .select()
       .single();
 
     if (error) {
-      console.error('Update profile database error:', error);
-      throw new ApiError(500, `Could not update profile: ${error.message}`);
+      console.error('Upsert profile database error:', error);
+      throw new ApiError(500, `Could not upsert profile: ${error.message}`);
     }
 
     return data;
   } catch (error) {
     if (error instanceof ApiError) throw error;
-    console.error('Unexpected error in updateProfile:', error);
+    console.error('Unexpected error in upsertProfile:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     throw new ApiError(500, `An unexpected error occurred: ${errorMessage}`);
   }
@@ -61,5 +61,5 @@ async function updateProfile(userId: string, input: UpdateProfileInput) {
 
 export const profilesService = {
   getProfile,
-  updateProfile,
+  updateProfile: upsertProfile,
 }; 

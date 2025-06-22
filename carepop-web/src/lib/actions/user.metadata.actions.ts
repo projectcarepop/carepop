@@ -3,17 +3,6 @@
 import { clerkClient, currentUser } from '@clerk/nextjs/server';
 import { z } from 'zod';
 
-function calculateAge(dobString: string): number {
-  const dob = new Date(dobString);
-  const today = new Date();
-  let age = today.getFullYear() - dob.getFullYear();
-  const monthDifference = today.getMonth() - dob.getMonth();
-  if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < dob.getDate())) {
-    age--;
-  }
-  return age;
-}
-
 const profileFormSchema = z.object({
   first_name: z.string().min(1, 'First name is required'),
   last_name: z.string().min(1, 'Last name is required'),
@@ -74,41 +63,49 @@ export async function updateUserMetadata(
   }
   
   try {
-    const { first_name, last_name, birth_day, birth_month, birth_year, ...metadata } = validatedFields.data;
+    const { birth_day, birth_month, birth_year, ...profileData } = validatedFields.data;
 
     const dateOfBirthString = `${birth_year}-${birth_month}-${birth_day}`;
     
-    // Final check for a valid date
     const dob = new Date(dateOfBirthString);
     if (isNaN(dob.getTime()) || dob > new Date()) {
         return { message: 'Invalid date of birth provided.', success: false };
     }
 
-    const age = calculateAge(dateOfBirthString);
-
-    const dataToUpdate = {
-      first_name,
-      last_name,
-      ...metadata,
-      age,
-      date_of_birth: dob.toISOString().split('T')[0], // format as YYYY-MM-DD
-      profileComplete: true,
+    const dataForBackend = {
+        ...profileData,
+        date_of_birth: dob.toISOString().split('T')[0],
     };
+
+    const backendApiUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/profiles`;
+    const response = await fetch(backendApiUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(dataForBackend),
+    });
+
+    if (!response.ok) {
+        const errorBody = await response.json();
+        console.error("Backend API error:", errorBody);
+        return { message: `An error occurred while saving your profile: ${errorBody.message || response.statusText}`, success: false };
+    }
     
-    // We are now ONLY updating Clerk. The webhook will handle the DB sync.
     const clerkApi = await clerkClient();
     await clerkApi.users.updateUser(user.id, {
-      firstName: first_name,
-      lastName: last_name,
+      firstName: dataForBackend.first_name,
+      lastName: dataForBackend.last_name,
       publicMetadata: {
         ...user.publicMetadata,
-        ...dataToUpdate,
+        profileComplete: true,
       },
     });
 
     return { message: 'Welcome aboard! Your profile has been set up successfully.', success: true };
   } catch (error) {
-    console.error('Error updating user metadata in Clerk:', error);
-    return { message: 'An unexpected error occurred while updating your profile.', success: false };
+    console.error('Error in updateUserMetadata action:', error);
+    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';
+    return { message: errorMessage, success: false };
   }
 } 
