@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useMemo, useTransition } from 'react';
 import { useUser } from '@clerk/nextjs';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useActionState } from 'react';
 import { useForm, FieldName } from 'react-hook-form';
@@ -75,12 +74,10 @@ function FinalSubmitButton({ isPending, onClick }: { isPending: boolean, onClick
 }
 
 export function CompleteProfileForm({ userProfile, psgc }: CompleteProfileFormProps) {
-    const router = useRouter();
     const { user } = useUser();
     const [currentStep, setCurrentStep] = useState(0);
     const [direction, setDirection] = useState(1);
     const [isPending, startTransition] = useTransition();
-    const [submissionSuccess, setSubmissionSuccess] = useState(false);
 
     const { toast } = useToast();
     const initialState: ProfileMetadataState = { message: '', errors: {}, success: false };
@@ -129,17 +126,12 @@ export function CompleteProfileForm({ userProfile, psgc }: CompleteProfileFormPr
     useEffect(() => {
         const handleSuccess = async () => {
             if (state.success && user) {
-                toast({
-                    title: "Profile Complete!",
-                    description: state.message,
-                });
                 localStorage.removeItem(FORM_STORAGE_KEY);
-                await user.reload(); // Force a session refresh
-                setSubmissionSuccess(true);
+                await user.reload(); // Force a session refresh to update client-side auth state
             }
         };
         handleSuccess();
-    }, [state.success, state.message, user, toast, router]);
+    }, [state.success, user]);
 
     useEffect(() => {
         if (state.errors) {
@@ -212,7 +204,7 @@ export function CompleteProfileForm({ userProfile, psgc }: CompleteProfileFormPr
         exit: (direction: number) => ({ zIndex: 0, x: direction < 0 ? 500 : -500, y: 0, opacity: 0 }),
     };
 
-    if (submissionSuccess) {
+    if (state.success) {
         return (
             <div className="w-full max-w-2xl bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-8 flex flex-col items-center justify-center text-center" style={{ minHeight: '520px' }}>
                 <CheckCircle className="h-16 w-16 text-green-500 mb-4" />
