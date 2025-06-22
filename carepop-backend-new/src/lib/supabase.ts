@@ -1,3 +1,4 @@
+import { createClient } from '@supabase/supabase-js';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { type Context } from 'hono';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
@@ -30,19 +31,11 @@ export const createSupabaseClient = (c: Context) => {
 };
 
 // We can also create a service role client here if needed for admin tasks
-export const supabaseAdmin = createServerClient(
+// This should use the standard Node.js client, not the SSR client.
+export const supabaseAdmin = createClient(
   env.SUPABASE_URL,
   env.SUPABASE_SERVICE_ROLE_KEY,
   {
-    cookies: {
-      // A dummy cookies object is required for the admin client,
-      // but it doesn't need to do anything.
-      get(key: string) {
-        return undefined;
-      },
-      set(key: string, value: string, options: CookieOptions) {},
-      remove(key: string, options: CookieOptions) {},
-    },
     auth: {
       autoRefreshToken: false,
       persistSession: false,
