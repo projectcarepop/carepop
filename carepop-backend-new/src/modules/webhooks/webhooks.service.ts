@@ -52,14 +52,31 @@ async function upsertUserRole(userId: string, role: 'admin' | 'user') {
 }
 
 export async function handleWebhookEvent(event: WebhookEvent) {
-    if (event.type === 'user.created' || event.type === 'user.updated') {
+    if (event.type !== 'user.created' && event.type !== 'user.updated') {
+        console.log(`Received and ignored unhandled event type: ${event.type}`);
+        return; // Exit early for unhandled events
+    }
+    
+    console.log(`Processing ${event.type} for user ${event.data.id}`);
+    
+    try {
         const userData = event.data;
-        await upsertProfile(userData);
 
+        // Step 1: Always upsert the profile first. This is the primary record.
+        const profile = await upsertProfile(userData);
+        console.log(`Successfully upserted profile for user ${userData.id}`);
+
+        // Step 2: Now that we know the profile exists, upsert the role.
         const role = (userData.public_metadata?.role as 'admin' | 'user') || 'user';
         await upsertUserRole(userData.id, role);
-        console.log(`Processed ${event.type} for user ${userData.id}`);
-    } else {
-        console.log(`Received unhandled event type: ${event.type}`);
+        console.log(`Successfully upserted role for user ${userData.id}`);
+
+        console.log(`Fully processed ${event.type} for user ${userData.id}`);
+
+    } catch (error) {
+        // Log the specific error that occurred during the process.
+        console.error(`Error processing webhook for user ${event.data.id}:`, error);
+        // It's often better to not re-throw here, to prevent Clerk from retrying
+        // a webhook that might be fundamentally broken. Instead, we rely on logs.
     }
 } 
