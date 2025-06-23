@@ -134,7 +134,7 @@ export function CompleteProfileForm({ userProfile, psgc }: CompleteProfileFormPr
             const parsedData = JSON.parse(savedData);
             form.reset(parsedData);
         }
-    }, []);
+    }, [form]);
 
     useEffect(() => {
         localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(debouncedValues));

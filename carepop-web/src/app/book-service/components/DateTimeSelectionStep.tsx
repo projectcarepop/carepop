@@ -92,7 +92,7 @@ const DateTimeSelectionStep: React.FC = () => {
     <Card className="w-full shadow-xl">
       <CardHeader>
         <CardTitle>Step 2: Select Date & Time</CardTitle>
-        <CardDescription>Pick a date and time for your '{selectedService.name}' appointment at {selectedClinic.name}.</CardDescription>
+        <CardDescription>Pick a date and time for your &apos;{selectedService.name}&apos; appointment at {selectedClinic.name}.</CardDescription>
       </CardHeader>
       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div>
