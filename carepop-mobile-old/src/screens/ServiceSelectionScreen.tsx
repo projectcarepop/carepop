@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, Activ
 import { theme } from '../components';
 import { useNavigation, useRoute, NavigationProp, RouteProp } from '@react-navigation/native';
 import { BookingStackParamList } from '../navigation/AppNavigator';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '@clerk/clerk-expo';
 import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -23,13 +23,14 @@ export function ServiceSelectionScreen() {
   const route = useRoute<ServiceSelectionRouteProp>();
   const { clinicId, clinicName } = route.params;
 
-  const { session } = useAuth();
+  const { getToken } = useAuth();
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchServicesForClinic = useCallback(async () => {
-    if (!session) {
+    const token = await getToken();
+    if (!token) {
       setError('You must be logged in to view services.');
       setIsLoading(false);
       return;
@@ -45,7 +46,7 @@ export function ServiceSelectionScreen() {
     try {
       const response = await fetch(`${backendUrl}/api/v1/public/clinics/${clinicId}/services`, {
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${token}`,
         },
       });
 
@@ -62,7 +63,7 @@ export function ServiceSelectionScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [session, clinicId]);
+  }, [getToken, clinicId]);
 
   useEffect(() => {
     fetchServicesForClinic();

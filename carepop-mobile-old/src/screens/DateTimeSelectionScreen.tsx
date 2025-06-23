@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Ale
 import { theme } from '../components';
 import { useNavigation, useRoute, NavigationProp, RouteProp } from '@react-navigation/native';
 import { BookingStackParamList } from '../navigation/AppNavigator';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '@clerk/clerk-expo';
 import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 import { Calendar, DateData } from 'react-native-calendars';
@@ -34,7 +34,7 @@ export const DateTimeSelectionScreen = () => {
     const route = useRoute<DateTimeSelectionRouteProp>();
     const { clinicId, serviceId, serviceName } = route.params;
 
-    const { session } = useAuth();
+    const { getToken } = useAuth();
     const [schedules, setSchedules] = useState<ScheduleSlot[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -46,7 +46,8 @@ export const DateTimeSelectionScreen = () => {
 
     // Fetch schedules from the backend
     const fetchSchedules = useCallback(async () => {
-        if (!session) {
+        const token = await getToken();
+        if (!token) {
             setError('You must be logged in.');
             setIsLoading(false);
             return;
@@ -59,7 +60,7 @@ export const DateTimeSelectionScreen = () => {
         }
         try {
             const response = await fetch(`${backendUrl}/api/v1/public/schedules/availability?clinic_id=${clinicId}&service_id=${serviceId}`, {
-                headers: { 'Authorization': `Bearer ${session.access_token}` },
+                headers: { 'Authorization': `Bearer ${token}` },
             });
             const data = await response.json();
             if (!response.ok) throw new Error(data.message || 'Failed to fetch schedules.');
@@ -69,7 +70,7 @@ export const DateTimeSelectionScreen = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [session, clinicId, serviceId]);
+    }, [getToken, clinicId, serviceId]);
 
     useEffect(() => {
         fetchSchedules();

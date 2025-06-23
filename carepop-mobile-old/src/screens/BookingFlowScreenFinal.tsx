@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { theme } from '../components/theme';
 import { X, Building, Tag, Calendar as CalendarIcon, CheckCircle2 } from 'lucide-react-native';
 import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '@clerk/clerk-expo';
 import Constants from 'expo-constants';
 import { Calendar, DateData } from 'react-native-calendars';
 import { getDay, format } from 'date-fns';
@@ -38,22 +38,28 @@ interface TimeSlot {
 // --- Step Components ---
 
 const ClinicSelectionStep = ({ onSelectClinic }: { onSelectClinic: (clinic: Clinic) => void }) => {
-    const { session } = useAuth();
+    const { getToken } = useAuth();
     const [clinics, setClinics] = useState<Clinic[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     const fetchClinics = useCallback(async () => {
         const backendUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL;
-        if (!backendUrl || !session) {
+        if (!backendUrl) {
             setError('Could not connect to services.');
             setIsLoading(false);
             return;
         }
 
         try {
+            const token = await getToken();
+            if (!token) {
+                setError('Authentication token not available.');
+                setIsLoading(false);
+                return;
+            }
             const response = await fetch(`${backendUrl}/api/v1/public/clinics`, {
-                headers: { 'Authorization': `Bearer ${session.access_token}` },
+                headers: { 'Authorization': `Bearer ${token}` },
             });
             const data = await response.json();
             if (!response.ok) throw new Error(data.message || 'Failed to fetch clinics.');
@@ -63,7 +69,7 @@ const ClinicSelectionStep = ({ onSelectClinic }: { onSelectClinic: (clinic: Clin
         } finally {
             setIsLoading(false);
         }
-    }, [session]);
+    }, [getToken]);
 
     useEffect(() => {
         fetchClinics();
@@ -102,22 +108,28 @@ const ClinicSelectionStep = ({ onSelectClinic }: { onSelectClinic: (clinic: Clin
 };
 
 const ServiceSelectionStep = ({ clinic, onSelectService }: { clinic: Clinic; onSelectService: (service: Service) => void }) => {
-    const { session } = useAuth();
+    const { getToken } = useAuth();
     const [services, setServices] = useState<Service[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     const fetchServices = useCallback(async () => {
         const backendUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL;
-        if (!backendUrl || !session) {
+        if (!backendUrl) {
             setError('Could not connect to services.');
             setIsLoading(false);
             return;
         }
 
         try {
+            const token = await getToken();
+            if (!token) {
+                setError('Authentication token not available.');
+                setIsLoading(false);
+                return;
+            }
             const response = await fetch(`${backendUrl}/api/v1/public/clinics/${clinic.id}/services`, {
-                headers: { 'Authorization': `Bearer ${session.access_token}` },
+                headers: { 'Authorization': `Bearer ${token}` },
             });
             const data = await response.json();
             if (!response.ok) throw new Error(data.message || 'Failed to fetch services.');
@@ -127,7 +139,7 @@ const ServiceSelectionStep = ({ clinic, onSelectService }: { clinic: Clinic; onS
         } finally {
             setIsLoading(false);
         }
-    }, [session, clinic.id]);
+    }, [getToken, clinic.id]);
 
     useEffect(() => {
         fetchServices();
@@ -166,7 +178,7 @@ const ServiceSelectionStep = ({ clinic, onSelectService }: { clinic: Clinic; onS
 };
 
 const DateTimeSelectionStep = ({ clinic, service, onSelectDateTime }: { clinic: Clinic; service: Service; onSelectDateTime: (date: string, timeSlot: TimeSlot) => void }) => {
-    const { session } = useAuth();
+    const { getToken } = useAuth();
     const [providers, setProviders] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -177,14 +189,20 @@ const DateTimeSelectionStep = ({ clinic, service, onSelectDateTime }: { clinic: 
 
     const fetchProvidersAndSchedules = useCallback(async () => {
         const backendUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL;
-        if (!backendUrl || !session) {
+        if (!backendUrl) {
             setError('Could not connect.');
             setIsLoading(false);
             return;
         }
         try {
+            const token = await getToken();
+            if (!token) {
+                setError('Authentication token not available.');
+                setIsLoading(false);
+                return;
+            }
             const response = await fetch(`${backendUrl}/api/v1/public/clinics/${clinic.id}/providers?serviceId=${service.id}`, {
-                headers: { 'Authorization': `Bearer ${session.access_token}` },
+                headers: { 'Authorization': `Bearer ${token}` },
             });
             const data = await response.json();
             if (!response.ok) throw new Error(data.message || 'Failed to fetch provider schedules.');
@@ -194,7 +212,7 @@ const DateTimeSelectionStep = ({ clinic, service, onSelectDateTime }: { clinic: 
         } finally {
             setIsLoading(false);
         }
-    }, [session, clinic.id, service.id]);
+    }, [getToken, clinic.id, service.id]);
 
     useEffect(() => {
         fetchProvidersAndSchedules();
@@ -366,7 +384,7 @@ export function BookingFlowScreen() {
     const [selectedService, setSelectedService] = useState<Service | null>(null);
     const [selectedDateTime, setSelectedDateTime] = useState<{ date: string; timeSlot: TimeSlot; } | null>(null);
 
-    const { session } = useAuth();
+    const { getToken, userId } = useAuth();
 
     const handleNext = () => {
         if (currentStep < STEPS.length - 1) {
@@ -412,6 +430,13 @@ export function BookingFlowScreen() {
         }
 
         try {
+            const token = await getToken();
+            if (!token) {
+                setBookingError('Authentication token not available.');
+                setIsBooking(false);
+                return;
+            }
+
             const [time, period] = selectedDateTime.timeSlot.time.split(' ');
             let [hours, minutes] = time.split(':').map(Number);
             if (period === 'PM' && hours < 12) hours += 12;
@@ -422,9 +447,9 @@ export function BookingFlowScreen() {
 
             const response = await fetch(`${backendUrl}/api/v1/public/appointments`, {
                 method: 'POST',
-                headers: {
+                headers: { 
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session?.access_token}`,
+                    'Authorization': `Bearer ${token}`,
                 },
                 body: JSON.stringify({
                     clinic_id: selectedClinic.id,

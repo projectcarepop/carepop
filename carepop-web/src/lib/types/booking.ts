@@ -2,25 +2,47 @@
 export interface Clinic {
   id: string;
   name: string;
-  address: string; // Full address for display
-  imageUrl?: string; // Optional URL for a clinic image or logo
-  contactPhone?: string; // Optional contact phone number
-  operatingHours?: string; // Optional, could be a string or a structured object (e.g., JSON string)
-  // Add other relevant clinic details as needed, e.g.:
-  // servicesSummary?: string[]; // A brief list of key services
-  // distance?: string; // If calculated and relevant for display
+  isActive: boolean;
+  streetAddress: string | null;
+  locality: string | null;
+  region: string | null;
+  postalCode: string | null;
+  countryCode: string | null;
+  latitude: string | null;
+  longitude: string | null;
+  contactPhone: string | null;
+  contactEmail: string | null;
+  operationDays: string[] | null;
+  operationHours: string | null;
+  fpopChapterAffiliation: string | null;
+  additionalNotes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Kept for backward compatibility with display logic, will be derived
+  address?: string; 
+}
+
+export interface Specialization {
+  id: string;
+  name: string;
+  description: string | null;
 }
 
 // Corresponds to data from: Backend Integration Guide - Section 1.2
 export interface Service {
   id: string;
   name: string;
-  description: string;
-  category: string; // Added for grouping
-  cost: number | string; // Added for display
-  typicalDurationMinutes: number;
-  requiresProviderAssignment: boolean;
-  // clinicSpecificPrice?: number; // If added later
+  description: string | null;
+  price: string | null;
+  durationMinutes: number | null;
+  isActive: boolean;
+  specializationId: string | null;
+  specialization?: Specialization; // The nested object from the API
+  // DEPRECATED but kept for now to avoid breaking other components.
+  category?: string;
+  cost?: number | string;
+  typicalDurationMinutes?: number;
+  requiresProviderAssignment?: boolean;
 }
 
 export interface ServiceCategory {
@@ -31,10 +53,19 @@ export interface ServiceCategory {
 // Corresponds to data from: Backend Integration Guide - Section 2.1
 export interface Provider {
   id: string;
-  fullName: string;
-  specialty: string;
-  photoUrl?: string;
+  profileId: string | null;
+  licenseNumber: string | null;
+  bio: string | null;
   acceptingNewPatients: boolean;
+  profile: {
+    firstName: string | null;
+    lastName: string | null;
+    avatarUrl: string | null;
+  };
+  // DEPRECATED but kept for now to avoid breaking other components
+  fullName?: string;
+  specialty?: string;
+  photoUrl?: string;
 }
 
 // Corresponds to data from: Backend Integration Guide - Section 3.1

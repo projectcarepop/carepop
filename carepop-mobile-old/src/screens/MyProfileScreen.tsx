@@ -17,7 +17,7 @@ import { Button } from '../components/button.native';
 import { Card, CardHeader, CardContent, CardTitle } from '../components/card.native';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { format } from 'date-fns';
-import { Menu } from 'lucide-react-native';
+import { Menu, LogOut } from 'lucide-react-native';
 
 import provinces from '../data/psgc/provinces.json';
 import cities from '../data/psgc/cities-municipalities.json';
@@ -149,10 +149,11 @@ export function MyProfileScreen() {
           />
           <Button
             title="Log Out"
-            variant="destructive"
+            variant="outline"
             onPress={handleLogout}
             disabled={!isLoaded}
             size="xl"
+            icon={<LogOut size={18} color={theme.colors.accent} />}
             style={{ marginTop: theme.spacing.md }}
           />
         </View>

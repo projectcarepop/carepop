@@ -186,9 +186,14 @@ export const EditProfileScreen = () => {
     const handleSave = async () => {
         setIsSaving(true);
         try {
-            const profileData = {
-                first_name: firstName,
-                last_name: lastName,
+            const token = await getToken();
+            if (!token) {
+                showToast("Authentication error. Please sign in again.", 'error');
+                setIsSaving(false);
+                return;
+            }
+
+            const publicProfileData = {
                 middle_initial: middleInitial,
                 date_of_birth: dateOfBirth ? dateOfBirth.toISOString().split('T')[0] : null,
                 contact_no: contactNo,
@@ -206,7 +211,11 @@ export const EditProfileScreen = () => {
                 age: dateOfBirth ? new Date(new Date().getTime() - dateOfBirth.getTime()).getUTCFullYear() - 1970 : null,
             };
 
-            await api.post('/profiles', profileData, getToken);
+            await user?.update({
+                firstName: firstName,
+                lastName: lastName,
+                publicMetadata: publicProfileData
+            });
 
             await user?.reload(); // Reload user data to reflect changes
             showToast("Profile updated successfully!", 'success');

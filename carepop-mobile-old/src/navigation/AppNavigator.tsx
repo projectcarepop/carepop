@@ -48,6 +48,7 @@ import { EmailConfirmationScreen } from '../../screens/EmailConfirmationScreen';
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { LoginScreen } from '../../screens/LoginScreen';
 import { RegisterScreen } from '../../screens/RegisterScreen';
+import { ClinicFinderScreen } from '../../screens/ClinicFinderScreen';
 
 
 // --- Param Lists ---
@@ -71,6 +72,19 @@ export type AppointmentsStackParamList = {
 
 export type BookingStackParamList = {
   BookingFlow: undefined;
+  ServiceSelection: { clinicId: string; clinicName: string };
+  DateTimeSelection: { clinicId: string; serviceId: string; serviceName: string };
+  BookingConfirmation: { 
+    clinicId: string; 
+    serviceId: string; 
+    providerId: string; 
+    schedule: {
+      date: string;
+      time: string;
+      day: string;
+    } 
+  };
+  BookingSuccess: undefined;
 };
 
 export type OnboardingStackParamList = {
@@ -79,20 +93,13 @@ export type OnboardingStackParamList = {
   OnboardingThree: undefined;
 };
 
-export type AuthOnboardingStackParamList = {
-  OnboardingOne: undefined;
-  OnboardingTwo: undefined;
-  OnboardingThree: undefined;
-  Login: undefined;
-  Register: undefined;
-};
-
 export type DrawerParamList = {
   Dashboard: undefined; // This will point to the HomeScreen directly now
   Appointments: undefined;
   Records: undefined;
   'Health Buddy': undefined;
   'Book a Service': undefined;
+  'Clinic Finder': undefined;
   AboutUs: undefined;
   Profile: undefined;
 };
@@ -101,7 +108,6 @@ export type RootStackParamList = {
   Splash: undefined;
   Auth: { screen?: string } | undefined; // Allow passing initial screen
   Onboarding: undefined; 
-  AuthOnboarding: undefined;
   CreateProfile: undefined;
   Main: undefined; // The Drawer Navigator
   EditProfile: undefined;
@@ -114,22 +120,19 @@ const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
 const AppointmentsStackNav = createNativeStackNavigator<AppointmentsStackParamList>();
 const BookingStackNav = createNativeStackNavigator<BookingStackParamList>();
 const OnboardingStack = createNativeStackNavigator<OnboardingStackParamList>();
-const AuthOnboardingStack = createNativeStackNavigator<AuthOnboardingStackParamList>();
 const Drawer = createDrawerNavigator<DrawerParamList>();
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 
 
 // --- Component-Based Navigators ---
 
-function AuthOnboardingNavigator() {
+function OnboardingNavigator() {
   return (
-    <AuthOnboardingStack.Navigator screenOptions={{ headerShown: false }}>
-      <AuthOnboardingStack.Screen name="OnboardingOne" component={OnboardingScreenOne} />
-      <AuthOnboardingStack.Screen name="OnboardingTwo" component={OnboardingScreenTwo} />
-      <AuthOnboardingStack.Screen name="OnboardingThree" component={OnboardingScreenThree} />
-      <AuthOnboardingStack.Screen name="Login" component={LoginScreen} />
-      <AuthOnboardingStack.Screen name="Register" component={RegisterScreen} />
-    </AuthOnboardingStack.Navigator>
+    <OnboardingStack.Navigator screenOptions={{ headerShown: false }}>
+      <OnboardingStack.Screen name="OnboardingOne" component={OnboardingScreenOne} />
+      <OnboardingStack.Screen name="OnboardingTwo" component={OnboardingScreenTwo} />
+      <OnboardingStack.Screen name="OnboardingThree" component={OnboardingScreenThree} />
+    </OnboardingStack.Navigator>
   );
 }
 
@@ -223,27 +226,23 @@ function AppDrawer() {
     >
       <Drawer.Screen name="Dashboard" component={DashboardScreen} options={{ drawerIcon: ({ color }: { color: string }) => <LayoutDashboard size={20} color={color} /> }} />
       <Drawer.Screen name="Appointments" component={AppointmentsStack} options={{ drawerIcon: ({ color }: { color: string }) => <CalendarCheck size={20} color={color} /> }} />
-      <Drawer.Screen name="Records" component={MyRecordsScreen} options={{ drawerIcon: ({ color }: { color: string }) => <FileText size={20} color={color} /> }} />
-      <Drawer.Screen name="Health Buddy" component={HealthBuddyScreen} options={{ drawerIcon: ({ color }: { color: string }) => <HeartPulse size={20} color={color} /> }} />
       <Drawer.Screen name="Book a Service" component={BookingStack} options={{ drawerIcon: ({ color }: { color: string }) => <CalendarPlus size={20} color={color} /> }} />
+      <Drawer.Screen name="Clinic Finder" component={ClinicFinderScreen} options={{ drawerIcon: ({ color }: { color: string }) => <Map size={20} color={color} /> }} />
+      <Drawer.Screen name="Health Buddy" component={HealthBuddyScreen} options={{ drawerIcon: ({ color }: { color: string }) => <HeartPulse size={20} color={color} /> }} />
+      <Drawer.Screen name="Records" component={MyRecordsScreen} options={{ drawerIcon: ({ color }: { color:string }) => <FileText size={20} color={color} /> }} />
       <Drawer.Screen name="AboutUs" component={AboutUsScreen} options={{ title: 'About Us', drawerIcon: ({ color }: { color: string }) => <Info size={20} color={color} /> }} />
       <Drawer.Screen name="Profile" component={MyProfileScreen} options={{ drawerIcon: ({ color }: { color: string }) => <User size={20} color={color} /> }} />
     </Drawer.Navigator>
   );
 }
 
-// --- Profile Stack Navigator ---
-// This will be part of the root stack to be presented modally
-function ProfileStackNavigator() {
+// --- Auth Flow & Root Navigators ---
+function AuthFlow() {
   return (
-    <ProfileStack.Navigator
-      screenOptions={{
-        headerShown: false, // We will control headers in the screens themselves
-      }}
-    >
-      <ProfileStack.Screen name="MyProfile" component={MyProfileScreen} />
-      <ProfileStack.Screen name="EditProfile" component={EditProfileScreen} />
-    </ProfileStack.Navigator>
+    <AuthStackNav.Navigator screenOptions={{ headerShown: false }}>
+      <AuthStackNav.Screen name="Login" component={LoginScreen} />
+      <AuthStackNav.Screen name="Register" component={RegisterScreen} />
+    </AuthStackNav.Navigator>
   );
 }
 
@@ -251,29 +250,31 @@ function ProfileStackNavigator() {
 export function RootAppNavigator() {
   const { isLoaded, isSignedIn } = useAuth();
   const { user } = useUser();
-  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
+  const [isCheckingOnboarding, setIsCheckingOnboarding] = useState(true);
 
   useEffect(() => {
     const checkOnboarding = async () => {
-      try {
-        const value = await AsyncStorage.getItem('hasCompletedOnboarding');
-        setHasCompletedOnboarding(value === 'true');
-      } catch (e) {
-        setHasCompletedOnboarding(false);
-      }
+      const value = await AsyncStorage.getItem('hasCompletedOnboarding');
+      setHasCompletedOnboarding(value === 'true');
+      setIsCheckingOnboarding(false);
     };
+
     checkOnboarding();
   }, []);
 
-  if (!isLoaded || hasCompletedOnboarding === null) {
+  if (!isLoaded || isCheckingOnboarding) {
     return <SplashScreen />;
   }
+
+  // Determine if the profile is complete from Clerk's metadata
+  const isProfileComplete = user?.publicMetadata?.profileComplete === true;
 
   return (
     <NavigationContainer>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         {isSignedIn ? (
-          user?.publicMetadata?.profileComplete === true ? (
+          isProfileComplete ? (
             <>
               <RootStack.Screen name="Main" component={AppDrawer} />
               <RootStack.Screen 
@@ -285,10 +286,14 @@ export function RootAppNavigator() {
           ) : (
             <RootStack.Screen name="CreateProfile" component={CreateProfileScreen} />
           )
-        ) : hasCompletedOnboarding ? (
-          <RootStack.Screen name="Auth" component={AuthNavigator} />
         ) : (
-          <RootStack.Screen name="AuthOnboarding" component={AuthOnboardingNavigator} />
+          <>
+            {hasCompletedOnboarding ? (
+              <RootStack.Screen name="Auth" component={AuthNavigator} />
+            ) : (
+              <RootStack.Screen name="Onboarding" component={OnboardingNavigator} />
+            )}
+          </>
         )}
       </RootStack.Navigator>
     </NavigationContainer>

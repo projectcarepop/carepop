@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Alert, Activity
 import { theme } from '../components';
 import { useNavigation, useRoute, NavigationProp, RouteProp } from '@react-navigation/native';
 import { BookingStackParamList } from '../navigation/AppNavigator';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '@clerk/clerk-expo';
 import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
@@ -20,7 +20,7 @@ interface BookingDetails {
 export const BookingConfirmationScreen = () => {
     const navigation = useNavigation<BookingConfirmationNavigationProp>();
     const route = useRoute<BookingConfirmationRouteProp>();
-    const { session } = useAuth();
+    const { getToken } = useAuth();
     const { clinicId, serviceId, providerId, schedule } = route.params;
 
     const [details, setDetails] = useState<BookingDetails | null>(null);
@@ -65,6 +65,13 @@ export const BookingConfirmationScreen = () => {
         }
 
         try {
+            const token = await getToken();
+            if (!token) {
+                Alert.alert('Error', 'You must be logged in to book an appointment.');
+                setIsBooking(false);
+                return;
+            }
+
             // Reformat date and time for backend (e.g., ISO string)
             const [time, period] = schedule.time.split(' ');
             let [hours, minutes] = time.split(':').map(Number);
@@ -78,7 +85,7 @@ export const BookingConfirmationScreen = () => {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session?.access_token}`,
+                    'Authorization': `Bearer ${token}`,
                 },
                 body: JSON.stringify({
                     clinic_id: clinicId,
@@ -98,8 +105,7 @@ export const BookingConfirmationScreen = () => {
             navigation.reset({
                 index: 0,
                 routes: [{ 
-                    name: 'BookingSuccess', 
-                    params: { appointmentDetails: { ...details, ...schedule } } 
+                    name: 'BookingSuccess'
                 }],
             });
 

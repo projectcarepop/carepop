@@ -13,8 +13,8 @@ function getApiUrl() {
     const hostUri = Constants.expoConfig?.hostUri;
     // We only want the IP address part, not the port.
     const host = hostUri?.split(':')[0];
-    // We construct the full URL with the backend port (3001)
-    return `http://${host}:3001/api/v1`;
+    // We construct the full URL with the backend port (3000)
+    return `http://${host}:3000/api/v1`;
   } else {
     // In production (an EAS build), we use the official URL from app.json
     return MANIFEST_BACKEND_URL;
@@ -233,11 +233,41 @@ export const getDirections = async (
       origin,
       destination,
       mode,
-    }, async () => null); // Pass a dummy getToken for public endpoints
+    });
     return data;
   } catch (err: any) {
     console.error('API call failed for getDirections:', err);
     // Re-throwing the error so the calling component can handle it (e.g., show a toast)
     throw err;
   }
+};
+
+export const logHealthEntry = async (
+    getToken: () => Promise<string | null>,
+    entryData: {
+        entry_type: 'pill' | 'mood' | 'menstrual_cycle';
+        status?: string;
+        value?: string;
+        details?: Record<string, unknown>;
+    }
+) => {
+    try {
+        const data = await api.post('/health', entryData, getToken);
+        return data;
+    } catch (error) {
+        console.error('Error logging health entry:', error);
+        throw error; // Re-throw to be handled by the calling component
+    }
+};
+
+export const getHealthInsights = async (
+    getToken: () => Promise<string | null>
+) => {
+    try {
+        const data = await api.get('/health/insights', getToken);
+        return data;
+    } catch (error) {
+        console.error('Error fetching health insights:', error);
+        throw error;
+    }
 }; 

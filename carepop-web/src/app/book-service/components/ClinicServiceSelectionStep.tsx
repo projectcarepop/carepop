@@ -11,6 +11,7 @@ import { Loader2, Info, MapPin, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from '@clerk/nextjs';
+import { getBookingClinics, getBookingServices } from '@/lib/apiClient';
 
 const ClinicServiceSelectionStep: React.FC = () => {
   const { state, dispatch } = useBookingContext();
@@ -38,21 +39,9 @@ const ClinicServiceSelectionStep: React.FC = () => {
     dispatch({ type: 'SET_CLINICS_LOADING', payload: true });
     try {
       const token = await getToken();
-      const res = await fetch(`${API_BASE_URL}/api/v1/public/clinics`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (!res.ok) {
-        const errorText = res.status === 401 
-          ? 'You are not authorized to view this page.'
-          : res.status === 404 
-          ? 'The clinics directory could not be found.' 
-          : `An unexpected error occurred (Code: ${res.status}).`;
-        throw new Error(errorText);
-      }
-      const result = await res.json();
-      const data: Clinic[] = result.data;
+      if (!token) throw new Error("Authentication token not found.");
+
+      const data = await getBookingClinics(token);
       dispatch({ type: 'SET_CLINICS_SUCCESS', payload: data });
     } catch (error) {
       console.error("Error fetching clinics:", error);
@@ -68,20 +57,12 @@ const ClinicServiceSelectionStep: React.FC = () => {
     dispatch({ type: 'SET_SERVICES_FOR_CLINIC_LOADING', payload: true });
     try {
       const token = await getToken();
-      const res = await fetch(`${API_BASE_URL}/api/v1/public/clinics/${clinicId}/services`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (!res.ok) {
-        const errorText = res.status === 404 ? `Services for this clinic could not be found.` : `An unexpected error occurred (Code: ${res.status}).`;
-        throw new Error(errorText);
-      }
-      const result = await res.json();
-      const services: Service[] = result.data;
+      if (!token) throw new Error("Authentication token not found.");
+      
+      const services = await getBookingServices(token, clinicId);
 
       const groupedServices = services.reduce((acc, service) => {
-        const category = service.category || 'Uncategorized';
+        const category = service.specialization?.name || 'Uncategorized';
         if (!acc[category]) {
           acc[category] = [];
         }

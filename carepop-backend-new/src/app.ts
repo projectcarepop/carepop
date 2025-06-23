@@ -14,6 +14,9 @@ import clinicRoutes from './modules/clinics/clinics.routes';
 import mobileRoutes from './modules/mobile/mobile.routes';
 //import appointments from './modules/appointments/appointments.routes';
 import services from './modules/services/services.routes';
+import booking from './modules/booking/booking.routes';
+import health from './modules/health/health.routes';
+import providers from './modules/providers/providers.routes';
 
 const app = new Hono();
 
@@ -35,6 +38,7 @@ const apiV1 = new Hono();
 const publicApi = new Hono();
 publicApi.get('/', (c) => c.text('CarePoP API is running!'));
 publicApi.route('/auth', authRoutes); // e.g., for webhooks or login initiation
+publicApi.route('/booking', booking);
 apiV1.route('/', publicApi);
 
 // --- Protected Routes ---
@@ -47,6 +51,8 @@ protectedApi.route('/clinics', clinicRoutes);
 protectedApi.route('/mobile', mobileRoutes);
 //protectedApi.route('/appointments', appointments);
 protectedApi.route('/services', services);
+protectedApi.route('/health', health);
+protectedApi.route('/providers', providers);
 apiV1.route('/', protectedApi);
 
 // Register the v1 API router to the main app

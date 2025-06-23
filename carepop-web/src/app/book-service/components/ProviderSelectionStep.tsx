@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useBookingContext } from '@/lib/contexts/BookingContext';
 import { Provider } from '@/lib/types/booking';
 import { Button } from '@/components/ui/button';
@@ -8,11 +8,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, UserCircle, ShieldCheck, ShieldAlert, Info } from 'lucide-react';
 import Image from 'next/image';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { useAuth } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
+import { getBookingProviders } from '@/lib/apiClient';
 
 const ProviderSelectionStep: React.FC = () => {
   const { state, dispatch } = useBookingContext();
+  const { getToken, isSignedIn } = useAuth();
   const { 
     selectedClinic,
     selectedService,
@@ -26,33 +28,14 @@ const ProviderSelectionStep: React.FC = () => {
     dispatch({ type: 'SET_PROVIDERS_LOADING', payload: true });
 
     try {
-      const supabase = createSupabaseBrowserClient();
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-
-      if (sessionError || !sessionData.session) {
-        console.error("Auth error:", sessionError);
+      if (!isSignedIn) {
         throw new Error('Your session is invalid. Please log in again.');
       }
-      const token = sessionData.session.access_token;
+      const token = await getToken();
+      if (!token) throw new Error("Authentication token not found.");
       
-      const queryParams = new URLSearchParams({ serviceId }).toString();
-      const res = await fetch(`/api/v1/public/clinics/${clinicId}/providers?${queryParams}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        }
-      });
-
-      if (!res.ok) {
-        const errorText = res.status === 404 ? 'No providers were found for this service.' : `An unexpected error occurred (Code: ${res.status}).`;
-        throw new Error(errorText);
-      }
-
-      const data = await res.json();
-      if (data.success) {
-        dispatch({ type: 'SET_PROVIDERS_SUCCESS', payload: data.data as Provider[] });
-      } else {
-        throw new Error(data.message || 'Failed to parse provider data.');
-      }
+      const data = await getBookingProviders(token, clinicId, serviceId);
+      dispatch({ type: 'SET_PROVIDERS_SUCCESS', payload: data });
     } catch (error) {
       console.error("Error fetching providers:", error);
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred while fetching providers.';
@@ -77,6 +60,17 @@ const ProviderSelectionStep: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClinic, selectedService]);
+
+  const providersWithDerivedData = useMemo(() => {
+    return providersForService.map(p => ({
+      ...p,
+      fullName: `${p.profile?.firstName || ''} ${p.profile?.lastName || ''}`.trim(),
+      photoUrl: p.profile?.avatarUrl,
+      // The specialty is no longer directly on the provider.
+      // This will need to be adjusted if the UI requires it. For now, we'll leave it blank.
+      specialty: 'Healthcare Provider',
+    }));
+  }, [providersForService]);
 
   const handleProviderSelect = (provider: Provider) => {
     dispatch({ type: 'SELECT_PROVIDER', payload: provider });
@@ -157,7 +151,7 @@ const ProviderSelectionStep: React.FC = () => {
 
         {!isLoading.providersForService && providersForService.length > 0 && (
           <div className="flex flex-col gap-2">
-            {providersForService.map((provider) => (
+            {providersWithDerivedData.map((provider) => (
               <Card 
                 key={provider.id} 
                 onClick={() => handleProviderSelect(provider)}
@@ -173,7 +167,7 @@ const ProviderSelectionStep: React.FC = () => {
                     {provider.photoUrl ? (
                       <Image 
                         src={provider.photoUrl} 
-                        alt={provider.fullName} 
+                        alt={provider.fullName || 'Provider'} 
                         width={48}
                         height={48}
                         className="rounded-full object-cover w-12 h-12 border-2 border-muted group-hover:border-primary/30 transition-colors"
