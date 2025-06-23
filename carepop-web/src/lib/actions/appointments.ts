@@ -2,7 +2,7 @@
 
 import { revalidateTag } from 'next/cache';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { getAuthToken } from '@/lib/utils/auth';
+import { getAuthToken, getUserId } from '@/lib/utils/auth';
 import { API_BASE_URL } from '@/lib/config';
 import { Database } from '@/types/supabase'; // Import the main DB type
 
@@ -196,16 +196,34 @@ export async function deleteAppointmentAsAdmin(appointment: { id: string, clinic
 export async function createAppointmentAction(
     clinicId: string, 
     serviceId: string, 
-    providerId: string, 
     startTime: string, 
-    notes?: string
+    notes?: string,
+    providerId?: string | null,
 ): Promise<{success: boolean; message: string; data?: any}> {
-    const token = await getAuthToken();
-    if (!token) {
-        return { success: false, message: "Authentication required." };
+
+    // First, verify the user is authenticated on the server.
+    const userId = await getUserId();
+    if (!userId) {
+        return { success: false, message: "Authentication failed. Please sign in and try again." };
     }
 
-    const payload = { clinicId, serviceId, providerId, startTime, notes };
+    const token = await getAuthToken();
+    if (!token) {
+        // This is a fallback, but the userId check should catch this.
+        return { success: false, message: "Authentication required. Please sign in." };
+    }
+
+    const payload: {
+        clinicId: string;
+        serviceId: string;
+        startTime: string;
+        notes?: string;
+        providerId?: string;
+    } = { clinicId, serviceId, startTime, notes };
+
+    if (providerId) {
+        payload.providerId = providerId;
+    }
 
     try {
         const response = await fetch(`${API_BASE_URL}/appointments`, {

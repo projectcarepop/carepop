@@ -1,17 +1,12 @@
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import SupplierList from './components/SupplierList';
+import React from 'react';
 
-export default function SuppliersPage() {
+const SuppliersPage = () => {
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Suppliers</h1>
-        <Button asChild>
-          <Link href="/admin/inventory/suppliers/new">Add New Supplier</Link>
-        </Button>
-      </div>
-      <SupplierList />
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-4">Supplier Management</h1>
+      <p>Supplier data table and management controls will be displayed here.</p>
     </div>
   );
-} 
+};
+
+export default SuppliersPage; 

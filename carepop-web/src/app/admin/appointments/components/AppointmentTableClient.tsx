@@ -42,18 +42,22 @@ import { toast } from 'sonner';
 
 export interface Appointment {
   id: string;
+  startTime: string;
   status: string;
-  appointment_datetime: string;
+  notes: string | null;
   cancellation_reason?: string | null;
-  user: {
-    full_name: string;
+  patient: {
+    fullName: string;
     email: string;
+    contactNo: string | null;
   } | null;
   service: {
     name: string;
+    price: number | null;
+    durationMinutes: number | null;
   } | null;
   provider: {
-    full_name: string;
+    fullName: string;
   } | null;
 }
 
@@ -83,13 +87,18 @@ export const columns: ColumnDef<Appointment>[] = [
     },
     {
       header: 'Patient Name',
-      accessorKey: 'user.full_name',
-      cell: ({ row }) => row.original.user?.full_name ?? 'N/A',
+      accessorKey: 'patient.fullName',
+      cell: ({ row }) => row.original.patient?.fullName ?? 'N/A',
+    },
+    {
+      header: 'Contact No.',
+      accessorKey: 'patient.contactNo',
+      cell: ({ row }) => row.original.patient?.contactNo ?? 'N/A',
     },
     {
       header: 'Email',
-      accessorKey: 'user.email',
-      cell: ({ row }) => row.original.user?.email ?? 'N/A',
+      accessorKey: 'patient.email',
+      cell: ({ row }) => row.original.patient?.email ?? 'N/A',
     },
     {
       header: 'Service',
@@ -97,24 +106,40 @@ export const columns: ColumnDef<Appointment>[] = [
       cell: ({ row }) => row.original.service?.name ?? 'N/A',
     },
     {
-      header: 'Provider',
-      accessorKey: 'provider.full_name',
-       cell: ({ row }) => row.original.provider?.full_name ?? 'N/A',
+      header: 'Price',
+      accessorKey: 'service.price',
+      cell: ({ row }) => {
+        const price = row.original.service?.price;
+        return price ? `₱${Number(price).toFixed(2)}` : 'N/A';
+      }
     },
     {
-      accessorKey: "appointment_datetime",
+      header: 'Provider',
+      accessorKey: 'provider.fullName',
+       cell: ({ row }) => row.original.provider?.fullName ?? 'N/A',
+    },
+    {
+      accessorKey: "startTime",
       header: ({ column }) => (
         <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="-ml-4">
           Date/Time
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      cell: ({ row }) => new Date(row.getValue("appointment_datetime")).toLocaleString(),
+      cell: ({ row }) => new Date(row.getValue("startTime")).toLocaleString(),
     },
     {
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => <StatusBadge status={row.getValue("status")} />,
+    },
+    {
+      header: 'Notes',
+      accessorKey: 'notes',
+      cell: ({ row }) => {
+        const notes = row.original.notes;
+        return <div className="truncate w-32" title={notes ?? ''}>{notes ?? 'N/A'}</div>
+      }
     },
     {
       id: 'actions',
@@ -167,12 +192,10 @@ export function AppointmentTableClient({ data, totalRecords, error }: Appointmen
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const [isLoading, setIsLoading] = React.useState(false);
-
   // Pagination and Sorting State from URL
   const page = searchParams.get('page') ?? '1';
   const per_page = searchParams.get('per_page') ?? '10';
-  const sort = searchParams.get('sort') ?? 'appointment_datetime.desc';
+  const sort = searchParams.get('sort') ?? 'startTime.desc';
 
   const [sorting, setSorting] = React.useState<SortingState>(() => {
     const [id, order] = sort.split('.');
@@ -184,14 +207,13 @@ export function AppointmentTableClient({ data, totalRecords, error }: Appointmen
     pageSize: Number(per_page),
   });
   
-  const [searchTerm, setSearchTerm] = React.useState(searchParams.get('search') || '');
+  const [searchTerm, setSearchTerm] = React.useState(searchParams.get('searchTerm') || '');
   const [debouncedSearch] = useDebounce(searchTerm, 500);
 
   // Effect to handle navigation changes for search, sort, and pagination
   React.useEffect(() => {
     const params = new URLSearchParams(searchParams);
-    setIsLoading(true);
-
+    
     params.set('page', String(pagination.pageIndex + 1));
     params.set('per_page', String(pagination.pageSize));
     
@@ -202,19 +224,18 @@ export function AppointmentTableClient({ data, totalRecords, error }: Appointmen
     }
 
     if(debouncedSearch) {
-        params.set('search', debouncedSearch);
+        params.set('searchTerm', debouncedSearch);
         if (String(pagination.pageIndex + 1) !== '1') {
             params.set('page', '1');
             setPagination(prev => ({ ...prev, pageIndex: 0 }));
         }
     } else {
-        params.delete('search');
+        params.delete('searchTerm');
     }
     
+    // The router replaces the URL, which will cause Next.js to re-render the page
+    // on the server with the new search params.
     router.replace(`${pathname}?${params.toString()}`);
-
-    const timer = setTimeout(() => setIsLoading(false), 300);
-    return () => clearTimeout(timer);
 
   }, [pagination, sorting, debouncedSearch, router, pathname, searchParams]);
 
@@ -288,7 +309,6 @@ export function AppointmentTableClient({ data, totalRecords, error }: Appointmen
                             <TableRow
                                 key={row.id}
                                 data-state={row.getIsSelected() && "selected"}
-                                className={isLoading ? 'opacity-50' : ''}
                             >
                                 {row.getVisibleCells().map((cell) => (
                                     <TableCell key={cell.id}>

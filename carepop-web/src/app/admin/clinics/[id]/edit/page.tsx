@@ -1,49 +1,47 @@
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
-import { notFound } from 'next/navigation';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { EditClinicForm } from './components/EditClinicForm';
+import EditClinicClient from './EditClinicClient';
+import { auth } from '@clerk/nextjs/server';
+import { Clinic } from '@/lib/types/clinic.types';
 
-async function getClinicById(id: string) {
-    const supabase = await createSupabaseServerClient();
+const API_URL = process.env.NEXT_PUBLIC_BACKEND_API_URL;
 
-    const { data, error } = await supabase
-        .from('clinics')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-    if (error || !data) {
-        console.error(`Error fetching clinic with ID ${id}:`, error);
-        notFound();
-    }
+async function getClinic(id: string): Promise<Clinic | null> {
+    const { getToken, userId } = await auth();
+    if (!userId) return null;
     
-    return {
-        id: data.id,
-        name: data.name ?? '',
-        full_address: data.full_address ?? '',
-        contact_email: data.contact_email ?? '',
-        contact_phone: data.contact_phone ?? '',
-        operating_hours: data.operating_hours ?? '',
-        is_active: data.is_active ?? true,
-    };
+    const token = await getToken();
+
+    try {
+        const response = await fetch(`${API_URL}/api/v1/clinics/${id}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+            return null;
+        }
+        return await response.json();
+    } catch (error) {
+        console.error("Failed to fetch clinic:", error);
+        return null;
+    }
 }
 
-export default async function EditClinicPage({ params }: { params: { id:string } }) {
-    const clinicData = await getClinicById(params.id);
+interface EditClinicPageProps {
+  params: {
+    id: string;
+  };
+}
 
-    return (
-        <div className="container mx-auto py-10">
-            <div className="mb-6">
-                <Button variant="outline" asChild>
-                <Link href="/admin/clinics">
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back to Clinic List
-                </Link>
-                </Button>
-            </div>
-            <EditClinicForm clinic={clinicData} />
-        </div>
-    );
+// This needs to be a server component to fetch data
+export default async function EditClinicPage({ params }: EditClinicPageProps) {
+  const clinic = await getClinic(params.id);
+
+  if (!clinic) {
+    return <div>Clinic not found or failed to load.</div>;
+  }
+
+  return (
+    <div className="flex flex-col w-full gap-4">
+      <EditClinicClient clinic={clinic} />
+    </div>
+  );
 } 

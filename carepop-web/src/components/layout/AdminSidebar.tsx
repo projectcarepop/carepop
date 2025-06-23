@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Hospital, Stethoscope, Users, CalendarCheck, LogOut, CircleUser, LayoutGrid, Briefcase, Warehouse } from 'lucide-react';
+import { LayoutDashboard, Hospital, Users, CalendarCheck, LogOut, CircleUser, LayoutGrid, Briefcase, Warehouse } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -12,7 +12,6 @@ const navItems = [
     { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
     { href: "/admin/appointments", label: "Appointments", icon: CalendarCheck },
     { href: "/admin/users", label: "Users", icon: Users },
-    { href: "/admin/providers", label: "Providers", icon: Stethoscope },
     { href: "/admin/clinics", label: "Clinics", icon: Hospital },
     { href: "/admin/services", label: "Services", icon: Briefcase },
     { href: "/admin/service-categories", label: "Categories", icon: LayoutGrid },

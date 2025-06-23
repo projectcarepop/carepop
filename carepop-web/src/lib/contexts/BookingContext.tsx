@@ -1,24 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useReducer, Dispatch, ReactNode } from 'react';
-import { 
-  BookingState as ImportedBookingState,
-  BookingAction as ImportedBookingAction,
-  Clinic as ImportedClinic,
-  ServiceCategory as ImportedServiceCategory,
-  Provider as ImportedProvider,
-  AvailabilitySlot as ImportedAvailabilitySlot,
-  BookingConfirmationData as ImportedBookingConfirmationData
-} from '@/lib/types/booking';
-
-// Re-export to mark as used and for potential external use if needed
-export type Clinic = ImportedClinic;
-export type ServiceCategory = ImportedServiceCategory;
-export type Provider = ImportedProvider;
-export type AvailabilitySlot = ImportedAvailabilitySlot;
-export type BookingConfirmationData = ImportedBookingConfirmationData;
-export type BookingState = ImportedBookingState;
-export type BookingAction = ImportedBookingAction;
+import React, { createContext, useReducer, useContext, ReactNode } from 'react';
+import { BookingState, BookingAction } from '@/lib/types/booking';
 
 const initialState: BookingState = {
   currentStep: 1,
@@ -26,8 +9,6 @@ const initialState: BookingState = {
   selectedClinic: null,
   servicesForClinic: [],
   selectedService: null,
-  providersForService: [],
-  selectedProvider: null,
   availabilitySlots: [],
   selectedDate: null,
   selectedTimeSlot: null,
@@ -36,32 +17,31 @@ const initialState: BookingState = {
   isLoading: {
     clinics: false,
     servicesForClinic: false,
-    providersForService: false,
     availabilitySlots: false,
     bookingSubmission: false,
   },
   errors: {
     clinics: null,
     servicesForClinic: null,
-    providersForService: null,
     availabilitySlots: null,
     bookingSubmission: null,
   },
 };
 
-const BookingContext = createContext<{
-  state: BookingState;
-  dispatch: Dispatch<BookingAction>;
-} | undefined>(undefined);
-
-function bookingReducer(state: BookingState, action: BookingAction): BookingState {
+const bookingReducer = (state: BookingState, action: BookingAction): BookingState => {
   switch (action.type) {
     case 'SET_CURRENT_STEP':
       return { ...state, currentStep: action.payload };
+
     case 'SET_CLINICS_LOADING':
-      return { ...state, isLoading: { ...state.isLoading, clinics: action.payload }, errors: { ...state.errors, clinics: null } };
+      return { ...state, isLoading: { ...state.isLoading, clinics: action.payload } };
     case 'SET_CLINICS_SUCCESS':
-      return { ...state, clinics: action.payload, isLoading: { ...state.isLoading, clinics: false } };
+      return {
+        ...state,
+        clinics: action.payload,
+        isLoading: { ...state.isLoading, clinics: false },
+        errors: { ...state.errors, clinics: null }
+      };
     case 'SET_CLINICS_ERROR':
       return { ...state, isLoading: { ...state.isLoading, clinics: false }, errors: { ...state.errors, clinics: action.payload } };
     case 'SELECT_CLINIC':
@@ -70,66 +50,83 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
         selectedClinic: action.payload,
         selectedService: null,
         servicesForClinic: [],
-        selectedProvider: null,
-        providersForService: [],
-        selectedTimeSlot: null,
         availabilitySlots: [],
         selectedDate: null,
+        selectedTimeSlot: null,
       };
+
     case 'SET_SERVICES_FOR_CLINIC_LOADING':
-      return { ...state, isLoading: { ...state.isLoading, servicesForClinic: action.payload }, errors: { ...state.errors, servicesForClinic: null } };
+      return { ...state, isLoading: { ...state.isLoading, servicesForClinic: action.payload } };
     case 'SET_SERVICES_FOR_CLINIC_SUCCESS':
-      return { ...state, servicesForClinic: action.payload, isLoading: { ...state.isLoading, servicesForClinic: false } };
+      return {
+        ...state,
+        servicesForClinic: action.payload,
+        isLoading: { ...state.isLoading, servicesForClinic: false },
+        errors: { ...state.errors, servicesForClinic: null }
+      };
     case 'SET_SERVICES_FOR_CLINIC_ERROR':
-      return { ...state, isLoading: { ...state.isLoading, servicesForClinic: false }, errors: { ...state.errors, servicesForClinic: action.payload } };
+      return {
+        ...state,
+        isLoading: { ...state.isLoading, servicesForClinic: false },
+        errors: { ...state.errors, servicesForClinic: action.payload }
+      };
     case 'SELECT_SERVICE':
       return {
         ...state,
         selectedService: action.payload,
-        selectedProvider: null,
-        providersForService: [],
-        selectedTimeSlot: null,
         availabilitySlots: [],
         selectedDate: null,
+        selectedTimeSlot: null,
       };
-    case 'SET_PROVIDERS_LOADING':
-      return { ...state, isLoading: { ...state.isLoading, providersForService: action.payload }, errors: { ...state.errors, providersForService: null } };
-    case 'SET_PROVIDERS_SUCCESS':
-      return { ...state, providersForService: action.payload, isLoading: { ...state.isLoading, providersForService: false } };
-    case 'SET_PROVIDERS_ERROR':
-      return { ...state, isLoading: { ...state.isLoading, providersForService: false }, errors: { ...state.errors, providersForService: action.payload } };
-    case 'SELECT_PROVIDER':
+
+    case 'SET_AVAILABILITY_LOADING':
+      return { ...state, isLoading: { ...state.isLoading, availabilitySlots: action.payload } };
+    case 'SET_AVAILABILITY_SUCCESS':
       return {
         ...state,
-        selectedProvider: action.payload,
-        selectedTimeSlot: null,
-        availabilitySlots: [],
-        selectedDate: null,
+        availabilitySlots: action.payload,
+        isLoading: { ...state.isLoading, availabilitySlots: false },
+        errors: { ...state.errors, availabilitySlots: null }
       };
-    case 'SET_AVAILABILITY_LOADING':
-      return { ...state, isLoading: { ...state.isLoading, availabilitySlots: action.payload }, errors: { ...state.errors, availabilitySlots: null } };
-    case 'SET_AVAILABILITY_SUCCESS':
-      return { ...state, availabilitySlots: action.payload, isLoading: { ...state.isLoading, availabilitySlots: false } };
     case 'SET_AVAILABILITY_ERROR':
       return { ...state, isLoading: { ...state.isLoading, availabilitySlots: false }, errors: { ...state.errors, availabilitySlots: action.payload } };
     case 'SELECT_DATE':
-        return { ...state, selectedDate: action.payload, selectedTimeSlot: null };
+      return {
+        ...state,
+        selectedDate: action.payload,
+        selectedTimeSlot: null,
+        errors: { ...state.errors, availabilitySlots: null }
+      };
     case 'SELECT_TIME_SLOT':
       return { ...state, selectedTimeSlot: action.payload };
+
     case 'SET_BOOKING_NOTES':
-      return { ...state, bookingNotes: action.payload };
+        return { ...state, bookingNotes: action.payload };
+
     case 'SET_BOOKING_SUBMISSION_LOADING':
-      return { ...state, isLoading: { ...state.isLoading, bookingSubmission: action.payload }, errors: { ...state.errors, bookingSubmission: null } };
+        return { ...state, isLoading: { ...state.isLoading, bookingSubmission: action.payload }};
     case 'SET_BOOKING_SUBMISSION_SUCCESS':
-      return { ...state, bookingConfirmation: action.payload, isLoading: { ...state.isLoading, bookingSubmission: false } };
+        return { 
+            ...state, 
+            bookingConfirmation: action.payload,
+            currentStep: 4, // Move to success step
+            isLoading: { ...state.isLoading, bookingSubmission: false }
+        };
     case 'SET_BOOKING_SUBMISSION_ERROR':
-      return { ...state, isLoading: { ...state.isLoading, bookingSubmission: false }, errors: { ...state.errors, bookingSubmission: action.payload } };
+        return { ...state, isLoading: { ...state.isLoading, bookingSubmission: false }, errors: { ...state.errors, bookingSubmission: action.payload }};
+    
     case 'RESET_BOOKING_STATE':
-      return initialState;
+        return initialState;
+
     default:
       return state;
   }
-}
+};
+
+const BookingContext = createContext<{
+  state: BookingState;
+  dispatch: React.Dispatch<BookingAction>;
+} | undefined>(undefined);
 
 export const BookingProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(bookingReducer, initialState);

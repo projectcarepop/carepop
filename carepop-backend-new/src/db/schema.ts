@@ -17,10 +17,8 @@ export const healthEntryTypeEnum = pgEnum('health_entry_type', ['pill', 'mood', 
 // ============== USERS & PROFILES ==============
 // The `profiles` table is the core user data table, linked to Clerk.
 export const profiles = pgTable('profiles', {
-  // The new primary key is an independent, auto-generated UUID.
-  id: uuid('id').primaryKey().defaultRandom(),
-  // The `clerk_id` is the definitive link to the Clerk user record.
-  clerkId: text('clerk_id').unique().notNull(),
+  // The clerk_id is the primary key and the definitive link to the Clerk user record.
+  clerkId: text('clerk_id').primaryKey(),
   // The old Supabase Auth ID is kept for historical reference.
   supabaseAuthUserIdOld: text('supabase_auth_user_id_old'),
 
@@ -50,8 +48,8 @@ export const profiles = pgTable('profiles', {
 export const providers = pgTable('providers', {
   // Independent UUID primary key.
   id: uuid('id').primaryKey().defaultRandom(),
-  // Foreign key linking back to the core profile.
-  profileId: uuid('profile_id').references(() => profiles.id, { onDelete: 'cascade' }),
+  // Foreign key linking back to the core profile's clerk_id.
+  profileId: text('profile_id').references(() => profiles.clerkId, { onDelete: 'cascade' }),
   licenseNumber: text('license_number').unique(),
   bio: text('bio'),
   acceptingNewPatients: boolean('accepting_new_patients').notNull().default(true),
@@ -89,10 +87,11 @@ export const clinicProviders = pgTable('clinic_providers', {
     providerId: uuid('provider_id').notNull().references(() => providers.id, { onDelete: 'cascade' }),
 });
 
-export const specializations = pgTable('specializations', {
+export const serviceCategories = pgTable('service_categories', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
   description: text('description'),
+  isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -101,7 +100,7 @@ export const services = pgTable('services', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
   description: text('description'),
-  specializationId: uuid('specialization_id').references(() => specializations.id),
+  serviceCategoryId: uuid('service_category_id').references(() => serviceCategories.id),
   price: decimal('price', { precision: 10, scale: 2 }),
   durationMinutes: integer('duration_minutes'),
   isActive: boolean('is_active').notNull().default(true),
@@ -131,7 +130,7 @@ export const providerAvailability = pgTable('provider_availability', {
 
 export const appointments = pgTable('appointments', {
     id: uuid('id').primaryKey().defaultRandom(),
-    patientId: uuid('patient_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+    patientId: text('patient_id').notNull().references(() => profiles.clerkId, { onDelete: 'cascade' }),
     providerId: uuid('provider_id').notNull().references(() => providers.id, { onDelete: 'cascade' }),
     clinicId: uuid('clinic_id').notNull().references(() => clinics.id, { onDelete: 'cascade' }),
     serviceId: uuid('service_id').notNull().references(() => services.id, { onDelete: 'cascade' }),
@@ -146,7 +145,7 @@ export const appointments = pgTable('appointments', {
 // ============== HEALTH BUDDY ==============
 export const health_entries = pgTable('health_entries', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => profiles.clerkId, { onDelete: 'cascade' }),
   entryType: healthEntryTypeEnum('entry_type').notNull(),
   status: text('status'),
   value: text('value'),
@@ -156,11 +155,45 @@ export const health_entries = pgTable('health_entries', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ============== INVENTORY ==============
+export const suppliers = pgTable('suppliers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  contactPerson: text('contact_person'),
+  email: text('email').notNull(),
+  phone: text('phone'),
+  address: text('address'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const inventoryItems = pgTable('inventory_items', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  description: text('description'),
+  reorderLevel: integer('reorder_level').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const inventoryItemBatches = pgTable('inventory_item_batches', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  itemId: uuid('item_id').notNull().references(() => inventoryItems.id, { onDelete: 'cascade' }),
+  supplierId: uuid('supplier_id').references(() => suppliers.id, { onDelete: 'set null' }),
+  batchNumber: text('batch_number'),
+  initialQuantity: integer('initial_quantity').notNull(),
+  currentQuantity: integer('current_quantity').notNull(),
+  expiryDate: timestamp('expiry_date', { withTimezone: true }),
+  receivedDate: timestamp('received_date', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ============== RELATIONS ==============
 
 export const profilesRelations = relations(profiles, ({ one, many }) => ({
 	providerInfo: one(providers, {
-		fields: [profiles.id],
+		fields: [profiles.clerkId],
 		references: [providers.profileId],
 	}),
   appointmentsAsPatient: many(appointments),
@@ -170,7 +203,7 @@ export const profilesRelations = relations(profiles, ({ one, many }) => ({
 export const providersRelations = relations(providers, ({ one, many }) => ({
 	profile: one(profiles, {
 		fields: [providers.profileId],
-		references: [profiles.id],
+		references: [profiles.clerkId],
 	}),
   clinicProviders: many(clinicProviders),
   providerServices: many(providerServices),
@@ -185,16 +218,16 @@ export const clinicsRelations = relations(clinics, ({ many }) => ({
 }));
 
 export const servicesRelations = relations(services, ({ one, many }) => ({
-  specialization: one(specializations, {
-    fields: [services.specializationId],
-    references: [specializations.id],
+  serviceCategory: one(serviceCategories, {
+    fields: [services.serviceCategoryId],
+    references: [serviceCategories.id],
   }),
   clinicServices: many(clinicServices),
   providerServices: many(providerServices),
   appointments: many(appointments),
 }));
 
-export const specializationsRelations = relations(specializations, ({ many }) => ({
+export const serviceCategoriesRelations = relations(serviceCategories, ({ many }) => ({
   services: many(services),
 }));
 
@@ -243,7 +276,7 @@ export const providerAvailabilityRelations = relations(providerAvailability, ({ 
 export const appointmentsRelations = relations(appointments, ({ one }) => ({
   patient: one(profiles, {
     fields: [appointments.patientId],
-    references: [profiles.id],
+    references: [profiles.clerkId],
     relationName: 'appointments_as_patient'
   }),
   provider: one(providers, {
@@ -264,6 +297,26 @@ export const appointmentsRelations = relations(appointments, ({ one }) => ({
 export const healthEntriesRelations = relations(health_entries, ({ one }) => ({
   user: one(profiles, {
     fields: [health_entries.userId],
-    references: [profiles.id],
+    references: [profiles.clerkId],
+  }),
+}));
+
+// ============== INVENTORY RELATIONS ==============
+export const suppliersRelations = relations(suppliers, ({ many }) => ({
+  batches: many(inventoryItemBatches),
+}));
+
+export const inventoryItemsRelations = relations(inventoryItems, ({ many }) => ({
+  batches: many(inventoryItemBatches),
+}));
+
+export const inventoryItemBatchesRelations = relations(inventoryItemBatches, ({ one }) => ({
+  item: one(inventoryItems, {
+    fields: [inventoryItemBatches.itemId],
+    references: [inventoryItems.id],
+  }),
+  supplier: one(suppliers, {
+    fields: [inventoryItemBatches.supplierId],
+    references: [suppliers.id],
   }),
 })); 

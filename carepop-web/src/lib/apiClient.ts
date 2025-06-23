@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Clinic, Service, Provider } from '@/lib/types/booking';
+import { Clinic, Service, Provider, ServiceCategory } from '@/lib/types/booking';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000/api/v1';
 
@@ -25,22 +25,29 @@ apiClient.interceptors.request.use(
     }
 );
 
-export const getBookingClinics = async (token: string): Promise<Clinic[]> => {
-    const response = await apiClient.get('/booking/clinics', {
+export const getSpecializations = async (token: string): Promise<ServiceCategory[]> => {
+    const response = await apiClient.get('/service-categories', {
         headers: { Authorization: `Bearer ${token}` },
     });
     return response.data;
 };
 
-export const getBookingServices = async (token: string, clinicId: string): Promise<Service[]> => {
-    const response = await apiClient.get('/booking/services', {
+export const getClinics = async (token: string): Promise<Clinic[]> => {
+    const response = await apiClient.get('/appointments/clinics', {
         headers: { Authorization: `Bearer ${token}` },
-        params: { clinicId },
     });
     return response.data;
 };
 
-export const getBookingProviders = async (token: string, clinicId: string, serviceId: string): Promise<Provider[]> => {
+export const getServices = async (token: string, clinicId: string, specializationId?: string): Promise<Service[]> => {
+    const response = await apiClient.get('/appointments/services', {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { clinicId, specializationId },
+    });
+    return response.data;
+};
+
+export const getProviders = async (token: string, clinicId: string, serviceId: string): Promise<Provider[]> => {
     const response = await apiClient.get('/providers', {
         headers: { Authorization: `Bearer ${token}` },
         params: { clinicId, serviceId },
@@ -49,9 +56,17 @@ export const getBookingProviders = async (token: string, clinicId: string, servi
 };
 
 export const getProviderAvailability = async (token: string, providerId: string, date: string): Promise<string[]> => {
-    const response = await apiClient.get('/booking/availability', {
+    const response = await apiClient.get('/appointments/availability', {
         headers: { Authorization: `Bearer ${token}` },
         params: { providerId, date },
+    });
+    return response.data;
+};
+
+export const getServiceAvailability = async (token: string, clinicId: string, serviceId: string, date: string): Promise<string[]> => {
+    const response = await apiClient.get('/appointments/service-availability', {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { clinicId, serviceId, date },
     });
     return response.data;
 };

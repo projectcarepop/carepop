@@ -3,24 +3,18 @@
 import React from 'react';
 import { BookingProvider, useBookingContext } from '@/lib/contexts/BookingContext';
 import ClinicServiceSelectionStep from './components/ClinicServiceSelectionStep';
-import ProviderSelectionStep from './components/ProviderSelectionStep';
 import DateTimeSelectionStep from './components/DateTimeSelectionStep';
 import ConfirmationStep from './components/ConfirmationStep';
 import BookingSuccessStep from './components/BookingSuccessStep';
 import BookingProgressIndicator from './components/BookingProgressIndicator';
 import { Card, CardContent } from '@/components/ui/card';
 
-// Define the steps array (similar to BookingForm.tsx)
+// Define the steps array for the new, simplified flow
 const bookingFlowSteps = [
   {
     id: 'clinicServiceSelection',
     name: 'Clinic & Service',
     description: 'Find your clinic and service.',
-  },
-  {
-    id: 'providerSelection',
-    name: 'Provider',
-    description: 'Choose a provider.',
   },
   {
     id: 'dateTimeSelection',
@@ -38,39 +32,34 @@ const BookingFlowManager: React.FC = () => {
   const { state } = useBookingContext();
   const { currentStep, bookingConfirmation } = state;
 
+  // If we have a booking confirmation, we are done. Show the success step.
+  if (bookingConfirmation) {
+    return <BookingSuccessStep />;
+  }
+
   const renderStepContent = () => {
-    // Step 5 is the success/confirmation display page
-    if (bookingConfirmation && currentStep === 5) { 
-      return <BookingSuccessStep />;
-    }
     switch (currentStep) {
       case 1:
         return <ClinicServiceSelectionStep />;
       case 2:
-        return <ProviderSelectionStep />;
-      case 3:
         return <DateTimeSelectionStep />;
-      case 4:
+      case 3:
         return <ConfirmationStep />;
       default:
-        // Fallback to step 1 or an error message if step is invalid and not success
+        // Fallback to step 1
         return <ClinicServiceSelectionStep />;
     }
   };
 
-  const TOTAL_BOOKING_STEPS = bookingFlowSteps.length; // Use the length of the new array
-
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
-      {/* Use BookingProgressIndicator if not on success page (currentStep 5) */}
-      {currentStep <= TOTAL_BOOKING_STEPS && currentStep !== 0 && currentStep !== 5 && (
-        <div className="mb-8">
-          <BookingProgressIndicator 
-            steps={bookingFlowSteps} 
-            currentStepIndex={currentStep -1} // Adjust index because steps array is 0-indexed
-          />
-        </div>
-      )}
+      {/* Show progress indicator only during the booking flow */}
+      <div className="mb-8">
+        <BookingProgressIndicator 
+          steps={bookingFlowSteps} 
+          currentStepIndex={currentStep - 1} // Adjust index because steps array is 0-indexed
+        />
+      </div>
       
       <Card className="p-0 overflow-hidden">
         <CardContent className="p-4 sm:p-8">

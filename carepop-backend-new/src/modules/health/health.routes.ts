@@ -1,74 +1,54 @@
 import { Hono } from 'hono';
 import { clerkAuthMiddleware, getAuth } from '../../middleware/auth.middleware';
-// import { validate } from '../../middleware/validate.middleware'; // Will create this next
+import { HealthService } from './health.service';
+import { zValidator } from '@hono/zod-validator';
 import { createHealthEntrySchema } from './health.validation';
-import { healthService } from './health.service';
-import { z } from 'zod';
 
 const app = new Hono();
 
-// We will need a validation middleware for Hono. Let's assume one exists for now.
-// For example, using `zod-validator` from `@hono/zod-validator`
-import { zValidator } from '@hono/zod-validator';
+const healthService = new HealthService();
 
+// GET /api/v1/health/status/today - Fast status for dashboard
+app.get('/status/today', clerkAuthMiddleware(), async c => {
+  const auth = getAuth(c);
+  if (!auth?.userId) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+  const status = await healthService.getTodayStatus(auth.userId);
+  return c.json(status);
+});
 
-// Route to create a new health entry
+// GET /api/v1/health/summary - Detailed summary for health buddy screen
+app.get('/summary', clerkAuthMiddleware(), async c => {
+  const auth = getAuth(c);
+  if (!auth?.userId) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+  const summary = await healthService.getHealthSummary(auth.userId);
+  return c.json(summary);
+});
+
+// POST /api/v1/health/entry - Log new health data
 app.post(
-  '/',
+  '/entry',
   clerkAuthMiddleware(),
   zValidator('json', createHealthEntrySchema),
-  async (c) => {
+  async c => {
     const auth = getAuth(c);
     if (!auth?.userId) {
-        return c.json({ error: 'Unauthorized' }, 401);
+      return c.json({ error: 'Unauthorized' }, 401);
     }
-    const body = c.req.valid('json');
-    // Transform snake_case from body to camelCase for the service
-    const result = await healthService.createEntry(auth.userId, {
-      entryType: body.entry_type,
-      status: body.status,
-      value: body.value,
-      details: body.details,
-      entryDate: body.entry_date,
-    });
+    const entryData = c.req.valid('json');
+    
+    // The schema validation ensures entry_type is one of the allowed values
+    const result = await healthService.createEntry(auth.userId, entryData as any);
     return c.json(result, 201);
   }
 );
 
-// Route to get health entries for a user by type
-const entryTypeSchema = z.enum(['pill', 'mood', 'menstrual_cycle']);
-app.get(
-  '/:entryType',
-  clerkAuthMiddleware(),
-  async (c) => {
-    const auth = getAuth(c);
-    if (!auth?.userId) {
-        return c.json({ error: 'Unauthorized' }, 401);
-    }
-    const entryTypeParam = c.req.param('entryType');
-    const parsedEntryType = entryTypeSchema.safeParse(entryTypeParam);
-
-    if (!parsedEntryType.success) {
-        return c.json({ error: 'Invalid entry type' }, 400);
-    }
-    
-    const entries = await healthService.getEntries(auth.userId, parsedEntryType.data);
-    return c.json(entries);
-  }
-);
-
-// Route to get AI-powered insights
-app.get(
-    '/insights',
-    clerkAuthMiddleware(),
-    async (c) => {
-        const auth = getAuth(c);
-        if (!auth?.userId) {
-            return c.json({ error: 'Unauthorized' }, 401);
-        }
-        const insights = await healthService.getInsights(auth.userId);
-        return c.json(insights);
-    }
-);
+// This is a placeholder and doesn't do anything yet.
+app.get('/insights', clerkAuthMiddleware(), async c => {
+    return c.json({ message: 'Insights are coming soon!' });
+});
 
 export default app; 

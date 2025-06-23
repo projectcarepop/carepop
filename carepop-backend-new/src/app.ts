@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { logger } from 'hono/logger';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
-import { clerkAuthMiddleware } from './middleware/auth.middleware';
+import { clerkAuthMiddleware, roleAuthorization } from './middleware/auth.middleware';
 import errorHandler from './middleware/error.middleware';
 
 // --- Route Imports (Corrected based on error logs) ---
@@ -12,11 +12,13 @@ import { profilesRoutes } from './modules/profiles/profiles.routes'; // This one
 import usersRoutes from './modules/users/users.routes';
 import clinicRoutes from './modules/clinics/clinics.routes';
 import mobileRoutes from './modules/mobile/mobile.routes';
-//import appointments from './modules/appointments/appointments.routes';
+import appointmentsRoutes from './modules/appointments/appointments.routes';
 import services from './modules/services/services.routes';
-import booking from './modules/booking/booking.routes';
 import health from './modules/health/health.routes';
+import healthLogsRoutes from './modules/health/health-logs.routes';
 import providers from './modules/providers/providers.routes';
+import serviceCategories from './modules/service-categories/service-categories.routes';
+import { adminInventoryRoutes } from './modules/inventory/inventory.routes';
 
 const app = new Hono();
 
@@ -38,7 +40,6 @@ const apiV1 = new Hono();
 const publicApi = new Hono();
 publicApi.get('/', (c) => c.text('CarePoP API is running!'));
 publicApi.route('/auth', authRoutes); // e.g., for webhooks or login initiation
-publicApi.route('/booking', booking);
 apiV1.route('/', publicApi);
 
 // --- Protected Routes ---
@@ -49,10 +50,21 @@ protectedApi.route('/users', usersRoutes);
 protectedApi.route('/profiles', profilesRoutes);
 protectedApi.route('/clinics', clinicRoutes);
 protectedApi.route('/mobile', mobileRoutes);
-//protectedApi.route('/appointments', appointments);
+protectedApi.route('/appointments', appointmentsRoutes);
 protectedApi.route('/services', services);
 protectedApi.route('/health', health);
+protectedApi.route('/health-logs', healthLogsRoutes);
 protectedApi.route('/providers', providers);
+protectedApi.route('/service-categories', serviceCategories);
+
+// --- Admin-Only Routes ---
+// These routes are protected and require an 'admin' role
+const adminApi = new Hono();
+// Chain the middlewares: first authenticate, then check for admin role.
+adminApi.use('*', clerkAuthMiddleware(), roleAuthorization('admin'));
+adminApi.route('/inventory', adminInventoryRoutes);
+protectedApi.route('/admin', adminApi); // Register admin routes under /admin prefix
+
 apiV1.route('/', protectedApi);
 
 // Register the v1 API router to the main app

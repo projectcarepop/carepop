@@ -1,27 +1,17 @@
 'use client';
 
-import * as React from 'react';
+import { useState, useTransition } from 'react';
 import {
   ColumnDef,
-  SortingState,
   flexRender,
   getCoreRowModel,
+  getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
-  getFilteredRowModel,
+  SortingState,
   ColumnFiltersState,
 } from '@tanstack/react-table';
-import { MoreHorizontal } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -30,46 +20,65 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { DataTablePagination } from '@/components/ui/data-table-pagination';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import { Clinic } from './ClinicTable';
+import { useRouter } from 'next/navigation';
+import { deleteClinicAction } from '@/lib/actions/clinic.actions';
+import { toast } from 'sonner';
 
-interface ClinicTableClientProps {
-  data: Clinic[];
-}
+export function ClinicTableClient({ data }: { data: Clinic[] }) {
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
-export const columns: ColumnDef<Clinic>[] = [
-  {
-    accessorKey: 'name',
-    header: 'Name',
-  },
-  {
-    accessorKey: 'locality',
-    header: 'Location',
-    cell: ({ row }) => {
-        const clinic = row.original;
-        return `${clinic.locality || ''}, ${clinic.region || ''}`;
+  const handleDelete = (clinicId: string) => {
+    if (confirm('Are you sure you want to delete this clinic? This action cannot be undone.')) {
+      startTransition(async () => {
+        const result = await deleteClinicAction(clinicId);
+        if (result?.success) {
+          toast.success('Clinic Deleted', {
+            description: 'The clinic has been successfully removed.',
+          });
+        } else {
+          toast.error('Error Deleting Clinic', {
+            description: result.message || 'An unknown error occurred.',
+          });
+        }
+      });
     }
-  },
-  {
-    accessorKey: 'contact_phone',
-    header: 'Contact',
-  },
-  {
-    accessorKey: 'is_active',
-    header: 'Status',
-    cell: ({ row }) => {
-      const isActive = row.getValue('is_active');
-      return <Badge variant={isActive ? 'default' : 'secondary'}>{isActive ? 'Active' : 'Inactive'}</Badge>;
+  };
+
+  const columns: ColumnDef<Clinic>[] = [
+    {
+      accessorKey: 'name',
+      header: 'Name',
     },
-  },
-  {
-    id: 'actions',
-    cell: ({ row }) => {
-      const clinic = row.original;
-      return (
-        <div className="text-right">
+    {
+      accessorKey: 'locality',
+      header: 'City/Locality',
+    },
+    {
+      accessorKey: 'region',
+      header: 'Province/Region',
+    },
+    {
+      accessorKey: 'is_active',
+      header: 'Status',
+      cell: ({ row }) => {
+        const isActive = row.getValue('is_active');
+        return <Badge variant={isActive ? 'default' : 'secondary'}>{isActive ? 'Active' : 'Inactive'}</Badge>;
+      },
+    },
+    {
+      id: 'actions',
+      cell: ({ row }) => {
+        const clinic = row.original;
+        return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="h-8 w-8 p-0">
@@ -79,22 +88,24 @@ export const columns: ColumnDef<Clinic>[] = [
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem asChild>
-                <Link href={`/admin/clinics/${clinic.id}`}>Edit</Link>
+              <DropdownMenuItem onClick={() => router.push(`/admin/clinics/${clinic.id}/edit`)}>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit
               </DropdownMenuItem>
-              <DropdownMenuItem>View Details</DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                onClick={() => handleDelete(clinic.id)}
+                disabled={isPending}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
-      );
+        );
+      },
     },
-  },
-];
-
-
-export function ClinicTableClient({ data }: ClinicTableClientProps) {
-  const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
+  ];
 
   const table = useReactTable({
     data,
@@ -112,32 +123,32 @@ export function ClinicTableClient({ data }: ClinicTableClientProps) {
   });
 
   return (
-    <div className="w-full space-y-4">
-      <Input
-        placeholder="Search by name or location..."
-        value={(table.getColumn('name')?.getFilterValue() as string) ?? ''}
-        onChange={(event) =>
-          table.getColumn('name')?.setFilterValue(event.target.value)
-        }
-        className="max-w-sm"
-      />
-      <div className="rounded-md border overflow-x-auto">
+    <div className="w-full">
+      <div className="flex items-center py-4">
+        <Input
+          placeholder="Filter by clinic name..."
+          value={(table.getColumn('name')?.getFilterValue() as string) ?? ''}
+          onChange={(event) =>
+            table.getColumn('name')?.setFilterValue(event.target.value)
+          }
+          className="max-w-sm"
+        />
+      </div>
+      <div className="rounded-md border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  return (
-                    <TableHead key={header.id}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                    </TableHead>
-                  );
-                })}
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
+                  </TableHead>
+                ))}
               </TableRow>
             ))}
           </TableHeader>
@@ -150,7 +161,10 @@ export function ClinicTableClient({ data }: ClinicTableClientProps) {
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -168,7 +182,30 @@ export function ClinicTableClient({ data }: ClinicTableClientProps) {
           </TableBody>
         </Table>
       </div>
-      <DataTablePagination table={table} />
+      <div className="flex items-center justify-end space-x-2 py-4">
+        <div className="flex-1 text-sm text-muted-foreground">
+          {table.getFilteredRowModel().rows.length} of{' '}
+          {table.getCoreRowModel().rows.length} row(s) displayed.
+        </div>
+        <div className="space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

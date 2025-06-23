@@ -1,0 +1,427 @@
+[
+    {
+      "entity_type": "FUNCTION",
+      "entity_name": "public.current_user_clerk_id",
+      "details": "Arguments: "
+    },
+    {
+      "entity_type": "FUNCTION",
+      "entity_name": "public.is_admin",
+      "details": "Arguments: p_user_id text"
+    },
+    {
+      "entity_type": "FUNCTION",
+      "entity_name": "public.is_admin",
+      "details": "Arguments: user_id uuid"
+    },
+    {
+      "entity_type": "FUNCTION",
+      "entity_name": "public.moddatetime",
+      "details": "Arguments: "
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Admins can manage all appointments",
+      "details": "ON public.appointments FOR ALL TO public | DEFINITION: is_admin((auth.uid())::text)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Admins can manage all availability",
+      "details": "ON public.provider_availability FOR ALL TO public | DEFINITION: is_admin((auth.uid())::text)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Admins can manage all provider info",
+      "details": "ON public.providers FOR ALL TO public | DEFINITION: is_admin((auth.uid())::text)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Admins can manage all provider specializations",
+      "details": "ON public.provider_specializations FOR ALL TO public | DEFINITION: is_admin((auth.uid())::text)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Admins can manage all user roles",
+      "details": "ON public.user_roles FOR ALL TO public | DEFINITION: is_admin((auth.uid())::text)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Admins can manage clinic providers",
+      "details": "ON public.clinic_providers FOR ALL TO public | DEFINITION: is_admin((auth.uid())::text)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Admins can manage clinic services",
+      "details": "ON public.clinic_services FOR ALL TO public | DEFINITION: is_admin((auth.uid())::text)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Admins can manage clinics",
+      "details": "ON public.clinics FOR ALL TO public | DEFINITION: is_admin((auth.uid())::text)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Admins can manage form templates",
+      "details": "ON public.form_templates FOR ALL TO public | DEFINITION: is_admin((auth.uid())::text)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Admins can manage service categories",
+      "details": "ON public.service_categories FOR ALL TO public | DEFINITION: is_admin(auth.uid())"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Admins can manage services",
+      "details": "ON public.services FOR ALL TO public | DEFINITION: is_admin((auth.uid())::text)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Admins can see all clinics",
+      "details": "ON public.clinics FOR SELECT TO public | DEFINITION: is_admin((auth.uid())::text)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Admins have full access to medical records",
+      "details": "ON public.medical_records FOR ALL TO public | DEFINITION: is_admin((auth.uid())::text)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Admins have full access to profiles.",
+      "details": "ON public.profiles FOR ALL TO public | DEFINITION: is_admin((auth.uid())::text)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Allow full access to admin users on inventory items",
+      "details": "ON public.inventory_items FOR ALL TO public | DEFINITION: is_admin((auth.uid())::text)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Allow full access to admin users on item batches",
+      "details": "ON public.inventory_item_batches FOR ALL TO public | DEFINITION: is_admin((auth.uid())::text)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Allow full access to admin users on suppliers",
+      "details": "ON public.suppliers FOR ALL TO public | DEFINITION: is_admin((auth.uid())::text)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Allow service_role to create profiles",
+      "details": null
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Allow users to delete their own health entries",
+      "details": "ON public.health_entries FOR DELETE TO public | DEFINITION: ((auth.uid())::text = user_id)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Allow users to insert their own health entries",
+      "details": null
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Allow users to see their own health entries",
+      "details": "ON public.health_entries FOR SELECT TO public | DEFINITION: ((auth.uid())::text = user_id)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Allow users to update their own health entries",
+      "details": "ON public.health_entries FOR UPDATE TO public | DEFINITION: ((auth.uid())::text = user_id)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Authenticated users can read templates",
+      "details": "ON public.form_templates FOR SELECT TO public | DEFINITION: (auth.role() = 'authenticated'::text)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Patients can view their own medical records",
+      "details": "ON public.medical_records FOR SELECT TO public | DEFINITION: (auth.uid() = patient_id)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Providers can create records for their appointments",
+      "details": null
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Providers can manage their own availability",
+      "details": "ON public.provider_availability FOR ALL TO public | DEFINITION: (auth.uid() = provider_id)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Providers can manage their own specializations",
+      "details": "ON public.provider_specializations FOR ALL TO public | DEFINITION: (auth.uid() = provider_id)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Providers can update their own info",
+      "details": "ON public.providers FOR UPDATE TO public | DEFINITION: (auth.uid() = id)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Providers can view records for their appointments",
+      "details": "ON public.medical_records FOR SELECT TO public | DEFINITION: (auth.uid() = provider_id)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Providers can view their appointments",
+      "details": "ON public.appointments FOR SELECT TO public | DEFINITION: (auth.uid() = provider_id)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Public can view active clinics",
+      "details": "ON public.clinics FOR SELECT TO public | DEFINITION: (is_active = true)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Public can view clinic provider associations",
+      "details": "ON public.clinic_providers FOR SELECT TO public | DEFINITION: true"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Public can view clinic service associations",
+      "details": "ON public.clinic_services FOR SELECT TO public | DEFINITION: true"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Public can view provider availability",
+      "details": "ON public.provider_availability FOR SELECT TO public | DEFINITION: true"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Public can view provider info",
+      "details": "ON public.providers FOR SELECT TO public | DEFINITION: true"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Public can view provider specializations",
+      "details": "ON public.provider_specializations FOR SELECT TO public | DEFINITION: true"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Public can view service categories",
+      "details": "ON public.service_categories FOR SELECT TO public | DEFINITION: true"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Public can view services",
+      "details": "ON public.services FOR SELECT TO public | DEFINITION: true"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Users can access submissions for records they can access",
+      "details": "ON public.form_submissions FOR ALL TO public | DEFINITION: ( SELECT true\n   FROM medical_records mr\n  WHERE (mr.id = form_submissions.medical_record_id))"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Users can create their own appointments",
+      "details": null
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Users can update own appointments (24h notice)",
+      "details": "ON public.appointments FOR UPDATE TO public | DEFINITION: (auth.uid() = user_id)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Users can update their own profile.",
+      "details": "ON public.profiles FOR UPDATE TO public | DEFINITION: ((auth.uid())::text = clerk_id)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Users can view their own appointments",
+      "details": "ON public.appointments FOR SELECT TO public | DEFINITION: (auth.uid() = user_id)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Users can view their own profile.",
+      "details": "ON public.profiles FOR SELECT TO public | DEFINITION: ((auth.uid())::text = clerk_id)"
+    },
+    {
+      "entity_type": "POLICY",
+      "entity_name": "Users can view their own roles",
+      "details": "ON public.user_roles FOR SELECT TO public | DEFINITION: ((auth.uid())::text = user_id)"
+    },
+    {
+      "entity_type": "ROLE",
+      "entity_name": "authenticator",
+      "details": "Custom application role"
+    },
+    {
+      "entity_type": "ROLE",
+      "entity_name": "dashboard_user",
+      "details": "Custom application role"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "auth.audit_log_entries",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "auth.flow_state",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "auth.identities",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "auth.instances",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "auth.mfa_amr_claims",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "auth.mfa_challenges",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "auth.mfa_factors",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "auth.one_time_tokens",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "auth.refresh_tokens",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "auth.saml_providers",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "auth.saml_relay_states",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "auth.schema_migrations",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "auth.sessions",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "auth.sso_domains",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "auth.sso_providers",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "auth.users",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "public.appointments",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "public.clinic_providers",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "public.clinic_services",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "public.clinics",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "public.form_submissions",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "public.form_templates",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "public.health_entries",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "public.inventory_item_batches",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "public.inventory_items",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "public.medical_records",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "public.profiles",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "public.provider_availability",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "public.provider_specializations",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "public.providers",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "public.service_categories",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "public.services",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "public.suppliers",
+      "details": "Table Type: BASE TABLE"
+    },
+    {
+      "entity_type": "TABLE",
+      "entity_name": "public.user_roles",
+      "details": "Table Type: BASE TABLE"
+    }
+  ]

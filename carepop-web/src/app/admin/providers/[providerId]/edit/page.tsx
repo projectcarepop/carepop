@@ -1,80 +1,40 @@
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { ProviderForm } from '../../components/ProviderForm';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { notFound } from 'next/navigation';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-
-async function fetchProviderById(id: string) {
-  const supabase = createSupabaseServerClient();
-  const { data: providerData, error } = await supabase
-    .from('providers')
-    .select('*')
-    .eq('id', id)
-    .single();
-
-  if (error) {
-    console.error('Error fetching provider:', error);
-    // This will trigger the not-found page in Next.js
-    return notFound();
-  }
-
-  return providerData;
-}
+import { profilesService } from "@/app/admin/providers/_services/profiles.service";
+import { providersService } from "@/app/admin/providers/_services/providers.service";
+import { EditProviderForm } from "./_components/EditProviderForm";
 
 interface EditProviderPageProps {
-    params: {
-        providerId: string;
-    };
+  params: {
+    providerId: string;
+  };
 }
 
 export default async function EditProviderPage({ params }: EditProviderPageProps) {
-  const resolvedParams = await Promise.resolve(params);
-  const providerData = await fetchProviderById(resolvedParams.providerId);
-  
-  // Transform snake_case to camelCase for the form
-  const pData = providerData as any;
-  const initialData = {
-    id: pData.id,
-    firstName: pData.first_name,
-    lastName: pData.last_name,
-    email: pData.email ?? undefined,
-    phoneNumber: pData.contact_number ?? undefined,
-    specialization: pData.specialization ?? '',
-    licenseNumber: pData.license_number ?? '',
-    credentials: pData.credentials ?? '',
-    isActive: pData.is_active,
-    avatarUrl: pData.avatar_url,
-  };
+  const { providerId } = params;
+
+  // Fetch the provider's details and all unlinked profiles concurrently
+  const [provider, unlinkedProfiles] = await Promise.all([
+    providersService.getProviderById(providerId),
+    profilesService.getUnlinkedProfiles(),
+  ]);
+
+  if (!provider) {
+    return (
+      <div className="p-6">
+        <h1 className="text-2xl font-bold">Provider not found</h1>
+        <p>The provider with ID {providerId} could not be found.</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mx-auto py-10">
-      <div className="mb-6">
-        <Button variant="outline" asChild>
-          <Link href="/admin/providers">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Providers
-          </Link>
-        </Button>
+    <div className="p-4 md:p-6">
+       <div className="mb-6">
+        <h2 className="text-2xl font-bold tracking-tight">Edit Provider</h2>
+        <p className="text-muted-foreground">
+          Link this provider to a user profile and manage their details.
+        </p>
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-3xl">Edit Provider</CardTitle>
-          <CardDescription>
-            Update the details for {initialData.firstName} {initialData.lastName}.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ProviderForm initialData={initialData} />
-        </CardContent>
-      </Card>
+      <EditProviderForm provider={provider} profiles={unlinkedProfiles} />
     </div>
   );
 } 

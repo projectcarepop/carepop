@@ -1,59 +1,52 @@
-import { ServiceForm } from '../../components/ServiceForm';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { createClient } from "@/utils/supabase/server";
-import { cookies } from 'next/headers';
-import { updateService } from '@/lib/actions/service.admin.actions';
-import { notFound } from 'next/navigation';
-import { Toaster } from "sonner";
+import { auth } from '@clerk/nextjs/server';
+import EditServiceClient from './EditServiceClient';
+import { Service, ServiceCategory } from '@/lib/types/service.types';
 
-type EditServicePageProps = {
-    params: { id: string };
-};
+const API_URL = process.env.NEXT_PUBLIC_BACKEND_API_URL;
 
-async function getService(id: string) {
-    const cookieStore = await cookies();
-    const supabase = createClient(cookieStore);
-    const { data, error } = await supabase.from('services').select('*').eq('id', id).single();
-    if (error) {
-        console.error("Error fetching service:", error);
-        notFound();
+async function getServiceCategories(token: string): Promise<ServiceCategory[]> {
+    try {
+        const response = await fetch(`${API_URL}/api/v1/service-categories`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) return [];
+        return await response.json();
+    } catch (error) {
+        console.error("Failed to fetch service categories:", error);
+        return [];
     }
-    return data;
 }
 
-async function getCategories() {
-    const cookieStore = await cookies();
-    const supabase = createClient(cookieStore);
-    const { data, error } = await supabase.from('service_categories').select('id, name').order('name');
-    
-    if (error) {
-        console.error("Error fetching categories:", error);
-        throw new Error(`Failed to fetch service categories: ${error.message}`);
+async function getService(id: string, token: string): Promise<Service | null> {
+    try {
+        const response = await fetch(`${API_URL}/api/v1/services/${id}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) return null;
+        return await response.json();
+    } catch (error) {
+        console.error("Failed to fetch service:", error);
+        return null;
     }
-
-    return data;
 }
 
-export default async function EditServicePage({ params }: EditServicePageProps) {
-    const service = await getService(params.id);
-    const categories = await getCategories();
+export default async function EditServicePage({ params }: { params: { id: string }}) {
+  const { getToken } = await auth();
+  const token = await getToken();
+  if (!token) return <div>Unauthorized</div>;
 
-    return (
-        <div className="p-4 md:p-8">
-        <Card>
-            <CardHeader>
-                <CardTitle>Edit Service</CardTitle>
-                <CardDescription>Update the details for the service: {service.name}.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <ServiceForm
-                    initialData={service}
-                    categories={categories}
-                    onSave={updateService}
-                />
-            </CardContent>
-        </Card>
-        <Toaster richColors />
+  const [service, serviceCategories] = await Promise.all([
+    getService(params.id, token),
+    getServiceCategories(token)
+  ]);
+
+  if (!service) {
+    return <div>Service not found or failed to load.</div>;
+  }
+
+  return (
+    <div className="flex flex-col w-full gap-4">
+      <EditServiceClient service={service} serviceCategories={serviceCategories} />
     </div>
-    );
+  );
 }

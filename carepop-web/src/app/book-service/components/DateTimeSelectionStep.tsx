@@ -7,79 +7,50 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, Info, Calendar as CalendarIcon, Clock } from 'lucide-react';
 import { Calendar } from "@/components/ui/calendar";
-import { format } from 'date-fns';
-import { useAuth } from '@clerk/nextjs';
-import { getProviderAvailability } from '@/lib/apiClient';
+import { format, addMinutes, setHours, startOfDay } from 'date-fns';
 import { AvailabilitySlot } from '@/lib/types/booking';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const DateTimeSelectionStep: React.FC = () => {
   const { state, dispatch } = useBookingContext();
-  const { getToken, isSignedIn } = useAuth();
   const { 
     selectedClinic,
     selectedService,
-    selectedProvider,
     selectedDate,
     selectedTimeSlot,
     availabilitySlots,
     isLoading,
-    errors 
+    errors,
   } = state;
 
-  // Step-skipping logic: If the service doesn't require a provider, advance immediately.
   useEffect(() => {
-    if (selectedService && selectedService.requiresProviderAssignment === false) {
-      dispatch({ type: 'SET_CURRENT_STEP', payload: 4 }); // Skip to confirmation/details step
-    }
-  }, [selectedService, dispatch]);
+    // Generate static slots from 9 AM to 10 PM if a date is selected
+    if (selectedDate) {
+      const allSlots: AvailabilitySlot[] = [];
+      const day = startOfDay(selectedDate);
+      const startTime = setHours(day, 9); // 9:00 AM
+      const endTime = setHours(day, 22); // 10:00 PM
 
-  const fetchAvailability = async (providerId: string, date: Date) => {
-    if (!isSignedIn) {
-      dispatch({ type: 'SET_AVAILABILITY_ERROR', payload: 'You must be logged in to view availability.' });
-      return;
-    }
-    dispatch({ type: 'SET_AVAILABILITY_LOADING', payload: true });
-    try {
-      const token = await getToken();
-      if (!token) throw new Error("Authentication token not found.");
-
-      const dateString = format(date, 'yyyy-MM-dd');
-      const timeStrings = await getProviderAvailability(token, providerId, dateString);
-      
-      const slots: AvailabilitySlot[] = timeStrings.map(time => {
-        const [hour, minute] = time.split(':').map(Number);
-        const startTime = new Date(date);
-        startTime.setHours(hour, minute, 0, 0);
-
-        return {
-          slotId: `${dateString}-${time}`,
-          startTime: startTime.toISOString(),
-          // End time can be calculated if needed, e.g., add 30 mins
+      let currentTime = startTime;
+      while (currentTime < endTime) {
+        const slot = {
+          slotId: currentTime.toISOString(),
+          startTime: currentTime.toISOString(),
+          endTime: addMinutes(currentTime, 30).toISOString(),
         };
-      });
-
-      dispatch({ type: 'SET_AVAILABILITY_SUCCESS', payload: slots });
-    } catch (error) {
-      console.error("Error fetching availability:", error);
-      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-      dispatch({ type: 'SET_AVAILABILITY_ERROR', payload: `We couldn't load availability. ${errorMessage}` });
-    }
-  };
-
-  useEffect(() => {
-    // Only fetch if a provider is selected and a date is chosen.
-    // The service check handles cases where no provider is needed.
-    if (selectedProvider && selectedDate && isSignedIn) {
-      fetchAvailability(selectedProvider.id, selectedDate);
+        allSlots.push(slot);
+        currentTime = addMinutes(currentTime, 30);
+      }
+      dispatch({ type: 'SET_AVAILABILITY_SUCCESS', payload: allSlots });
     } else {
-      // Clear slots if dependencies change and are no longer valid
+      // Clear slots if no date is selected
       dispatch({ type: 'SET_AVAILABILITY_SUCCESS', payload: [] });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProvider, selectedDate, isSignedIn]);
+  }, [selectedDate]);
 
   const handleDateSelect = (date: Date | undefined) => {
-    dispatch({ type: 'SELECT_TIME_SLOT', payload: null }); // Reset time when date changes
+    dispatch({ type: 'SELECT_TIME_SLOT', payload: null });
     dispatch({ type: 'SELECT_DATE', payload: date || null });
   };
 
@@ -89,41 +60,29 @@ const DateTimeSelectionStep: React.FC = () => {
   
   const goToNextStep = () => {
     if (selectedDate && selectedTimeSlot) {
-      dispatch({ type: 'SET_CURRENT_STEP', payload: 4 });
+      dispatch({ type: 'SET_CURRENT_STEP', payload: 3 });
     }
   };
 
   const goToPreviousStep = () => {
-    dispatch({ type: 'SET_CURRENT_STEP', payload: 2 });
+    dispatch({ type: 'SET_CURRENT_STEP', payload: 1 });
   };
 
-  // If the service doesn't require a provider, this step will be skipped by the useEffect.
-  // We can show a loading or redirecting state.
-  if (selectedService && selectedService.requiresProviderAssignment === false) {
-      return (
-          <Card className="w-full shadow-xl animate-pulse">
-              <CardHeader><CardTitle>Configuring Appointment</CardTitle></CardHeader>
-              <CardContent><p>This service does not require a specific provider. Proceeding to the next step...</p></CardContent>
-          </Card>
-      );
-  }
-
-  // If we land here and don't have the required data, show an info message.
-  if (!selectedProvider || !selectedClinic || !selectedService) {
+  if (!selectedClinic || !selectedService) {
     return (
         <Card className="w-full shadow-xl">
             <CardHeader>
-                <CardTitle>Step 3: Select Date & Time</CardTitle>
+                <CardTitle>Step 2: Select Date & Time</CardTitle>
             </CardHeader>
             <CardContent>
                 <Alert>
                     <Info className="h-4 w-4" />
                     <AlertTitle>Missing Information</AlertTitle>
-                    <AlertDescription>Please go back and select a clinic, service, and provider first.</AlertDescription>
+                    <AlertDescription>Please go back and select a clinic and service first.</AlertDescription>
                 </Alert>
             </CardContent>
             <CardFooter>
-                <Button variant="outline" onClick={goToPreviousStep}>Back to Provider</Button>
+                <Button variant="outline" onClick={goToPreviousStep}>Back to Clinic & Service</Button>
             </CardFooter>
         </Card>
     );
@@ -132,8 +91,8 @@ const DateTimeSelectionStep: React.FC = () => {
   return (
     <Card className="w-full shadow-xl">
       <CardHeader>
-        <CardTitle>Step 3: Select Date & Time</CardTitle>
-        <CardDescription>Pick a date and time for your appointment with {selectedProvider.profile?.firstName}.</CardDescription>
+        <CardTitle>Step 2: Select Date & Time</CardTitle>
+        <CardDescription>Pick a date and time for your '{selectedService.name}' appointment at {selectedClinic.name}.</CardDescription>
       </CardHeader>
       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div>
@@ -143,46 +102,49 @@ const DateTimeSelectionStep: React.FC = () => {
               mode="single"
               selected={selectedDate || undefined}
               onSelect={handleDateSelect}
-              disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() - 1))} // Disable past dates
+              disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() - 1))}
               initialFocus
             />
           </div>
         </div>
         <div>
           <h4 className="font-medium mb-2 flex items-center"><Clock className="mr-2 h-5 w-5" />Select a Time</h4>
-          {isLoading.availabilitySlots && <div className="flex items-center space-x-2 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /> <span>Loading times...</span></div>}
           
+          {isLoading.availabilitySlots && <div className="flex items-center space-x-2 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /> <span>Loading times...</span></div>}
+
           {errors.availabilitySlots && (
-            <Alert variant="destructive">
-              <Info className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{errors.availabilitySlots}</AlertDescription>
+             <Alert variant="destructive">
+                <Info className="h-4 w-4" />
+                <AlertTitle>Error Loading Times</AlertTitle>
+                <AlertDescription>{errors.availabilitySlots}</AlertDescription>
             </Alert>
           )}
 
-          {!isLoading.availabilitySlots && selectedDate && availabilitySlots.length > 0 && (
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-              {availabilitySlots.map((slot) => (
-                <Button
-                  key={slot.slotId}
-                  variant={selectedTimeSlot?.slotId === slot.slotId ? 'default' : 'outline'}
-                  onClick={() => handleTimeSlotSelect(slot)}
-                >
-                  {format(new Date(slot.startTime), 'p')}
-                </Button>
-              ))}
-            </div>
+          {!isLoading.availabilitySlots && !errors.availabilitySlots && selectedDate && availabilitySlots.length > 0 && (
+            <ScrollArea className="h-60">
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 pr-4">
+                {availabilitySlots.map((slot) => (
+                  <Button
+                    key={slot.slotId}
+                    variant={selectedTimeSlot?.slotId === slot.slotId ? 'default' : 'outline'}
+                    onClick={() => handleTimeSlotSelect(slot)}
+                  >
+                    {format(new Date(slot.startTime), 'p')}
+                  </Button>
+                ))}
+              </div>
+            </ScrollArea>
           )}
 
-          {!isLoading.availabilitySlots && selectedDate && availabilitySlots.length === 0 && !errors.availabilitySlots && (
+          {!isLoading.availabilitySlots && !errors.availabilitySlots && selectedDate && availabilitySlots.length === 0 && (
             <Alert>
                 <Info className="h-4 w-4" />
                 <AlertTitle>No Available Slots</AlertTitle>
-                <AlertDescription>There are no available time slots for this provider on the selected date. Please pick another day.</AlertDescription>
+                <AlertDescription>There are no available time slots for this service on the selected date. Please pick another day.</AlertDescription>
             </Alert>
           )}
 
-          {!selectedDate && !isLoading.availabilitySlots && !errors.availabilitySlots && (
+          {!selectedDate && !isLoading.availabilitySlots && (
              <Alert variant="default">
                 <Info className="h-4 w-4" />
                 <AlertTitle>Select a date</AlertTitle>

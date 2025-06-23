@@ -22,7 +22,8 @@ export interface Clinic {
   address?: string; 
 }
 
-export interface Specialization {
+// This is the correct definition for a single specialization/category.
+export interface ServiceCategory {
   id: string;
   name: string;
   description: string | null;
@@ -37,7 +38,7 @@ export interface Service {
   durationMinutes: number | null;
   isActive: boolean;
   specializationId: string | null;
-  specialization?: Specialization; // The nested object from the API
+  specialization?: ServiceCategory; // The nested object from the API
   // DEPRECATED but kept for now to avoid breaking other components.
   category?: string;
   cost?: number | string;
@@ -45,7 +46,8 @@ export interface Service {
   requiresProviderAssignment?: boolean;
 }
 
-export interface ServiceCategory {
+// This is a view model for displaying services grouped by category name.
+export interface GroupedService {
   category: string;
   services: Service[];
 }
@@ -82,19 +84,15 @@ export interface BookingState {
   // Step 1 Data
   clinics: Clinic[];
   selectedClinic: Clinic | null;
-  servicesForClinic: ServiceCategory[];
+  servicesForClinic: GroupedService[];
   selectedService: Service | null;
   
-  // Step 2 Data
-  providersForService: Provider[];
-  selectedProvider: Provider | null;
-  
-  // Step 3 Data
+  // Step 2 Data (was Step 3)
   availabilitySlots: AvailabilitySlot[];
-  selectedDate: Date | null; // Or string, if preferred for consistency
+  selectedDate: Date | null; 
   selectedTimeSlot: AvailabilitySlot | null;
   
-  // Step 4 Data
+  // Step 3 Data (was step 4)
   bookingNotes: string;
   bookingConfirmation: BookingConfirmationData | null;
 
@@ -102,14 +100,12 @@ export interface BookingState {
   isLoading: {
     clinics: boolean;
     servicesForClinic: boolean;
-    providersForService: boolean;
     availabilitySlots: boolean;
     bookingSubmission: boolean;
   };
   errors: {
     clinics: string | null;
     servicesForClinic: string | null;
-    providersForService: string | null;
     availabilitySlots: string | null;
     bookingSubmission: string | null;
   };
@@ -132,13 +128,9 @@ export type BookingAction =
   | { type: 'SET_CLINICS_ERROR'; payload: string | null }
   | { type: 'SELECT_CLINIC'; payload: Clinic | null }
   | { type: 'SET_SERVICES_FOR_CLINIC_LOADING'; payload: boolean }
-  | { type: 'SET_SERVICES_FOR_CLINIC_SUCCESS'; payload: ServiceCategory[] }
+  | { type: 'SET_SERVICES_FOR_CLINIC_SUCCESS'; payload: GroupedService[] }
   | { type: 'SET_SERVICES_FOR_CLINIC_ERROR'; payload: string | null }
   | { type: 'SELECT_SERVICE'; payload: Service | null }
-  | { type: 'SET_PROVIDERS_LOADING'; payload: boolean }
-  | { type: 'SET_PROVIDERS_SUCCESS'; payload: Provider[] }
-  | { type: 'SET_PROVIDERS_ERROR'; payload: string | null }
-  | { type: 'SELECT_PROVIDER'; payload: Provider | null }
   | { type: 'SET_AVAILABILITY_LOADING'; payload: boolean }
   | { type: 'SET_AVAILABILITY_SUCCESS'; payload: AvailabilitySlot[] }
   | { type: 'SET_AVAILABILITY_ERROR'; payload: string | null }

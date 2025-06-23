@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -24,12 +24,13 @@ import {
 } from '../components/card.native';
 import { Button } from '../components/button.native';
 import { theme } from '../components/theme';
-import { useUser } from '@clerk/clerk-expo';
+import { useUser, useAuth } from '@clerk/clerk-expo';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions, CommonActions } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { DrawerParamList } from '../navigation/AppNavigator';
-import { Menu, HeartPulse, Stethoscope, Syringe, PersonStanding, Pill, FileText, User, Droplets, Bell, BookHeart, Calendar, Map, CheckCircle, XCircle, Smile, Meh, Frown, PlusCircle } from 'lucide-react-native';
+import { Menu, HeartPulse, Stethoscope, Syringe, PersonStanding, Pill, FileText, User, Droplets, Bell, BookHeart, Calendar, Map, CheckCircle, XCircle, Smile, Meh, Frown, PlusCircle, AlertCircle } from 'lucide-react-native';
+import api from '../utils/api';
 
 type DashboardNavigationProp = DrawerNavigationProp<DrawerParamList>;
 type DashboardProps = {};
@@ -55,6 +56,12 @@ interface HealthBuddyTool {
   description: string;
   icon: React.ElementType;
   screen: keyof DrawerParamList;
+}
+
+interface HealthStatusData {
+    pillLogged: boolean;
+    moodLogged: boolean;
+    cycleLogged: boolean;
 }
 
 const getIconForService = (serviceName: string): React.ElementType => {
@@ -232,8 +239,13 @@ const styles = StyleSheet.create({
 
 export const DashboardScreen: React.FC<DashboardProps> = () => {
   const { user, isLoaded } = useUser();
+  const { getToken } = useAuth();
   const navigation = useNavigation<DashboardNavigationProp>();
   const insets = useSafeAreaInsets();
+
+  const [healthStatus, setHealthStatus] = useState<HealthStatusData | null>(null);
+  const [isLoadingStatus, setIsLoadingStatus] = useState(true);
+  const [errorStatus, setErrorStatus] = useState<string | null>(null);
 
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(20);
@@ -245,8 +257,22 @@ export const DashboardScreen: React.FC<DashboardProps> = () => {
         duration: 500,
         easing: Easing.out(Easing.exp),
       });
+      fetchHealthStatus();
     }
   }, [isLoaded]);
+
+  const fetchHealthStatus = async () => {
+    try {
+      setIsLoadingStatus(true);
+      setErrorStatus(null);
+      const data = await api.get('/health/status/today', getToken);
+      setHealthStatus(data);
+    } catch (error: any) {
+      setErrorStatus(error.message || 'Failed to fetch health status.');
+    } finally {
+      setIsLoadingStatus(false);
+    }
+  };
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
@@ -256,22 +282,37 @@ export const DashboardScreen: React.FC<DashboardProps> = () => {
     };
   });
 
-  const HealthStatus = () => (
-    <View style={styles.healthStatusContainer}>
-      <View style={styles.statusItem}>
-        <CheckCircle size={32} color={theme.colors.primary} />
-        <Text style={styles.statusText}>Pill Taken</Text>
-      </View>
-      <View style={styles.statusItem}>
-        <XCircle size={32} color={theme.colors.primary} />
-        <Text style={styles.statusText}>Period Log</Text>
-      </View>
-      <View style={styles.statusItem}>
-        <Smile size={32} color={theme.colors.primary} />
-        <Text style={styles.statusText}>Mood Logged</Text>
-      </View>
-    </View>
-  );
+  const HealthStatus = () => {
+      if (isLoadingStatus) {
+          return <ActivityIndicator color={theme.colors.primary} />;
+      }
+
+      if (errorStatus) {
+          return (
+            <View style={styles.statusItem}>
+                <AlertCircle size={32} color={theme.colors.destructive} />
+                <Text style={styles.statusText}>Could not load status</Text>
+            </View>
+          );
+      }
+      
+      return (
+        <View style={styles.healthStatusContainer}>
+          <View style={styles.statusItem}>
+            {healthStatus?.pillLogged ? <CheckCircle size={32} color={theme.colors.primary} /> : <XCircle size={32} color={theme.colors.muted} />}
+            <Text style={styles.statusText}>Pill Taken</Text>
+          </View>
+          <View style={styles.statusItem}>
+            {healthStatus?.cycleLogged ? <CheckCircle size={32} color={theme.colors.primary} /> : <XCircle size={32} color={theme.colors.muted} />}
+            <Text style={styles.statusText}>Period Log</Text>
+          </View>
+          <View style={styles.statusItem}>
+            {healthStatus?.moodLogged ? <CheckCircle size={32} color={theme.colors.primary} /> : <XCircle size={32} color={theme.colors.muted} />}
+            <Text style={styles.statusText}>Mood Logged</Text>
+          </View>
+        </View>
+      );
+  }
 
   if (!isLoaded) {
     return (

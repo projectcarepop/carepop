@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Info, CheckSquare } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { createAppointmentAction } from '@/lib/actions/appointments';
 
 const ConfirmationStep: React.FC = () => {
@@ -15,7 +15,6 @@ const ConfirmationStep: React.FC = () => {
   const { 
     selectedClinic,
     selectedService,
-    selectedProvider,
     selectedDate,
     selectedTimeSlot,
     bookingNotes,
@@ -28,27 +27,28 @@ const ConfirmationStep: React.FC = () => {
   };
 
   const handleSubmitBooking = async () => {
-    if (!selectedClinic || !selectedService || !selectedProvider || !selectedDate || !selectedTimeSlot) {
+    if (!selectedClinic || !selectedService || !selectedDate || !selectedTimeSlot) {
       dispatch({ type: 'SET_BOOKING_SUBMISSION_ERROR', payload: 'Missing booking information. Please review previous steps.' });
       return;
     }
 
     dispatch({ type: 'SET_BOOKING_SUBMISSION_LOADING', payload: true });
 
-    const startTimeISO = `${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlot.startTime}`;
+    // The selectedTimeSlot.startTime is already a full ISO string or a string that can be parsed into one.
+    // We can just use it directly if the backend expects an ISO 8601 format string.
+    const startTimeISO = selectedTimeSlot.startTime;
 
     try {
       const result = await createAppointmentAction(
         selectedClinic.id,
         selectedService.id,
-        selectedProvider.id,
         startTimeISO,
         bookingNotes
       );
 
       if (result.success) {
         dispatch({ type: 'SET_BOOKING_SUBMISSION_SUCCESS', payload: result.data });
-        dispatch({ type: 'SET_CURRENT_STEP', payload: 5 }); // Move to a success/summary step
+        // The reducer will handle setting the currentStep to 4 for the success page
       } else {
         dispatch({ type: 'SET_BOOKING_SUBMISSION_ERROR', payload: result.message || 'Failed to submit booking.' });
       }
@@ -60,14 +60,14 @@ const ConfirmationStep: React.FC = () => {
   };
 
   const goToPreviousStep = () => {
-    dispatch({ type: 'SET_CURRENT_STEP', payload: 3 });
+    dispatch({ type: 'SET_CURRENT_STEP', payload: 2 });
   };
 
-  if (!selectedClinic || !selectedService || !selectedProvider || !selectedDate || !selectedTimeSlot) {
+  if (!selectedClinic || !selectedService || !selectedDate || !selectedTimeSlot) {
     return (
         <Card className="w-full shadow-xl">
             <CardHeader>
-                <CardTitle className="text-2xl font-bold">Step 4: Confirm Booking</CardTitle>
+                <CardTitle className="text-2xl font-bold">Step 3: Confirm Booking</CardTitle>
             </CardHeader>
             <CardContent>
                 <Alert variant="default" className="border-primary/50">
@@ -89,7 +89,7 @@ const ConfirmationStep: React.FC = () => {
     <Card className="w-full shadow-xl">
       <CardHeader>
         <CardTitle className="text-2xl font-bold flex items-center">
-            <CheckSquare className="mr-3 h-8 w-8 text-primary"/> Step 4: Confirm Your Booking
+            <CheckSquare className="mr-3 h-8 w-8 text-primary"/> Step 3: Confirm Your Booking
         </CardTitle>
         <CardDescription className="text-md pl-11">
           Please review your appointment details below and confirm.
@@ -108,21 +108,17 @@ const ConfirmationStep: React.FC = () => {
               <strong className="text-md">{selectedService.name}</strong>
             </div>
             <div className="flex flex-col space-y-0.5">
-              <span className="text-xs text-muted-foreground">Provider:</span>
-              <strong className="text-md">{selectedProvider.fullName}</strong>
-            </div>
-            <div className="flex flex-col space-y-0.5">
               <span className="text-xs text-muted-foreground">Date:</span>
               <strong className="text-md">{format(selectedDate, 'PPP')}</strong>
             </div>
-            <div className="flex flex-col space-y-0.5 md:col-span-2">
+            <div className="flex flex-col space-y-0.5">
               <span className="text-xs text-muted-foreground">Time:</span>
-              <strong className="text-md">{format(parseISO(selectedTimeSlot.startTime), 'p')} - {format(parseISO(selectedTimeSlot.endTime), 'p')}</strong>
+              <strong className="text-md">{format(new Date(selectedTimeSlot.startTime), 'p')}</strong>
             </div>
-            {selectedService.typicalDurationMinutes && 
+            {selectedService.durationMinutes && 
               <div className="flex flex-col space-y-0.5">
                 <span className="text-xs text-muted-foreground">Duration:</span>
-                <strong className="text-md">{selectedService.typicalDurationMinutes} minutes</strong>
+                <strong className="text-md">{selectedService.durationMinutes} minutes</strong>
               </div>
             }
           </div>
@@ -132,7 +128,7 @@ const ConfirmationStep: React.FC = () => {
           <label htmlFor="booking-notes" className="block text-sm font-medium text-gray-700">Additional Notes (Optional)</label>
           <Textarea 
             id="booking-notes"
-            placeholder="Any specific requests or information for the provider..."
+            placeholder="Any specific requests or information..."
             value={bookingNotes}
             onChange={handleNotesChange}
             className="min-h-[100px] focus:ring-primary focus:border-primary rounded-md shadow-sm"
@@ -146,16 +142,6 @@ const ConfirmationStep: React.FC = () => {
             <AlertTitle>Booking Failed</AlertTitle>
             <AlertDescription>
               {errors.bookingSubmission}
-              <Button
-                onClick={handleSubmitBooking}
-                variant="secondary"
-                size="sm"
-                className="mt-3 w-full"
-                disabled={isLoading.bookingSubmission}
-              >
-                {isLoading.bookingSubmission && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                Try to Book Again
-              </Button>
             </AlertDescription>
           </Alert>
         )}

@@ -25,14 +25,10 @@ import {
 } from 'lucide-react-native';
 
 // --- Screen Imports ---
-// No HomeScreen exists, so we remove the import.
-// import { HomeScreen } from '../screens/HomeScreen'; 
-// The Login and Register screens are now effectively handled by Clerk's UI
-// We will create new screens to host Clerk's components.
 import { CreateProfileScreen } from '../../screens/CreateProfileScreen';
 import { ForgotPasswordScreen } from '../../screens/ForgotPasswordScreen';
 import { BookingScreen } from '../../screens/BookingScreen';
-import { HealthBuddyScreen } from '../screens/HealthBuddyScreen';
+import HealthBuddyScreen from '../screens/HealthBuddyScreen';
 import { MyAppointmentsScreen } from '../screens/MyAppointmentsScreen';
 import { MyRecordsScreen } from '../screens/MyRecordsScreen';
 import { AboutUsScreen } from '../screens/AboutUsScreen';
@@ -49,6 +45,7 @@ import { DashboardScreen } from '../screens/DashboardScreen';
 import { LoginScreen } from '../../screens/LoginScreen';
 import { RegisterScreen } from '../../screens/RegisterScreen';
 import { ClinicFinderScreen } from '../../screens/ClinicFinderScreen';
+import LogHealthDataScreen from '../screens/LogHealthDataScreen';
 
 
 // --- Param Lists ---
@@ -111,6 +108,7 @@ export type RootStackParamList = {
   CreateProfile: undefined;
   Main: undefined; // The Drawer Navigator
   EditProfile: undefined;
+  LogHealthData: undefined; // Added here for modal presentation
 };
 
 
@@ -246,55 +244,61 @@ function AuthFlow() {
   );
 }
 
-// --- Root Navigator (Handles all top-level nav logic) ---
 export function RootAppNavigator() {
   const { isLoaded, isSignedIn } = useAuth();
-  const { user } = useUser();
-  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
-  const [isCheckingOnboarding, setIsCheckingOnboarding] = useState(true);
-
+  const [hasOnboarded, setHasOnboarded] = useState<boolean | null>(null);
+  
+  // This effect checks if the user has completed onboarding
   useEffect(() => {
     const checkOnboarding = async () => {
-      const value = await AsyncStorage.getItem('hasCompletedOnboarding');
-      setHasCompletedOnboarding(value === 'true');
-      setIsCheckingOnboarding(false);
+      const value = await AsyncStorage.getItem('hasOnboarded');
+      setHasOnboarded(value === 'true');
     };
-
     checkOnboarding();
   }, []);
 
-  if (!isLoaded || isCheckingOnboarding) {
+  if (!isLoaded || hasOnboarded === null) {
     return <SplashScreen />;
   }
 
-  // Determine if the profile is complete from Clerk's metadata
-  const isProfileComplete = user?.publicMetadata?.profileComplete === true;
+  // Determine initial route based on auth state and onboarding status
+  let initialRouteName: keyof RootStackParamList = 'Auth';
+  if(isSignedIn) {
+    initialRouteName = 'Main';
+  } else if (!hasOnboarded) {
+    initialRouteName = 'Onboarding';
+  }
 
   return (
     <NavigationContainer>
-      <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {isSignedIn ? (
-          isProfileComplete ? (
-            <>
-              <RootStack.Screen name="Main" component={AppDrawer} />
-              <RootStack.Screen 
-                name="EditProfile" 
-                component={EditProfileScreen} 
-                options={{ presentation: 'modal' }} 
-              />
-            </>
-          ) : (
-            <RootStack.Screen name="CreateProfile" component={CreateProfileScreen} />
-          )
-        ) : (
-          <>
-            {hasCompletedOnboarding ? (
-              <RootStack.Screen name="Auth" component={AuthNavigator} />
-            ) : (
-              <RootStack.Screen name="Onboarding" component={OnboardingNavigator} />
-            )}
-          </>
-        )}
+      <RootStack.Navigator initialRouteName={initialRouteName} screenOptions={{ headerShown: false }}>
+        <RootStack.Screen name="Auth" component={AuthNavigator} />
+        <RootStack.Screen name="Onboarding" component={OnboardingNavigator} />
+        <RootStack.Screen name="CreateProfile" component={CreateProfileScreen} />
+        <RootStack.Screen name="Main" component={AppDrawer} />
+        <RootStack.Screen 
+            name="LogHealthData" 
+            component={LogHealthDataScreen} 
+            options={{ 
+                presentation: 'modal',
+                headerShown: true,
+                headerTitle: 'Log Your Day',
+                headerBackTitle: 'Cancel',
+                headerStyle: {
+                    backgroundColor: theme.colors.background,
+                    shadowOpacity: 0,
+                    elevation: 0,
+                },
+                headerTitleStyle: {
+                    color: theme.colors.primary,
+                    fontFamily: theme.typography.fontFamilyBold,
+                },
+                headerBackTitleStyle: {
+                    fontFamily: theme.typography.fontFamilyMedium,
+                },
+                headerTintColor: theme.colors.primary,
+            }} 
+        />
       </RootStack.Navigator>
     </NavigationContainer>
   );
@@ -302,7 +306,6 @@ export function RootAppNavigator() {
 
 const LoadingIndicator = () => (
   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-    {/* You can use an ActivityIndicator or a custom loading component here */}
     <Text>Loading...</Text>
   </View>
 );

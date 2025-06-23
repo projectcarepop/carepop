@@ -53,13 +53,16 @@ async function upsertProfile(userId: string, input: UpdateProfileInput) {
 
     // --- Start Clerk Sync with extra logging ---
     try {
+      // Step 1: Fetch the user's current data from Clerk to get existing metadata.
+      const clerkUser = await clerkClient.users.getUser(userId);
+
       // Age must be calculated on the backend using the definitive date of birth
       // from the database to ensure it's always correct.
       const age = dbProfile.date_of_birth
         ? new Date(new Date().getTime() - new Date(dbProfile.date_of_birth).getTime()).getUTCFullYear() - 1970
         : 0;
 
-      const metadataToSync = {
+      const newProfileMetadata = {
         profileComplete: true,
         middle_initial: dbProfile.middle_initial ?? '',
         date_of_birth: dbProfile.date_of_birth ?? '',
@@ -78,9 +81,16 @@ async function upsertProfile(userId: string, input: UpdateProfileInput) {
         age: age,
       };
 
+      // Step 2: Merge existing metadata with the new profile data.
+      // This preserves existing fields like 'role' while updating the profile.
+      const mergedPublicMetadata = {
+        ...clerkUser.publicMetadata,
+        ...newProfileMetadata,
+      };
+
       console.log('--- Clerk Sync Data ---');
       console.log('User ID:', userId);
-      console.log('Metadata to Sync:', JSON.stringify(metadataToSync, null, 2));
+      console.log('Merged Metadata to Sync:', JSON.stringify(mergedPublicMetadata, null, 2));
       console.log('First Name:', dbProfile.first_name ?? '');
       console.log('Last Name:', dbProfile.last_name ?? '');
       console.log('-----------------------');
@@ -90,7 +100,7 @@ async function upsertProfile(userId: string, input: UpdateProfileInput) {
       await clerkClient.users.updateUser(userId, {
         firstName: dbProfile.first_name ?? '',
         lastName: dbProfile.last_name ?? '',
-        publicMetadata: metadataToSync,
+        publicMetadata: mergedPublicMetadata,
       });
 
       console.log('Clerk sync successful for user:', userId);
