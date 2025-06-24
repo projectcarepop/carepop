@@ -1,10 +1,19 @@
 /// <reference types="@vis.gl/react-google-maps" />
 'use client';
 
-import { Clinic } from '@/lib/types/clinic';
 import { PanelState } from './SlidingPanel'; // Assuming PanelState is exported from SlidingPanel
 import dynamic from 'next/dynamic';
 import { Loader2 } from 'lucide-react';
+
+// Define a minimal Clinic type for this component's needs.
+// This should match the props expected by the wrapped MapDisplay component.
+type Clinic = {
+  id: string;
+  name: string;
+  latitude: number | null;
+  longitude: number | null;
+  is_active: boolean;
+};
 
 // Dynamically import MapDisplay with ssr: false
 const MapDisplay = dynamic(() => import('./MapDisplay'), {

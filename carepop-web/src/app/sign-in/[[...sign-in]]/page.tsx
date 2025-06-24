@@ -2,68 +2,72 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { useSignIn } from "@clerk/nextjs";
 import Link from "next/link";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Icons } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+
+const formSchema = z.object({
+  email: z.string().email({ message: "Please enter a valid email address." }),
+  password: z.string().min(1, { message: "Password is required." }),
+});
 
 export default function Page() {
-  const { isLoaded, signIn, setActive } = useSignIn();
   const router = useRouter();
   const { toast } = useToast();
-  const [emailAddress, setEmailAddress] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
   const [showPassword, setShowPassword] = React.useState(false);
+  const [isOauthLoading, setIsOauthLoading] = React.useState(false);
 
-  const handleOauthSignIn = async (provider: 'oauth_google' | 'oauth_apple') => {
-    if (!isLoaded) return;
-    try {
-      await signIn.authenticateWithRedirect({
-        strategy: provider,
-        redirectUrl: '/sign-in',
-        redirectUrlComplete: '/dashboard',
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
+
+  const handleOauthSignIn = async (provider: 'google') => {
+    setIsOauthLoading(true);
+    const supabase = createSupabaseBrowserClient();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${location.origin}/auth/callback`,
+      },
+    });
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Error signing in with Google",
+        description: error.message,
       });
-    } catch (cause) {
-      console.error(cause);
-      const message = (cause as any).errors?.[0]?.message || "Something went wrong.";
-      setError(message);
+    }
+    setIsOauthLoading(false);
+  }
+
+  const onSignInPress = async (values: z.infer<typeof formSchema>) => {
+    const supabase = createSupabaseBrowserClient();
+    const { error } = await supabase.auth.signInWithPassword({
+      email: values.email,
+      password: values.password,
+    });
+
+    if (error) {
       toast({
         variant: "destructive",
         title: "Error signing in",
-        description: message,
-      })
-    }
-  }
-
-  const onSignInPress = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isLoaded) {
-      return;
-    }
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const result = await signIn.create({
-        identifier: emailAddress,
-        password,
+        description: error.message,
       });
-
-      if (result.status === "complete") {
-        await setActive({ session: result.createdSessionId });
-        router.push("/");
       } else {
-        console.log(result);
-      }
-    } catch (err: any) {
-      setError(err.errors[0]?.longMessage || "Something went wrong. Please check your credentials.");
-    } finally {
-      setIsLoading(false);
+      router.push("/dashboard");
+      router.refresh();
     }
   };
 
@@ -78,30 +82,39 @@ export default function Page() {
                 Sign in to continue to your account.
             </p>
         </div>
-        <form onSubmit={onSignInPress} className="space-y-4">
-            <div>
-            <Label htmlFor="email">Email address</Label>
+        <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSignInPress)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email address</FormLabel>
+                      <FormControl>
             <Input
-                value={emailAddress}
                 type="email"
-                id="email"
                 placeholder="Enter your email address"
-                onChange={(e) => setEmailAddress(e.target.value)}
-                required
-                className="mt-1"
-            />
-            </div>
-            <div>
-                <Label htmlFor="password">Password</Label>
+                            {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Password</FormLabel>
                 <div className="relative mt-1">
+                            <FormControl>
                     <Input
-                        value={password}
                         type={showPassword ? "text" : "password"}
-                        id="password"
                         placeholder="Enter your password"
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
+                                    {...field}
                     />
+                            </FormControl>
                     <Button
                         type="button"
                         variant="ghost"
@@ -119,6 +132,7 @@ export default function Page() {
                         </span>
                     </Button>
                 </div>
+                        <FormMessage />
                  <div className="flex items-center justify-end mt-2">
                     <Link href="/forgot-password"
                         className="text-sm font-medium text-primary hover:text-primary/90 underline underline-offset-4"
@@ -126,15 +140,14 @@ export default function Page() {
                         Forgot password?
                     </Link>
                 </div>
-              </div>
-
-              <div id="clerk-captcha"></div>
-
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? "Signing in..." : "Continue"}
+                    </FormItem>
+                  )}
+                />
+              <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+                  {form.formState.isSubmitting ? "Signing in..." : "Continue"}
               </Button>
-              {error && <p className="text-sm text-red-500 text-center">{error}</p>}
           </form>
+        </Form>
         <div className="relative">
             <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
@@ -145,11 +158,8 @@ export default function Page() {
                 </span>
             </div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
-            <Button variant="outline" type="button" onClick={() => handleOauthSignIn('oauth_apple')} disabled={isLoading}>
-                <Icons.apple className="mr-2 h-4 w-4" /> Apple
-            </Button>
-            <Button variant="outline" type="button" onClick={() => handleOauthSignIn('oauth_google')} disabled={isLoading}>
+        <div className="grid grid-cols-1 gap-4">
+            <Button variant="outline" type="button" onClick={() => handleOauthSignIn('google')} disabled={isOauthLoading || form.formState.isSubmitting}>
                 <Icons.google className="mr-2 h-4 w-4" /> Google
             </Button>
         </div>

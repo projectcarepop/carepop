@@ -1,8 +1,6 @@
 'use client';
 
 import { useMemo, useEffect } from "react";
-import { Clinic } from "@/lib/types/clinic";
-import { Service } from "@/lib/types/service";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose
@@ -12,6 +10,24 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+
+// Define minimal types for this component's needs.
+// The parent is responsible for providing objects that match this shape.
+type Clinic = {
+  id: string; // Used implicitly by React keys
+  name: string;
+  fpop_chapter_affiliation?: string | null;
+  full_address?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
+  website_url?: string | null;
+  services_offered?: string[]; // Assuming this is an array of service IDs
+};
+
+type Service = {
+  id: string;
+  name: string;
+};
 
 interface ClinicDetailModalProps {
   clinic: Clinic | null;

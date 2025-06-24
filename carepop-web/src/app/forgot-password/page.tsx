@@ -1,133 +1,138 @@
 "use client";
 
-import * as React from "react";
-import { useSignIn } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { useState } from 'react'
+import Link from 'next/link'
+import { createBrowserClient } from '@supabase/ssr'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import * as z from 'zod'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Icons } from '@/components/icons'
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
+import { useToast } from '@/hooks/use-toast'
+
+const formSchema = z.object({
+  email: z.string().email({ message: 'Please enter a valid email address.' }),
+})
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [code, setCode] = React.useState("");
-  const [successfulCreation, setSuccessfulCreation] = React.useState(false);
-  const [error, setError] = React.useState("");
-  const [isLoading, setIsLoading] = React.useState(false);
+  const [supabase] = useState(() => createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  ));
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSuccess, setIsSuccess] = useState(false)
+  const { toast } = useToast()
+  
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      email: '',
+    },
+  })
 
-  const router = useRouter();
-  const { isLoaded, signIn, setActive } = useSignIn();
-
-  async function create(e: React.FormEvent) {
-    e.preventDefault();
-    if (!isLoaded) return;
-    setIsLoading(true);
-
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    setIsSubmitting(true)
     try {
-      await signIn.create({
-        strategy: "reset_password_email_code",
-        identifier: email,
-      });
-      setSuccessfulCreation(true);
-    } catch (err: any) {
-      setError(err.errors[0].longMessage);
+      const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
+        redirectTo: `${location.origin}/auth/callback?next=/update-password`,
+      })
+
+      if (error) {
+        toast({
+          variant: 'destructive',
+          title: 'Uh oh! Something went wrong.',
+          description: error.message,
+        })
+      } else {
+        setIsSuccess(true);
+      }
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: 'Uh oh! Something went wrong.',
+        description: 'An unexpected error occurred. Please try again.',
+      })
     } finally {
-        setIsLoading(false);
+      setIsSubmitting(false)
     }
   }
 
-  async function reset(e: React.FormEvent) {
-    e.preventDefault();
-    if (!isLoaded) return;
-    setIsLoading(true);
-
-    try {
-      const result = await signIn.attemptFirstFactor({
-        strategy: "reset_password_email_code",
-        code,
-        password,
-      });
-      
-      await setActive({ session: result.createdSessionId });
-      router.push("/");
-
-    } catch (err: any) {
-        setError(err.errors[0].longMessage);
-    } finally {
-        setIsLoading(false);
-    }
+  if (isSuccess) {
+    return (
+      <div className="flex justify-center items-center h-screen bg-gray-50">
+        <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md border border-gray-200 text-center">
+            <Icons.mail className="mx-auto h-12 w-12 text-primary" />
+            <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-space-grotesk)' }}>Check your email</h1>
+            <p className="text-muted-foreground">
+              We&apos;ve sent a password reset link to your email address. Please check your inbox.
+            </p>
+            <Button asChild>
+                <Link href="/sign-in">Back to Sign In</Link>
+            </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="flex justify-center items-center h-screen bg-gray-50">
-        <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md border border-gray-200">
-            <div className="text-center">
-                <h1 className="text-3xl font-bold tracking-tight text-gray-900" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
-                    Forgot Password
-                </h1>
-                <p className="mt-2 text-sm text-gray-600">
-                    Enter your email to reset your password.
-                </p>
-            </div>
-
-            <form onSubmit={!successfulCreation ? create : reset} className="space-y-4">
-            {!successfulCreation && (
-                <>
-                    <div className="flex flex-col space-y-2">
-                        <Label htmlFor="email">Email Address</Label>
-                        <Input
-                        type="email"
-                        id="email"
-                        placeholder="Enter your email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        />
-                    </div>
-                    <Button type="submit" className="w-full" disabled={isLoading}>
-                        {isLoading ? "Sending..." : "Send Reset Code"}
-                    </Button>
-                </>
-            )}
-
-            {successfulCreation && (
-                <>
-                    <div className="flex flex-col space-y-2">
-                        <Label htmlFor="code">Verification Code</Label>
-                        <Input
-                            id="code"
-                            placeholder="Enter the code from your email"
-                            value={code}
-                            onChange={(e) => setCode(e.target.value)}
-                        />
-                    </div>
-                    <div className="flex flex-col space-y-2">
-                        <Label htmlFor="password">New Password</Label>
-                        <Input
-                            type="password"
-                            id="password"
-                            placeholder="Enter your new password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                        />
-                    </div>
-
-                    <Button type="submit" className="w-full" disabled={isLoading}>
-                        {isLoading ? "Resetting..." : "Reset Password"}
-                    </Button>
-                </>
-            )}
-             {error && <p className="text-sm text-red-500 text-center mt-2">{error}</p>}
-            </form>
-             <p className="px-8 text-center text-sm text-muted-foreground">
-                <Link
-                href="/sign-in"
-                className="underline underline-offset-4 text-primary hover:text-primary/90"
-                >
-                Back to Sign In
-                </Link>
-            </p>
+    <div className="flex justify-center items-center min-h-screen bg-gray-50">
+      <div className="w-full max-w-md p-8 my-8 space-y-6 bg-white rounded-lg shadow-md border border-gray-200">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
+            Forgot Password
+          </h1>
+          <p className="mt-2 text-sm text-gray-600">
+            Enter your email and we&apos;ll send you a link to reset your password.
+          </p>
         </div>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email address</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Enter your email address"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                'Send Reset Link'
+              )}
+            </Button>
+          </form>
+        </Form>
+        <p className="px-8 text-center text-sm text-muted-foreground">
+          <Link
+            href="/sign-in"
+            className="underline underline-offset-4 text-primary hover:text-primary/90"
+          >
+            Back to Sign In
+          </Link>
+        </p>
+      </div>
     </div>
-  );
+  )
 } 

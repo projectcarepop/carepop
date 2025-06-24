@@ -1,215 +1,216 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useSignUp } from "@clerk/nextjs";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Icons } from "@/components/icons";
+import { useState } from 'react'
+import Link from 'next/link'
+import { createBrowserClient } from '@supabase/ssr'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import * as z from 'zod'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Icons } from '@/components/icons'
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
+import { useToast } from '@/hooks/use-toast'
 
-export default function Page() {
-  const { isLoaded, signUp, setActive } = useSignUp();
-  const router = useRouter();
-  const [emailAddress, setEmailAddress] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [pendingVerification, setPendingVerification] = React.useState(false);
-  const [code, setCode] = React.useState("");
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const [showPassword, setShowPassword] = React.useState(false);
+const formSchema = z.object({
+  email: z.string().email({ message: 'Please enter a valid email address.' }),
+  password: z
+    .string()
+    .min(8, { message: 'Password must be at least 8 characters long.' }),
+})
 
-  const handleOauthSignUp = async (provider: 'oauth_google' | 'oauth_apple') => {
-    if (!isLoaded) return;
+export default function SignUpPage() {
+  const [supabase] = useState(() => createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  ));
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSuccess, setIsSuccess] = useState(false)
+  const { toast } = useToast()
+  
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+  })
+
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    setIsSubmitting(true)
     try {
-      await signUp.authenticateWithRedirect({
-        strategy: provider,
-        redirectUrl: '/sign-up',
-        redirectUrlComplete: '/complete-profile',
-      });
-    } catch (cause) {
-      console.error(cause);
-      // Handle error accordingly
+      const { error } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.password,
+        options: {
+          emailRedirectTo: `${location.origin}/auth/callback`,
+        },
+      })
+
+      if (error) {
+        toast({
+          variant: 'destructive',
+          title: 'Uh oh! Something went wrong.',
+          description: error.message,
+        })
+      } else {
+        setIsSuccess(true);
+      }
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: 'Uh oh! Something went wrong.',
+        description: 'An unexpected error occurred. Please try again.',
+      })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
-  const onSignUpPress = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isLoaded) {
-      return;
-    }
-    setIsLoading(true);
-    setError(null);
-
+  async function handleOAuthSignUp(provider: 'google') {
+    setIsSubmitting(true);
     try {
-      await signUp.create({
-        emailAddress,
-        password,
+      await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${location.origin}/auth/callback`,
+        },
       });
-
-      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-      setPendingVerification(true);
-
-    } catch (err: any) {
-      setError(err.errors[0]?.message || "Something went wrong.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const onVerifyPress = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isLoaded) {
-      return;
-    }
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const completeSignUp = await signUp.attemptEmailAddressVerification({
-        code,
+    } catch (error: any) {
+       toast({
+        variant: 'destructive',
+        title: 'Uh oh! Something went wrong.',
+        description: error.message,
       });
-      if (completeSignUp.status !== "complete") {
-        console.log(JSON.stringify(completeSignUp, null, 2));
-      }
-      if (completeSignUp.status === "complete") {
-        await setActive({ session: completeSignUp.createdSessionId });
-        router.push("/");
-      }
-    } catch (err: any) {
-      setError(err.errors[0]?.longMessage || "Something went wrong.");
-    } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
-  };
+  }
+
+
+  if (isSuccess) {
+    return (
+      <div className="flex justify-center items-center h-screen bg-gray-50">
+        <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md border border-gray-200 text-center">
+            <Icons.mail className="mx-auto h-12 w-12 text-primary" />
+            <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-space-grotesk)' }}>Confirm your email</h1>
+            <p className="text-muted-foreground">
+              We&apos;ve sent a confirmation link to your email address. Please check your inbox and click the link to complete the sign-up process.
+            </p>
+            <Button asChild>
+                <Link href="/sign-in">Back to Sign In</Link>
+            </Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="flex justify-center items-center h-screen bg-gray-50">
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md border border-gray-200">
-        {!pendingVerification && (
-          <>
-            <div className="text-center">
-              <h1 className="text-3xl font-bold tracking-tight text-gray-900" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
-                Create your account
-              </h1>
-              <p className="mt-2 text-sm text-gray-600">
-                Welcome! Please fill in the details to get started.
-              </p>
-            </div>
-            <form onSubmit={onSignUpPress} className="space-y-4">
-              <div>
-                <Label htmlFor="email">Email address</Label>
-                <Input
-                  value={emailAddress}
-                  type="email"
-                  id="email"
-                  placeholder="Enter your email address"
-                  onChange={(e) => setEmailAddress(e.target.value)}
-                  required
-                  className="mt-1"
-                />
-              </div>
-              <div className="relative">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  value={password}
-                  type={showPassword ? "text" : "password"}
-                  id="password"
-                  placeholder="Enter your password"
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="mt-1"
-                />
-                <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="focus:outline-none">
-                    {showPassword ? (
-                      <Icons.eyeOff className="h-5 w-5 text-gray-400" />
-                    ) : (
-                      <Icons.eye className="h-5 w-5 text-gray-400" />
-                    )}
-                  </button>
-                </div>
-              </div>
-              <div id="clerk-captcha"></div>
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Creating account..." : "Create account"}
-              </Button>
-              {error && <p className="text-sm text-red-500 text-center">{error}</p>}
-            </form>
-            <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-white px-2 text-muted-foreground">
-                    OR CONTINUE WITH
-                    </span>
-                </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-                <Button variant="outline" type="button" onClick={() => handleOauthSignUp('oauth_apple')} disabled={isLoading}>
-                    <Icons.apple className="mr-2 h-4 w-4" /> Apple
-                </Button>
-                <Button variant="outline" type="button" onClick={() => handleOauthSignUp('oauth_google')} disabled={isLoading}>
-                    <Icons.google className="mr-2 h-4 w-4" /> Google
-                </Button>
-            </div>
-             <p className="px-8 text-center text-sm text-muted-foreground">
-              Already have an account?{" "}
-              <Link
-                href="/sign-in"
-                className="underline underline-offset-4 text-primary hover:text-primary/90"
-              >
-                Login
-              </Link>
-            </p>
-          </>
-        )}
-        {pendingVerification && (
-          <>
-            <div className="text-center">
-                <h1 className="text-2xl font-bold">Verify your email</h1>
-                <p className="mt-2 text-sm text-muted-foreground">
-                    A verification code has been sent to your email.
-                </p>
-            </div>
-            <form onSubmit={onVerifyPress} className="space-y-4">
-              <div className="flex flex-col space-y-2">
-                <Label htmlFor="code">Verification Code</Label>
-                <Input
-                  value={code}
-                  id="code"
-                  placeholder="Enter verification code"
-                  onChange={(e) => setCode(e.target.value)}
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Verifying..." : "Verify"}
-              </Button>
-              {error && <p className="text-sm text-red-500 text-center">{error}</p>}
-            </form>
-          </>
-        )}
-         <p className="px-8 text-center text-sm text-muted-foreground">
-            By clicking continue, you agree to our{" "}
-            <a
-              href="/terms"
-              className="underline underline-offset-4 text-primary hover:text-primary/90"
-            >
-              Terms of Service
-            </a>{" "}
-            and{" "}
-            <a
-              href="/privacy"
-              className="underline underline-offset-4 text-primary hover:text-primary/90"
-            >
-              Privacy Policy
-            </a>
-            .
+    <div className="flex justify-center items-center min-h-screen bg-gray-50">
+      <div className="w-full max-w-md p-8 my-8 space-y-6 bg-white rounded-lg shadow-md border border-gray-200">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
+            Create your account
+          </h1>
+          <p className="mt-2 text-sm text-gray-600">
+            Welcome! Please fill in the details to get started.
           </p>
+        </div>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email address</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Enter your email address"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="password"
+                      placeholder="Enter your password"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+                  Creating account...
+                </>
+              ) : (
+                'Create account'
+              )}
+            </Button>
+          </form>
+        </Form>
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-white px-2 text-muted-foreground">
+              OR CONTINUE WITH
+            </span>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4">
+            <Button variant="outline" type="button" onClick={() => handleOAuthSignUp('google')} disabled={isSubmitting}>
+                <Icons.google className="mr-2 h-4 w-4" /> Google
+            </Button>
+        </div>
+        <p className="px-8 text-center text-sm text-muted-foreground">
+          Already have an account?{' '}
+          <Link
+            href="/sign-in"
+            className="underline underline-offset-4 text-primary hover:text-primary/90"
+          >
+            Login
+          </Link>
+        </p>
+        <p className="px-8 text-center text-sm text-muted-foreground">
+          By clicking continue, you agree to our{' '}
+          <a
+            href="/terms"
+            className="underline underline-offset-4 text-primary hover:text-primary/90"
+          >
+            Terms of Service
+          </a>{' '}
+          and{' '}
+          <a
+            href="/privacy"
+            className="underline underline-offset-4 text-primary hover:text-primary/90"
+          >
+            Privacy Policy
+          </a>
+          .
+        </p>
       </div>
     </div>
-  );
+  )
 } 

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { useUser } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -15,14 +14,18 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, UploadCloud } from 'lucide-react';
 import Image from 'next/image';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { apiClient } from '@/lib/apiClient';
+import type { User } from '@supabase/supabase-js';
 
 interface ProfileImageUploadModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
+  user: User | null;
+  onSuccess?: () => void;
 }
 
-export function ProfileImageUploadModal({ isOpen, onOpenChange }: ProfileImageUploadModalProps) {
-  const { user } = useUser();
+export function ProfileImageUploadModal({ isOpen, onOpenChange, user, onSuccess }: ProfileImageUploadModalProps) {
   const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -41,19 +44,54 @@ export function ProfileImageUploadModal({ isOpen, onOpenChange }: ProfileImageUp
     if (!file || !user) return;
 
     setIsUploading(true);
+    const supabase = createSupabaseBrowserClient();
+
     try {
-      await user.setProfileImage({ file });
+      // Step 1: Upload the file to Supabase Storage.
+      // A unique path is created for each user to prevent overwrites.
+      const filePath = `${user.id}/${Date.now()}_${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('avatars') // NOTE: Assumes an 'avatars' bucket exists and is configured.
+        .upload(filePath, file);
+
+      if (uploadError) {
+        throw new Error(`Storage Error: ${uploadError.message}`);
+      }
+
+      // Step 2: Get the public URL of the uploaded file.
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+      
+      if (!urlData.publicUrl) {
+          throw new Error("Could not retrieve public URL for the uploaded file.");
+      }
+
+      // Step 3: Update the user's profile with the new avatar URL via our Hono API.
+      const res = await apiClient.me.profile.$put({
+        json: { avatarUrl: urlData.publicUrl },
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(`API Error: ${errorData.error || 'Failed to update profile'}`);
+      }
+      
       toast({
         title: 'Success!',
         description: 'Your profile picture has been updated.',
       });
-      onOpenChange(false); // Close modal on success
+
+      onSuccess?.(); // Optionally trigger a refresh on the parent component.
+      onOpenChange(false); // Close modal on success.
+
     } catch (error) {
       console.error('Error uploading profile image:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Something went wrong. Please try again.';
       toast({
         variant: 'destructive',
         title: 'Upload Failed',
-        description: 'Something went wrong. Please try again.',
+        description: errorMessage,
       });
     } finally {
       setIsUploading(false);
@@ -62,8 +100,15 @@ export function ProfileImageUploadModal({ isOpen, onOpenChange }: ProfileImageUp
     }
   };
 
+  const handleClose = () => {
+    if (isUploading) return;
+    setFile(null);
+    setPreviewUrl(null);
+    onOpenChange(false);
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Update Profile Picture</DialogTitle>
@@ -103,7 +148,7 @@ export function ProfileImageUploadModal({ isOpen, onOpenChange }: ProfileImageUp
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isUploading}>
+          <Button variant="outline" onClick={handleClose} disabled={isUploading}>
             Cancel
           </Button>
           <Button onClick={handleUpload} disabled={!file || isUploading}>

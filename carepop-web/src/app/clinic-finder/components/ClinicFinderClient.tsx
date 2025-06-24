@@ -6,11 +6,9 @@ import ClinicList from './ClinicList';
 import DynamicMapLoader from './DynamicMapLoader';
 import ClinicDetailModal from './ClinicDetailModal';
 import SlidingPanel, { PanelState } from './SlidingPanel';
-import { Clinic } from '@/lib/types/clinic';
 import { Loader2, SlidersHorizontal, ArrowLeft, LocateFixed } from 'lucide-react';
 import LocationSearchInput from './LocationSearchInput';
 import ServiceFilter from './ServiceFilter';
-import { Service } from '@/lib/types/service';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -23,7 +21,18 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
+} from "@/components/ui/tooltip";
+import { type InferResponseType } from 'hono/client';
+import { apiClient } from '@/lib/apiClient';
+
+// --- Start: New Inferred Types ---
+// These are the canonical types for this feature, inferred from the API.
+type ClinicsResponse = InferResponseType<typeof apiClient.public.clinics.$get>;
+type Clinic = ClinicsResponse extends { data: (infer T)[] } ? T : never;
+
+type ServicesResponse = InferResponseType<typeof apiClient.public.services.$get>;
+type Service = ServicesResponse extends { data: (infer T)[] } ? T : never;
+// --- End: New Inferred Types ---
 
 type ActiveView = 'list' | 'filters';
 
@@ -34,7 +43,7 @@ interface ClinicFinderClientProps {
 }
 
 export default function ClinicFinderClient({ initialClinics, initialServices, initialFetchError: initialError }: ClinicFinderClientProps) {
-  const isDesktop = useMediaQuery('(min-width: 1024px)'); // Use a wider breakpoint for 2-column layout
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
   
   const [clinics, setClinics] = useState<Clinic[]>(initialClinics);
   const [error, setError] = useState<string | null>(initialError);
@@ -52,8 +61,6 @@ export default function ClinicFinderClient({ initialClinics, initialServices, in
   const [panelState, setPanelState] = useState<PanelState>('collapsed');
   const [activeView, setActiveView] = useState<ActiveView>('list');
 
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
-
   useEffect(() => {
     if (error) {
       toast.error(error);
@@ -61,10 +68,29 @@ export default function ClinicFinderClient({ initialClinics, initialServices, in
     }
   }, [error]);
 
-  const serviceFilteredClinics = clinics.filter(clinic => {
+  // Add client-side distance calculation if userLocation is available
+  const clinicsWithDistance = React.useMemo(() => {
+    if (!userLocation) return clinics;
+    // haversine formula for distance calculation
+    const toRad = (x: number) => x * Math.PI / 180;
+    return clinics.map(clinic => {
+      if (!clinic.latitude || !clinic.longitude) return clinic;
+      const R = 6371; // Earth radius in km
+      const dLat = toRad(clinic.latitude - userLocation.lat);
+      const dLon = toRad(clinic.longitude - userLocation.lon);
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(toRad(userLocation.lat)) * Math.cos(toRad(clinic.latitude)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distance = R * c;
+      return { ...clinic, distance_km: distance };
+    }).sort((a, b) => (a.distance_km || Infinity) - (b.distance_km || Infinity));
+  }, [clinics, userLocation]);
+
+  const serviceFilteredClinics = clinicsWithDistance.filter(clinic => {
     return selectedServices.length === 0 || 
            selectedServices.every(serviceId => 
-             (clinic.services_offered || []).includes(serviceId)
+             (clinic.services_offered || []).some(s => s.serviceId === serviceId)
            );
   });
 
@@ -86,11 +112,16 @@ export default function ClinicFinderClient({ initialClinics, initialServices, in
     }
 
     try {
-      const url = `${API_BASE_URL}/api/v1/public/clinics?latitude=${lat}&longitude=${lon}&radius=${radius * 1000}`;
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Failed to fetch clinics');
-      const data = await response.json();
-      setClinics(data.data);
+      const res = await apiClient.public.clinics.nearby.$get({
+        query: {
+          lat: lat.toString(),
+          lon: lon.toString(),
+          radius: (radius * 1000).toString(), // API expects radius in meters
+        }
+      });
+      if (!res.ok) throw new Error('Failed to fetch clinics');
+      const data = await res.json();
+      setClinics(data.data ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
     } finally {

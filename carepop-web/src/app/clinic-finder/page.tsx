@@ -1,5 +1,8 @@
-import React from 'react'; // Removed useState, useEffect
+import React from 'react';
 import { Metadata } from 'next';
+import ClinicFinderClient from './components/ClinicFinderClient';
+import { apiClient } from '@/lib/apiClient';
+import { type InferResponseType } from 'hono/client';
 
 // Components that are part of the page layout but don't require client interactivity directly here
 // import LocationSearchInput from './components/LocationSearchInput'; 
@@ -7,10 +10,13 @@ import { Metadata } from 'next';
 // import SearchClinicsButton from './components/SearchClinicsButton';
 // The above will be rendered by ClinicFinderClient.tsx
 
-import ClinicFinderClient from './components/ClinicFinderClient'; // Import the new client component
-import { Clinic } from '@/lib/types/clinic';
-import { Service } from '@/lib/types/service';
-// AlertTriangle might be used by ClinicFinderClient if fetchError is passed and handled there
+// --- Start: New Inferred Types ---
+type ClinicsResponse = InferResponseType<typeof apiClient.public.clinics.$get>;
+type Clinic = ClinicsResponse extends { data: (infer T)[] } ? T : never;
+
+type ServicesResponse = InferResponseType<typeof apiClient.public.services.$get>;
+type Service = ServicesResponse extends { data: (infer T)[] } ? T : never;
+// --- End: New Inferred Types ---
 
 export const dynamic = 'force-dynamic';
 
@@ -61,22 +67,16 @@ const exampleClinicSchema = {
   url: 'https://www.carepop.ph/clinic/sample-clinic'
 };
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
-
 async function getClinics(): Promise<Clinic[]> {
-  // Use the correct public endpoint
-  const url = `${API_BASE_URL}/api/v1/public/clinics`;
-  console.log(`Fetching clinics from: ${url}`);
   try {
-    // Use an absolute URL for server-side fetch
-    const response = await fetch(url, { cache: 'no-store' }); // Use no-store for dynamic data
-    if (!response.ok) {
-      const errorText = await response.text();
+    const res = await apiClient.public.clinics.$get();
+    if (!res.ok) {
+      const errorText = await res.text();
       console.error("Failed to fetch clinics:", errorText);
-      throw new Error(`Failed to fetch clinics: ${response.status} ${response.statusText}`);
+      throw new Error(`Failed to fetch clinics`);
     }
-    const result = await response.json();
-    return result.data; // The API returns data in a 'data' property
+    const data = await res.json();
+    return data.data ?? [];
   } catch (error) {
     console.error("An error occurred while fetching clinics:", error);
     return [];
@@ -84,17 +84,15 @@ async function getClinics(): Promise<Clinic[]> {
 }
 
 async function getServices(): Promise<Service[]> {
-  const url = `${API_BASE_URL}/api/v1/public/services`;
-  console.log(`Fetching services from: ${url}`);
   try {
-    const response = await fetch(url, { cache: 'no-store' });
-    if (!response.ok) {
-      const errorText = await response.text();
+    const res = await apiClient.public.services.$get();
+    if (!res.ok) {
+      const errorText = await res.text();
       console.error("Failed to fetch services:", errorText);
-      throw new Error(`Failed to fetch services: ${response.status} ${response.statusText}`);
+      throw new Error(`Failed to fetch services`);
     }
-    const result = await response.json();
-    return result.data; // The API returns data in a 'data' property
+    const data = await res.json();
+    return data.data ?? [];
   } catch (error) {
     console.error("An error occurred while fetching services:", error);
     return [];

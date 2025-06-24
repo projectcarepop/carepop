@@ -8,8 +8,17 @@ import {
   Pin,
 } from '@vis.gl/react-google-maps';
 import { DirectionsService, DirectionsRenderer, GoogleMap, useJsApiLoader } from '@react-google-maps/api';
-import { Clinic } from '@/lib/types/clinic';
 import { Loader2 } from 'lucide-react';
+
+// Define a minimal Clinic type for this component's needs.
+// The parent component is responsible for providing objects that match this shape.
+type Clinic = {
+  id: string;
+  name: string;
+  latitude: number | null;
+  longitude: number | null;
+  is_active: boolean;
+};
 
 const GOOGLE_MAPS_LIBRARIES: ("geometry" | "places")[] = ["geometry", "places"];
 

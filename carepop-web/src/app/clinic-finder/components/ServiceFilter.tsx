@@ -4,7 +4,13 @@ import { useState } from 'react';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Service } from '@/lib/types/service';
+
+// Define a minimal Service type for this component's needs.
+// The parent component is responsible for providing objects that match this shape.
+type Service = {
+  id: string;
+  name: string;
+};
 
 interface ServiceFilterProps {
   services: Service[];

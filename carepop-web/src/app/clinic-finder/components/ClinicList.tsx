@@ -4,6 +4,15 @@
 import { Clinic } from "@/lib/types/clinic"; // Import the new Clinic type
 import ClinicListItem from './ClinicListItem';
 
+// Define a minimal Clinic type for this component's needs.
+// This should match the props expected by the wrapped ClinicListItem component.
+type Clinic = {
+  id: string;
+  name: string;
+  full_address: string | null;
+  distance_km?: number | null;
+};
+
 interface ClinicListProps {
   clinics: Clinic[];
   onViewDetails: (clinic: Clinic) => void;

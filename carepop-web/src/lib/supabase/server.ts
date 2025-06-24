@@ -1,34 +1,29 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { Database } from '@/types/supabase';
 
-export const createSupabaseServerClient = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+export const createClient = async () => {
+  const cookieStore = await cookies()
 
-  return createServerClient<Database>(
-    supabaseUrl,
-    supabaseKey,
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get: async (name: string) => {
-          const cookieStore = await cookies()
+        get(name: string) {
           return cookieStore.get(name)?.value
         },
-        set: async (name: string, value: string, options: CookieOptions) => {
+        set(name: string, value: string, options: CookieOptions) {
           try {
-            const cookieStore = await cookies()
-            cookieStore.set(name, value, options)
+            cookieStore.set({ name, value, ...options })
           } catch {
             // The `set` method was called from a Server Component.
             // This can be ignored if you have middleware refreshing
             // user sessions.
           }
         },
-        remove: async (name: string, options: CookieOptions) => {
+        remove(name: string, options: CookieOptions) {
           try {
-            const cookieStore = await cookies()
-            cookieStore.set(name, '', options)
+            cookieStore.set({ name, value: '', ...options })
           } catch {
             // The `delete` method was called from a Server Component.
             // This can be ignored if you have middleware refreshing

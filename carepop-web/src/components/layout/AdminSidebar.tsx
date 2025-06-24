@@ -5,8 +5,10 @@ import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Hospital, Users, CalendarCheck, LogOut, CircleUser, LayoutGrid, Briefcase, Warehouse } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { useAuth, useUser } from '@clerk/nextjs';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { signOutUser } from '@/app/auth/actions';
+import { useAuth } from '@/lib/contexts/auth-context';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const navItems = [
     { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
@@ -33,10 +35,21 @@ const NavLink = ({ href, label, icon: Icon, isActive }: { href: string; label: s
 
 export default function AdminSidebar() {
     const pathname = usePathname();
-    const { user } = useUser();
-    const { signOut } = useAuth();
+    const { user, isLoading } = useAuth();
 
-    if (!user) {
+    if (isLoading) {
+        return (
+            <aside className="hidden w-64 flex-col border-r bg-muted/40 sm:flex p-4 space-y-2">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+            </aside>
+        );
+    }
+
+    // This is the crucial security check. If the user is not an admin, render nothing.
+    if (user?.app_metadata?.role !== 'admin') {
         return null; 
     }
 
@@ -61,7 +74,7 @@ export default function AdminSidebar() {
                       <Button variant="ghost" className="flex items-center justify-start gap-3 w-full">
                           <CircleUser className="h-6 w-6" />
                           <div className="text-left">
-                              <p className="text-sm font-medium">{user.emailAddresses[0]?.emailAddress}</p>
+                              <p className="text-sm font-medium">{user.email}</p>
                           </div>
                       </Button>
                   </DropdownMenuTrigger>
@@ -72,15 +85,17 @@ export default function AdminSidebar() {
                                   My Account
                               </p>
                               <p className="text-xs leading-none text-muted-foreground">
-                                  {user.emailAddresses[0]?.emailAddress}
+                                  {user.email}
                               </p>
                           </div>
                       </DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onSelect={() => signOut()}>
-                          <LogOut className="mr-2 h-4 w-4" />
-                          <span>Log out</span>
-                      </DropdownMenuItem>
+                      <form action={signOutUser}>
+                        <button type="submit" className="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent">
+                            <LogOut className="mr-2 h-4 w-4" />
+                            <span>Log out</span>
+                        </button>
+                      </form>
                   </DropdownMenuContent>
               </DropdownMenu>
           </div>

@@ -1,10 +1,6 @@
 "use client"; // Required because CancelAppointmentModal is a client component and used here
 
 import {
-  UserAppointmentDetails,
-  AppointmentStatus,
-} from "@/lib/types/appointmentTypes";
-import {
   Card,
   CardContent,
   CardDescription,
@@ -16,25 +12,33 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CancelAppointmentModal } from "./CancelAppointmentModal";
 import { useRouter } from 'next/navigation'; // For onCancellationSuccess
+import { type InferResponseType } from 'hono/client';
+import { apiClient } from "@/lib/apiClient";
+
+// Infer the type from the Hono client response
+type AppointmentResponse = InferResponseType<typeof apiClient.me.appointments.$get>;
+// The API returns an array of appointments, so we get the type of a single element
+type Appointment = AppointmentResponse extends (infer T)[] ? T : never;
+type AppointmentStatus = Appointment['status'];
 
 interface AppointmentCardProps {
-  appointment: UserAppointmentDetails;
+  appointment: Appointment;
 }
 
 function getStatusBadgeVariant(
   status: AppointmentStatus
 ): "default" | "secondary" | "destructive" | "outline" {
   switch (status) {
-    case AppointmentStatus.CONFIRMED:
-      return "default"; // Greenish or bluish for confirmed
-    case AppointmentStatus.COMPLETED:
-      return "default"; // Typically green or blue
-    case AppointmentStatus.PENDING:
-      return "secondary"; // Yellowish or grayish for pending
-    case AppointmentStatus.CANCELLED_USER:
-    case AppointmentStatus.CANCELLED_CLINIC:
-    case AppointmentStatus.NO_SHOW:
-      return "destructive"; // Reddish for cancelled/no_show
+    case "CONFIRMED":
+      return "default";
+    case "COMPLETED":
+      return "default";
+    case "PENDING":
+      return "secondary";
+    case "CANCELLED_BY_USER":
+    case "CANCELLED_BY_CLINIC":
+    case "NO_SHOW":
+      return "destructive";
     default:
       return "outline";
   }
@@ -44,9 +48,9 @@ export default function AppointmentCard({ appointment }: AppointmentCardProps) {
   const router = useRouter();
 
   const isCancellable = 
-    (appointment.status === AppointmentStatus.PENDING || 
-     appointment.status === AppointmentStatus.CONFIRMED) &&
-    new Date(appointment.appointment_time) > new Date(); // And is in the future
+    (appointment.status === "PENDING" || 
+     appointment.status === "CONFIRMED") &&
+    new Date(appointment.appointmentTime) > new Date(); // And is in the future
 
   const handleCancellationSuccess = () => {
     router.refresh(); // Re-fetch data on the current page
@@ -63,13 +67,13 @@ export default function AppointmentCard({ appointment }: AppointmentCardProps) {
             </Badge>
           </div>
           <CardDescription>
-            {new Date(appointment.appointment_time).toLocaleDateString(undefined, {
+            {new Date(appointment.appointmentTime).toLocaleDateString(undefined, {
               weekday: 'long',
               year: 'numeric',
               month: 'long',
               day: 'numeric',
             })} 
-            at {new Date(appointment.appointment_time).toLocaleTimeString(undefined, {
+            at {new Date(appointment.appointmentTime).toLocaleTimeString(undefined, {
               hour: '2-digit',
               minute: '2-digit',
               hour12: true,
