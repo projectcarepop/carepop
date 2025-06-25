@@ -16,8 +16,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Users, ChevronLeft, ChevronRight, Briefcase, HeartPulse } from 'lucide-react';
 import { DatePicker } from '@/components/ui/datepicker';
-import { completeUserProfile, FormState } from '@/legacy/app/complete-profile/actions';
-import { profileFormSchema, ProfileFormValues } from '@/lib/validation/profile-schema';
+import { completeUserProfile, FormState } from '@/app/auth/actions';
+import { profileFormSchema, ProfileFormValues } from '@/lib/validation/profile';
 
 export interface ProfileFormProps {
     userProfile: any;
@@ -247,7 +247,7 @@ export function ProfileForm({ userProfile, psgc }: ProfileFormProps) {
                                          <FormItem>
                                              <FormLabel>Gender Identity</FormLabel>
                                              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                 <FormControl><SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger></FormControl>
+                                                 <FormControl><SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger></FormControl>
                                                  <SelectContent>
                                                      <SelectItem value="Male">Male</SelectItem>
                                                      <SelectItem value="Female">Female</SelectItem>
@@ -264,7 +264,7 @@ export function ProfileForm({ userProfile, psgc }: ProfileFormProps) {
                                          <FormItem>
                                              <FormLabel>Pronouns</FormLabel>
                                              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                 <FormControl><SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger></FormControl>
+                                                 <FormControl><SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger></FormControl>
                                                  <SelectContent>
                                                      <SelectItem value="He/Him">He/Him</SelectItem>
                                                      <SelectItem value="She/Her">She/Her</SelectItem>
@@ -279,7 +279,7 @@ export function ProfileForm({ userProfile, psgc }: ProfileFormProps) {
                                          <FormItem>
                                              <FormLabel>Assigned Sex at Birth</FormLabel>
                                              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                 <FormControl><SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger></FormControl>
+                                                 <FormControl><SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger></FormControl>
                                                  <SelectContent>
                                                      <SelectItem value="Male">Male</SelectItem>
                                                      <SelectItem value="Female">Female</SelectItem>
@@ -311,7 +311,7 @@ export function ProfileForm({ userProfile, psgc }: ProfileFormProps) {
                                          <FormItem>
                                              <FormLabel>Civil Status</FormLabel>
                                              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                 <FormControl><SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger></FormControl>
+                                                 <FormControl><SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger></FormControl>
                                                  <SelectContent>
                                                      <SelectItem value="Single">Single</SelectItem>
                                                      <SelectItem value="Married">Married</SelectItem>
@@ -374,7 +374,7 @@ export function ProfileForm({ userProfile, psgc }: ProfileFormProps) {
                         </Button>
 
                         {currentStep < stepsConfig.length - 1 ? (
-                            <Button type="button" onClick={nextStep}>
+                            <Button type="button" onClick={nextStep} className="mt-8">
                                 Next
                                 <ChevronRight className="h-4 w-4 ml-2" />
                             </Button>

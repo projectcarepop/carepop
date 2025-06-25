@@ -9,6 +9,7 @@ import * as z from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Icons } from '@/components/icons'
+import { GoogleIcon } from '@/components/icons/GoogleIcon'
 import {
   Form,
   FormControl,
@@ -18,6 +19,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { useToast } from '@/hooks/use-toast'
+import { MailCheck } from 'lucide-react'
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email address.' }),
@@ -33,6 +35,7 @@ export default function SignUpPage() {
   ));
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const { toast } = useToast()
   
   const form = useForm<z.infer<typeof formSchema>>({
@@ -50,7 +53,7 @@ export default function SignUpPage() {
         email: values.email,
         password: values.password,
         options: {
-          emailRedirectTo: `${location.origin}/auth/callback`,
+          emailRedirectTo: `${location.origin}/auth/callback?next=/auth/email-verified`,
         },
       })
 
@@ -97,8 +100,8 @@ export default function SignUpPage() {
   if (isSuccess) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-50">
-        <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md border border-gray-200 text-center">
-            <Icons.mail className="mx-auto h-12 w-12 text-primary" />
+        <div className="w-full max-w-md p-10 space-y-6 bg-white rounded-lg shadow-md border border-gray-200 text-center">
+            <MailCheck className="mx-auto h-12 w-12 text-primary" />
             <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-space-grotesk)' }}>Confirm your email</h1>
             <p className="text-muted-foreground">
               We&apos;ve sent a confirmation link to your email address. Please check your inbox and click the link to complete the sign-up process.
@@ -147,11 +150,25 @@ export default function SignUpPage() {
                 <FormItem>
                   <FormLabel>Password</FormLabel>
                   <FormControl>
-                    <Input
-                      type="password"
-                      placeholder="Enter your password"
-                      {...field}
-                    />
+                    <div className="relative">
+                      <Input
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Enter your password"
+                        {...field}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute inset-y-0 right-0 flex items-center pr-3"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? (
+                          <Icons.eyeOff className="h-5 w-5 text-gray-400" />
+                        ) : (
+                          <Icons.eye className="h-5 w-5 text-gray-400" />
+                        )}
+                      </button>
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -181,7 +198,7 @@ export default function SignUpPage() {
         </div>
         <div className="grid grid-cols-1 gap-4">
             <Button variant="outline" type="button" onClick={() => handleOAuthSignUp('google')} disabled={isSubmitting}>
-                <Icons.google className="mr-2 h-4 w-4" /> Google
+                <GoogleIcon className="mr-2 h-4 w-4" /> Google
             </Button>
         </div>
         <p className="px-8 text-center text-sm text-muted-foreground">
@@ -195,19 +212,19 @@ export default function SignUpPage() {
         </p>
         <p className="px-8 text-center text-sm text-muted-foreground">
           By clicking continue, you agree to our{' '}
-          <a
-            href="/terms"
+          <Link
+            href="/terms-of-service"
             className="underline underline-offset-4 text-primary hover:text-primary/90"
           >
             Terms of Service
-          </a>{' '}
+          </Link>{' '}
           and{' '}
-          <a
-            href="/privacy"
+          <Link
+            href="/privacy-policy"
             className="underline underline-offset-4 text-primary hover:text-primary/90"
           >
             Privacy Policy
-          </a>
+          </Link>
           .
         </p>
       </div>

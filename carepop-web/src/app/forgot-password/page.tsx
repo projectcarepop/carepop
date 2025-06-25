@@ -17,7 +17,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
-import { useToast } from '@/hooks/use-toast'
+import { MailCheck } from 'lucide-react'
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email address.' }),
@@ -30,7 +30,7 @@ export default function ForgotPasswordPage() {
   ));
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
-  const { toast } = useToast()
+  const [formError, setFormError] = useState<string | null>(null);
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -41,26 +41,19 @@ export default function ForgotPasswordPage() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true)
+    setFormError(null);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
         redirectTo: `${location.origin}/auth/callback?next=/update-password`,
       })
 
       if (error) {
-        toast({
-          variant: 'destructive',
-          title: 'Uh oh! Something went wrong.',
-          description: error.message,
-        })
+        setFormError(error.message);
       } else {
         setIsSuccess(true);
       }
     } catch {
-      toast({
-        variant: 'destructive',
-        title: 'Uh oh! Something went wrong.',
-        description: 'An unexpected error occurred. Please try again.',
-      })
+      setFormError('An unexpected error occurred. Please try again.');
     } finally {
       setIsSubmitting(false)
     }
@@ -70,7 +63,7 @@ export default function ForgotPasswordPage() {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-50">
         <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md border border-gray-200 text-center">
-            <Icons.mail className="mx-auto h-12 w-12 text-primary" />
+            <MailCheck className="mx-auto h-12 w-12 text-primary" />
             <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-space-grotesk)' }}>Check your email</h1>
             <p className="text-muted-foreground">
               We&apos;ve sent a password reset link to your email address. Please check your inbox.
@@ -112,6 +105,7 @@ export default function ForgotPasswordPage() {
                 </FormItem>
               )}
             />
+            {formError && <p className="text-sm font-medium text-destructive">{formError}</p>}
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>

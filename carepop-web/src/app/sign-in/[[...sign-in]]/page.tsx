@@ -10,6 +10,7 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Icons } from "@/components/icons";
+import { GoogleIcon } from "@/components/icons/GoogleIcon";
 import { useToast } from "@/hooks/use-toast";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -24,6 +25,7 @@ export default function Page() {
   const { toast } = useToast();
   const [showPassword, setShowPassword] = React.useState(false);
   const [isOauthLoading, setIsOauthLoading] = React.useState(false);
+  const [signInError, setSignInError] = React.useState<string | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -53,6 +55,7 @@ export default function Page() {
   }
 
   const onSignInPress = async (values: z.infer<typeof formSchema>) => {
+    setSignInError(null);
     const supabase = createSupabaseBrowserClient();
     const { error } = await supabase.auth.signInWithPassword({
       email: values.email,
@@ -60,13 +63,9 @@ export default function Page() {
     });
 
     if (error) {
-      toast({
-        variant: "destructive",
-        title: "Error signing in",
-        description: error.message,
-      });
-      } else {
-      router.push("/dashboard");
+      setSignInError(error.message);
+    } else {
+      router.push("/main-dashboard");
       router.refresh();
     }
   };
@@ -143,6 +142,9 @@ export default function Page() {
                     </FormItem>
                   )}
                 />
+                {signInError && (
+                  <p className="text-sm font-medium text-destructive text-center">{signInError}</p>
+                )}
               <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
                   {form.formState.isSubmitting ? "Signing in..." : "Continue"}
               </Button>
@@ -160,7 +162,7 @@ export default function Page() {
         </div>
         <div className="grid grid-cols-1 gap-4">
             <Button variant="outline" type="button" onClick={() => handleOauthSignIn('google')} disabled={isOauthLoading || form.formState.isSubmitting}>
-                <Icons.google className="mr-2 h-4 w-4" /> Google
+                <GoogleIcon className="mr-2 h-4 w-4" /> Google
             </Button>
         </div>
         <p className="px-8 text-center text-sm text-muted-foreground">

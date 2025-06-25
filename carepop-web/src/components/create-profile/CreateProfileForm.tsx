@@ -117,15 +117,15 @@ export function CreateProfileForm({ profile }: { profile: Profile | null }) {
                         {step === 1 && (
                             <section id="step-1" className="space-y-4 animate-in fade-in-50">
                                 <h3 className="text-lg font-medium">Personal Information</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                                     <FormField name="firstName" control={form.control} render={({ field }) => (
-                                        <FormItem><RequiredLabel>First Name</RequiredLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                                        <FormItem className="md:col-span-2"><RequiredLabel>First Name</RequiredLabel><FormControl><Input {...field} /></FormControl><div className="h-5"><FormMessage /></div></FormItem>
                                     )}/>
                                     <FormField name="middleInitial" control={form.control} render={({ field }) => (
-                                        <FormItem><FormLabel>Middle Initial</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                                        <FormItem className="md:col-span-1"><FormLabel>Middle Initial</FormLabel><FormControl><Input {...field} /></FormControl><div className="h-5"><FormMessage /></div></FormItem>
                                     )}/>
                                     <FormField name="lastName" control={form.control} render={({ field }) => (
-                                        <FormItem><RequiredLabel>Last Name</RequiredLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                                        <FormItem className="md:col-span-2"><RequiredLabel>Last Name</RequiredLabel><FormControl><Input {...field} /></FormControl><div className="h-5"><FormMessage /></div></FormItem>
                                     )}/>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -139,31 +139,40 @@ export function CreateProfileForm({ profile }: { profile: Profile | null }) {
                                                 </FormControl>
                                             </PopoverTrigger>
                                             <PopoverContent className="w-auto p-0" align="start">
-                                                <Calendar mode="single" selected={field.value ? parseISO(field.value) : undefined} onSelect={(date) => field.onChange(date?.toISOString().split('T')[0])} initialFocus />
-                                            </PopoverContent></Popover><FormMessage />
+                                                <Calendar
+                                                    mode="single"
+                                                    captionLayout="dropdown"
+                                                    selected={field.value ? parseISO(field.value) : undefined}
+                                                    onSelect={(date) => field.onChange(date?.toISOString().split('T')[0])}
+                                                    disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                                                    initialFocus
+                                                    fromYear={1900}
+                                                    toYear={new Date().getFullYear()}
+                                                />
+                                            </PopoverContent></Popover><div className="h-5"><FormMessage /></div>
                                         </FormItem>
                                     )}/>
                                     <FormField name="civilStatus" control={form.control} render={({ field }) => (
-                                        <FormItem><FormLabel>Civil Status</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger></FormControl>
+                                        <FormItem><FormLabel>Civil Status</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger></FormControl>
                                             <SelectContent><SelectItem value="Single">Single</SelectItem><SelectItem value="Married">Married</SelectItem><SelectItem value="Divorced">Divorced</SelectItem><SelectItem value="Widowed">Widowed</SelectItem></SelectContent>
-                                        </Select><FormMessage /></FormItem>
+                                        </Select><div className="h-5"><FormMessage /></div></FormItem>
                                     )}/>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                      <FormField name="genderIdentity" control={form.control} render={({ field }) => (
-                                        <FormItem><FormLabel>Gender Identity</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger></FormControl>
+                                        <FormItem><FormLabel>Gender Identity</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger></FormControl>
                                             <SelectContent><SelectItem value="Woman">Woman</SelectItem><SelectItem value="Man">Man</SelectItem><SelectItem value="Non-binary">Non-binary</SelectItem><SelectItem value="Prefer not to say">Prefer not to say</SelectItem></SelectContent>
-                                        </Select><FormMessage /></FormItem>
+                                        </Select><div className="h-5"><FormMessage /></div></FormItem>
                                     )}/>
                                      <FormField name="pronouns" control={form.control} render={({ field }) => (
-                                        <FormItem><FormLabel>Pronouns</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger></FormControl>
+                                        <FormItem><FormLabel>Pronouns</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger></FormControl>
                                             <SelectContent><SelectItem value="she/her">she/her</SelectItem><SelectItem value="he/him">he/him</SelectItem><SelectItem value="they/them">they/them</SelectItem><SelectItem value="Prefer not to say">Prefer not to say</SelectItem></SelectContent>
-                                        </Select><FormMessage /></FormItem>
+                                        </Select><div className="h-5"><FormMessage /></div></FormItem>
                                     )}/>
                                      <FormField name="assignedSexAtBirth" control={form.control} render={({ field }) => (
-                                        <FormItem><FormLabel>Assigned Sex at Birth</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger></FormControl>
+                                        <FormItem><FormLabel>Assigned Sex at Birth</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger></FormControl>
                                             <SelectContent><SelectItem value="Female">Female</SelectItem><SelectItem value="Male">Male</SelectItem></SelectContent>
-                                        </Select><FormMessage /></FormItem>
+                                        </Select><div className="h-5"><FormMessage /></div></FormItem>
                                     )}/>
                                 </div>
                             </section>
@@ -172,10 +181,10 @@ export function CreateProfileForm({ profile }: { profile: Profile | null }) {
                              <section id="step-2" className="space-y-4 animate-in fade-in-50">
                                 <h3 className="text-lg font-medium">Contact & Address</h3>
                                 <FormField name="contactNo" control={form.control} render={({ field }) => (
-                                    <FormItem><FormLabel>Contact Number</FormLabel><FormControl><Input placeholder="09171234567" {...field} /></FormControl><FormMessage /></FormItem>
+                                    <FormItem><FormLabel>Contact Number</FormLabel><FormControl><Input placeholder="09171234567" {...field} /></FormControl><div className="h-5"><FormMessage /></div></FormItem>
                                 )}/>
                                 <FormField name="street" control={form.control} render={({ field }) => (
-                                    <FormItem><FormLabel>Street Address</FormLabel><FormControl><Input placeholder="123 Rizal St, Brgy. Poblacion" {...field} /></FormControl><FormMessage /></FormItem>
+                                    <FormItem><FormLabel>Street Address</FormLabel><FormControl><Input placeholder="123 Rizal St, Brgy. Poblacion" {...field} /></FormControl><div className="h-5"><FormMessage /></div></FormItem>
                                 )}/>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     {/* Province */}
@@ -192,7 +201,7 @@ export function CreateProfileForm({ profile }: { profile: Profile | null }) {
                                                         </CommandItem>
                                                     ))}
                                                 </CommandGroup></CommandList>
-                                            </Command></PopoverContent></Popover><FormMessage />
+                                            </Command></PopoverContent></Popover><div className="h-5"><FormMessage /></div>
                                         </FormItem>
                                     )}/>
                                     {/* City / Municipality */}
@@ -209,7 +218,7 @@ export function CreateProfileForm({ profile }: { profile: Profile | null }) {
                                                         </CommandItem>
                                                     ))}
                                                 </CommandGroup></CommandList>
-                                            </Command></PopoverContent></Popover><FormMessage />
+                                            </Command></PopoverContent></Popover><div className="h-5"><FormMessage /></div>
                                         </FormItem>
                                     )}/>
                                     {/* Barangay */}
@@ -226,15 +235,15 @@ export function CreateProfileForm({ profile }: { profile: Profile | null }) {
                                                         </CommandItem>
                                                     ))}
                                                 </CommandGroup></CommandList>
-                                            </Command></PopoverContent></Popover><FormMessage />
+                                            </Command></PopoverContent></Popover><div className="h-5"><FormMessage /></div>
                                         </FormItem>
                                     )}/>
                                 </div>
                             </section>
                         )}
                     </CardContent>
-                    <CardFooter className="flex justify-between">
-                        {step === 1 && <Button type="button" onClick={handleNextStep}>Next</Button>}
+                    <CardFooter className={`flex ${step === 1 ? 'justify-end' : 'justify-between'}`}>
+                        {step === 1 && <Button type="button" onClick={handleNextStep} className="mt-4">Next</Button>}
                         {step === 2 && <Button type="button" variant="outline" onClick={() => setStep(1)}>Back</Button>}
                         {step === 2 && <Button type="submit" disabled={isPending}>{isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Profile</Button>}
                     </CardFooter>
