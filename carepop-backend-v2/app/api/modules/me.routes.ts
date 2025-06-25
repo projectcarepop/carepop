@@ -40,17 +40,16 @@ meRoutes.get('/profile', async (c) => {
  */
 meRoutes.get('/appointments', async (c) => {
   const user = c.get('user');
-
   try {
+    console.log(`Fetching basic appointments for user: ${user.id}`);
     const userAppointments = await db.query.appointments.findMany({
-      where: eq(appointments.patientId, user.id),
-      orderBy: (appointments, { desc }) => [desc(appointments.appointmentTime)],
+      where: eq(appointments.patientId, user.id)
     });
-
-    return c.json(userAppointments);
+    console.log(`Successfully fetched ${userAppointments.length} basic appointments.`);
+    return c.json({ appointments: userAppointments });
   } catch (error) {
-    console.error('Error fetching appointments (simplified query):', error);
-    return c.json({ error: 'Internal Server Error' }, 500);
+    console.error("Error during SIMPLIFIED appointment fetch:", error);
+    return c.json({ error: "Internal Server Error during simplified fetch" }, 500);
   }
 });
 
@@ -60,27 +59,21 @@ meRoutes.get('/appointments', async (c) => {
  */
 meRoutes.get('/medical-records', async (c) => {
   const user = c.get('user');
-  
   try {
-    const recordsByAppointment = await db.query.appointments.findMany({
-      where: and(
-        eq(appointments.patientId, user.id),
-        exists(db.select({ id: medicalRecords.id }).from(medicalRecords).where(eq(medicalRecords.appointmentId, appointments.id)))
-      ),
-      with: {
-        medicalRecords: true,
-        doctor: true,
-        service: true,
-        clinic: true
-      },
-      orderBy: (appointments, { desc }) => [desc(appointments.appointmentTime)],
-    });
+    console.log(`Fetching basic medical records for user: ${user.id}`);
+    // This is a more complex query, as we need to find records via appointments
+    const userMedicalRecords = await db
+      .select()
+      .from(medicalRecords)
+      .innerJoin(appointments, eq(medicalRecords.appointmentId, appointments.id))
+      .where(eq(appointments.patientId, user.id));
 
-    return c.json(recordsByAppointment);
+    console.log(`Successfully fetched ${userMedicalRecords.length} basic records.`);
+    return c.json({ records: userMedicalRecords.map(r => r.medical_records) }); // Return just the record part
 
   } catch (error) {
-    console.error('Error fetching medical records:', error);
-    return c.json({ error: 'Internal Server Error' }, 500);
+    console.error("Error during SIMPLIFIED medical records fetch:", error);
+    return c.json({ error: "Internal Server Error" }, 500);
   }
 });
 

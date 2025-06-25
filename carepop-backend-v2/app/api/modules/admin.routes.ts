@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { db } from '../lib/db';
-import { clinics, profiles, doctors } from '../../../drizzle/schema';
+import { clinics, profiles, doctors, services } from '../../../drizzle/schema';
 import { eq, sql } from 'drizzle-orm';
 import { authMiddleware, adminMiddleware, AuthEnv } from '../middleware/auth';
 
@@ -105,6 +105,27 @@ adminRoutes.post('/doctors', zValidator('json', createDoctorSchema), async (c) =
   } catch (error) {
     console.error('Error creating doctor:', error);
     return c.json({ error: 'Internal Server Error' }, 500);
+  }
+});
+
+// --- Service Management Endpoints ---
+adminRoutes.get('/services', async (c) => {
+  try {
+    const allServices = await db.query.services.findMany({
+      with: {
+        serviceCategory: {
+          columns: {
+            name: true,
+          },
+        },
+      },
+      orderBy: (services, { desc }) => [desc(services.name)],
+    });
+
+    return c.json(allServices);
+  } catch (error) {
+    console.error("Failed to fetch services with categories:", error);
+    return c.json({ error: "Internal Server Error" }, 500);
   }
 });
 

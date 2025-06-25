@@ -31,6 +31,38 @@ app.route('/public', publicRoutes);
 app.route('/me', meRoutes);
 app.route('/admin', adminRoutes);
 
+// ========= TEMPORARY DEBUGGING ROUTE =========
+app.get('/test-profile-update', async (c) => {
+  console.log("--- RUNNING PROFILE UPDATE TEST ---");
+
+  // Replace with the token you generated from the SQL Editor
+  const TEST_USER_JWT = "PASTE_YOUR_LONG_JWT_STRING_HERE";
+
+  const profileUpdatePayload = {
+    firstName: "InternalTest",
+    lastName: "Success"
+  };
+
+  // The 'app' object can dispatch requests to itself.
+  // We are simulating a client hitting our own API internally.
+  const res = await app.request('/api/me/profile', {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${TEST_USER_JWT}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(profileUpdatePayload)
+  });
+
+  const responseBody = await res.text();
+  console.log(`--- TEST COMPLETE ---`);
+  console.log(`Status: ${res.status}`);
+  console.log(`Response Body: ${responseBody}`);
+
+  return c.text(`Test complete. Check your backend terminal logs. Status: ${res.status}`);
+});
+// ========= END OF TEMPORARY DEBUGGING ROUTE =========
+
 // This type is now defined in the shared SDK
 export type AppType = typeof app;
 

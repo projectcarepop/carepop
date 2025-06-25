@@ -1,427 +1,9 @@
 {
-  "id": "00000000-0000-0000-0000-000000000000",
-  "prevId": "",
+  "id": "8988a26e-55cc-4670-9e98-d79f383f2b4a",
+  "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.clinics": {
-      "name": "clinics",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "uuid_generate_v4()"
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "address": {
-          "name": "address",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "phone_number": {
-          "name": "phone_number",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "logo_url": {
-          "name": "logo_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "location": {
-          "name": "location",
-          "type": "geography",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "is_active": {
-          "name": "is_active",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "clinics_location_idx": {
-          "name": "clinics_location_idx",
-          "columns": [
-            {
-              "expression": "location",
-              "asc": true,
-              "nulls": "last",
-              "opclass": "gist_geography_ops",
-              "isExpression": false
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "gist",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {},
-      "policies": {
-        "Admins can manage platform data.": {
-          "name": "Admins can manage platform data.",
-          "as": "PERMISSIVE",
-          "for": "ALL",
-          "to": [
-            "public"
-          ],
-          "using": "(get_my_role() = 'admin'::text)"
-        },
-        "Anyone can view public data.": {
-          "name": "Anyone can view public data.",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": [
-            "public"
-          ]
-        }
-      },
-      "isRLSEnabled": true
-    },
-    "public.doctors": {
-      "name": "doctors",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "uuid_generate_v4()"
-        },
-        "full_name": {
-          "name": "full_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "specialty_text": {
-          "name": "specialty_text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "bio": {
-          "name": "bio",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "avatar_url": {
-          "name": "avatar_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "is_active": {
-          "name": "is_active",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {},
-      "policies": {
-        "Admins can manage platform data.": {
-          "name": "Admins can manage platform data.",
-          "as": "PERMISSIVE",
-          "for": "ALL",
-          "to": [
-            "public"
-          ],
-          "using": "(get_my_role() = 'admin'::text)"
-        },
-        "Anyone can view public data.": {
-          "name": "Anyone can view public data.",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": [
-            "public"
-          ]
-        }
-      },
-      "isRLSEnabled": true
-    },
-    "public.service_categories": {
-      "name": "service_categories",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "uuid_generate_v4()"
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {},
-      "policies": {
-        "Admins can manage platform data.": {
-          "name": "Admins can manage platform data.",
-          "as": "PERMISSIVE",
-          "for": "ALL",
-          "to": [
-            "public"
-          ],
-          "using": "(get_my_role() = 'admin'::text)"
-        },
-        "Anyone can view public data.": {
-          "name": "Anyone can view public data.",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": [
-            "public"
-          ]
-        }
-      },
-      "isRLSEnabled": true
-    },
-    "public.services": {
-      "name": "services",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "uuid_generate_v4()"
-        },
-        "category_id": {
-          "name": "category_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "price": {
-          "name": "price",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "duration_minutes": {
-          "name": "duration_minutes",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "is_active": {
-          "name": "is_active",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "fk_services_category_id": {
-          "name": "fk_services_category_id",
-          "tableFrom": "services",
-          "tableTo": "service_categories",
-          "schemaTo": "public",
-          "columnsFrom": [
-            "category_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "services_duration_minutes_check": {
-          "name": "services_duration_minutes_check",
-          "value": "duration_minutes > 0"
-        },
-        "services_price_check": {
-          "name": "services_price_check",
-          "value": "price >= (0)::numeric"
-        }
-      },
-      "policies": {
-        "Admins can manage platform data.": {
-          "name": "Admins can manage platform data.",
-          "as": "PERMISSIVE",
-          "for": "ALL",
-          "to": [
-            "public"
-          ],
-          "using": "(get_my_role() = 'admin'::text)"
-        },
-        "Anyone can view public data.": {
-          "name": "Anyone can view public data.",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": [
-            "public"
-          ]
-        }
-      },
-      "isRLSEnabled": true
-    },
-    "public.profiles": {
-      "name": "profiles",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "full_name": {
-          "name": "full_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "date_of_birth": {
-          "name": "date_of_birth",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "role": {
-          "name": "role",
-          "type": "user_role",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'patient'"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "fk_profiles_id": {
-          "name": "fk_profiles_id",
-          "tableFrom": "profiles",
-          "tableTo": "users",
-          "schemaTo": "auth",
-          "columnsFrom": [
-            "id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {},
-      "policies": {
-        "Admins can manage all profiles.": {
-          "name": "Admins can manage all profiles.",
-          "as": "PERMISSIVE",
-          "for": "ALL",
-          "to": [
-            "public"
-          ],
-          "using": "(get_my_role() = 'admin'::text)"
-        },
-        "Users can update their own profile.": {
-          "name": "Users can update their own profile.",
-          "as": "PERMISSIVE",
-          "for": "UPDATE",
-          "to": [
-            "public"
-          ]
-        },
-        "Users can view their own profile.": {
-          "name": "Users can view their own profile.",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": [
-            "public"
-          ]
-        }
-      },
-      "isRLSEnabled": true
-    },
     "public.appointments": {
       "name": "appointments",
       "schema": "",
@@ -497,10 +79,10 @@
           "columns": [
             {
               "expression": "clinic_id",
+              "isExpression": false,
               "asc": true,
               "nulls": "last",
-              "opclass": "uuid_ops",
-              "isExpression": false
+              "opclass": "uuid_ops"
             }
           ],
           "isUnique": false,
@@ -513,10 +95,10 @@
           "columns": [
             {
               "expression": "doctor_id",
+              "isExpression": false,
               "asc": true,
               "nulls": "last",
-              "opclass": "uuid_ops",
-              "isExpression": false
+              "opclass": "uuid_ops"
             }
           ],
           "isUnique": false,
@@ -529,10 +111,10 @@
           "columns": [
             {
               "expression": "patient_id",
+              "isExpression": false,
               "asc": true,
               "nulls": "last",
-              "opclass": "uuid_ops",
-              "isExpression": false
+              "opclass": "uuid_ops"
             }
           ],
           "isUnique": false,
@@ -546,7 +128,6 @@
           "name": "fk_appointments_clinic_id",
           "tableFrom": "appointments",
           "tableTo": "clinics",
-          "schemaTo": "public",
           "columnsFrom": [
             "clinic_id"
           ],
@@ -560,7 +141,6 @@
           "name": "fk_appointments_doctor_id",
           "tableFrom": "appointments",
           "tableTo": "doctors",
-          "schemaTo": "public",
           "columnsFrom": [
             "doctor_id"
           ],
@@ -574,7 +154,6 @@
           "name": "fk_appointments_patient_id",
           "tableFrom": "appointments",
           "tableTo": "profiles",
-          "schemaTo": "public",
           "columnsFrom": [
             "patient_id"
           ],
@@ -588,7 +167,6 @@
           "name": "fk_appointments_service_id",
           "tableFrom": "appointments",
           "tableTo": "services",
-          "schemaTo": "public",
           "columnsFrom": [
             "service_id"
           ],
@@ -601,7 +179,6 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {},
       "policies": {
         "Admins can manage all patient-owned data.": {
           "name": "Admins can manage all patient-owned data.",
@@ -637,7 +214,508 @@
           ]
         }
       },
-      "isRLSEnabled": true
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.clinics": {
+      "name": "clinics",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuid_generate_v4()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "address": {
+          "name": "address",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "phone_number": {
+          "name": "phone_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "logo_url": {
+          "name": "logo_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "location": {
+          "name": "location",
+          "type": "geography(Point, 4326)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "clinics_location_idx": {
+          "name": "clinics_location_idx",
+          "columns": [
+            {
+              "expression": "location",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "gist_geography_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gist",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "Admins can manage platform data.": {
+          "name": "Admins can manage platform data.",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "using": "(get_my_role() = 'admin'::text)"
+        },
+        "Anyone can view public data.": {
+          "name": "Anyone can view public data.",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "public"
+          ]
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.doctor_clinics": {
+      "name": "doctor_clinics",
+      "schema": "",
+      "columns": {
+        "doctor_id": {
+          "name": "doctor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "clinic_id": {
+          "name": "clinic_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fk_doctor_clinics_clinic_id": {
+          "name": "fk_doctor_clinics_clinic_id",
+          "tableFrom": "doctor_clinics",
+          "tableTo": "clinics",
+          "columnsFrom": [
+            "clinic_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_doctor_clinics_doctor_id": {
+          "name": "fk_doctor_clinics_doctor_id",
+          "tableFrom": "doctor_clinics",
+          "tableTo": "doctors",
+          "columnsFrom": [
+            "doctor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "doctor_clinics_pkey": {
+          "name": "doctor_clinics_pkey",
+          "columns": [
+            "doctor_id",
+            "clinic_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "Admins can manage platform data.": {
+          "name": "Admins can manage platform data.",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "using": "(get_my_role() = 'admin'::text)"
+        },
+        "Anyone can view public data.": {
+          "name": "Anyone can view public data.",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "public"
+          ]
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.doctor_services": {
+      "name": "doctor_services",
+      "schema": "",
+      "columns": {
+        "doctor_id": {
+          "name": "doctor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "service_id": {
+          "name": "service_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fk_doctor_services_doctor_id": {
+          "name": "fk_doctor_services_doctor_id",
+          "tableFrom": "doctor_services",
+          "tableTo": "doctors",
+          "columnsFrom": [
+            "doctor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_doctor_services_service_id": {
+          "name": "fk_doctor_services_service_id",
+          "tableFrom": "doctor_services",
+          "tableTo": "services",
+          "columnsFrom": [
+            "service_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "doctor_services_pkey": {
+          "name": "doctor_services_pkey",
+          "columns": [
+            "doctor_id",
+            "service_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "Admins can manage platform data.": {
+          "name": "Admins can manage platform data.",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "using": "(get_my_role() = 'admin'::text)"
+        },
+        "Anyone can view public data.": {
+          "name": "Anyone can view public data.",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "public"
+          ]
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.doctors": {
+      "name": "doctors",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuid_generate_v4()"
+        },
+        "full_name": {
+          "name": "full_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "specialty_text": {
+          "name": "specialty_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bio": {
+          "name": "bio",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "avatar_url": {
+          "name": "avatar_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "Admins can manage platform data.": {
+          "name": "Admins can manage platform data.",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "using": "(get_my_role() = 'admin'::text)"
+        },
+        "Anyone can view public data.": {
+          "name": "Anyone can view public data.",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "public"
+          ]
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.health_logs": {
+      "name": "health_logs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuid_generate_v4()"
+        },
+        "patient_id": {
+          "name": "patient_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "log_date": {
+          "name": "log_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mood": {
+          "name": "mood",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "symptoms": {
+          "name": "symptoms",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_health_logs_patient_id_log_date": {
+          "name": "idx_health_logs_patient_id_log_date",
+          "columns": [
+            {
+              "expression": "patient_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "date_ops"
+            },
+            {
+              "expression": "log_date",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "first",
+              "opclass": "date_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "fk_health_logs_patient_id": {
+          "name": "fk_health_logs_patient_id",
+          "tableFrom": "health_logs",
+          "tableTo": "profiles",
+          "columnsFrom": [
+            "patient_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "health_logs_patient_id_log_date_key": {
+          "name": "health_logs_patient_id_log_date_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "patient_id",
+            "log_date"
+          ]
+        }
+      },
+      "policies": {
+        "Patients can manage their own health logs.": {
+          "name": "Patients can manage their own health logs.",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "using": "(auth.uid() = patient_id)"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.inventory": {
+      "name": "inventory",
+      "schema": "",
+      "columns": {
+        "product_id": {
+          "name": "product_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "quantity_on_hand": {
+          "name": "quantity_on_hand",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fk_inventory_product_id": {
+          "name": "fk_inventory_product_id",
+          "tableFrom": "inventory",
+          "tableTo": "products",
+          "columnsFrom": [
+            "product_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "Admins can manage platform data.": {
+          "name": "Admins can manage platform data.",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "using": "(get_my_role() = 'admin'::text)"
+        }
+      },
+      "checkConstraints": {
+        "inventory_quantity_on_hand_check": {
+          "name": "inventory_quantity_on_hand_check",
+          "value": "quantity_on_hand >= 0"
+        }
+      },
+      "isRLSEnabled": false
     },
     "public.medical_records": {
       "name": "medical_records",
@@ -683,7 +761,6 @@
           "name": "fk_medical_records_appointment_id",
           "tableFrom": "medical_records",
           "tableTo": "appointments",
-          "schemaTo": "public",
           "columnsFrom": [
             "appointment_id"
           ],
@@ -696,7 +773,6 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {},
       "policies": {
         "Admins can manage all patient-owned data.": {
           "name": "Admins can manage all patient-owned data.",
@@ -716,10 +792,11 @@
           ]
         }
       },
-      "isRLSEnabled": true
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "public.reviews": {
-      "name": "reviews",
+    "public.menstrual_logs": {
+      "name": "menstrual_logs",
       "schema": "",
       "columns": {
         "id": {
@@ -729,79 +806,31 @@
           "notNull": true,
           "default": "uuid_generate_v4()"
         },
-        "appointment_id": {
-          "name": "appointment_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
         "patient_id": {
           "name": "patient_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "doctor_id": {
-          "name": "doctor_id",
-          "type": "uuid",
+        "start_date": {
+          "name": "start_date",
+          "type": "date",
           "primaryKey": false,
           "notNull": true
         },
-        "rating": {
-          "name": "rating",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "comment": {
-          "name": "comment",
-          "type": "text",
+        "end_date": {
+          "name": "end_date",
+          "type": "date",
           "primaryKey": false,
           "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
         }
       },
       "indexes": {},
       "foreignKeys": {
-        "fk_reviews_appointment_id": {
-          "name": "fk_reviews_appointment_id",
-          "tableFrom": "reviews",
-          "tableTo": "appointments",
-          "schemaTo": "public",
-          "columnsFrom": [
-            "appointment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "fk_reviews_doctor_id": {
-          "name": "fk_reviews_doctor_id",
-          "tableFrom": "reviews",
-          "tableTo": "doctors",
-          "schemaTo": "public",
-          "columnsFrom": [
-            "doctor_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "fk_reviews_patient_id": {
-          "name": "fk_reviews_patient_id",
-          "tableFrom": "reviews",
+        "fk_menstrual_logs_patient_id": {
+          "name": "fk_menstrual_logs_patient_id",
+          "tableFrom": "menstrual_logs",
           "tableTo": "profiles",
-          "schemaTo": "public",
           "columnsFrom": [
             "patient_id"
           ],
@@ -813,24 +842,92 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "reviews_appointment_id_key": {
-          "columns": [
-            "appointment_id"
-          ],
-          "nullsNotDistinct": false,
-          "name": "reviews_appointment_id_key"
-        }
-      },
-      "checkConstraints": {
-        "reviews_rating_check": {
-          "name": "reviews_rating_check",
-          "value": "(rating >= 1) AND (rating <= 5)"
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {
-        "Admins can manage all reviews.": {
-          "name": "Admins can manage all reviews.",
+        "Patients can manage their own menstrual logs.": {
+          "name": "Patients can manage their own menstrual logs.",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "using": "(auth.uid() = patient_id)"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.patient_order_items": {
+      "name": "patient_order_items",
+      "schema": "",
+      "columns": {
+        "order_id": {
+          "name": "order_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "price_at_purchase": {
+          "name": "price_at_purchase",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fk_patient_order_items_order_id": {
+          "name": "fk_patient_order_items_order_id",
+          "tableFrom": "patient_order_items",
+          "tableTo": "patient_orders",
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_patient_order_items_product_id": {
+          "name": "fk_patient_order_items_product_id",
+          "tableFrom": "patient_order_items",
+          "tableTo": "products",
+          "columnsFrom": [
+            "product_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "patient_order_items_pkey": {
+          "name": "patient_order_items_pkey",
+          "columns": [
+            "order_id",
+            "product_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "Admins can manage all patient-owned data.": {
+          "name": "Admins can manage all patient-owned data.",
           "as": "PERMISSIVE",
           "for": "ALL",
           "to": [
@@ -838,24 +935,113 @@
           ],
           "using": "(get_my_role() = 'admin'::text)"
         },
-        "Anyone can read reviews.": {
-          "name": "Anyone can read reviews.",
+        "Patients can view their own order items.": {
+          "name": "Patients can view their own order items.",
           "as": "PERMISSIVE",
           "for": "SELECT",
           "to": [
             "public"
           ]
+        }
+      },
+      "checkConstraints": {
+        "patient_order_items_quantity_check": {
+          "name": "patient_order_items_quantity_check",
+          "value": "quantity > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.patient_orders": {
+      "name": "patient_orders",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuid_generate_v4()"
         },
-        "Patients can create reviews for their own appointments.": {
-          "name": "Patients can create reviews for their own appointments.",
+        "patient_id": {
+          "name": "patient_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "order_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending_payment'"
+        },
+        "shipping_address": {
+          "name": "shipping_address",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tracking_number": {
+          "name": "tracking_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_amount": {
+          "name": "total_amount",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fk_patient_orders_patient_id": {
+          "name": "fk_patient_orders_patient_id",
+          "tableFrom": "patient_orders",
+          "tableTo": "profiles",
+          "columnsFrom": [
+            "patient_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "Admins can manage all patient-owned data.": {
+          "name": "Admins can manage all patient-owned data.",
           "as": "PERMISSIVE",
-          "for": "INSERT",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "using": "(get_my_role() = 'admin'::text)"
+        },
+        "Patients can manage their own orders.": {
+          "name": "Patients can manage their own orders.",
+          "as": "PERMISSIVE",
+          "for": "ALL",
           "to": [
             "public"
           ]
         }
       },
-      "isRLSEnabled": true
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.product_categories": {
       "name": "product_categories",
@@ -885,7 +1071,6 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {},
       "policies": {
         "Admins can manage platform data.": {
           "name": "Admins can manage platform data.",
@@ -905,7 +1090,8 @@
           ]
         }
       },
-      "isRLSEnabled": true
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
     "public.products": {
       "name": "products",
@@ -969,7 +1155,6 @@
           "name": "fk_products_category_id",
           "tableFrom": "products",
           "tableTo": "product_categories",
-          "schemaTo": "public",
           "columnsFrom": [
             "category_id"
           ],
@@ -983,17 +1168,11 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "products_sku_key": {
+          "name": "products_sku_key",
+          "nullsNotDistinct": false,
           "columns": [
             "sku"
-          ],
-          "nullsNotDistinct": false,
-          "name": "products_sku_key"
-        }
-      },
-      "checkConstraints": {
-        "products_price_check": {
-          "name": "products_price_check",
-          "value": "price >= (0)::numeric"
+          ]
         }
       },
       "policies": {
@@ -1015,24 +1194,146 @@
           ]
         }
       },
-      "isRLSEnabled": true
+      "checkConstraints": {
+        "products_price_check": {
+          "name": "products_price_check",
+          "value": "price >= (0)::numeric"
+        }
+      },
+      "isRLSEnabled": false
     },
-    "public.inventory": {
-      "name": "inventory",
+    "public.profiles": {
+      "name": "profiles",
       "schema": "",
       "columns": {
-        "product_id": {
-          "name": "product_id",
+        "id": {
+          "name": "id",
           "type": "uuid",
           "primaryKey": true,
           "notNull": true
         },
-        "quantity_on_hand": {
-          "name": "quantity_on_hand",
-          "type": "integer",
+        "first_name": {
+          "name": "first_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "middle_initial": {
+          "name": "middle_initial",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_name": {
+          "name": "last_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contact_no": {
+          "name": "contact_no",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gender_identity": {
+          "name": "gender_identity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pronouns": {
+          "name": "pronouns",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "assigned_sex_at_birth": {
+          "name": "assigned_sex_at_birth",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "birthday": {
+          "name": "birthday",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "civil_status": {
+          "name": "civil_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "religion": {
+          "name": "religion",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "occupation": {
+          "name": "occupation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "philhealth_no": {
+          "name": "philhealth_no",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "street": {
+          "name": "street",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "baranggay_code": {
+          "name": "baranggay_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "city_municipality_code": {
+          "name": "city_municipality_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "province_code": {
+          "name": "province_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "avatar_url": {
+          "name": "avatar_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "role": {
+          "name": "role",
+          "type": "user_role",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
-          "default": 0
+          "default": "'patient'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         },
         "updated_at": {
           "name": "updated_at",
@@ -1044,13 +1345,12 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "fk_inventory_product_id": {
-          "name": "fk_inventory_product_id",
-          "tableFrom": "inventory",
-          "tableTo": "products",
-          "schemaTo": "public",
+        "fk_profiles_id": {
+          "name": "fk_profiles_id",
+          "tableFrom": "profiles",
+          "tableTo": "users",
           "columnsFrom": [
-            "product_id"
+            "id"
           ],
           "columnsTo": [
             "id"
@@ -1060,11 +1360,114 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "inventory_quantity_on_hand_check": {
-          "name": "inventory_quantity_on_hand_check",
-          "value": "quantity_on_hand >= 0"
+      "uniqueConstraints": {
+        "profiles_email_unique": {
+          "name": "profiles_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {
+        "Admins can manage all profiles.": {
+          "name": "Admins can manage all profiles.",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "using": "(get_my_role() = 'admin'::text)"
+        },
+        "Users can update their own profile.": {
+          "name": "Users can update their own profile.",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": [
+            "public"
+          ]
+        },
+        "Users can view their own profile.": {
+          "name": "Users can view their own profile.",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "public"
+          ]
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.provider_availability": {
+      "name": "provider_availability",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuid_generate_v4()"
+        },
+        "doctor_id": {
+          "name": "doctor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "day_of_week": {
+          "name": "day_of_week",
+          "type": "day_of_week",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "start_time": {
+          "name": "start_time",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "end_time": {
+          "name": "end_time",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_available": {
+          "name": "is_available",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "provider_availability_doctor_id_doctors_id_fk": {
+          "name": "provider_availability_doctor_id_doctors_id_fk",
+          "tableFrom": "provider_availability",
+          "tableTo": "doctors",
+          "columnsFrom": [
+            "doctor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "provider_availability_doctor_day_unique": {
+          "name": "provider_availability_doctor_day_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "doctor_id",
+            "day_of_week"
+          ]
         }
       },
       "policies": {
@@ -1076,12 +1479,21 @@
             "public"
           ],
           "using": "(get_my_role() = 'admin'::text)"
+        },
+        "Anyone can view public data.": {
+          "name": "Anyone can view public data.",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "public"
+          ]
         }
       },
-      "isRLSEnabled": true
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "public.patient_orders": {
-      "name": "patient_orders",
+    "public.reviews": {
+      "name": "reviews",
       "schema": "",
       "columns": {
         "id": {
@@ -1091,37 +1503,35 @@
           "notNull": true,
           "default": "uuid_generate_v4()"
         },
+        "appointment_id": {
+          "name": "appointment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
         "patient_id": {
           "name": "patient_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "status": {
-          "name": "status",
-          "type": "order_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending_payment'"
-        },
-        "shipping_address": {
-          "name": "shipping_address",
-          "type": "jsonb",
+        "doctor_id": {
+          "name": "doctor_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
-        "tracking_number": {
-          "name": "tracking_number",
+        "rating": {
+          "name": "rating",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "comment": {
+          "name": "comment",
           "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "total_amount": {
-          "name": "total_amount",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": true
         },
         "created_at": {
           "name": "created_at",
@@ -1133,118 +1543,36 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "fk_patient_orders_patient_id": {
-          "name": "fk_patient_orders_patient_id",
-          "tableFrom": "patient_orders",
-          "tableTo": "profiles",
-          "schemaTo": "public",
+        "fk_reviews_appointment_id": {
+          "name": "fk_reviews_appointment_id",
+          "tableFrom": "reviews",
+          "tableTo": "appointments",
           "columnsFrom": [
-            "patient_id"
+            "appointment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_reviews_doctor_id": {
+          "name": "fk_reviews_doctor_id",
+          "tableFrom": "reviews",
+          "tableTo": "doctors",
+          "columnsFrom": [
+            "doctor_id"
           ],
           "columnsTo": [
             "id"
           ],
           "onDelete": "set null",
           "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {},
-      "policies": {
-        "Admins can manage all patient-owned data.": {
-          "name": "Admins can manage all patient-owned data.",
-          "as": "PERMISSIVE",
-          "for": "ALL",
-          "to": [
-            "public"
-          ],
-          "using": "(get_my_role() = 'admin'::text)"
         },
-        "Patients can manage their own orders.": {
-          "name": "Patients can manage their own orders.",
-          "as": "PERMISSIVE",
-          "for": "ALL",
-          "to": [
-            "public"
-          ]
-        }
-      },
-      "isRLSEnabled": true
-    },
-    "public.health_logs": {
-      "name": "health_logs",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "uuid_generate_v4()"
-        },
-        "patient_id": {
-          "name": "patient_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "log_date": {
-          "name": "log_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "mood": {
-          "name": "mood",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "symptoms": {
-          "name": "symptoms",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "notes": {
-          "name": "notes",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "idx_health_logs_patient_id_log_date": {
-          "name": "idx_health_logs_patient_id_log_date",
-          "columns": [
-            {
-              "expression": "patient_id",
-              "asc": true,
-              "nulls": "last",
-              "opclass": "date_ops",
-              "isExpression": false
-            },
-            {
-              "expression": "log_date",
-              "asc": false,
-              "nulls": "first",
-              "opclass": "date_ops",
-              "isExpression": false
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "fk_health_logs_patient_id": {
-          "name": "fk_health_logs_patient_id",
-          "tableFrom": "health_logs",
+        "fk_reviews_patient_id": {
+          "name": "fk_reviews_patient_id",
+          "tableFrom": "reviews",
           "tableTo": "profiles",
-          "schemaTo": "public",
           "columnsFrom": [
             "patient_id"
           ],
@@ -1257,31 +1585,51 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "health_logs_patient_id_log_date_key": {
-          "columns": [
-            "patient_id",
-            "log_date"
-          ],
+        "reviews_appointment_id_key": {
+          "name": "reviews_appointment_id_key",
           "nullsNotDistinct": false,
-          "name": "health_logs_patient_id_log_date_key"
+          "columns": [
+            "appointment_id"
+          ]
         }
       },
-      "checkConstraints": {},
       "policies": {
-        "Patients can manage their own health logs.": {
-          "name": "Patients can manage their own health logs.",
+        "Admins can manage all reviews.": {
+          "name": "Admins can manage all reviews.",
           "as": "PERMISSIVE",
           "for": "ALL",
           "to": [
             "public"
           ],
-          "using": "(auth.uid() = patient_id)"
+          "using": "(get_my_role() = 'admin'::text)"
+        },
+        "Anyone can read reviews.": {
+          "name": "Anyone can read reviews.",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "public"
+          ]
+        },
+        "Patients can create reviews for their own appointments.": {
+          "name": "Patients can create reviews for their own appointments.",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "public"
+          ]
         }
       },
-      "isRLSEnabled": true
+      "checkConstraints": {
+        "reviews_rating_check": {
+          "name": "reviews_rating_check",
+          "value": "(rating >= 1) AND (rating <= 5)"
+        }
+      },
+      "isRLSEnabled": false
     },
-    "public.menstrual_logs": {
-      "name": "menstrual_logs",
+    "public.service_categories": {
+      "name": "service_categories",
       "schema": "",
       "columns": {
         "id": {
@@ -1291,117 +1639,112 @@
           "notNull": true,
           "default": "uuid_generate_v4()"
         },
-        "patient_id": {
-          "name": "patient_id",
-          "type": "uuid",
+        "name": {
+          "name": "name",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "start_date": {
-          "name": "start_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "end_date": {
-          "name": "end_date",
-          "type": "date",
+        "description": {
+          "name": "description",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         }
       },
       "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "Admins can manage platform data.": {
+          "name": "Admins can manage platform data.",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "using": "(get_my_role() = 'admin'::text)"
+        },
+        "Anyone can view public data.": {
+          "name": "Anyone can view public data.",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "public"
+          ]
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.services": {
+      "name": "services",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuid_generate_v4()"
+        },
+        "category_id": {
+          "name": "category_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "price": {
+          "name": "price",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "duration_minutes": {
+          "name": "duration_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        }
+      },
+      "indexes": {},
       "foreignKeys": {
-        "fk_menstrual_logs_patient_id": {
-          "name": "fk_menstrual_logs_patient_id",
-          "tableFrom": "menstrual_logs",
-          "tableTo": "profiles",
-          "schemaTo": "public",
+        "fk_services_category_id": {
+          "name": "fk_services_category_id",
+          "tableFrom": "services",
+          "tableTo": "service_categories",
           "columnsFrom": [
-            "patient_id"
+            "category_id"
           ],
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {},
-      "policies": {
-        "Patients can manage their own menstrual logs.": {
-          "name": "Patients can manage their own menstrual logs.",
-          "as": "PERMISSIVE",
-          "for": "ALL",
-          "to": [
-            "public"
-          ],
-          "using": "(auth.uid() = patient_id)"
-        }
-      },
-      "isRLSEnabled": true
-    },
-    "public.doctor_clinics": {
-      "name": "doctor_clinics",
-      "schema": "",
-      "columns": {
-        "doctor_id": {
-          "name": "doctor_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "clinic_id": {
-          "name": "clinic_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "fk_doctor_clinics_clinic_id": {
-          "name": "fk_doctor_clinics_clinic_id",
-          "tableFrom": "doctor_clinics",
-          "tableTo": "clinics",
-          "schemaTo": "public",
-          "columnsFrom": [
-            "clinic_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "fk_doctor_clinics_doctor_id": {
-          "name": "fk_doctor_clinics_doctor_id",
-          "tableFrom": "doctor_clinics",
-          "tableTo": "doctors",
-          "schemaTo": "public",
-          "columnsFrom": [
-            "doctor_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "doctor_clinics_pkey": {
-          "name": "doctor_clinics_pkey",
-          "columns": [
-            "doctor_id",
-            "clinic_id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {},
       "policies": {
         "Admins can manage platform data.": {
           "name": "Admins can manage platform data.",
@@ -1421,225 +1764,90 @@
           ]
         }
       },
-      "isRLSEnabled": true
-    },
-    "public.doctor_services": {
-      "name": "doctor_services",
-      "schema": "",
-      "columns": {
-        "doctor_id": {
-          "name": "doctor_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "service_id": {
-          "name": "service_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "fk_doctor_services_doctor_id": {
-          "name": "fk_doctor_services_doctor_id",
-          "tableFrom": "doctor_services",
-          "tableTo": "doctors",
-          "schemaTo": "public",
-          "columnsFrom": [
-            "doctor_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "fk_doctor_services_service_id": {
-          "name": "fk_doctor_services_service_id",
-          "tableFrom": "doctor_services",
-          "tableTo": "services",
-          "schemaTo": "public",
-          "columnsFrom": [
-            "service_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "doctor_services_pkey": {
-          "name": "doctor_services_pkey",
-          "columns": [
-            "doctor_id",
-            "service_id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {},
-      "policies": {
-        "Admins can manage platform data.": {
-          "name": "Admins can manage platform data.",
-          "as": "PERMISSIVE",
-          "for": "ALL",
-          "to": [
-            "public"
-          ],
-          "using": "(get_my_role() = 'admin'::text)"
-        },
-        "Anyone can view public data.": {
-          "name": "Anyone can view public data.",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": [
-            "public"
-          ]
-        }
-      },
-      "isRLSEnabled": true
-    },
-    "public.patient_order_items": {
-      "name": "patient_order_items",
-      "schema": "",
-      "columns": {
-        "order_id": {
-          "name": "order_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "product_id": {
-          "name": "product_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "quantity": {
-          "name": "quantity",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "price_at_purchase": {
-          "name": "price_at_purchase",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "fk_patient_order_items_order_id": {
-          "name": "fk_patient_order_items_order_id",
-          "tableFrom": "patient_order_items",
-          "tableTo": "patient_orders",
-          "schemaTo": "public",
-          "columnsFrom": [
-            "order_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "fk_patient_order_items_product_id": {
-          "name": "fk_patient_order_items_product_id",
-          "tableFrom": "patient_order_items",
-          "tableTo": "products",
-          "schemaTo": "public",
-          "columnsFrom": [
-            "product_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "patient_order_items_pkey": {
-          "name": "patient_order_items_pkey",
-          "columns": [
-            "order_id",
-            "product_id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
       "checkConstraints": {
-        "patient_order_items_quantity_check": {
-          "name": "patient_order_items_quantity_check",
-          "value": "quantity > 0"
-        }
-      },
-      "policies": {
-        "Admins can manage all patient-owned data.": {
-          "name": "Admins can manage all patient-owned data.",
-          "as": "PERMISSIVE",
-          "for": "ALL",
-          "to": [
-            "public"
-          ],
-          "using": "(get_my_role() = 'admin'::text)"
+        "services_duration_minutes_check": {
+          "name": "services_duration_minutes_check",
+          "value": "duration_minutes > 0"
         },
-        "Patients can view their own order items.": {
-          "name": "Patients can view their own order items.",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": [
-            "public"
-          ]
+        "services_price_check": {
+          "name": "services_price_check",
+          "value": "price >= (0)::numeric"
         }
       },
-      "isRLSEnabled": true
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     }
   },
   "enums": {
     "public.appointment_status": {
       "name": "appointment_status",
+      "schema": "public",
       "values": [
         "scheduled",
         "completed",
         "canceled_by_patient",
         "canceled_by_admin",
         "no_show"
-      ],
-      "schema": "public"
+      ]
+    },
+    "public.day_of_week": {
+      "name": "day_of_week",
+      "schema": "public",
+      "values": [
+        "SUNDAY",
+        "MONDAY",
+        "TUESDAY",
+        "WEDNESDAY",
+        "THURSDAY",
+        "FRIDAY",
+        "SATURDAY"
+      ]
     },
     "public.medical_record_type": {
       "name": "medical_record_type",
+      "schema": "public",
       "values": [
         "PRESCRIPTION",
         "LAB_ORDER",
         "DOCTOR_NOTE"
-      ],
-      "schema": "public"
+      ]
     },
     "public.order_status": {
       "name": "order_status",
+      "schema": "public",
       "values": [
         "pending_payment",
         "processing",
         "shipped",
         "delivered",
         "canceled"
-      ],
-      "schema": "public"
+      ]
     },
     "public.user_role": {
       "name": "user_role",
+      "schema": "public",
       "values": [
         "patient",
         "admin"
-      ],
-      "schema": "public"
+      ]
     }
   },
   "schemas": {},
@@ -1648,21 +1856,8 @@
   "policies": {},
   "views": {},
   "_meta": {
+    "columns": {},
     "schemas": {},
-    "tables": {},
-    "columns": {}
-  },
-  "internal": {
-    "tables": {
-      "health_logs": {
-        "columns": {
-          "symptoms": {
-            "isArray": true,
-            "dimensions": 1,
-            "rawType": "text"
-          }
-        }
-      }
-    }
+    "tables": {}
   }
 }
