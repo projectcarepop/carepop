@@ -11,6 +11,7 @@ import { format, parseISO } from 'date-fns';
 
 import { type Profile } from '@/lib/types';
 import { profileFormSchema, type ProfileFormData } from '@/lib/validation/profile-schema';
+import { getProvinces, getCities, getBarangays, updateMyProfile } from '@/services/api';
 
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -22,7 +23,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Calendar } from '@/components/ui/calendar';
 import { Loader2 } from 'lucide-react';
-import { apiClient } from '@/lib/apiClient';
 
 const RequiredLabel = ({ children }: { children: React.ReactNode }) => (
     <FormLabel>{children} <span className="text-red-500">*</span></FormLabel>
@@ -60,73 +60,34 @@ export function CreateProfileForm({ profile }: { profile: Profile | null }) {
     const provinceCode = form.watch('provinceCode');
     const cityMunicipalityCode = form.watch('cityMunicipalityCode');
 
-    // --- Data Fetching for Comboboxes ---
+    // --- Data Fetching for Comboboxes using the new service layer ---
     const { data: provinces, isLoading: isLoadingProvinces } = useQuery<Location[]>({
         queryKey: ['locations', 'provinces'],
-        queryFn: async () => {
-            const res = await apiClient.api.public.locations.provinces.$get();
-            if (!res.ok) {
-                console.error("Failed to fetch provinces:", await res.text());
-                throw new Error('Failed to fetch provinces');
-            }
-            return res.json();
-        },
+        queryFn: getProvinces,
     });
 
     const { data: cities, isLoading: isLoadingCities } = useQuery<Location[]>({
         queryKey: ['locations', 'cities', provinceCode],
-        queryFn: async () => {
-            if (!provinceCode) return [];
-            const res = await apiClient.api.public.locations.cities.$get({ query: { provinceCode } });
-            if (!res.ok) {
-                console.error("Failed to fetch cities:", await res.text());
-                throw new Error('Failed to fetch cities');
-            }
-            return res.json();
-        },
+        queryFn: () => getCities(provinceCode!),
         enabled: !!provinceCode,
     });
 
     const { data: barangays, isLoading: isLoadingBarangays } = useQuery<Location[]>({
         queryKey: ['locations', 'barangays', cityMunicipalityCode],
-        queryFn: async () => {
-            if (!cityMunicipalityCode) return [];
-            const res = await apiClient.api.public.locations.barangays.$get({ query: { cityCode: cityMunicipalityCode } });
-            if (!res.ok) {
-                console.error("Failed to fetch barangays:", await res.text());
-                throw new Error('Failed to fetch barangays');
-            }
-            return res.json();
-        },
+        queryFn: () => getBarangays(cityMunicipalityCode!),
         enabled: !!cityMunicipalityCode,
     });
     
-    // --- Form Submission Mutation ---
-    const { mutate: updateProfile, isPending } = useMutation({
-        mutationFn: async (formData: ProfileFormData) => {
-            const res = await apiClient.api.me.profile.$put({ json: formData });
-
-            if (!res.ok) {
-                try {
-                    const errorData = await res.json();
-                    throw new Error(errorData.error || `Profile update failed with status: ${res.status}`);
-                } catch {
-                    throw new Error(`Profile update failed: ${res.status} - ${res.statusText}`);
-                }
-            }
-            return res.json();
-        },
+    // --- Form Submission Mutation using the new service layer ---
+    const { mutate: submitProfile, isPending } = useMutation({
+        mutationFn: (formData: ProfileFormData) => updateMyProfile(formData),
         onSuccess: () => {
             toast({ title: "Profile Saved!", description: "Your information has been updated successfully." });
             router.push('/main-dashboard');
             router.refresh();
         },
         onError: (error: Error) => {
-            toast({
-                title: "Update Failed",
-                description: error.message,
-                variant: "destructive",
-            });
+            toast({ title: "Update Failed", description: error.message, variant: "destructive" });
         },
     });
 
@@ -139,7 +100,7 @@ export function CreateProfileForm({ profile }: { profile: Profile | null }) {
 
     const onSubmit = (data: ProfileFormData) => {
         console.log("Submitting form data:", data);
-        updateProfile(data);
+        submitProfile(data);
     };
     
     return (

@@ -3,19 +3,24 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useReactTable, getCoreRowModel, flexRender, ColumnDef } from "@tanstack/react-table";
-import { apiClient } from '@/lib/apiClient';
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from '@/hooks/use-toast';
+import { 
+    getAdminProducts, 
+    getAdminProductCategories, 
+    upsertProduct, 
+    upsertProductCategory, 
+    updateStock 
+} from '@/services/api';
 
-import { PlusCircle, MoreHorizontal, AlertCircle } from "lucide-react";
+import { PlusCircle, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 
-import { type Product, type ProductCategory } from '../page';
+import { type ProductCategory, type ProductWithStockAndCategory as Product } from '@/lib/types';
 import { ProductForm } from './ProductForm';
 import { CategoryForm } from './CategoryForm';
 import { UpdateStockForm } from './UpdateStockForm';
@@ -53,47 +58,44 @@ export function InventoryClient({ initialProducts, initialCategories }: { initia
     // --- Data Fetching ---
     const { data: products = [] } = useQuery<Product[]>({
         queryKey: ['adminProducts'],
-        queryFn: async () => (await apiClient.api.admin.products.$get()).json().then(res => res.data),
+        queryFn: getAdminProducts,
         initialData: initialProducts,
     });
     const { data: categories = [] } = useQuery<ProductCategory[]>({
         queryKey: ['adminProductCategories'],
-        queryFn: async () => (await apiClient.api.admin['product-categories'].$get()).json().then(res => res.data),
+        queryFn: getAdminProductCategories,
         initialData: initialCategories,
     });
     
     // --- Mutations ---
     const productMutation = useMutation({
-        mutationFn: (values: any) => modalState.data 
-            ? apiClient.api.admin.products[modalState.data.id].$put({ json: values })
-            : apiClient.api.admin.products.$post({ json: values }),
+        mutationFn: (values: any) => upsertProduct(values, (modalState.data as Product)?.id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['adminProducts'] });
             toast({ title: `Product ${modalState.data ? 'updated' : 'created'}` });
             setModalState({ isOpen: false, type: null, data: null });
         },
-        onError: (err) => toast({ title: "Product operation failed", description: err.message, variant: 'destructive' })
+        onError: (err: Error) => toast({ title: "Product operation failed", description: err.message, variant: 'destructive' })
     });
+
     const categoryMutation = useMutation({
-         mutationFn: (values: any) => modalState.data 
-            ? apiClient.api.admin['product-categories'][modalState.data.id].$put({ json: values })
-            : apiClient.api.admin['product-categories'].$post({ json: values }),
+         mutationFn: (values: any) => upsertProductCategory(values, (modalState.data as ProductCategory)?.id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['adminProductCategories'] });
             toast({ title: `Category ${modalState.data ? 'updated' : 'created'}` });
             setModalState({ isOpen: false, type: null, data: null });
         },
-        onError: (err) => toast({ title: "Category operation failed", description: err.message, variant: 'destructive' })
+        onError: (err: Error) => toast({ title: "Category operation failed", description: err.message, variant: 'destructive' })
     });
+
      const stockMutation = useMutation({
-        mutationFn: ({ productId, quantity }: { productId: string, quantity: number }) => 
-            apiClient.api.admin.inventory[productId].$put({ json: { quantity } }),
+        mutationFn: ({ productId, quantity }: { productId: string, quantity: number }) => updateStock(productId, quantity),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['adminProducts'] });
             toast({ title: "Stock updated successfully" });
             setModalState({ isOpen: false, type: null, data: null });
         },
-        onError: (err) => toast({ title: "Stock update failed", description: err.message, variant: 'destructive' })
+        onError: (err: Error) => toast({ title: "Stock update failed", description: err.message, variant: 'destructive' })
     });
 
     const isSubmitting = productMutation.isPending || categoryMutation.isPending || stockMutation.isPending;

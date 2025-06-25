@@ -14,7 +14,6 @@ import type { AppointmentWithRelations } from "@/app/main-dashboard/page";
 import type { Appointment } from "@/lib/types";
 
 // --- Type Definition ---
-// This should also come from the SDK eventually.
 /*
 interface Appointment {
   id: string;

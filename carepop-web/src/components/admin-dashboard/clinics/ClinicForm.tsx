@@ -8,19 +8,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Loader2 } from 'lucide-react';
-
-// This could be imported from columns.tsx or a central types file
-import { Clinic } from './columns';
+import { type Clinic } from '@/lib/types';
+import { Textarea } from '@/components/ui/textarea';
 
 // --- Validation Schema ---
 const formSchema = z.object({
   name: z.string().min(3, { message: "Name must be at least 3 characters." }),
   address: z.string().min(5, { message: "Address is required." }),
-  city: z.string().min(2, { message: "City is required." }),
-  phone: z.string().min(10, { message: "A valid phone number is required." }),
+  phoneNumber: z.string().min(10, { message: "A valid phone number is required." }).nullable(),
 });
 
-type ClinicFormData = z.infer<typeof formSchema>;
+export type ClinicFormData = z.infer<typeof formSchema>;
 
 interface ClinicFormProps {
     initialData?: Clinic | null;
@@ -33,9 +31,8 @@ export function ClinicForm({ initialData, onSubmit, isPending }: ClinicFormProps
         resolver: zodResolver(formSchema),
         defaultValues: {
             name: initialData?.name || '',
-            address: initialData?.address || '',
-            city: initialData?.city || '',
-            phone: initialData?.phone || '',
+            address: (initialData?.address as string) || '', // Drizzle type is `unknown`
+            phoneNumber: initialData?.phoneNumber || '',
         },
     });
 
@@ -62,7 +59,7 @@ export function ClinicForm({ initialData, onSubmit, isPending }: ClinicFormProps
                         <FormItem>
                             <FormLabel>Address</FormLabel>
                             <FormControl>
-                                <Input placeholder="123 Health St." {...field} />
+                                <Textarea placeholder="123 Health St., Quezon City" {...field} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -70,25 +67,12 @@ export function ClinicForm({ initialData, onSubmit, isPending }: ClinicFormProps
                 />
                  <FormField
                     control={form.control}
-                    name="city"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>City</FormLabel>
-                            <FormControl>
-                                <Input placeholder="Quezon City" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                 <FormField
-                    control={form.control}
-                    name="phone"
+                    name="phoneNumber"
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>Phone Number</FormLabel>
                             <FormControl>
-                                <Input placeholder="(+63) 917 123 4567" {...field} />
+                                <Input placeholder="(+63) 917 123 4567" {...field} value={field.value ?? ''} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>

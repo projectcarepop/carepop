@@ -7,7 +7,7 @@ import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { type ServiceCategory } from '@/types/app';
+import { type ServiceCategory } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({

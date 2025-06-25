@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useReactTable, getCoreRowModel, flexRender, ColumnDef } from "@tanstack/react-table";
-import { apiClient } from '@/lib/apiClient';
+import { getAdminAppointments } from '@/services/api';
 import { useRouter } from 'next/navigation';
 import { DateRange } from 'react-day-picker';
 import { format } from 'date-fns';
@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar as CalendarIcon } from "lucide-react";
 import { useDebounce } from '@/hooks/useDebounce';
 
-import { type Appointment, type Clinic, type Doctor } from '../page';
+import { type AdminAppointment, type Clinic, type Doctor } from '@/lib/types';
 
 // --- Helper: Data Table Component ---
 function DataTable<TData, TValue>({ columns, data, onRowClick }: { columns: ColumnDef<TData, TValue>[], data: TData[], onRowClick: (row: TData) => void }) {
@@ -36,7 +36,7 @@ function DataTable<TData, TValue>({ columns, data, onRowClick }: { columns: Colu
 
 // --- Main Client Component ---
 interface AppointmentsClientProps {
-    initialAppointments: Appointment[];
+    initialAppointments: AdminAppointment[];
     clinics: Clinic[];
     doctors: Doctor[];
 }
@@ -62,20 +62,20 @@ export function AppointmentsClient({ initialAppointments, clinics, doctors }: Ap
         return params;
     }, [debouncedFilters]);
 
-    const { data: appointments = [] } = useQuery<Appointment[]>({
+    const { data: appointments = [] } = useQuery<AdminAppointment[]>({
         queryKey: ['adminAppointments', queryParams],
-        queryFn: async () => (await apiClient.api.admin.appointments.$get({ query: queryParams })).json().then(res => res.data),
+        queryFn: () => getAdminAppointments(queryParams),
         initialData: initialAppointments,
         enabled: !!debouncedFilters, // Only run query when debounced filters are set
     });
 
-    const columns: ColumnDef<Appointment>[] = [
+    const columns: ColumnDef<AdminAppointment>[] = [
         { accessorKey: 'patientName', header: 'Patient' },
         { accessorKey: 'doctorName', header: 'Doctor' },
         { accessorKey: 'clinicName', header: 'Clinic' },
         { accessorKey: 'serviceName', header: 'Service' },
-        { accessorKey: 'startTime', header: 'Date & Time', cell: ({ row }) => format(new Date(row.original.startTime), 'PPpp')},
-        { accessorKey: 'status', header: 'Status', cell: ({ row }) => <Badge variant={row.original.status === 'canceled' ? 'destructive' : 'default'}>{row.original.status}</Badge>},
+        { accessorKey: 'appointmentTime', header: 'Date & Time', cell: ({ row }) => format(new Date(row.original.appointmentTime), 'PPpp')},
+        { accessorKey: 'status', header: 'Status', cell: ({ row }) => <Badge variant={row.original.status.startsWith('canceled') ? 'destructive' : 'default'}>{row.original.status.replace(/_/g, ' ')}</Badge>},
     ];
     
     const handleFilterChange = (key: keyof typeof filters, value: any) => {
@@ -84,12 +84,12 @@ export function AppointmentsClient({ initialAppointments, clinics, doctors }: Ap
 
     return (
         <div>
-            <div className="flex gap-4 items-center mb-4 p-4 border rounded-lg">
-                <Select value={filters.status} onValueChange={(v) => handleFilterChange('status', v)}><SelectTrigger><SelectValue placeholder="Filter by Status..." /></SelectTrigger><SelectContent><SelectItem value="scheduled">Scheduled</SelectItem><SelectItem value="completed">Completed</SelectItem><SelectItem value="canceled">Canceled</SelectItem></SelectContent></Select>
+            <div className="flex flex-col md:flex-row gap-4 items-center mb-4 p-4 border rounded-lg">
+                <Select value={filters.status} onValueChange={(v) => handleFilterChange('status', v)}><SelectTrigger><SelectValue placeholder="Filter by Status..." /></SelectTrigger><SelectContent><SelectItem value="scheduled">Scheduled</SelectItem><SelectItem value="completed">Completed</SelectItem><SelectItem value="canceled_by_patient">Canceled (Patient)</SelectItem><SelectItem value="canceled_by_admin">Canceled (Admin)</SelectItem><SelectItem value="no_show">No Show</SelectItem></SelectContent></Select>
                 <Select value={filters.clinicId} onValueChange={(v) => handleFilterChange('clinicId', v)}><SelectTrigger><SelectValue placeholder="Filter by Clinic..." /></SelectTrigger><SelectContent>{clinics.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select>
                 <Select value={filters.doctorId} onValueChange={(v) => handleFilterChange('doctorId', v)}><SelectTrigger><SelectValue placeholder="Filter by Doctor..." /></SelectTrigger><SelectContent>{doctors.map(d => <SelectItem key={d.id} value={d.id}>{d.fullName}</SelectItem>)}</SelectContent></Select>
                 <Popover>
-                    <PopoverTrigger asChild><Button variant="outline"><CalendarIcon className="mr-2 h-4 w-4" />{filters.dateRange?.from ? (filters.dateRange.to ? `${format(filters.dateRange.from, "LLL dd, y")} - ${format(filters.dateRange.to, "LLL dd, y")}` : format(filters.dateRange.from, "LLL dd, y")) : "Pick a date range"}</Button></PopoverTrigger>
+                    <PopoverTrigger asChild><Button variant="outline" className="w-[240px] justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{filters.dateRange?.from ? (filters.dateRange.to ? `${format(filters.dateRange.from, "LLL dd, y")} - ${format(filters.dateRange.to, "LLL dd, y")}` : format(filters.dateRange.from, "LLL dd, y")) : <span>Pick a date range</span>}</Button></PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start"><Calendar mode="range" selected={filters.dateRange} onSelect={(range) => handleFilterChange('dateRange', range)}/></PopoverContent>
                 </Popover>
                  <Button onClick={() => setFilters({ status: '', clinicId: '', doctorId: '', dateRange: undefined })} variant="ghost">Clear Filters</Button>

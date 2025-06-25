@@ -20,14 +20,10 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"],
-      "@my-org/shared-sdk": ["../carepop-shared-sdk/src/index.ts"]
+      "@/*": ["./src/*"]
     },
     "baseUrl": "."
   },
-  "references": [
-    { "path": "../carepop-shared-sdk" }
-  ],
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]
 }

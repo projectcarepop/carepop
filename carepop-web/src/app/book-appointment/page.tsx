@@ -1,12 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { BookingWizard } from '@/components/booking/BookingWizard';
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from '@/components/ui/card';
+import { Container } from "@/components/layout/Container";
 
 /**
  * The server component for the Appointment Booking page.
@@ -25,21 +20,14 @@ export default async function BookAppointmentPage() {
   }
 
   return (
-    <main className="container mx-auto flex min-h-screen flex-col items-center p-4 pt-12">
-      <div className="w-full max-w-4xl">
-        <Card className="border-none shadow-none">
-          <CardHeader>
-            <CardTitle className="text-3xl font-bold tracking-tight">
-              Book a New Appointment
-            </CardTitle>
-            <CardDescription>
-              Follow the steps below to schedule your consultation.
-            </CardDescription>
-          </CardHeader>
-          {/* The interactive part of the booking flow is handled by the client component */}
-          <BookingWizard />
-        </Card>
+    <Container>
+      <div className="py-8">
+        <h1 className="text-3xl font-bold tracking-tight mb-4">Book Your Appointment</h1>
+        <p className="text-muted-foreground mb-8">
+          Follow the steps below to find a service, clinic, and time that works for you.
+        </p>
+        <BookingWizard />
       </div>
-    </main>
+    </Container>
   );
 } 

@@ -5,8 +5,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '@/lib/apiClient';
-import { useToast } from "@/components/ui/use-toast";
+import { addNoteToAppointment } from '@/services/api';
+import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,7 @@ interface AddNoteModalProps {
 export function AddNoteModal({ appointmentId }: AddNoteModalProps) {
   const { toast } = useToast();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
 
   const form = useForm<AddNoteFormValues>({
@@ -36,20 +37,17 @@ export function AddNoteModal({ appointmentId }: AddNoteModalProps) {
   });
 
   const addNoteMutation = useMutation({
-    mutationFn: (values: AddNoteFormValues) => {
-        const payload = {
-            recordType: 'DOCTOR_NOTE',
-            details: { content: values.note },
-        };
-        return apiClient.api.admin.appointments[appointmentId].records.$post({ json: payload });
-    },
+    mutationFn: (values: AddNoteFormValues) => addNoteToAppointment(appointmentId, values.note),
     onSuccess: () => {
         toast({ title: 'Note added successfully' });
         setIsOpen(false);
         form.reset();
-        router.refresh(); // Refresh server component data
+        // Invalidate queries related to appointments or notes to refetch data
+        queryClient.invalidateQueries({ queryKey: ['adminAppointmentDetails', appointmentId] });
+        queryClient.invalidateQueries({ queryKey: ['adminAppointments'] });
+        router.refresh(); 
     },
-    onError: (err) => toast({ title: "Failed to add note", description: err.message, variant: 'destructive' })
+    onError: (err: Error) => toast({ title: "Failed to add note", description: err.message, variant: 'destructive' })
   });
   
   const isSubmitting = addNoteMutation.isPending;
@@ -77,7 +75,7 @@ export function AddNoteModal({ appointmentId }: AddNoteModalProps) {
                     name="note"
                     render={({ field }) => (
                         <FormItem>
-                        <FormLabel>Doctor's Note</FormLabel>
+                        <FormLabel>Doctor&apos;s Note</FormLabel>
                         <FormControl>
                             <Textarea placeholder="Enter clinical notes for this visit..." {...field} rows={5} />
                         </FormControl>

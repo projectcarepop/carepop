@@ -4,32 +4,17 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { AppointmentsTable } from './AppointmentsTable';
 import { Button } from '@/components/ui/button';
-import { apiClient as honoClient } from '@/lib/apiClient';
-import type { AppType } from '../../../../carepop-backend-v2/app/api/route';
-import { hc } from 'hono/client';
+import { getMyAppointments } from '@/services/api';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle } from 'lucide-react';
 import type { Profile } from '@/lib/types';
 import type { AppointmentWithRelations } from '@/app/main-dashboard/page';
 
-// Explicitly type the api client to resolve inference issues
-const apiClient = honoClient as unknown as hc<AppType>;
-
 interface MainDashboardClientProps {
   profile: Profile;
   initialAppointments: AppointmentWithRelations[];
 }
-
-// --- API Fetching Functions ---
-const fetchAppointments = async (): Promise<AppointmentWithRelations[]> => {
-  const response = await apiClient.me.appointments.get({ query: { limit: '3' } });
-  if (response.status !== 200) {
-    throw new Error('Failed to fetch appointments');
-  }
-  // We trust the backend API to return data matching the `AppointmentWithRelations` shape.
-  return response.body.data as AppointmentWithRelations[];
-};
 
 // --- The Client Component ---
 export function MainDashboardClient({ 
@@ -43,7 +28,7 @@ export function MainDashboardClient({
     isLoading: isLoadingAppointments 
   } = useQuery({
     queryKey: ['dashboardAppointments'],
-    queryFn: fetchAppointments,
+    queryFn: () => getMyAppointments({ limit: 3 }),
     initialData: initialAppointments,
   });
 

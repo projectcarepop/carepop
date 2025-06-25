@@ -1,7 +1,7 @@
 'use client';
 
 import { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, MoreHorizontal } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,14 +11,14 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { type Doctor } from "@/lib/types";
 
-// TODO: Centralize this type
-export type Doctor = {
-  id: string;
-  fullName: string;
-  specialty: string;
-  isActive: boolean;
-};
+// Extend the window interface for our table meta
+declare module '@tanstack/react-table' {
+  interface TableMeta<TData> {
+    editDoctor: (doctor: TData) => void;
+  }
+}
 
 export const columns: ColumnDef<Doctor>[] = [
   {
@@ -26,8 +26,8 @@ export const columns: ColumnDef<Doctor>[] = [
     header: "Full Name",
   },
   {
-    accessorKey: "specialty",
-    header: "Specialty",
+    accessorKey: "specialization",
+    header: "Specialization",
   },
   {
     accessorKey: "isActive",
@@ -39,7 +39,7 @@ export const columns: ColumnDef<Doctor>[] = [
   },
   {
     id: "actions",
-    cell: ({ row }) => {
+    cell: ({ row, table }) => {
       const doctor = row.original;
       return (
         <DropdownMenu>
@@ -51,9 +51,8 @@ export const columns: ColumnDef<Doctor>[] = [
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem>Edit Doctor</DropdownMenuItem>
-            <DropdownMenuItem className="text-red-600">
-              Deactivate Doctor
+            <DropdownMenuItem onClick={() => table.options.meta?.editDoctor?.(doctor)}>
+              Edit Doctor
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

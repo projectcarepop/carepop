@@ -2,22 +2,19 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useReactTable, getCoreRowModel, flexRender, ColumnDef } from "@tanstack/react-table";
-import { apiClient } from '@/lib/apiClient';
-import { useToast } from "@/components/ui/use-toast";
+import { useReactTable, getCoreRowModel, flexRender } from "@tanstack/react-table";
+import { useToast } from "@/hooks/use-toast";
+import { getAdminUsers, updateUserRole } from '@/services/api';
+import { columns } from './columns';
+import { type AdminUser } from '@/lib/types';
 
-import { MoreHorizontal } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-import { type UserProfile } from '@/types/app';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Loader2 } from 'lucide-react';
 
 interface UsersClientProps {
-    initialData: UserProfile[];
+    initialData: AdminUser[];
 }
 
 export function UsersClient({ initialData }: UsersClientProps) {
@@ -25,37 +22,26 @@ export function UsersClient({ initialData }: UsersClientProps) {
     const queryClient = useQueryClient();
     
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+    const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
     const [newRole, setNewRole] = useState<'admin' | 'patient' | ''>('');
 
-    // --- Data Fetching ---
-    const { data: users = [] } = useQuery<UserProfile[]>({
+    const { data: users = [] } = useQuery<AdminUser[]>({
         queryKey: ['adminUsers'],
-        queryFn: async () => {
-            const res = await apiClient.api.admin.users.$get();
-            if (!res.ok) throw new Error('Failed to fetch users');
-            const { data } = await res.json();
-            return data;
-        },
+        queryFn: getAdminUsers,
         initialData: initialData,
     });
 
-    // --- Mutation ---
     const updateUserRoleMutation = useMutation({
-        mutationFn: ({ userId, role }: { userId: string, role: 'admin' | 'patient' }) => {
-            return apiClient.api.admin.users[userId].role.$put({ json: { role } });
-        },
+        mutationFn: ({ userId, role }: { userId: string, role: 'admin' | 'patient' }) => updateUserRole(userId, role),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
             toast({ title: 'User role updated successfully' });
             setIsModalOpen(false);
-            setSelectedUser(null);
         },
-        onError: (error) => toast({ title: 'Error updating role', description: error.message, variant: 'destructive' }),
+        onError: (error: Error) => toast({ title: 'Error updating role', description: error.message, variant: 'destructive' }),
     });
 
-    // --- Event Handlers ---
-    const openEditRoleModal = (user: UserProfile) => {
+    const openEditRoleModal = (user: AdminUser) => {
         setSelectedUser(user);
         setNewRole(user.role as 'admin' | 'patient');
         setIsModalOpen(true);
@@ -67,39 +53,13 @@ export function UsersClient({ initialData }: UsersClientProps) {
         }
     };
     
-    // --- Table Columns ---
-    // Defined inside the component to have access to the open modal handler
-    const columns: ColumnDef<UserProfile>[] = [
-        { accessorKey: "fullName", header: "Full Name" },
-        { accessorKey: "email", header: "Email" },
-        { 
-            accessorKey: "role", 
-            header: "Role",
-            cell: ({ row }) => {
-                const role = row.getValue("role") as string;
-                return <Badge variant={role === 'admin' ? 'default' : 'secondary'}>{role}</Badge>;
-            }
-        },
-        {
-            id: "actions",
-            cell: ({ row }) => (
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => openEditRoleModal(row.original)}>Edit Role</DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            ),
-        },
-    ];
-
     const table = useReactTable({
         data: users,
         columns,
         getCoreRowModel: getCoreRowModel(),
+        meta: {
+            editUserRole: openEditRoleModal,
+        }
     });
 
     return (
@@ -131,7 +91,7 @@ export function UsersClient({ initialData }: UsersClientProps) {
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction onClick={handleRoleChangeCommit} disabled={updateUserRoleMutation.isPending}>
-                            {updateUserRoleMutation.isPending && <MoreHorizontal className="mr-2 h-4 w-4 animate-spin" />}
+                            {updateUserRoleMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Save Changes
                         </AlertDialogAction>
                     </AlertDialogFooter>

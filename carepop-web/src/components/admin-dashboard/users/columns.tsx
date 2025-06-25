@@ -1,6 +1,6 @@
 'use client';
 
-import { ColumnDef } from "@tanstack/react-table";
+import { type ColumnDef } from "@tanstack/react-table";
 import { MoreHorizontal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,11 +11,15 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { type AdminUser } from "@/lib/types";
 
-// Assuming UserProfile is imported from a central types file
-import { type UserProfile } from "@/types/app";
+declare module '@tanstack/react-table' {
+  interface TableMeta<TData> {
+    editUserRole?: (user: TData) => void;
+  }
+}
 
-export const columns: ColumnDef<UserProfile>[] = [
+export const columns: ColumnDef<AdminUser>[] = [
   {
     accessorKey: "fullName",
     header: "Full Name",
@@ -35,9 +39,7 @@ export const columns: ColumnDef<UserProfile>[] = [
   },
   {
     id: "actions",
-    cell: ({ row }) => {
-      const user = row.original;
-      // The actual edit functionality will be handled in the client component
+    cell: ({ row, table }) => {
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -48,7 +50,9 @@ export const columns: ColumnDef<UserProfile>[] = [
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem>Edit Role</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => table.options.meta?.editUserRole?.(row.original)}>
+              Edit Role
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       );

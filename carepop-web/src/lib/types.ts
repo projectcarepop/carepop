@@ -1,5 +1,6 @@
 import { type InferSelectModel, type InferInsertModel } from "drizzle-orm";
 import * as schema from "../drizzle/schema";
+import { z } from "zod";
 
 // =================================================================
 // ENUMS
@@ -102,10 +103,23 @@ export type AppointmentDetails = Appointment & {
   medicalRecords: MedicalRecord[];
 };
 
-export type ProductWithDetails = Product & {
-  categoryName?: string;
-  quantityOnHand?: number;
-}; 
+export type ProductWithStockAndCategory = Product & {
+  categoryName: string;
+  quantityOnHand: number;
+};
+
+export type AdminAppointment = Appointment & {
+  patientName: string;
+  doctorName: string;
+  clinicName: string;
+  serviceName: string;
+};
+
+export type AdminUser = UserProfile & {
+  email: string;
+  role: string;
+  fullName: string;
+};
 
 // --- Custom Types for API responses / UI Components ---
 export type UserProfile = Profile;
@@ -126,4 +140,37 @@ export type DashboardMedicalRecord = {
     summary: string;
     createdAt: string;
     serviceName: string; 
-}; 
+};
+
+export const adminServiceSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    description: z.string().nullable(),
+    price: z.string(),
+    durationMinutes: z.number().nullable(),
+    isActive: z.boolean(),
+    createdAt: z.string(),
+    serviceCategory: z.object({
+        id: z.string(),
+        name: z.string(),
+    }).nullable(),
+});
+export type AdminService = z.infer<typeof adminServiceSchema>;
+
+export const adminDoctorSchema = z.object({
+    id: z.string(),
+    userId: z.string(),
+    fullName: z.string(),
+    serviceCategory: z.object({ 
+        id: z.string(),
+        name: z.string() 
+    }).nullable(),
+    clinics: z.array(z.object({ id: z.string(), name: z.string() })),
+    services: z.array(z.object({ id: z.string(), name: z.string() })),
+});
+export type AdminDoctor = z.infer<typeof adminDoctorSchema>;
+
+export const adminUserSchema = z.object({
+    id: z.string(),
+    // ... existing code ...
+}); 

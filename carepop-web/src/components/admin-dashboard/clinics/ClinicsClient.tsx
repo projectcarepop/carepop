@@ -7,13 +7,14 @@ import {
     getCoreRowModel, 
     useReactTable,
     getSortedRowModel,
-    SortingState,
+    type SortingState,
 } from "@tanstack/react-table";
 
-import { apiClient } from '@/lib/apiClient';
 import { useToast } from "@/hooks/use-toast";
-import { columns, Clinic } from './columns';
-import { ClinicForm } from './ClinicForm';
+import { getAdminClinics, upsertClinic } from '@/services/api';
+import { type Clinic } from "@/lib/types";
+import { columns } from './columns';
+import { ClinicForm, type ClinicFormData } from './ClinicForm';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -47,35 +48,23 @@ export function ClinicsClient({ initialData }: ClinicsClientProps) {
     // --- Data Fetching ---
     const { data: clinics = [] } = useQuery<Clinic[]>({
         queryKey: ['adminClinics'],
-        queryFn: async () => {
-            const res = await apiClient.api.admin.clinics.$get();
-            if (!res.ok) throw new Error('Failed to fetch clinics');
-            const data = await res.json();
-            return data.data;
-        },
+        queryFn: getAdminClinics,
         initialData: initialData,
     });
 
     // --- Mutations ---
-    const createClinicMutation = useMutation({
-        mutationFn: (newClinic: Omit<Clinic, 'id'>) => apiClient.api.admin.clinics.$post({ json: newClinic }),
+    const clinicMutation = useMutation({
+        mutationFn: (clinicData: ClinicFormData) => upsertClinic(clinicData, selectedClinic?.id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['adminClinics'] });
-            toast({ title: 'Clinic created successfully' });
+            const action = selectedClinic ? 'updated' : 'created';
+            toast({ title: `Clinic ${action} successfully` });
             setIsModalOpen(false);
         },
-        onError: (error) => toast({ title: 'Error creating clinic', description: error.message, variant: 'destructive' }),
-    });
-
-    const updateClinicMutation = useMutation({
-        mutationFn: (updatedClinic: Clinic) => apiClient.api.admin.clinics[updatedClinic.id].$put({ json: updatedClinic }),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['adminClinics'] });
-            toast({ title: 'Clinic updated successfully' });
-            setIsModalOpen(false);
-            setSelectedClinic(null);
+        onError: (error: Error) => {
+            const action = selectedClinic ? 'updating' : 'creating';
+            toast({ title: `Error ${action} clinic`, description: error.message, variant: 'destructive' });
         },
-        onError: (error) => toast({ title: 'Error updating clinic', description: error.message, variant: 'destructive' }),
     });
 
     // --- Table Definition ---
@@ -88,6 +77,12 @@ export function ClinicsClient({ initialData }: ClinicsClientProps) {
         state: {
           sorting,
         },
+        meta: {
+            editClinic: (clinic: Clinic) => {
+                setSelectedClinic(clinic);
+                setIsModalOpen(true);
+            }
+        }
     });
 
     // --- Event Handlers ---
@@ -96,17 +91,20 @@ export function ClinicsClient({ initialData }: ClinicsClientProps) {
         setIsModalOpen(true);
     };
 
-    const handleFormSubmit = (values: Omit<Clinic, 'id'>) => {
-        if (selectedClinic) {
-            updateClinicMutation.mutate({ ...selectedClinic, ...values });
-        } else {
-            createClinicMutation.mutate(values);
-        }
+    const handleFormSubmit = (values: ClinicFormData) => {
+        clinicMutation.mutate(values);
     };
+
+    const handleModalChange = (isOpen: boolean) => {
+        if (!isOpen) {
+            setSelectedClinic(null);
+        }
+        setIsModalOpen(isOpen);
+    }
 
     return (
         <div>
-            <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+            <Dialog open={isModalOpen} onOpenChange={handleModalChange}>
                 <Button onClick={handleAddNew}>Create New Clinic</Button>
                 <DialogContent>
                     <DialogHeader>
@@ -118,7 +116,7 @@ export function ClinicsClient({ initialData }: ClinicsClientProps) {
                     <ClinicForm 
                         initialData={selectedClinic}
                         onSubmit={handleFormSubmit}
-                        isPending={createClinicMutation.isPending || updateClinicMutation.isPending}
+                        isPending={clinicMutation.isPending}
                     />
                 </DialogContent>
             </Dialog>

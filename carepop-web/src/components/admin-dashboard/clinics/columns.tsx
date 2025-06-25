@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown, MoreHorizontal } from "lucide-react";
@@ -9,17 +9,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-// TODO: Centralize this type in @/types/app.ts
-export type Clinic = {
-  id: string;
-  name: string;
-  address: string;
-  city: string;
-  phone: string;
-};
+import { type Clinic } from "@/lib/types";
 
 export const columns: ColumnDef<Clinic>[] = [
   {
@@ -50,7 +43,7 @@ export const columns: ColumnDef<Clinic>[] = [
   },
   {
     id: "actions",
-    cell: ({ row }) => {
+    cell: ({ row, table }) => {
       const clinic = row.original;
 
       return (
@@ -66,11 +59,11 @@ export const columns: ColumnDef<Clinic>[] = [
             <DropdownMenuItem
               onClick={() => navigator.clipboard.writeText(clinic.id)}
             >
-              Copy Clinic ID
+              Copy clinic ID
             </DropdownMenuItem>
-            <DropdownMenuItem>Edit Clinic</DropdownMenuItem>
-            <DropdownMenuItem className="text-red-600">
-              Delete Clinic
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => table.options.meta?.editClinic?.(clinic)}>
+              Edit Clinic
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
