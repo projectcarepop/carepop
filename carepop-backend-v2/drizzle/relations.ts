@@ -14,20 +14,12 @@ export const serviceCategoriesRelations = relations(serviceCategories, ({many}) 
 	services: many(services),
 }));
 
-export const profilesRelations = relations(profiles, ({one, many}) => ({
-	usersInAuth: one(usersInAuth, {
-		fields: [profiles.id],
-		references: [usersInAuth.id]
-	}),
+export const profilesRelations = relations(profiles, ({many}) => ({
 	appointments: many(appointments),
 	reviews: many(reviews),
 	patientOrders: many(patientOrders),
 	healthLogs: many(healthLogs),
 	menstrualLogs: many(menstrualLogs),
-}));
-
-export const usersInAuthRelations = relations(usersInAuth, ({many}) => ({
-	profiles: many(profiles),
 }));
 
 export const appointmentsRelations = relations(appointments, ({one, many}) => ({
@@ -48,7 +40,7 @@ export const appointmentsRelations = relations(appointments, ({one, many}) => ({
 		references: [services.id]
 	}),
 	medicalRecords: many(medicalRecords),
-	reviews: many(reviews),
+	review: one(reviews),
 }));
 
 export const clinicsRelations = relations(clinics, ({many}) => ({

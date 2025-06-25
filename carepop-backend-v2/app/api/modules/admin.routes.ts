@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { db } from '../lib/db';
-import { clinics, profiles } from '../../../drizzle/schema';
+import { clinics, profiles, doctors } from '../../../drizzle/schema';
 import { eq, sql } from 'drizzle-orm';
 import { authMiddleware, adminMiddleware, AuthEnv } from '../middleware/auth';
 
@@ -27,6 +27,13 @@ const createClinicSchema = z.object({
 });
 
 const updateClinicSchema = createClinicSchema.partial();
+
+const createDoctorSchema = z.object({
+  fullName: z.string().min(1, { message: "Full name is required" }),
+  specialtyText: z.string().optional(),
+  bio: z.string().optional(),
+  isActive: z.boolean().optional().default(true),
+});
 
 const updateUserRoleSchema = z.object({
   role: z.enum(['patient', 'admin']),
@@ -64,8 +71,17 @@ adminRoutes
     const { id } = c.req.param();
     const values = c.req.valid('json');
 
+    // Create a mutable copy to transform
+    const updatePayload: any = { ...values };
+
+    // If location is being updated, transform it to the SQL format
+    if (values.location) {
+      const { lon, lat } = values.location;
+      updatePayload.location = sql`ST_GeomFromText(${`POINT(${lon} ${lat})`}, 4326)`;
+    }
+
     const [updatedClinic] = await db.update(clinics)
-      .set(values)
+      .set(updatePayload)
       .where(eq(clinics.id, id))
       .returning();
 
@@ -79,6 +95,37 @@ adminRoutes
     return c.body(null, 204);
   });
 
+// --- Doctor Management Endpoints ---
+adminRoutes.post('/doctors', zValidator('json', createDoctorSchema), async (c) => {
+  const newDoctorData = c.req.valid('json');
+  
+  try {
+    const [createdDoctor] = await db.insert(doctors).values(newDoctorData).returning();
+    return c.json(createdDoctor, 201);
+  } catch (error) {
+    console.error('Error creating doctor:', error);
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
+});
+
+// --- Appointment Management Endpoints ---
+adminRoutes.get('/appointments', async (c) => {
+    try {
+        const allAppointments = await db.query.appointments.findMany({
+            with: {
+                profile: { columns: { fullName: true } },
+                doctor: { columns: { fullName: true } },
+                service: { columns: { name: true } },
+                clinic: { columns: { name: true } },
+            },
+            orderBy: (appointments, { desc }) => [desc(appointments.appointmentTime)],
+        });
+        return c.json(allAppointments);
+    } catch (error) {
+        console.error('Error fetching all appointments:', error);
+        return c.json({ error: 'Internal Server Error' }, 500);
+    }
+});
 
 // --- User Management Endpoints ---
 

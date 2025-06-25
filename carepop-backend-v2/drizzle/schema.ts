@@ -1,11 +1,35 @@
-import { pgTable, index, pgPolicy, uuid, text, jsonb, boolean, timestamp, foreignKey, check, numeric, integer, date, unique, primaryKey, pgEnum } from "drizzle-orm/pg-core"
+import { pgTable, index, pgPolicy, uuid, text, jsonb, boolean, timestamp, foreignKey, check, numeric, integer, date, unique, primaryKey, pgEnum, customType } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
+
+// Placeholder for auth.users table
+export const usersInAuth = pgTable("users", {
+  id: uuid().primaryKey(),
+}, (table) => {
+    return {
+        tableName: "users",
+        schemaName: "auth"
+    }
+});
 
 export const appointmentStatus = pgEnum("appointment_status", ['scheduled', 'completed', 'canceled_by_patient', 'canceled_by_admin', 'no_show'])
 export const medicalRecordType = pgEnum("medical_record_type", ['PRESCRIPTION', 'LAB_ORDER', 'DOCTOR_NOTE'])
 export const orderStatus = pgEnum("order_status", ['pending_payment', 'processing', 'shipped', 'delivered', 'canceled'])
 export const userRole = pgEnum("user_role", ['patient', 'admin'])
+export const dayOfWeekEnum = pgEnum("day_of_week", [
+  "SUNDAY",
+  "MONDAY",
+  "TUESDAY",
+  "WEDNESDAY",
+  "THURSDAY",
+  "FRIDAY",
+  "SATURDAY",
+]);
 
+const geographyPoint = customType<{ data: string }>({
+    dataType() {
+        return 'geography(Point, 4326)';
+    },
+});
 
 export const clinics = pgTable("clinics", {
 	id: uuid().default(sql`uuid_generate_v4()`).primaryKey().notNull(),
@@ -14,7 +38,7 @@ export const clinics = pgTable("clinics", {
 	phoneNumber: text("phone_number"),
 	logoUrl: text("logo_url"),
 	// TODO: failed to parse database type 'geography'
-	location: unknown("location"),
+	location: geographyPoint("location"),
 	isActive: boolean("is_active").default(true).notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
@@ -67,15 +91,31 @@ export const services = pgTable("services", {
 
 export const profiles = pgTable("profiles", {
 	id: uuid().primaryKey().notNull(),
-	fullName: text("full_name"),
-	dateOfBirth: date("date_of_birth"),
+	firstName: text("first_name"),
+	middleInitial: text("middle_initial"),
+	lastName: text("last_name"),
+	email: text("email").notNull().unique(),
+	contactNo: text("contact_no"),
+	genderIdentity: text("gender_identity"),
+	pronouns: text("pronouns"),
+	assignedSexAtBirth: text("assigned_sex_at_birth"),
+	birthday: date("birthday"),
+	civilStatus: text("civil_status"),
+	religion: text("religion"),
+	occupation: text("occupation"),
+	philhealthNo: text("philhealth_no"),
+	street: text("street"),
+	barangayCode: text("baranggay_code"),
+	cityMunicipalityCode: text("city_municipality_code"),
+	provinceCode: text("province_code"),
+	avatarUrl: text("avatar_url"),
 	role: userRole().default('patient').notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	foreignKey({
 			columns: [table.id],
-			foreignColumns: [users.id],
+			foreignColumns: [usersInAuth.id],
 			name: "fk_profiles_id"
 		}).onDelete("cascade"),
 	pgPolicy("Admins can manage all profiles.", { as: "permissive", for: "all", to: ["public"], using: sql`(get_my_role() = 'admin'::text)` }),
@@ -144,7 +184,7 @@ export const reviews = pgTable("reviews", {
 	id: uuid().default(sql`uuid_generate_v4()`).primaryKey().notNull(),
 	appointmentId: uuid("appointment_id").notNull(),
 	patientId: uuid("patient_id").notNull(),
-	doctorId: uuid("doctor_id").notNull(),
+	doctorId: uuid("doctor_id"),
 	rating: integer().notNull(),
 	comment: text(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -323,4 +363,17 @@ export const patientOrderItems = pgTable("patient_order_items", {
 	pgPolicy("Admins can manage all patient-owned data.", { as: "permissive", for: "all", to: ["public"], using: sql`(get_my_role() = 'admin'::text)` }),
 	pgPolicy("Patients can view their own order items.", { as: "permissive", for: "select", to: ["public"] }),
 	check("patient_order_items_quantity_check", sql`quantity > 0`),
+]);
+
+export const providerAvailability = pgTable("provider_availability", {
+  id: uuid().default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+  doctorId: uuid("doctor_id").notNull().references(() => doctors.id, { onDelete: 'cascade' }),
+  dayOfWeek: dayOfWeekEnum("day_of_week").notNull(),
+  startTime: text("start_time").notNull(), // "HH:MM:SS" format
+  endTime: text("end_time").notNull(),     // "HH:MM:SS" format
+  isAvailable: boolean("is_available").default(true).notNull(),
+}, (table) => [
+  unique("provider_availability_doctor_day_unique").on(table.doctorId, table.dayOfWeek),
+  pgPolicy("Admins can manage platform data.", { as: "permissive", for: "all", to: ["public"], using: sql`(get_my_role() = 'admin'::text)` }),
+	pgPolicy("Anyone can view public data.", { as: "permissive", for: "select", to: ["public"] }),
 ]);

@@ -2,8 +2,8 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { db } from '../lib/db';
-import { appointments, healthLogs, doctors, clinics, services } from '../../../drizzle/schema';
-import { and, eq } from 'drizzle-orm';
+import { appointments, healthLogs, doctors, clinics, services, medicalRecords, profiles } from '../../../drizzle/schema';
+import { and, eq, exists } from 'drizzle-orm';
 import { authMiddleware, AuthEnv } from '../middleware/auth';
 // Mock Vertex AI import for demonstration purposes
 // import { VertexAI } from '@google-cloud/aiplatform';
@@ -12,6 +12,27 @@ const meRoutes = new Hono<AuthEnv>();
 
 // Apply auth middleware to all routes in this module
 meRoutes.use('*', authMiddleware);
+
+/**
+ * GET /me/profile
+ * Fetches the profile for the authenticated user.
+ */
+meRoutes.get('/profile', async (c) => {
+  const user = c.get('user');
+  
+  try {
+    const [userProfile] = await db.select().from(profiles).where(eq(profiles.id, user.id));
+
+    if (!userProfile) {
+      return c.json({ error: 'Profile not found' }, 404);
+    }
+
+    return c.json(userProfile);
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
+});
 
 /**
  * GET /me/appointments
@@ -23,17 +44,42 @@ meRoutes.get('/appointments', async (c) => {
   try {
     const userAppointments = await db.query.appointments.findMany({
       where: eq(appointments.patientId, user.id),
-      with: {
-        doctor: true,
-        clinic: true,
-        service: true,
-      },
       orderBy: (appointments, { desc }) => [desc(appointments.appointmentTime)],
     });
 
     return c.json(userAppointments);
   } catch (error) {
-    console.error('Error fetching user appointments:', error);
+    console.error('Error fetching appointments (simplified query):', error);
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
+});
+
+/**
+ * GET /me/medical-records
+ * Fetches all medical records for the authenticated user, grouped by appointment.
+ */
+meRoutes.get('/medical-records', async (c) => {
+  const user = c.get('user');
+  
+  try {
+    const recordsByAppointment = await db.query.appointments.findMany({
+      where: and(
+        eq(appointments.patientId, user.id),
+        exists(db.select({ id: medicalRecords.id }).from(medicalRecords).where(eq(medicalRecords.appointmentId, appointments.id)))
+      ),
+      with: {
+        medicalRecords: true,
+        doctor: true,
+        service: true,
+        clinic: true
+      },
+      orderBy: (appointments, { desc }) => [desc(appointments.appointmentTime)],
+    });
+
+    return c.json(recordsByAppointment);
+
+  } catch (error) {
+    console.error('Error fetching medical records:', error);
     return c.json({ error: 'Internal Server Error' }, 500);
   }
 });
@@ -104,6 +150,52 @@ meRoutes.post('/ai/insight', async (c) => {
 
   } catch (error) {
     console.error('Error generating AI insight:', error);
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
+});
+
+// Zod schema for updating a user's profile
+const updateProfileSchema = z.object({
+  firstName: z.string().min(1, "First name is required").optional(),
+  lastName: z.string().min(1, "Last name is required").optional(),
+  middleInitial: z.string().max(1).optional().nullable(),
+  contactNo: z.string().optional().nullable(),
+  birthday: z.string().optional().nullable(),
+  genderIdentity: z.string().optional().nullable(),
+  pronouns: z.string().optional().nullable(),
+  assignedSexAtBirth: z.string().optional().nullable(),
+  civilStatus: z.string().optional().nullable(),
+  religion: z.string().optional().nullable(),
+  occupation: z.string().optional().nullable(),
+  philhealthNo: z.string().optional().nullable(),
+  street: z.string().optional().nullable(),
+  barangayCode: z.string().optional().nullable(),
+  cityMunicipalityCode: z.string().optional().nullable(),
+  provinceCode: z.string().optional().nullable(),
+  avatarUrl: z.string().url("Invalid URL format").optional().nullable(),
+});
+
+/**
+ * PUT /me/profile
+ * Updates the profile for the authenticated user.
+ */
+meRoutes.put('/profile', zValidator('json', updateProfileSchema), async (c) => {
+  const user = c.get('user');
+  const validatedProfileData = c.req.valid('json');
+
+  try {
+    const [updatedProfile] = await db.update(profiles)
+      .set({ ...validatedProfileData, updatedAt: new Date().toISOString() })
+      .where(eq(profiles.id, user.id))
+      .returning();
+    
+    if (!updatedProfile) {
+      return c.json({ error: 'Profile not found' }, 404);
+    }
+    
+    return c.json(updatedProfile);
+  } catch (error) {
+    console.error('Error updating profile:', error);
     return c.json({ error: 'Internal Server Error' }, 500);
   }
 });

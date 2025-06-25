@@ -1,0 +1,30 @@
+{
+  "name": "carepop-backend-v2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "vitest",
+    "dev": "tsx watch dev.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@hono/node-server": "^1.11.2",
+    "@types/node": "^20.14.9",
+    "dotenv": "^16.5.0",
+    "drizzle-kit": "^0.31.2",
+    "tsx": "^4.10.2",
+    "vitest": "^1.6.0"
+  },
+  "dependencies": {
+    "@hono/zod-validator": "^0.7.0",
+    "@supabase/supabase-js": "^2.50.0",
+    "date-fns": "^4.1.0",
+    "drizzle-orm": "^0.44.2",
+    "postgres": "^3.4.7",
+    "zod": "^3.25.67"
+  }
+}
