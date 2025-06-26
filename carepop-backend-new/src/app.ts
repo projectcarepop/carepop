@@ -25,10 +25,17 @@ const app = new Hono();
 // --- Middleware ---
 app.use('*', logger());
 app.use('*', secureHeaders());
+
+// Get allowed origins from environment variable, split by comma.
+// Fallback to an empty string if the variable is not set.
+const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '').split(',').filter(Boolean);
+
 app.use(
   '*',
   cors({
-    origin: '*', // In production, you should restrict this to your frontend's domain
+    origin: allowedOrigins.length > 0 ? allowedOrigins : '*',
+    credentials: true,
+    exposeHeaders: ['Content-Length', 'X-Kuma-Revision'],
   })
 );
 

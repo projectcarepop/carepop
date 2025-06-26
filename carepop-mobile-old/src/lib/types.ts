@@ -52,6 +52,7 @@ export type Service = {
   description: string | null;
   price: string; // Numeric is string in JS
   durationMinutes: number;
+  categoryId: string | null;
 };
 
 export type ServiceCategory = {
@@ -102,4 +103,9 @@ export type AvailabilitySlot = {
   avatarUrl?: string | null;
   specialtyText?: string | null;
   slots: string[];
+};
+
+// New type for the combined service and category data
+export type ServiceWithCategory = Service & {
+  serviceCategory: ServiceCategory | null;
 };

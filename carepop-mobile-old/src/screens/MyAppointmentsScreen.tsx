@@ -164,7 +164,7 @@ export const MyAppointmentsScreen: React.FC = () => {
     { key: 'past', title: 'Past' },
   ]);
 
-  const { data: allAppointments, isLoading, refetch, isRefetching } = useQuery({
+  const { data: allAppointments, isLoading, isError, error, refetch, isRefetching } = useQuery({
       queryKey: ['myAppointments'],
       queryFn: getMyAppointments
   });
@@ -198,6 +198,31 @@ export const MyAppointmentsScreen: React.FC = () => {
       flex: 1,
     };
   });
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
+
+  if (isError) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.errorContainer}>
+          <AlertCircle size={48} color={theme.colors.destructive} />
+          <Text style={styles.errorText}>
+            Could not load appointments.
+          </Text>
+          <Text style={styles.errorSubText}>
+            {error?.message || 'An unexpected error occurred.'}
+          </Text>
+          <Button title="Retry" onPress={() => refetch()} style={{ marginTop: theme.spacing.lg }} />
+        </View>
+      </View>
+    )
+  }
 
   const renderScene = SceneMap({
     upcoming: () => <AppointmentsList appointments={upcomingAppointments} isLoading={isLoading} onRefresh={refetch} refreshing={isRefetching} navigation={navigation} />,
@@ -343,6 +368,29 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamilyBold,
   },
   emptySubText: {
+    ...theme.typography.body,
+    color: theme.colors.mutedForeground,
+    textAlign: 'center',
+    marginTop: theme.spacing.sm,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing.xl,
+  },
+  errorText: {
+    ...theme.typography.h3,
+    marginTop: theme.spacing.lg,
+    color: theme.colors.foreground,
+    fontFamily: theme.typography.fontFamilyBold,
+  },
+  errorSubText: {
     ...theme.typography.body,
     color: theme.colors.mutedForeground,
     textAlign: 'center',

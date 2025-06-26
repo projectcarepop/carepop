@@ -35,8 +35,6 @@ import { MyRecordsScreen } from '../screens/MyRecordsScreen';
 import { AboutUsScreen } from '../screens/AboutUsScreen';
 import { MyProfileScreen } from '../screens/MyProfileScreen';
 import { EditProfileScreen } from '../screens/EditProfileScreen';
-import { NewBookingScreen } from '../../screens/NewBookingScreen';
-import { SelectDateTimeScreen } from '../../screens/SelectDateTimeScreen';
 import { AppointmentDetailScreen } from '../screens/AppointmentDetailScreen';
 import { SplashScreen } from '../../screens/Onboarding/SplashScreen';
 import { OnboardingScreenOne } from '../../screens/Onboarding/OnboardingScreenOne';
@@ -48,6 +46,7 @@ import { LoginScreen } from '../../screens/LoginScreen';
 import { RegisterScreen } from '../../screens/RegisterScreen';
 import { ClinicFinderScreen } from '../../screens/ClinicFinderScreen';
 import LogHealthDataScreen from '../screens/LogHealthDataScreen';
+import { BookingNavigator } from './BookingNavigator';
 
 
 // --- Param Lists ---
@@ -131,16 +130,6 @@ function AuthNavigator() {
       <AuthStackNav.Screen name="Register" component={RegisterScreen} />
       <AuthStackNav.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
     </AuthStackNav.Navigator>
-  );
-}
-
-// --- Booking Flow Stack ---
-function BookingStack() {
-  return (
-    <BookingStackNav.Navigator screenOptions={{ headerShown: false }}>
-      <BookingStackNav.Screen name="BookAppointment" component={NewBookingScreen} />
-      <BookingStackNav.Screen name="SelectDateTime" component={SelectDateTimeScreen} />
-    </BookingStackNav.Navigator>
   );
 }
 
@@ -232,7 +221,7 @@ function AppDrawer() {
     >
       <Drawer.Screen name="Dashboard" component={DashboardScreen} options={{ drawerIcon: ({ color }: { color: string }) => <LayoutDashboard size={20} color={color} /> }} />
       <Drawer.Screen name="Appointments" component={AppointmentsStack} options={{ drawerIcon: ({ color }: { color: string }) => <CalendarCheck size={20} color={color} /> }} />
-      <Drawer.Screen name="Book a Service" component={BookingStack} options={{ drawerIcon: ({ color }: { color: string }) => <CalendarPlus size={20} color={color} /> }} />
+      <Drawer.Screen name="Book a Service" component={BookingNavigator} options={{ drawerIcon: ({ color }: { color: string }) => <CalendarPlus size={20} color={color} /> }} />
       <Drawer.Screen name="Clinic Finder" component={ClinicFinderScreen} options={{ drawerIcon: ({ color }: { color: string }) => <Map size={20} color={color} /> }} />
       <Drawer.Screen name="Health Buddy" component={HealthBuddyScreen} options={{ drawerIcon: ({ color }: { color: string }) => <HeartPulse size={20} color={color} /> }} />
       <Drawer.Screen name="Records" component={MyRecordsScreen} options={{ drawerIcon: ({ color }: { color:string }) => <FileText size={20} color={color} /> }} />

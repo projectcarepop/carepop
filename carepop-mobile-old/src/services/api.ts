@@ -9,6 +9,7 @@ import type {
   Service,
   UpdateProfilePayload,
   AvailabilitySlot,
+  ServiceWithCategory,
 } from "../lib/types";
 import type { RegisterFormValues, LoginFormValues } from '../lib/validation/auth';
 
@@ -212,15 +213,21 @@ export const getPublicClinics = async (): Promise<Clinic[]> => {
  * Fetches publicly available services. If a clinic ID is provided, it fetches
  * services specific to that clinic from our backend API. Otherwise, it returns all services.
  * @param clinicId Optional clinic ID to filter services by.
- * @returns A promise that resolves to an array of services.
+ * @returns A promise that resolves to an array of services with their categories.
  */
-export const getPublicServices = async (clinicId?: string): Promise<Service[]> => {
+export const getPublicServices = async (clinicId?: string): Promise<ServiceWithCategory[]> => {
   if (clinicId) {
-    // Fetch services for a specific clinic from the backend endpoint
+    // This endpoint should be updated in the backend to return the nested category.
+    // For now, we assume it does, matching the web client's expectation.
     return apiFetch(`/api/public/clinics/${clinicId}/services`);
   }
-  // Fallback to fetching all services if no clinic is specified
-  const services = await supabaseCall(supabase.from('services').select('*'));
+  // Fetch all services with their category joined.
+  const services = await supabaseCall(
+    supabase.from('services').select(`
+      *,
+      serviceCategory:service_categories(*)
+    `)
+  );
   return services ?? [];
 };
 
@@ -240,6 +247,23 @@ export const getPublicAvailability = async (
 ): Promise<AvailabilitySlot[]> => {
   const query = new URLSearchParams(params).toString();
   return apiFetch(`/api/public/availability?${query}`);
+};
+
+/**
+ * Fetches which dates are available for a given service and clinic.
+ * @param params The clinic and service to filter by.
+ * @returns A promise that resolves to an array of date strings (e.g., "2024-12-25").
+ */
+export const getPublicAvailableDates = async ({
+  clinicId,
+  serviceId,
+}: {
+  clinicId: string;
+  serviceId: string;
+}): Promise<string[]> => {
+  const query = new URLSearchParams({ clinicId, serviceId }).toString();
+  // This endpoint needs to be created in the backend. We assume it exists for now.
+  return apiFetch(`/api/public/available-dates?${query}`);
 };
 
 /**
