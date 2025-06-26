@@ -345,15 +345,22 @@ export async function getPublicAvailability(params: { serviceId: string; clinicI
 }
 
 export async function getPublicAvailableDates(params: { clinicId: string; serviceId: string; }) {
-    const queryParams = new URLSearchParams(params);
-    const response = await fetch(`${API_BASE_URL}/api/public/available-dates?${queryParams.toString()}`);
+    const url = `${API_BASE_URL}/api/public/availability/dates?clinicId=${params.clinicId}&serviceId=${params.serviceId}`;
+    const response = await fetch(url);
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Failed to fetch available dates.' }));
+        throw new Error('Failed to fetch available dates.');
+    }
+    return response.json();
+}
+
+export async function getProvidersForService(serviceId: string) {
+    const url = `${API_BASE_URL}/api/public/services/${serviceId}/providers`;
+    const response = await fetch(url);
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: `Failed to fetch providers for service ${serviceId}` }));
         throw new Error(error.message);
     }
-    const result = await response.json();
-    // This endpoint returns data in a 'data' property.
-    return result.data || [];
+    return response.json();
 }
 
 // --- Authenticated Booking Endpoints ---

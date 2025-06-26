@@ -1,4 +1,4 @@
-import { getProvidersForService } from '@/lib/api/services';
+import { getProvidersForService } from '@/services/api';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
