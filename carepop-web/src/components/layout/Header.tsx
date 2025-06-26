@@ -61,7 +61,7 @@ export default function Header() {
                   <Link href="/clinic-finder" className="hover:text-primary focus:text-primary">Find a Clinic</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild className="hover:bg-transparent focus:bg-transparent">
-                  <Link href="/book-service" className="hover:text-primary focus:text-primary">Book a Service</Link>
+                  <Link href="/book-appointment" className="hover:text-primary focus:text-primary">Book a Service</Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { type BookingData } from '../page';
-import apiClient from '@/lib/apiClient';
+import type { BookingData } from '../page';
+import { getPublicClinics } from '@/services/api';
 
 // Assuming a Clinic type, can be centralized later
 interface Clinic {
@@ -29,13 +29,9 @@ export function ClinicSelectionStep({ bookingData, onNext, onBack, updateBooking
     const { data: clinics, isLoading, isError } = useQuery<Clinic[]>({
         queryKey: ['clinics', bookingData.service?.id],
         queryFn: async () => {
-            const res = await apiClient.get('/public/clinics', {
-                params: { serviceId: bookingData.service?.id }
-            });
-            if (res.status !== 200) {
-                throw new Error('Failed to fetch clinics');
-            }
-            return res.data;
+            const res = await getPublicClinics(bookingData.service?.id);
+            // The service function wraps the result in a 'data' property
+            return res.data || [];
         },
         enabled: !!bookingData.service?.id, // Only run the query if a service is selected
     });

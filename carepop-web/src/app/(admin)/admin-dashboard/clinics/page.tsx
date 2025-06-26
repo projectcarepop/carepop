@@ -1,7 +1,6 @@
-import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { ClinicsClient } from '@/components/admin-dashboard/clinics/ClinicsClient';
-import { type Clinic } from '@/types/app'; // Assuming Clinic type is defined in a shared types file
+import { type Clinic } from '@/lib/types';
 
 // This server-side function fetches the initial list of clinics from our API.
 async function getClinics(accessToken: string): Promise<Clinic[]> {
@@ -31,8 +30,7 @@ async function getClinics(accessToken: string): Promise<Clinic[]> {
 }
 
 export default async function ManageClinicsPage() {
-    const cookieStore = cookies();
-    const supabase = createClient(cookieStore);
+    const supabase = createClient();
 
     const { data: { session } } = await supabase.auth.getSession();
 

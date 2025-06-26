@@ -1,6 +1,7 @@
 export interface UserProfile {
   id: string;
   email: string;
+  role?: 'admin' | 'user'; // Make it optional as it might not always be present
   firstName: string | null;
   lastName: string | null;
   // Add other profile fields from your database schema as needed

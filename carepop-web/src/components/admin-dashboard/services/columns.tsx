@@ -9,15 +9,27 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { type Service, type ServiceCategory } from "@/lib/types";
+import { type Service as BaseService, type ServiceCategory } from "@/lib/types";
 
-// Note: We need a specific type for the services table that includes categoryName
-export type ServiceWithCategory = Service & { categoryName: string };
+// The API now returns the category object nested inside the service object.
+// We can define the type for our table data accordingly.
+export type Service = BaseService & {
+  serviceCategory: {
+    name: string;
+  } | null; // Handle services that might not have a category
+};
 
 // --- Services Columns ---
-export const serviceColumns: ColumnDef<ServiceWithCategory>[] = [
+export const serviceColumns: ColumnDef<Service>[] = [
     { accessorKey: 'name', header: 'Name' },
-    { accessorKey: 'categoryName', header: 'Category' },
+    { 
+      accessorKey: "serviceCategory.name",
+      header: "Category",
+      cell: ({ row }) => {
+        const categoryName = row.original.serviceCategory?.name;
+        return categoryName || <span className="text-muted-foreground">Uncategorized</span>;
+      }
+    },
     { accessorKey: 'price', header: 'Price (PHP)', cell: ({ row }) => `₱${row.original.price}` },
     { accessorKey: 'duration', header: 'Duration (min)' },
     { id: 'actions', cell: ({ row }) => (

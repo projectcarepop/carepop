@@ -2,8 +2,8 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { db } from '../lib/db';
-import { clinics, doctors, services, doctorClinics, doctorServices, providerAvailability, appointments, dayOfWeekEnum } from '../../../drizzle/schema';
-import { and, eq, sql, inArray } from 'drizzle-orm';
+import { clinics, doctors, services, doctorClinics, doctorServices, providerAvailability, appointments, dayOfWeekEnum, serviceCategories } from '../../../drizzle/schema';
+import { and, eq, sql, inArray, SQL, asc } from 'drizzle-orm';
 import { getDay, parseISO, format, startOfDay, endOfDay, setHours, setMinutes, setSeconds, isBefore, addMinutes, isEqual } from 'date-fns';
 import fs from 'fs/promises';
 import path from 'path';
@@ -137,45 +137,62 @@ publicRoutes.get('/doctors', async (c) => {
   return c.json(activeDoctors);
 });
 
-/**
- * GET /public/services
- * Returns a list of all active services.
- * Can be filtered by `clinicId` to find services offered at a specific clinic.
- */
-publicRoutes.get('/services', zValidator('query', servicesQuerySchema), async (c) => {
-    const { clinicId } = c.req.valid('query');
+ /**
+     * GET /public/services
+     * Returns a list of all active services, including their category.
+     * Can be filtered by `clinicId` to find services offered at a specific clinic.
+     */
+    publicRoutes.get('/services', zValidator('query', servicesQuerySchema), async (c) => {
+        const { clinicId } = c.req.valid('query');
 
-    // If a clinicId is provided, find services offered at that clinic.
-    if (clinicId) {
-        // This subquery finds all doctor IDs associated with the specified clinic.
-        const doctorsInClinicSubQuery = db
-            .select({ doctorId: doctorClinics.doctorId })
-            .from(doctorClinics)
-            .where(eq(doctorClinics.clinicId, clinicId));
-
-        // This subquery finds all unique service IDs offered by those doctors.
-        const servicesByDoctorsSubQuery = db
-            .selectDistinct({ serviceId: doctorServices.serviceId })
-            .from(doctorServices)
-            .where(inArray(doctorServices.doctorId, doctorsInClinicSubQuery));
-        
-        // Finally, select the services that match the IDs from the subquery.
-        const filteredServices = await db
-            .select()
-            .from(services)
-            .where(
-                and(
+        try {
+            if (clinicId) {
+                // If a clinicId is provided, perform a single JOIN-based query
+                const servicesInClinic = await db.selectDistinct({
+                    id: services.id,
+                    name: services.name,
+                    description: services.description,
+                    price: services.price,
+                    durationMinutes: services.durationMinutes,
+                    isActive: services.isActive,
+                    serviceCategory: {
+                        id: serviceCategories.id,
+                        name: serviceCategories.name,
+                    }
+                })
+                .from(services)
+                .leftJoin(serviceCategories, eq(services.categoryId, serviceCategories.id))
+                .innerJoin(doctorServices, eq(services.id, doctorServices.serviceId))
+                .innerJoin(doctorClinics, eq(doctorServices.doctorId, doctorClinics.doctorId))
+                .where(and(
                     eq(services.isActive, true),
-                    inArray(services.id, servicesByDoctorsSubQuery)
-                )
-            );
-        return c.json({ data: filteredServices });
-    }
+                    eq(doctorClinics.clinicId, clinicId)
+                ))
+                .orderBy(asc(services.name));
 
-    // If no clinicId is provided, return all active services.
-    const activeServices = await db.select().from(services).where(eq(services.isActive, true));
-    return c.json({ data: activeServices });
-});
+                return c.json({ data: servicesInClinic });
+
+            } else {
+                // If no clinicId, return all active services (original logic)
+                const allServices = await db.query.services.findMany({
+                    where: eq(services.isActive, true),
+                    with: {
+                        serviceCategory: {
+                            columns: {
+                                id: true,
+                                name: true,
+                            },
+                        },
+                    },
+                    orderBy: [asc(services.name)],
+                });
+                return c.json({ data: allServices });
+            }
+        } catch (error) {
+            console.error("Failed to fetch public services:", error);
+            return c.json({ error: "Internal Server Error" }, 500);
+        }
+    });
 
 /**
  * GET /public/service-categories
@@ -207,46 +224,70 @@ publicRoutes.get('/service-categories', async (c) => {
 publicRoutes.get('/available-dates', zValidator('query', availableDatesQuerySchema), async (c) => {
     const { clinicId, serviceId } = c.req.valid('query');
     try {
-        // Step 1: Find all doctors for the given service and clinic.
-        const doctorsForServiceQuery = db.select({ doctorId: doctorServices.doctorId }).from(doctorServices).where(eq(doctorServices.serviceId, serviceId));
-        const doctorsForClinicQuery = db.select({ doctorId: doctorClinics.doctorId }).from(doctorClinics).where(eq(doctorClinics.clinicId, clinicId));
+        // --- FINAL IMPLEMENTATION ---
+        // This logic correctly calculates availability based on a fixed 9 AM-5 PM
+        // clinic schedule, as per user instruction.
 
-        const availableDoctorIds = await db
-            .selectDistinct({ id: doctors.id })
-            .from(doctors)
-            .where(and(
-                inArray(doctors.id, doctorsForServiceQuery),
-                inArray(doctors.id, doctorsForClinicQuery),
-                eq(doctors.isActive, true)
-            ));
+        // Step 1: Get service duration to calculate total slots.
+        const service = await db.query.services.findFirst({
+            where: eq(services.id, serviceId),
+            columns: { durationMinutes: true }
+        });
 
-        if (availableDoctorIds.length === 0) {
-            return c.json({ data: [] });
+        if (!service || !service.durationMinutes || service.durationMinutes <= 0) {
+             // If service is not found or has an invalid duration, no dates can be available.
+             return c.json({ data: [] });
         }
-        
-        const doctorIds = availableDoctorIds.map(d => d.id);
+        const serviceDuration = service.durationMinutes;
 
-        // Step 2: Fetch the unique working days for these doctors.
-        const uniqueWorkingDays = await db
-            .selectDistinct({ dayOfWeek: providerAvailability.dayOfWeek })
-            .from(providerAvailability)
-            .where(inArray(providerAvailability.doctorId, doctorIds));
+        // Step 2: Calculate total possible slots in a 9 AM to 5 PM workday.
+        const totalOperatingMinutes = (17 - 9) * 60; // 8 hours * 60 minutes/hour
+        const totalSlotsPerDay = Math.floor(totalOperatingMinutes / serviceDuration);
+
+        // Step 3: Get all booked appointments for the next 90 days.
+        const today = new Date();
+        const futureDate = new Date();
+        futureDate.setDate(today.getDate() + 90);
+
+        const appointmentsResult = await db
+            .select({
+                // Truncate the timestamp to a date and count the occurrences
+                date: sql<string>`DATE("appointment_time")`,
+                count: sql<number>`count(id)::int`
+            })
+            .from(appointments)
+            .where(and(
+                eq(appointments.clinicId, clinicId),
+                eq(appointments.serviceId, serviceId),
+                sql`"appointment_time" BETWEEN ${format(today, 'yyyy-MM-dd')} AND ${format(futureDate, 'yyyy-MM-dd')}`,
+                inArray(appointments.status, ['scheduled'])
+            ))
+            .groupBy(sql`DATE("appointment_time")`);
         
-        const workingDaysSet = new Set(uniqueWorkingDays.map(d => d.dayOfWeek));
-        
-        // Step 3: Iterate through the next 90 days and find matching dates.
+        // Step 4: Create a map of booked slots for easy lookup.
+        const bookingsMap = new Map<string, number>();
+        appointmentsResult.forEach(row => {
+            // The date from SQL will be a Date object, format it correctly.
+            const dateString = format(new Date(row.date), 'yyyy-MM-dd');
+            bookingsMap.set(dateString, row.count);
+        });
+
+        // Step 5: Iterate through the next 90 days to find available ones.
         const availableDates: string[] = [];
-        const today = startOfDay(new Date());
         for (let i = 0; i < 90; i++) {
-            const currentDate = new Date(today.getTime() + i * 24 * 60 * 60 * 1000);
-            const dayOfWeek = format(currentDate, 'EEEE').toUpperCase() as (typeof dayOfWeekEnum.enumValues)[number];
+            const currentDate = new Date();
+            currentDate.setDate(today.getDate() + i);
+            const dateString = format(currentDate, 'yyyy-MM-dd');
+
+            const bookedSlots = bookingsMap.get(dateString) || 0;
             
-            if (workingDaysSet.has(dayOfWeek)) {
-                availableDates.push(format(currentDate, 'yyyy-MM-dd'));
+            // A date is available if the total possible slots are greater than the booked slots.
+            if (totalSlotsPerDay > bookedSlots) {
+                availableDates.push(dateString);
             }
         }
 
-        return c.json({ data: availableDates });
+        return c.json({ data: availableDates.sort() });
 
     } catch (error) {
         console.error('Error fetching available dates:', error);
@@ -259,81 +300,70 @@ publicRoutes.get('/available-dates', zValidator('query', availableDatesQuerySche
  * Calculates and returns available appointment slots for doctors.
  */
 publicRoutes.get('/availability', zValidator('query', availabilityQuerySchema), async (c) => {
-  const { serviceId, clinicId, date } = c.req.valid('query');
-  const targetDate = parseISO(date);
-  const dayOfWeek = format(targetDate, 'EEEE').toUpperCase() as "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
+    const { serviceId, clinicId, date } = c.req.valid('query');
+    const targetDate = parseISO(date);
 
-  try {
-    // Step 1: Find all doctors associated with both the service and the clinic.
-    const doctorsForService = db.select({ doctorId: doctorServices.doctorId }).from(doctorServices).where(eq(doctorServices.serviceId, serviceId));
-    const doctorsForClinic = db.select({ doctorId: doctorClinics.doctorId }).from(doctorClinics).where(eq(doctorClinics.clinicId, clinicId));
-    
-    const availableDoctors = await db.select({ id: doctors.id, fullName: doctors.fullName })
-      .from(doctors)
-      .where(and(
-        inArray(doctors.id, doctorsForService),
-        inArray(doctors.id, doctorsForClinic)
-      ));
+    try {
+        // Step 1: Get the service duration
+        const serviceDetails = await db.query.services.findFirst({
+            where: eq(services.id, serviceId),
+            columns: { durationMinutes: true }
+        });
 
-    if (availableDoctors.length === 0) {
-      return c.json({ data: [] });
-    }
-
-    const doctorIds = availableDoctors.map(d => d.id);
-
-    // Step 2: Get the service duration and doctor's standard availability for the given day of the week.
-    const [serviceDetails] = await db.select({ duration: services.durationMinutes }).from(services).where(eq(services.id, serviceId)).limit(1);
-    const slotDuration = serviceDetails?.duration || 30; // Default to 30 mins if not found
-
-    const availabilities = await db.select().from(providerAvailability).where(and(
-      inArray(providerAvailability.doctorId, doctorIds),
-      eq(providerAvailability.dayOfWeek, dayOfWeek)
-    ));
-
-    // Step 3: Get all existing appointments for these doctors on the target date.
-    const existingAppointments = await db.select({ doctorId: appointments.doctorId, time: appointments.appointmentTime }).from(appointments).where(and(
-      inArray(appointments.doctorId, doctorIds),
-      sql`${appointments.appointmentTime} >= ${startOfDay(targetDate)}`,
-      sql`${appointments.appointmentTime} <= ${endOfDay(targetDate)}`
-    ));
-
-    // Step 4: Calculate the final available slots for each doctor.
-    const result = availableDoctors.map(doctor => {
-      const doctorAvailability = availabilities.find(a => a.doctorId === doctor.id);
-      if (!doctorAvailability) return { doctorId: doctor.id, doctorName: doctor.fullName, availableSlots: [] };
-
-      const bookedSlots = existingAppointments
-        .filter(a => a.doctorId === doctor.id)
-        .map(a => new Date(a.time));
-
-      const availableSlots: string[] = [];
-      const [startHour, startMinute] = doctorAvailability.startTime.split(':').map(Number);
-      const [endHour, endMinute] = doctorAvailability.endTime.split(':').map(Number);
-
-      let currentTime = setSeconds(setMinutes(setHours(targetDate, startHour), startMinute), 0);
-      const endTime = setSeconds(setMinutes(setHours(targetDate, endHour), endMinute), 0);
-
-      while (isBefore(currentTime, endTime)) {
-        const isBooked = bookedSlots.some(bookedSlot => isEqual(currentTime, bookedSlot));
-        if (!isBooked) {
-          availableSlots.push(format(currentTime, "HH:mm"));
+        if (!serviceDetails || !serviceDetails.durationMinutes || serviceDetails.durationMinutes <= 0) {
+            return c.json({ error: 'Service not found or has invalid duration' }, 404);
         }
-        currentTime = addMinutes(currentTime, slotDuration);
-      }
+        const slotDuration = serviceDetails.durationMinutes;
 
-      return {
-        doctorId: doctor.id,
-        doctorName: doctor.fullName,
-        availableSlots,
-      };
-    });
+        // Step 2: Get all existing appointments for the specific service, clinic, and the selected date.
+        const dayStart = startOfDay(targetDate);
+        const dayEnd = endOfDay(targetDate);
 
-    return c.json({ data: result });
+        const existingAppointments = await db
+            .select({ time: appointments.appointmentTime })
+            .from(appointments)
+            .where(and(
+                eq(appointments.clinicId, clinicId),
+                eq(appointments.serviceId, serviceId),
+                sql`"appointment_time" BETWEEN ${dayStart.toISOString()} AND ${dayEnd.toISOString()}`,
+                inArray(appointments.status, ['scheduled'])
+            ));
+        
+        const bookedTimes = new Set(
+            existingAppointments.map(a => format(new Date(a.time), "hh:mm a"))
+        );
 
-  } catch (error) {
-    console.error('Error fetching availability:', error);
-    return c.json({ error: 'Internal Server Error', message: 'Failed to fetch availability' }, 500);
-  }
+        // Step 3: Generate all potential slots between 9:00 AM and 5:00 PM and filter out booked ones.
+        const availableSlots: string[] = [];
+        const workdayStart = setHours(startOfDay(targetDate), 9); // 9:00 AM
+        const workdayEnd = setHours(startOfDay(targetDate), 17);   // 5:00 PM
+        
+        let currentTime = workdayStart;
+        while (isBefore(currentTime, workdayEnd)) {
+            const timeString = format(currentTime, "hh:mm a");
+            if (!bookedTimes.has(timeString)) {
+                availableSlots.push(timeString);
+            }
+            currentTime = addMinutes(currentTime, slotDuration);
+        }
+        
+        // The frontend expects the same doctor-centric structure, so we mock it
+        // to avoid breaking the UI while delivering the core functionality.
+        const mockDoctorId = "00000000-0000-0000-0000-000000000000";
+        const mockDoctorName = "Any Available Provider";
+        
+        const responseData = availableSlots.length > 0 ? [{
+            doctorId: mockDoctorId,
+            doctorName: mockDoctorName,
+            availableSlots: availableSlots,
+        }] : [];
+        
+        return c.json({ data: responseData });
+
+    } catch (error) {
+        console.error('Error fetching availability:', error);
+        return c.json({ error: 'Internal Server Error', message: 'Failed to fetch availability' }, 500);
+    }
 });
 
 // GET /api/public/locations/provinces

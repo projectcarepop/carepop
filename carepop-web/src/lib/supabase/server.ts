@@ -1,9 +1,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { type ReadonlyRequestCookies } from 'next/dist/server/web/spec-extension/adapters/request-cookies'
 
-export const createClient = async () => {
-  const cookieStore = await cookies()
-
+export function createClient(cookieStore: ReadonlyRequestCookies) {
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -13,24 +11,16 @@ export const createClient = async () => {
           return cookieStore.get(name)?.value
         },
         set(name: string, value: string, options: CookieOptions) {
-          try {
-            cookieStore.set({ name, value, ...options })
-          } catch {
-            // The `set` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
-          }
+          // The `set` method may fail if called from a Server Component.
+          // This can be ignored if you have middleware refreshing user sessions.
+          cookieStore.set({ name, value, ...options })
         },
         remove(name: string, options: CookieOptions) {
-          try {
-            cookieStore.set({ name, value: '', ...options })
-          } catch {
-            // The `delete` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
-          }
+          // The `delete` method may fail if called from a Server Component.
+          // This can be ignored if you have middleware refreshing user sessions.
+          cookieStore.set({ name, value: '', ...options })
         },
       },
     }
   )
-}
+} 

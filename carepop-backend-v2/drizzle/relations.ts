@@ -1,7 +1,7 @@
 import { relations } from "drizzle-orm/relations";
 import { serviceCategories, services, usersInAuth, profiles, clinics, appointments, doctors, medicalRecords, reviews, productCategories, products, inventory, patientOrders, healthLogs, menstrualLogs, doctorClinics, doctorServices, patientOrderItems } from "./schema";
 
-export const servicesRelations = relations(services, ({one, many}) => ({
+export const servicesRelations = relations(services, ({ one }) => ({
 	serviceCategory: one(serviceCategories, {
 		fields: [services.categoryId],
 		references: [serviceCategories.id]
@@ -10,7 +10,7 @@ export const servicesRelations = relations(services, ({one, many}) => ({
 	doctorServices: many(doctorServices),
 }));
 
-export const serviceCategoriesRelations = relations(serviceCategories, ({many}) => ({
+export const serviceCategoriesRelations = relations(serviceCategories, ({ many }) => ({
 	services: many(services),
 }));
 

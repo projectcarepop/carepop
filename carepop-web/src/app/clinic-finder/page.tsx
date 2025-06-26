@@ -1,8 +1,9 @@
 import React from 'react';
 import { Metadata } from 'next';
 import ClinicFinderClient from './components/ClinicFinderClient';
-import { apiClient } from '@/lib/apiClient';
-import { type InferResponseType } from 'hono/client';
+import { createClient } from '@/lib/supabase/server';
+import { cookies } from 'next/headers';
+import { Tables } from '@/types/supabase';
 
 // Components that are part of the page layout but don't require client interactivity directly here
 // import LocationSearchInput from './components/LocationSearchInput'; 
@@ -11,11 +12,8 @@ import { type InferResponseType } from 'hono/client';
 // The above will be rendered by ClinicFinderClient.tsx
 
 // --- Start: New Inferred Types ---
-type ClinicsResponse = InferResponseType<typeof apiClient.public.clinics.$get>;
-type Clinic = ClinicsResponse extends { data: (infer T)[] } ? T : never;
-
-type ServicesResponse = InferResponseType<typeof apiClient.public.services.$get>;
-type Service = ServicesResponse extends { data: (infer T)[] } ? T : never;
+type Clinic = Tables<'clinics'>;
+type Service = Tables<'services'>;
 // --- End: New Inferred Types ---
 
 export const dynamic = 'force-dynamic';
@@ -67,53 +65,44 @@ const exampleClinicSchema = {
   url: 'https://www.carepop.ph/clinic/sample-clinic'
 };
 
-async function getClinics(): Promise<Clinic[]> {
-  try {
-    const res = await apiClient.public.clinics.$get();
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error("Failed to fetch clinics:", errorText);
-      throw new Error(`Failed to fetch clinics`);
-    }
-    const data = await res.json();
-    return data.data ?? [];
-  } catch (error) {
-    console.error("An error occurred while fetching clinics:", error);
-    return [];
-  }
-}
-
-async function getServices(): Promise<Service[]> {
-  try {
-    const res = await apiClient.public.services.$get();
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error("Failed to fetch services:", errorText);
-      throw new Error(`Failed to fetch services`);
-    }
-    const data = await res.json();
-    return data.data ?? [];
-  } catch (error) {
-    console.error("An error occurred while fetching services:", error);
-    return [];
-  }
-}
-
 export default async function ClinicFinderPage() {
+  const cookieStore = cookies();
+  const supabase = createClient(cookieStore);
+
   let clinics: Clinic[] = [];
   let services: Service[] = [];
   let fetchError: string | null = null;
 
   try {
     // Fetch both clinics and services in parallel
-    [clinics, services] = await Promise.all([
-      getClinics(),
-      getServices()
+    const clinicsPromise = supabase.from('clinics').select('*').eq('is_active', true);
+    const servicesPromise = supabase.from('services').select('*').eq('is_active', true);
+
+    const [clinicsResult, servicesResult] = await Promise.all([
+      clinicsPromise,
+      servicesPromise,
     ]);
+
+    if (clinicsResult.error) {
+      console.error('Error fetching clinics:', clinicsResult.error.message);
+      // Throwing the error to be caught by the catch block below
+      throw new Error(`Failed to fetch clinics: ${clinicsResult.error.message}`);
+    }
+    clinics = clinicsResult.data || [];
+    
+    if (servicesResult.error) {
+      console.error('Error fetching services:', servicesResult.error.message);
+      // Throwing the error to be caught by the catch block below
+      throw new Error(`Failed to fetch services: ${servicesResult.error.message}`);
+    }
+    services = servicesResult.data || [];
+
   } catch (error) {
     console.error("Error in ClinicFinderPage (Server Component) while fetching initial data:", error);
     fetchError = error instanceof Error ? error.message : "An unknown error occurred while loading page data.";
     // clinics and services will remain empty
+    clinics = [];
+    services = [];
   }
 
   return (

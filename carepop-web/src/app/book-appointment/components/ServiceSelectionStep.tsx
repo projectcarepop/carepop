@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { type BookingData } from '../page';
-import apiClient from '@/lib/apiClient';
+import type { BookingData } from '../page';
+import { getPublicServices } from '@/services/api';
 
 // Assuming a Service type, can be centralized later
 interface Service {
@@ -28,11 +28,8 @@ export function ServiceSelectionStep({ onNext, updateBookingData }: ServiceSelec
     const { data: services, isLoading, isError } = useQuery<Service[]>({
         queryKey: ['services'],
         queryFn: async () => {
-            const res = await apiClient.get('/public/services');
-            if (res.status !== 200) {
-                throw new Error('Failed to fetch services');
-            }
-            return res.data;
+            const res = await getPublicServices();
+            return res.data || [];
         },
     });
 

@@ -176,20 +176,32 @@ meRoutes.put('/profile', zValidator('json', updateProfileSchema), async (c) => {
   const user = c.get('user');
   const validatedProfileData = c.req.valid('json');
 
+  if (!user.email) {
+    return c.json({ error: 'User email not found in authentication token.' }, 400);
+  }
+
   try {
-    const [updatedProfile] = await db.update(profiles)
-      .set({ ...validatedProfileData, updatedAt: new Date().toISOString() })
-      .where(eq(profiles.id, user.id))
-      .returning();
+    const [result] = await db.insert(profiles).values({
+      id: user.id,
+      email: user.email,
+      ...validatedProfileData,
+    }).onConflictDoUpdate({
+      target: profiles.id,
+      set: {
+        ...validatedProfileData,
+        updatedAt: new Date().toISOString()
+      }
+    }).returning();
     
-    if (!updatedProfile) {
-      return c.json({ error: 'Profile not found' }, 404);
+    return c.json(result);
+    
+  } catch (error: any) {
+    // Check for a specific database error code for unique constraint violation
+    if (error.code === '23505') { 
+      return c.json({ message: 'A profile with this email already exists.' }, 409); // 409 Conflict
     }
-    
-    return c.json(updatedProfile);
-  } catch (error) {
-    console.error('Error updating profile:', error);
-    return c.json({ error: 'Internal Server Error' }, 500);
+    console.error('Error upserting profile:', error);
+    return c.json({ message: 'An internal server error occurred.' }, 500);
   }
 });
 

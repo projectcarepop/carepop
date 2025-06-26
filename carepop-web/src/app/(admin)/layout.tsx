@@ -1,4 +1,3 @@
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { type UserProfile } from '@/types/app';
@@ -32,18 +31,21 @@ export default async function AdminLayout({
 }: {
     children: React.ReactNode;
 }) {
-    const cookieStore = cookies();
-    const supabase = createClient(cookieStore);
+    const supabase = createClient();
 
-    const { data: { session } } = await supabase.auth.getSession();
-
-    // --- 1. Primary Security Check: Session ---
-    // If there's no session, they are not logged in. Redirect to sign-in.
-    if (!session) {
+    // --- 1. Primary Security Check: User Authentication ---
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
         return redirect('/sign-in');
     }
 
-    // --- 2. Secondary Security Check: Admin Role ---
+    // --- 2. Secondary Security Check: Admin Role via Session Token ---
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+        // This is a failsafe. If a user exists, a session should too.
+        return redirect('/sign-in?error=session_not_found');
+    }
+    
     // Fetch the full profile from our backend to check the role.
     const userProfile = await getAdminProfile(session.access_token);
 

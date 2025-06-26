@@ -1,11 +1,11 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useMemo } from 'react';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-import type { Session, User } from '@supabase/supabase-js';
-import { usePathname, useRouter } from 'next/navigation';
+import { createContext, useContext, useEffect, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
 
 type AuthContextType = {
+  supabase: SupabaseClient;
   session: Session | null;
   user: User | null;
   isLoading: boolean;
@@ -14,45 +14,42 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const supabase = createClient();
   const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // Memoize the client so it's not recreated on every render
-  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
-
-  const pathname = usePathname();
-  const router = useRouter();
 
   useEffect(() => {
-    // onAuthStateChange fires immediately with the initial session state.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setIsLoading(false);
-      }
-    );
+    const getInitialSession = async () => {
+      const { data: { session: initialSession } } = await supabase.auth.getSession();
+      setSession(initialSession);
+      setUser(initialSession?.user ?? null);
+      setIsLoading(false);
+    };
+
+    getInitialSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+      setUser(newSession?.user ?? null);
+      setIsLoading(false);
+    });
 
     return () => {
-      subscription.unsubscribe();
+      subscription?.unsubscribe();
     };
-    // We only want this to run once on mount.
-    // The pathname dependency is added to re-check auth state on navigation, 
-    // which can be useful in some edge cases like token expiry.
-  }, [supabase, pathname, router]);
+  }, []);
 
-  const value: AuthContextType = useMemo(() => ({
-    session,
-    user: session?.user ?? null,
-    isLoading,
-  }), [session, isLoading]);
+  const value = { supabase, session, user, isLoading };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  // We don't render anything until the initial session check is complete
+  return <AuthContext.Provider value={value}>{!isLoading && children}</AuthContext.Provider>;
 }
 
-export const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}; 
+} 

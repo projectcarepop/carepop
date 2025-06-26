@@ -39,6 +39,14 @@ export type NewServiceCategory = InferInsertModel<
 export type Service = InferSelectModel<typeof schema.services>;
 export type NewService = InferInsertModel<typeof schema.services>;
 
+// Custom type for services that include the nested category object
+export type ServiceWithCategory = Service & {
+  serviceCategory: {
+    id: string;
+    name: string;
+  } | null;
+};
+
 // =================================================================
 // APPOINTMENTS
 // =================================================================

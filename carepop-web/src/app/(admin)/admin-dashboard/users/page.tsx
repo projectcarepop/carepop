@@ -1,9 +1,8 @@
-import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { UsersClient } from '@/components/admin-dashboard/users/UsersClient';
-import { type UserProfile } from '@/types/app';
+import { type AdminUser } from '@/lib/types';
 
-async function getUsers(accessToken: string): Promise<UserProfile[]> {
+async function getUsers(accessToken: string): Promise<AdminUser[]> {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
     if (!apiUrl) {
         console.error('FATAL: API URL is not configured.');
@@ -20,7 +19,7 @@ async function getUsers(accessToken: string): Promise<UserProfile[]> {
             return [];
         }
         const data = await res.json();
-        return data.data as UserProfile[];
+        return data.data as AdminUser[];
     } catch (error) {
         console.error('An unexpected error occurred while fetching users:', error);
         return [];
@@ -28,8 +27,7 @@ async function getUsers(accessToken: string): Promise<UserProfile[]> {
 }
 
 export default async function ManageUsersPage() {
-    const cookieStore = cookies();
-    const supabase = createClient(cookieStore);
+    const supabase = createClient();
     const { data: { session } } = await supabase.auth.getSession();
 
     if (!session) return null;
