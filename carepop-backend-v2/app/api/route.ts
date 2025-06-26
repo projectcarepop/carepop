@@ -21,7 +21,7 @@ app.use('*', cors({
     'Content-Type',
     // Add any other custom headers your frontend might send
   ],
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Ensure PUT is here!
+  allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], // Add PATCH here
   credentials: true,
   maxAge: 86400, // Optional: How long the preflight response can be cached (in seconds)
 }));

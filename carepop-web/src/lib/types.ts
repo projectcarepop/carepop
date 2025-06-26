@@ -109,6 +109,22 @@ export type DoctorService = InferSelectModel<typeof schema.doctorServices>;
 export type NewDoctorService = InferInsertModel<typeof schema.doctorServices>;
 
 // --- Custom Types with Relations (for specific component needs) ---
+
+// The Doctor type may or may not have the full profile.
+export type DoctorWithProfile = Doctor & {
+  profile?: Profile;
+  fullName?: string; // Add fullName for convenience
+};
+
+// This type is used by the frontend to display appointment details.
+export type AppointmentWithRelations = Appointment & {
+  patient?: Profile;
+  doctor: DoctorWithProfile | null;
+  clinic: Clinic | null;
+  service: Service | null;
+  medicalRecords?: MedicalRecord[];
+};
+
 export type AppointmentDetails = Appointment & {
   patient: Profile;
   doctor: Doctor;
@@ -187,4 +203,4 @@ export type AdminDoctor = z.infer<typeof adminDoctorSchema>;
 export const adminUserSchema = z.object({
     id: z.string(),
     // ... existing code ...
-}); 
+});

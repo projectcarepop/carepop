@@ -415,4 +415,19 @@ export async function getAdminUsersByRole(supabase: SupabaseClient, role: 'docto
     const response = await fetch(`${API_BASE_URL}/api/admin/users?role=${role}`, { headers });
     if (!response.ok) throw new Error(`Failed to fetch users with role: ${role}.`);
     return response.json();
+}
+
+export async function cancelAppointment(supabase: SupabaseClient, appointmentId: string) {
+  const headers = await getAuthHeaders(supabase);
+  const response = await fetch(`${API_BASE_URL}/api/me/appointments/${appointmentId}/cancel`, {
+    method: 'PATCH',
+    headers,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: "An unknown error occurred." }));
+    throw new Error(error.message || "Failed to cancel appointment.");
+  }
+
+  return response.json();
 } 

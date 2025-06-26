@@ -174,6 +174,44 @@ meRoutes.post('/ai/insight', async (c) => {
   }
 });
 
+/**
+ * PATCH /me/appointments/:id/cancel
+ * Cancels a specific appointment for the authenticated user.
+ */
+meRoutes.patch('/appointments/:id/cancel', async (c) => {
+  const user = c.get('user');
+  const appointmentId = c.req.param('id');
+
+  try {
+    // First, verify the appointment exists and belongs to the user
+    const [appointment] = await db.select().from(appointments).where(
+      and(
+        eq(appointments.id, appointmentId),
+        eq(appointments.patientId, user.id)
+      )
+    );
+
+    if (!appointment) {
+      return c.json({ error: 'Appointment not found or you do not have permission to cancel it.' }, 404);
+    }
+    
+    if (appointment.status !== 'scheduled') {
+        return c.json({ error: 'Only scheduled appointments can be canceled.' }, 400);
+    }
+
+    // Update the appointment status
+    const [updatedAppointment] = await db.update(appointments)
+      .set({ status: 'canceled_by_patient' })
+      .where(eq(appointments.id, appointmentId))
+      .returning();
+
+    return c.json(updatedAppointment);
+  } catch (error) {
+    console.error(`Error canceling appointment ${appointmentId}:`, error);
+    return c.json({ error: 'Internal Server Error', message: 'Failed to cancel appointment.' }, 500);
+  }
+});
+
 // Zod schema for updating a user's profile
 const updateProfileSchema = z.object({
   firstName: z.string().min(1, "First name is required").optional(),
