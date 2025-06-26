@@ -374,6 +374,16 @@ export async function createAppointment(supabase: SupabaseClient, payload: Appoi
   return response.json();
 }
 
+export async function getAdminStats(supabase: SupabaseClient) {
+    const headers = await getAuthHeaders(supabase);
+    const response = await fetch(`${API_BASE_URL}/api/admin/stats`, { headers, cache: 'no-store' });
+    if (!response.ok) {
+        // It's better to throw an error so React Query or SWR can handle it
+        throw new Error('Failed to fetch admin stats.');
+    }
+    return response.json();
+}
+
 export async function getAdminUsers(supabase: SupabaseClient) {
     const headers = await getAuthHeaders(supabase);
     const response = await fetch(`${API_BASE_URL}/api/admin/users`, { headers });

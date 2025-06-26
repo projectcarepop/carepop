@@ -1,48 +1,22 @@
-import { createClient } from '@/lib/supabase/server';
-import { UsersClient } from '@/components/admin-dashboard/users/UsersClient';
-import { type AdminUser } from '@/lib/types';
+import { cookies } from "next/headers";
+import { createClient } from "@/lib/supabase/server";
+import { getAdminUsers } from "@/services/api";
+import { UserManagementClient } from "./_components/user-management-client";
 
-async function getUsers(accessToken: string): Promise<AdminUser[]> {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    if (!apiUrl) {
-        console.error('FATAL: API URL is not configured.');
-        return [];
-    }
-    
-    try {
-        const res = await fetch(`${apiUrl}/api/admin/users`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` },
-            cache: 'no-store',
-        });
-        if (!res.ok) {
-            console.error(`Failed to fetch users: ${res.statusText}`);
-            return [];
-        }
-        const data = await res.json();
-        return data.data as AdminUser[];
-    } catch (error) {
-        console.error('An unexpected error occurred while fetching users:', error);
-        return [];
-    }
-}
+export default async function UserManagementPage() {
+  const cookieStore = cookies();
+  const supabase = createClient(cookieStore);
+  const users = await getAdminUsers(supabase);
 
-export default async function ManageUsersPage() {
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session) return null;
-    
-    const initialUsers = await getUsers(session.access_token);
-    
-    return (
-        <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-bold">Manage Users</h1>
-                <p className="text-muted-foreground">
-                    View and manage user roles within the system.
-                </p>
-            </div>
-            <UsersClient initialData={initialUsers} />
-        </div>
-    );
+  return (
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">User Management</h1>
+        <p className="text-muted-foreground">
+          View and manage user roles in the platform.
+        </p>
+      </div>
+      <UserManagementClient users={users} />
+    </div>
+  );
 } 
