@@ -2,7 +2,13 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { type Profile, type AppointmentBookingPayload } from '@/lib/types'; // Uses our stable, Drizzle-generated types
 import { type ProfileFormData } from '@/lib/validation/profile-schema';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Defensively construct the API base URL
+let rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// If the URL is set and doesn't start with http, prepend https://
+if (rawApiUrl && !rawApiUrl.startsWith('http')) {
+  rawApiUrl = `https://${rawApiUrl}`;
+}
+const API_BASE_URL = rawApiUrl;
 
 // The getAuthHeaders function now takes the authenticated client as an argument.
 async function getAuthHeaders(supabase: SupabaseClient) {
@@ -33,9 +39,18 @@ async function getAuthHeaders(supabase: SupabaseClient) {
 // --- Profile Service ---
 export async function getMyProfile(supabase: SupabaseClient): Promise<Profile> {
   const headers = await getAuthHeaders(supabase);
-  const response = await fetch(`${API_BASE_URL}/api/me/profile`, { headers });
-  if (!response.ok) throw new Error("Failed to fetch profile.");
-  return response.json();
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/me/profile`, { headers });
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({ message: `HTTP Error: ${response.status} ${response.statusText}` }));
+      console.error("API Error in getMyProfile:", errorBody);
+      throw new Error(errorBody.message);
+    }
+    return response.json();
+  } catch (error) {
+    console.error("Network or parsing error in getMyProfile:", error);
+    throw new Error("A network error occurred. Please check your connection and try again.");
+  }
 }
 
 export async function updateMyProfile(supabase: SupabaseClient, profileData: Partial<ProfileFormData>): Promise<Profile> {
@@ -102,18 +117,23 @@ export async function getMyAppointments(supabase: SupabaseClient, params?: { lim
     url += `?${queryParams.toString()}`;
   }
 
-  const response = await fetch(url, { headers, cache: 'no-store' });
-  if (!response.ok) {
-      try {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to fetch appointments.");
-      } catch {
-        throw new Error(`Failed to fetch appointments: ${response.statusText}`);
-      }
+  try {
+    const response = await fetch(url, { headers, cache: 'no-store' });
+    if (!response.ok) {
+        try {
+          const error = await response.json();
+          throw new Error(error.message || "Failed to fetch appointments.");
+        } catch {
+          throw new Error(`Failed to fetch appointments: ${response.statusText}`);
+        }
+    }
+    const result = await response.json();
+    // The backend wraps the data in an 'appointments' property
+    return result.appointments || [];
+  } catch (error) {
+    console.error("Network or parsing error in getMyAppointments:", error);
+    throw new Error("A network error occurred while fetching appointments.");
   }
-  const result = await response.json();
-  // The backend wraps the data in an 'appointments' property
-  return result.appointments || [];
 }
 
 export async function getMyMedicalRecords(supabase: SupabaseClient, params?: { limit?: number }) {
