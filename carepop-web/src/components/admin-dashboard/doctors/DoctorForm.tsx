@@ -17,7 +17,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2 } from 'lucide-react';
 
 import { type AdminDoctor, type AdminService, type Clinic } from '@/lib/types';
-import { type ServiceCategory, type Profile as User } from '@/lib/types';
+import { type ServiceCategory, type UserProfile } from '@/lib/types';
+import { type SupabaseClient } from '@supabase/supabase-js';
 
 const formSchema = z.object({
   userId: z.string().min(1, "A doctor must be selected."),
@@ -29,12 +30,13 @@ const formSchema = z.object({
 type DoctorFormData = z.infer<typeof formSchema>;
 
 interface DoctorFormProps {
+    supabase: SupabaseClient<any, "public", any>;
     initialData?: AdminDoctor;
     onSubmit: (values: DoctorFormData) => void;
     isPending: boolean;
 }
 
-export function DoctorForm({ initialData, onSubmit, isPending }: DoctorFormProps) {
+export function DoctorForm({ supabase, initialData, onSubmit, isPending }: DoctorFormProps) {
     const form = useForm<DoctorFormData>({
         resolver: zodResolver(formSchema),
         defaultValues: {
@@ -46,21 +48,21 @@ export function DoctorForm({ initialData, onSubmit, isPending }: DoctorFormProps
     });
 
     // --- Fetch relational data for selectors ---
-    const { data: users, isLoading: isLoadingUsers } = useQuery<User[]>({
+    const { data: users, isLoading: isLoadingUsers } = useQuery<UserProfile[]>({
         queryKey: ['adminUsers', 'doctor'],
-        queryFn: () => getAdminUsersByRole('doctor'),
+        queryFn: () => getAdminUsersByRole(supabase, 'doctor'),
     });
     const { data: categories, isLoading: isLoadingCategories } = useQuery<ServiceCategory[]>({
         queryKey: ['adminServiceCategories'],
-        queryFn: getAdminServiceCategories,
+        queryFn: () => getAdminServiceCategories(supabase),
     });
     const { data: clinics, isLoading: isLoadingClinics } = useQuery<Clinic[]>({
         queryKey: ['adminClinics'],
-        queryFn: getAdminClinics,
+        queryFn: () => getAdminClinics(supabase),
     });
     const { data: services, isLoading: isLoadingServices } = useQuery<AdminService[]>({
         queryKey: ['adminServices'],
-        queryFn: getAdminServices,
+        queryFn: () => getAdminServices(supabase),
     });
     
     return (

@@ -12,9 +12,10 @@ import {
 
 import { useToast } from "@/hooks/use-toast";
 import { getAdminDoctors, upsertDoctor } from '@/services/api';
-import { type Doctor } from "@/lib/types";
+import { type AdminDoctor } from "@/lib/types";
 import { columns } from './columns';
 import { DoctorForm } from './DoctorForm'; 
+import { createClient } from '@/lib/supabase/client';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -34,7 +35,7 @@ import {
 } from "@/components/ui/dialog"
 
 interface DoctorsClientProps {
-    initialData: Doctor[];
+    initialData: AdminDoctor[];
 }
 
 export function DoctorsClient({ initialData }: DoctorsClientProps) {
@@ -42,18 +43,21 @@ export function DoctorsClient({ initialData }: DoctorsClientProps) {
     const queryClient = useQueryClient();
     const [sorting, setSorting] = useState<SortingState>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
+    const [selectedDoctor, setSelectedDoctor] = useState<AdminDoctor | null>(null);
+
+    // Create a single Supabase client instance for this component
+    const supabase = createClient();
 
     // --- Data Fetching ---
-    const { data: doctors = [] } = useQuery<Doctor[]>({
+    const { data: doctors = [] } = useQuery<AdminDoctor[]>({
         queryKey: ['adminDoctors'],
-        queryFn: getAdminDoctors,
+        queryFn: () => getAdminDoctors(supabase),
         initialData: initialData,
     });
 
     // --- Mutations ---
     const doctorMutation = useMutation({
-        mutationFn: (doctorData: any) => upsertDoctor(doctorData, selectedDoctor?.id),
+        mutationFn: (doctorData: any) => upsertDoctor(supabase, doctorData, selectedDoctor?.id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['adminDoctors'] });
             const action = selectedDoctor ? 'updated' : 'created';
@@ -77,7 +81,7 @@ export function DoctorsClient({ initialData }: DoctorsClientProps) {
           sorting,
         },
         meta: {
-            editDoctor: (doctor: Doctor) => {
+            editDoctor: (doctor: AdminDoctor) => {
                 setSelectedDoctor(doctor);
                 setIsModalOpen(true);
             }
@@ -113,6 +117,7 @@ export function DoctorsClient({ initialData }: DoctorsClientProps) {
                     </DialogDescription>
                     </DialogHeader>
                     <DoctorForm 
+                        supabase={supabase}
                         initialData={selectedDoctor}
                         onSubmit={handleFormSubmit}
                         isPending={doctorMutation.isPending}
@@ -164,4 +169,4 @@ export function DoctorsClient({ initialData }: DoctorsClientProps) {
             </div>
         </div>
     );
-} 
+}

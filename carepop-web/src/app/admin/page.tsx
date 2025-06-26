@@ -1,19 +1,23 @@
+import { cookies } from 'next/headers';
+import { createClient } from '@/lib/supabase/server';
+import { getAdminStats } from '@/services/api';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Building, Stethoscope, LineChart } from 'lucide-react';
-import { cookies } from "next/headers"; // <-- IMPORT
-import { createClient } from "@/lib/supabase/server";
-import { getAdminStats } from "@/services/api";
 
+// Define the shape of the stats object we expect from the API
 type AdminStats = {
   totalUsers: number;
   totalClinics: number;
   appointmentsToday: number;
-  pendingApprovals: number;
+  pendingApprovals: number; // Placeholder for now
 };
 
 export default async function AdminDashboardPage() {
-  const cookieStore = cookies(); // <-- GET COOKIES
-  const supabase = createClient(cookieStore); // <-- PASS TO CLIENT
+  // 1. Create a server-side Supabase client correctly.
+  const cookieStore = cookies();
+  const supabase = createClient(cookieStore);
+
+  // 2. Fetch the stats from our API, passing the client to get the auth token.
   let stats: AdminStats = {
     totalUsers: 0,
     totalClinics: 0,
@@ -25,10 +29,11 @@ export default async function AdminDashboardPage() {
     stats = await getAdminStats(supabase);
   } catch (error) {
     console.error("Failed to fetch admin stats:", error);
+    // If the fetch fails, the page will render with default 0 values.
+    // This is better than crashing the entire page.
   }
 
-  // ... rest of the file is the same
-
+  // 3. Render the dashboard UI.
   return (
     <div className="space-y-6">
       <div>
@@ -64,7 +69,6 @@ export default async function AdminDashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.appointmentsToday}</div>
-            <p className="text-xs text-muted-foreground">Placeholder value</p>
           </CardContent>
         </Card>
         <Card>
@@ -78,8 +82,6 @@ export default async function AdminDashboardPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* We can add more components here like recent activity, etc. */}
     </div>
   );
-}
+} 

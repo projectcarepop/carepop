@@ -1,16 +1,17 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { AdminSidebar } from '@/components/admin-dashboard/AdminSidebar';
+import { AdminSidebar } from '@/components/admin-dashboard/AdminSidebar'; // We can reuse the old sidebar
 
-// This is a placeholder type. You should define this in a central types file.
-// For example, src/lib/types/app.ts
+// This is a simplified version of the profile type needed for role checking.
+// It's good practice to have a central types file, but this is fine for now.
 type UserProfile = {
   id: string;
   role: string;
-  // ... other profile properties
 };
 
+// This function securely fetches the user's profile from our backend API
+// to verify their role. It requires the user's access token.
 async function getAdminProfile(accessToken: string): Promise<UserProfile | null> {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
     if (!apiUrl) {
@@ -19,46 +20,40 @@ async function getAdminProfile(accessToken: string): Promise<UserProfile | null>
     }
     const res = await fetch(`${apiUrl}/api/me/profile`, {
         headers: { 'Authorization': `Bearer ${accessToken}` },
-        cache: 'no-store', // Always check the role
+        cache: 'no-store', // Always check the role, don't cache
     });
 
     if (!res.ok) {
         return null;
     }
-    // The API returns the profile directly, not nested under 'data'
     return res.json();
 }
 
-
-export default async function AdminDashboardLayout({
+export default async function AdminLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
+    // 1. Create a server-side Supabase client with the user's cookies.
     const cookieStore = cookies();
     const supabase = createClient(cookieStore);
 
-    // 1. Check for authenticated user
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-        return redirect('/sign-in?redirect=/admin-dashboard');
-    }
-
-    // 2. Check for session to get access token
+    // 2. Check for an active user session.
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
-        return redirect('/sign-in?error=session_not_found');
+        // If no session, redirect to the sign-in page.
+        return redirect('/sign-in?redirect=/admin');
     }
     
-    // 3. Verify the user has an 'admin' role by calling our backend
+    // 3. Verify the user's role by calling our backend API.
     const userProfile = await getAdminProfile(session.access_token);
 
+    // 4. If the profile can't be fetched or the role is not 'admin', redirect.
     if (userProfile?.role !== 'admin') {
-        // Redirect non-admins to a 'forbidden' page or the home page
-        return redirect('/forbidden'); 
+        return redirect('/forbidden'); // A dedicated page for access denied
     }
 
-    // If all checks pass, render the admin layout
+    // 5. If all checks pass, render the admin layout with the sidebar.
     return (
         <div className="flex min-h-screen w-full flex-col bg-muted/40">
             <div className="flex flex-1">
