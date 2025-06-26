@@ -19,7 +19,11 @@ export type NewProfile = InferInsertModel<typeof schema.profiles>;
 // =================================================================
 // CLINICS
 // =================================================================
-export type Clinic = InferSelectModel<typeof schema.clinics>;
+export type Clinic = InferSelectModel<typeof schema.clinics> & {
+    status?: 'pending' | 'approved' | 'rejected';
+    city?: string;
+    province?: string;
+};
 export type NewClinic = InferInsertModel<typeof schema.clinics>;
 
 // =================================================================
@@ -199,6 +203,17 @@ export const adminDoctorSchema = z.object({
     services: z.array(z.object({ id: z.string(), name: z.string() })),
 });
 export type AdminDoctor = z.infer<typeof adminDoctorSchema>;
+
+export const adminProductSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    description: z.string().nullable(),
+    price: z.string(),
+    isActive: z.boolean(),
+    categoryName: z.string(),
+    quantityOnHand: z.number(),
+});
+export type AdminProduct = z.infer<typeof adminProductSchema>;
 
 export const adminUserSchema = z.object({
     id: z.string(),

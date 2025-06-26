@@ -21,10 +21,29 @@ export async function signIn(formData: FormData) {
     return redirect(`/sign-in?message=${encodeURIComponent(error.message)}`)
   }
 
-  // A successful sign-in will be handled by the middleware,
-  // which will redirect the user to the appropriate page.
-  // We just need to refresh the page to trigger the middleware.
+  // After successful sign-in, check the user's role to redirect them correctly.
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+    
+    if (profile?.role === 'admin') {
+        return redirect('/admin');
+    }
+  }
+
+  // For non-admin users or if the profile isn't found, redirect to the main dashboard.
   return redirect('/main-dashboard')
+}
+
+export async function signOut() {
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
+  await supabase.auth.signOut()
+  return redirect('/')
 }
 
 export async function googleSignIn() {

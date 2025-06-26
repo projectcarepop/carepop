@@ -148,9 +148,12 @@ export async function getMyMedicalRecords(supabase: SupabaseClient, params?: { l
 export async function getAdminProducts(supabase: SupabaseClient) {
     const headers = await getAuthHeaders(supabase);
     const response = await fetch(`${API_BASE_URL}/api/admin/products`, { headers });
-    if (!response.ok) throw new Error("Failed to fetch products.");
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
+        throw new Error(error.message || 'Failed to fetch products.');
+    }
     const result = await response.json();
-    return result.data;
+    return result.data || [];
 }
 
 export async function getAdminAppointments(supabase: SupabaseClient, filters: Record<string, string>) {
@@ -164,7 +167,7 @@ export async function getAdminAppointments(supabase: SupabaseClient, filters: Re
         throw new Error(error.message || 'Failed to fetch appointments.');
     }
     const result = await response.json();
-    return result.data;
+    return result.data || [];
 }
 
 export async function getAdminClinics(supabase: SupabaseClient) {
@@ -175,14 +178,18 @@ export async function getAdminClinics(supabase: SupabaseClient) {
         throw new Error(error.message || 'Failed to fetch clinics.');
     }
     const result = await response.json();
-    return result.data;
+    return result.data || [];
 }
 
 export async function getAdminDoctors(supabase: SupabaseClient) {
     const headers = await getAuthHeaders(supabase);
     const response = await fetch(`${API_BASE_URL}/api/admin/doctors`, { headers });
-    if (!response.ok) throw new Error("Failed to fetch doctors.");
-    return response.json();
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
+        throw new Error(error.message || 'Failed to fetch doctors.');
+    }
+    const result = await response.json();
+    return result.data || [];
 }
 
 export async function getAdminServiceCategories(supabase: SupabaseClient) {
@@ -195,9 +202,12 @@ export async function getAdminServiceCategories(supabase: SupabaseClient) {
 export async function getAdminServices(supabase: SupabaseClient) {
     const headers = await getAuthHeaders(supabase);
     const response = await fetch(`${API_BASE_URL}/api/admin/services`, { headers });
-    if (!response.ok) throw new Error("Failed to fetch services.");
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
+        throw new Error(error.message || 'Failed to fetch services.');
+    }
     const result = await response.json();
-    return result.data;
+    return result.data || [];
 }
 
 export async function upsertService(supabase: SupabaseClient, serviceData: any, serviceId?: string) {
@@ -394,9 +404,12 @@ export async function getAdminStats(supabase: SupabaseClient) {
 export async function getAdminUsers(supabase: SupabaseClient) {
     const headers = await getAuthHeaders(supabase);
     const response = await fetch(`${API_BASE_URL}/api/admin/users`, { headers });
-    if (!response.ok) throw new Error("Failed to fetch users.");
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: "Failed to fetch users."}));
+        throw new Error(error.message || "An unknown error occurred.");
+    }
     const result = await response.json();
-    return result.data;
+    return result.data || [];
 }
 
 export async function updateUserRole(supabase: SupabaseClient, userId: string, role: 'admin' | 'patient') {

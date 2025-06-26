@@ -54,6 +54,11 @@ export type Service = {
   durationMinutes: number;
 };
 
+export type ServiceCategory = {
+  id: string;
+  name: string;
+};
+
 export type Appointment = {
   id: string;
   patientId: string;

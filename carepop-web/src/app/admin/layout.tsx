@@ -35,7 +35,7 @@ export default async function AdminLayout({
     children: React.ReactNode;
 }) {
     // 1. Create a server-side Supabase client with the user's cookies.
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const supabase = createClient(cookieStore);
 
     // 2. Check for an active user session.

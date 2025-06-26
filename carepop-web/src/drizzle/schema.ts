@@ -4,7 +4,7 @@ import { sql } from "drizzle-orm"
 // Placeholder for auth.users table
 export const usersInAuth = pgTable("users", {
   id: uuid().primaryKey(),
-}, (table) => {
+}, (_table) => {
     return {
         tableName: "users",
         schemaName: "auth"
@@ -55,7 +55,7 @@ export const serviceCategories = pgTable("service_categories", {
 	id: uuid().default(sql`uuid_generate_v4()`).primaryKey().notNull(),
 	name: text().notNull(),
 	description: text(),
-}, (table) => [
+}, (_table) => [
 	pgPolicy("Admins can manage platform data.", { as: "permissive", for: "all", to: ["public"], using: sql`(get_my_role() = 'admin'::text)` }),
 	pgPolicy("Anyone can view public data.", { as: "permissive", for: "select", to: ["public"] }),
 ]);
@@ -287,13 +287,17 @@ export const menstrualLogs = pgTable("menstrual_logs", {
 	patientId: uuid("patient_id").notNull(),
 	startDate: date("start_date").notNull(),
 	endDate: date("end_date"),
-}, (table) => [
+	flowIntensity: text("flow_intensity"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (_table) => [
 	foreignKey({
 			columns: [table.patientId],
 			foreignColumns: [profiles.id],
 			name: "fk_menstrual_logs_patient_id"
 		}).onDelete("cascade"),
-	pgPolicy("Patients can manage their own menstrual logs.", { as: "permissive", for: "all", to: ["public"], using: sql`(auth.uid() = patient_id)` }),
+	pgPolicy("Admins can manage all patient-owned data.", { as: "permissive", for: "all", to: ["public"], using: sql`(get_my_role() = 'admin'::text)` }),
+	pgPolicy("Patients can create their own menstrual logs.", { as: "permissive", for: "insert", to: ["public"] }),
+	pgPolicy("Patients can view and delete their own menstrual logs.", { as: "permissive", for: "all", to: ["public"] }),
 ]);
 
 export const doctorClinics = pgTable("doctor_clinics", {

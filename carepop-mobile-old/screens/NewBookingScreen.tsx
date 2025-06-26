@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,17 +7,18 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Alert,
+  TextInput,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../src/context/AuthContext';
-import { getPublicClinics, getPublicServices } from '../src/services/api';
+import { getPublicClinics, getPublicServices, getPublicServiceCategories } from '../src/services/api';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stethoscope, MapPin, CheckCircle, ChevronRight } from 'lucide-react-native';
+import { Stethoscope, MapPin, CheckCircle, ChevronRight, Search } from 'lucide-react-native';
 import { theme, Button } from '../src/components';
 import { BookingStackParamList } from '../src/navigation/AppNavigator';
-import type { Clinic, Service } from '../src/lib/types';
+import type { Clinic, Service, ServiceCategory } from '../src/lib/types';
 
 type NewBookingNavigationProp = NativeStackNavigationProp<BookingStackParamList, 'BookAppointment'>;
 
@@ -27,15 +28,62 @@ export const NewBookingScreen: React.FC = () => {
   const [selectedClinic, setSelectedClinic] = useState<Clinic | null>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
 
+  const [clinicSearchQuery, setClinicSearchQuery] = useState('');
+  const [serviceSearchText, setServiceSearchText] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+
   const { data: clinics, isLoading: loadingClinics } = useQuery({
     queryKey: ['publicClinics'],
     queryFn: getPublicClinics,
   });
 
   const { data: services, isLoading: loadingServices } = useQuery({
-    queryKey: ['publicServices'],
-    queryFn: getPublicServices,
+    queryKey: ['publicServices', selectedClinic?.id],
+    queryFn: () => getPublicServices(selectedClinic!.id),
+    enabled: !!selectedClinic,
   });
+
+  const { data: categories, isLoading: loadingCategories } = useQuery({
+      queryKey: ['serviceCategories'],
+      queryFn: getPublicServiceCategories
+  });
+
+  const handleSelectClinic = (clinic: Clinic) => {
+    if (selectedClinic?.id === clinic.id) {
+        setSelectedClinic(null);
+        setSelectedService(null);
+        setSelectedCategoryId(null);
+    } else {
+        setSelectedClinic(clinic);
+        setSelectedService(null);
+        setSelectedCategoryId(null);
+    }
+  };
+
+  const filteredClinics = useMemo(() => {
+    if (!clinics) return [];
+    return clinics.filter((clinic) =>
+      clinic.name.toLowerCase().includes(clinicSearchQuery.toLowerCase())
+    );
+  }, [clinics, clinicSearchQuery]);
+
+  const filteredServices = useMemo(() => {
+    if (!services) return [];
+    
+    // First, filter by the selected category
+    const servicesByCategory = selectedCategoryId
+      ? services.filter((service) => (service as any).categoryId === selectedCategoryId)
+      : services;
+
+    // Second, filter by the search text
+    const servicesBySearch = serviceSearchText
+      ? servicesByCategory.filter((service) =>
+          service.name.toLowerCase().includes(serviceSearchText.toLowerCase())
+        )
+      : servicesByCategory;
+
+      return servicesBySearch;
+  }, [services, selectedCategoryId, serviceSearchText]);
 
   const handleNext = () => {
     if (selectedClinic && selectedService) {
@@ -112,23 +160,33 @@ export const NewBookingScreen: React.FC = () => {
                 <Text style={styles.stepText}>1</Text>
             </View>
             <View style={styles.stepLine} />
-            <View style={styles.step}>
+            <View style={[styles.step, selectedClinic && styles.activeStep]}>
                 <Text style={styles.stepText}>2</Text>
             </View>
              <View style={styles.stepLine} />
-            <View style={styles.step}>
+            <View style={[styles.step, selectedService && styles.activeStep]}>
                 <Text style={styles.stepText}>3</Text>
             </View>
         </View>
 
         <Text style={styles.sectionTitle}>1. Choose a Clinic</Text>
-        {clinics?.map((clinic) => (
+        <View style={styles.searchContainer}>
+          <Search color={theme.colors.mutedForeground} size={20} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search for a clinic..."
+            placeholderTextColor={theme.colors.mutedForeground}
+            value={clinicSearchQuery}
+            onChangeText={setClinicSearchQuery}
+          />
+        </View>
+        {filteredClinics?.map((clinic) => (
           <SelectionCard
             key={clinic.id}
             item={clinic}
             Icon={MapPin}
             isSelected={selectedClinic?.id === clinic.id}
-            onPress={() => setSelectedClinic(clinic)}
+            onPress={() => handleSelectClinic(clinic)}
           />
         ))}
 
@@ -136,22 +194,60 @@ export const NewBookingScreen: React.FC = () => {
           <Text style={[styles.sectionTitle, !selectedClinic && styles.disabledText]}>
             2. Choose a Service
           </Text>
-          {loadingServices ? (
+
+          {selectedClinic && (
+            <>
+                {loadingCategories ? <ActivityIndicator color={theme.colors.primary} /> : (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryContainer}>
+                        <TouchableOpacity
+                            style={[styles.categoryChip, !selectedCategoryId && styles.selectedCategoryChip]}
+                            onPress={() => setSelectedCategoryId(null)}
+                        >
+                            <Text style={[styles.categoryText, !selectedCategoryId && styles.selectedCategoryText]}>All</Text>
+                        </TouchableOpacity>
+                        {categories?.map((cat) => (
+                            <TouchableOpacity
+                                key={cat.id}
+                                style={[styles.categoryChip, selectedCategoryId === cat.id && styles.selectedCategoryChip]}
+                                onPress={() => setSelectedCategoryId(cat.id)}
+                            >
+                                <Text style={[styles.categoryText, selectedCategoryId === cat.id && styles.selectedCategoryText]}>{cat.name}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                )}
+                <View style={styles.searchContainer}>
+                    <Search color={theme.colors.mutedForeground} size={20} />
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="Search for a service..."
+                        placeholderTextColor={theme.colors.mutedForeground}
+                        value={serviceSearchText}
+                        onChangeText={setServiceSearchText}
+                    />
+                </View>
+            </>
+          )}
+          
+          {loadingServices && selectedClinic ? (
             <ActivityIndicator color={theme.colors.primary} style={{ marginVertical: 20 }}/>
-          ) : (services && services.length > 0) ? (
-            services.map((service) => (
+          ) : (filteredServices && filteredServices.length > 0) ? (
+            filteredServices.map((service) => (
               <SelectionCard
                 key={service.id}
                 item={service}
                 Icon={Stethoscope}
                 isSelected={selectedService?.id === service.id}
                 onPress={() => setSelectedService(service)}
+                disabled={!selectedClinic}
               />
             ))
           ) : (
-            <Text style={styles.placeholderText}>
-              No services available.
-            </Text>
+            selectedClinic && (
+                <Text style={styles.placeholderText}>
+                    No services found for this clinic.
+                </Text>
+            )
           )}
         </View>
       </ScrollView>
@@ -285,5 +381,43 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.input,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: theme.spacing.sm,
+    paddingLeft: theme.spacing.sm,
+    ...theme.typography.body,
+    color: theme.colors.foreground,
+  },
+  categoryContainer: {
+      paddingBottom: theme.spacing.md,
+      gap: theme.spacing.sm,
+  },
+  categoryChip: {
+      backgroundColor: theme.colors.muted,
+      paddingVertical: theme.spacing.sm,
+      paddingHorizontal: theme.spacing.md,
+      borderRadius: theme.radius.full,
+  },
+  selectedCategoryChip: {
+      backgroundColor: theme.colors.primary,
+  },
+  categoryText: {
+      ...theme.typography.small,
+      color: theme.colors.foreground,
+      fontFamily: theme.typography.fontFamilyMedium
+  },
+  selectedCategoryText: {
+      color: theme.colors.primaryForeground,
   },
 }); 

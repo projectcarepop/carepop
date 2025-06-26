@@ -46,13 +46,14 @@ export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
 export const adminMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
   const user = c.get('user');
 
-  // The user object should have been set by the authMiddleware.
-  // This check is for defensive programming.
   if (!user) {
     return c.json({ error: 'Forbidden', message: 'Authentication required' }, 403);
   }
 
-  if (user.app_metadata?.role !== 'admin') {
+  // --- DEBUGGING: Log the metadata to see what the backend receives ---
+  console.log('Admin Middleware Check: User metadata received:', user.user_metadata);
+
+  if (user.user_metadata?.role !== 'admin') {
     return c.json({ error: 'Forbidden', message: 'Admin access required' }, 403);
   }
 

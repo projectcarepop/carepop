@@ -107,7 +107,7 @@ export function CreateProfileForm({ initialProfile }: { initialProfile: Profile 
             }
         };
         fetchProvinces();
-    }, []);
+    }, [toast]);
 
     // 2. Fetch and filter cities when a province is selected
     React.useEffect(() => {
@@ -140,7 +140,7 @@ export function CreateProfileForm({ initialProfile }: { initialProfile: Profile 
             }
         };
         fetchCities();
-    }, [selectedProvinceCode]);
+    }, [selectedProvinceCode, form, toast]);
 
     // 3. Fetch and filter barangays when a city/municipality is selected
     React.useEffect(() => {
@@ -169,7 +169,7 @@ export function CreateProfileForm({ initialProfile }: { initialProfile: Profile 
             }
         };
         fetchBarangays();
-    }, [selectedCityCode]);
+    }, [selectedCityCode, form, toast]);
 
     // --- MUTATION & SUBMISSION ---
     const { mutate: submitProfile, isPending } = useMutation({

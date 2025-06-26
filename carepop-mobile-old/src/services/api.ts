@@ -12,6 +12,11 @@ import type {
 } from "../lib/types";
 import type { RegisterFormValues, LoginFormValues } from '../lib/validation/auth';
 
+export type ServiceCategory = {
+  id: string;
+  name: string;
+};
+
 // Ensure the API URL is read from environment variables
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -155,26 +160,37 @@ export const getMyMedicalRecords = async (): Promise<MedicalRecord[]> => {
 };
 
 /**
- * Creates a new appointment for the currently authenticated user.
- * @param appointmentData The data for the new appointment.
- * @returns A promise that resolves to the newly created detailed appointment.
- */
-export const createAppointment = async (
-  appointmentData: NewAppointment,
-): Promise<DetailedAppointment> => {
-  return apiFetch("/api/me/appointments", {
-    method: "POST",
-    body: JSON.stringify(appointmentData),
-  });
-};
-
-/**
  * Fetches an AI insight based on the user's health logs.
  * @returns A promise that resolves to an object containing the AI insight.
  */
 export const getAiInsight = async (): Promise<{ insight: string }> => {
   return apiFetch("/api/me/ai/insight", {
     method: "POST", // Assuming this is a POST as it may involve sending data
+  });
+};
+
+/**
+ * This payload is used for creating a new appointment via the mobile app,
+ * reflecting the new backend logic where a doctor is not selected upfront.
+ */
+export type NewAppointmentPayload = {
+  clinicId: string;
+  serviceId: string;
+  appointmentTime: string; // ISO String for the selected slot
+};
+
+/**
+ * Creates a new appointment for the currently authenticated user.
+ * This is updated to use the simplified payload.
+ * @param appointmentData The data for the new appointment.
+ * @returns A promise that resolves to the newly created detailed appointment.
+ */
+export const createAppointment = async (
+  appointmentData: NewAppointmentPayload,
+): Promise<DetailedAppointment> => {
+  return apiFetch("/api/me/appointments", {
+    method: "POST",
+    body: JSON.stringify(appointmentData),
   });
 };
 
@@ -193,10 +209,17 @@ export const getPublicClinics = async (): Promise<Clinic[]> => {
 };
 
 /**
- * Fetches all publicly available services.
+ * Fetches publicly available services. If a clinic ID is provided, it fetches
+ * services specific to that clinic from our backend API. Otherwise, it returns all services.
+ * @param clinicId Optional clinic ID to filter services by.
  * @returns A promise that resolves to an array of services.
  */
-export const getPublicServices = async (): Promise<Service[]> => {
+export const getPublicServices = async (clinicId?: string): Promise<Service[]> => {
+  if (clinicId) {
+    // Fetch services for a specific clinic from the backend endpoint
+    return apiFetch(`/api/public/clinics/${clinicId}/services`);
+  }
+  // Fallback to fetching all services if no clinic is specified
   const services = await supabaseCall(supabase.from('services').select('*'));
   return services ?? [];
 };
@@ -217,6 +240,31 @@ export const getPublicAvailability = async (
 ): Promise<AvailabilitySlot[]> => {
   const query = new URLSearchParams(params).toString();
   return apiFetch(`/api/public/availability?${query}`);
+};
+
+/**
+ * Fetches available appointment slots for a given service at a specific clinic.
+ * This uses the new backend slot-generation logic.
+ * @param params The clinic and service to filter by.
+ * @returns A promise that resolves to an array of availability slots.
+ */
+export const getPublicSlots = async ({
+  clinicId,
+  serviceId,
+}: {
+  clinicId: string;
+  serviceId:string;
+}): Promise<AvailabilitySlot[]> => {
+  return apiFetch(`/api/public/clinics/${clinicId}/slots?serviceId=${serviceId}`);
+};
+
+/**
+ * Fetches all publicly available service categories.
+ * @returns A promise that resolves to an array of service categories.
+ */
+export const getPublicServiceCategories = async (): Promise<ServiceCategory[]> => {
+  // Assuming v1 endpoint based on backend routing file
+  return apiFetch("/api/v1/service-categories");
 };
 
 export const forgotPassword = async (email: string): Promise<void> => {

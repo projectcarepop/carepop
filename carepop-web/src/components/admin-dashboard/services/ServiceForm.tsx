@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 
 import { Button } from '@/components/ui/button';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -17,7 +17,7 @@ const formSchema = z.object({
   name: z.string().min(2, { message: 'Service name must be at least 2 characters.' }),
   description: z.string().optional(),
   price: z.coerce.number().positive({ message: 'Price must be a positive number.' }),
-  duration: z.coerce.number().int().positive({ message: 'Duration must be a positive number of minutes.' }),
+  durationMinutes: z.coerce.number().int().positive({ message: 'Duration must be a positive number of minutes.' }),
   categoryId: z.string({ required_error: 'Please select a category.' }),
 });
 
@@ -36,8 +36,8 @@ export function ServiceForm({ initialData, categories, onSubmit, isSubmitting }:
     defaultValues: {
       name: initialData?.name || '',
       description: initialData?.description || '',
-      price: initialData?.price || 0,
-      duration: initialData?.duration || 30,
+      price: initialData ? Number(initialData.price) : 0,
+      durationMinutes: initialData?.durationMinutes || 30,
       categoryId: initialData?.categoryId || undefined,
     },
   });
@@ -99,7 +99,7 @@ export function ServiceForm({ initialData, categories, onSubmit, isSubmitting }:
             />
             <FormField
             control={form.control}
-            name="duration"
+            name="durationMinutes"
             render={({ field }) => (
                 <FormItem>
                 <FormLabel>Duration (in minutes)</FormLabel>
