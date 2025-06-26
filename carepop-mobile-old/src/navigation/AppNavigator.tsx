@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { NavigationContainer, CommonActions } from '@react-navigation/native';
-import { createNativeStackNavigator, NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import {
   createDrawerNavigator,
   DrawerContentScrollView,
@@ -9,8 +9,7 @@ import {
 } from '@react-navigation/drawer';
 import { View, Text, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-import { useAuth, useUser } from '@clerk/clerk-expo';
+import { useAuth } from '../context/AuthContext';
 import { theme } from '../components/theme';
 import {
   LayoutDashboard,
@@ -22,10 +21,12 @@ import {
   Info,
   User,
   LogOut,
+  UserCircle,
 } from 'lucide-react-native';
+import { navigationRef } from './navigation';
 
 // --- Screen Imports ---
-import { CreateProfileScreen } from '../../screens/CreateProfileScreen';
+import CreateProfileScreen from '../../screens/CreateProfileScreen';
 import { ForgotPasswordScreen } from '../../screens/ForgotPasswordScreen';
 import { BookingScreen } from '../../screens/BookingScreen';
 import HealthBuddyScreen from '../screens/HealthBuddyScreen';
@@ -34,7 +35,8 @@ import { MyRecordsScreen } from '../screens/MyRecordsScreen';
 import { AboutUsScreen } from '../screens/AboutUsScreen';
 import { MyProfileScreen } from '../screens/MyProfileScreen';
 import { EditProfileScreen } from '../screens/EditProfileScreen';
-import { BookingFlowScreen } from '../screens/BookingFlowScreen';
+import { NewBookingScreen } from '../../screens/NewBookingScreen';
+import { SelectDateTimeScreen } from '../../screens/SelectDateTimeScreen';
 import { AppointmentDetailScreen } from '../screens/AppointmentDetailScreen';
 import { SplashScreen } from '../../screens/Onboarding/SplashScreen';
 import { OnboardingScreenOne } from '../../screens/Onboarding/OnboardingScreenOne';
@@ -68,20 +70,8 @@ export type AppointmentsStackParamList = {
 };
 
 export type BookingStackParamList = {
-  BookingFlow: undefined;
-  ServiceSelection: { clinicId: string; clinicName: string };
-  DateTimeSelection: { clinicId: string; serviceId: string; serviceName: string };
-  BookingConfirmation: { 
-    clinicId: string; 
-    serviceId: string; 
-    providerId: string; 
-    schedule: {
-      date: string;
-      time: string;
-      day: string;
-    } 
-  };
-  BookingSuccess: undefined;
+  BookAppointment: undefined;
+  SelectDateTime: { clinicId: string; serviceId: string; };
 };
 
 export type OnboardingStackParamList = {
@@ -139,6 +129,7 @@ function AuthNavigator() {
     <AuthStackNav.Navigator screenOptions={{ headerShown: false }}>
       <AuthStackNav.Screen name="Login" component={LoginScreen} />
       <AuthStackNav.Screen name="Register" component={RegisterScreen} />
+      <AuthStackNav.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
     </AuthStackNav.Navigator>
   );
 }
@@ -146,8 +137,9 @@ function AuthNavigator() {
 // --- Booking Flow Stack ---
 function BookingStack() {
   return (
-    <BookingStackNav.Navigator screenOptions={{ headerShown: false, presentation: 'modal' }}>
-      <BookingStackNav.Screen name="BookingFlow" component={BookingFlowScreen} />
+    <BookingStackNav.Navigator screenOptions={{ headerShown: false }}>
+      <BookingStackNav.Screen name="BookAppointment" component={NewBookingScreen} />
+      <BookingStackNav.Screen name="SelectDateTime" component={SelectDateTimeScreen} />
     </BookingStackNav.Navigator>
   );
 }
@@ -165,27 +157,29 @@ function AppointmentsStack() {
 
 // --- Custom Drawer Content ---
 function CustomDrawerContent(props: any) {
-  // REMOVED: useAuth and useUser hooks to prevent context timing issues.
-  // The user's info and logout functionality will be handled on the profile screen.
   const drawerStyles = createDrawerStyles();
+  const { user, signOut } = useAuth();
+
   return (
     <DrawerContentScrollView {...props} contentContainerStyle={drawerStyles.container}>
-      <View style={drawerStyles.profileContainer}>
-        <View style={drawerStyles.avatar}>
-          <User size={28} color={theme.colors.secondary} />
-        </View>
-        <View style={drawerStyles.profileTextContainer}>
-          <Text style={drawerStyles.profileName} numberOfLines={1}>CarePoP User</Text>
-          <Text style={drawerStyles.profileEmail} numberOfLines={1}>Navigate to Profile</Text>
-        </View>
+      <View style={drawerStyles.header}>
+        <UserCircle color={theme.colors.primary} size={48} />
+        <Text style={drawerStyles.headerEmail} numberOfLines={1}>
+          {user?.email || 'User'}
+        </Text>
       </View>
       <View style={drawerStyles.menuGroup}>
         <DrawerItemList {...props} />
       </View>
-      {/* 
-        REMOVED: Logout button is moved to the MyProfileScreen for better context and to 
-        resolve the useAuth hook issue within the drawer's initial render cycle.
-      */}
+      <View style={drawerStyles.footer}>
+        <DrawerItem
+          label="Sign Out"
+          icon={({ color }) => <LogOut size={20} color={color} />}
+          onPress={signOut}
+          inactiveTintColor={theme.colors.destructive}
+          labelStyle={{ ...theme.typography.body, fontFamily: theme.typography.fontFamilyMedium }}
+        />
+      </View>
     </DrawerContentScrollView>
   );
 }
@@ -197,14 +191,28 @@ const styles = StyleSheet.create({
 
 const createDrawerStyles = () => StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.colors.background, },
-    profileContainer: { paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.xl, borderBottomWidth: 1, borderBottomColor: theme.colors.border, flexDirection: 'row', alignItems: 'center', },
-    avatar: { width: 56, height: 56, borderRadius: theme.radius.full, backgroundColor: theme.colors.muted, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.md, },
-    profileTextContainer: { flex: 1, flexDirection: 'column', },
-    profileName: { ...theme.typography.h4, color: theme.colors.foreground, fontFamily: theme.typography.fontFamilySemiBold, },
-    profileEmail: { ...theme.typography.small, color: theme.colors.mutedForeground, },
+    header: {
+      paddingHorizontal: theme.spacing.xl,
+      paddingVertical: theme.spacing.lg,
+      marginBottom: theme.spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    headerEmail: {
+      ...theme.typography.body,
+      fontFamily: theme.typography.fontFamilySemiBold,
+      color: theme.colors.secondary,
+      marginLeft: theme.spacing.md,
+      flex: 1,
+    },
     menuGroup: { flex: 1, paddingTop: theme.spacing.sm, },
-    footer: { borderTopWidth: 1, borderTopColor: theme.colors.border, paddingBottom: theme.spacing.md, },
-    logoutLabel: { ...theme.typography.body, fontFamily: theme.typography.fontFamilyMedium, color: theme.colors.secondary, marginLeft: 0, },
+    footer: {
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+      padding: theme.spacing.sm,
+    }
 });
 
 // --- Main Drawer Navigator ---
@@ -234,71 +242,44 @@ function AppDrawer() {
   );
 }
 
-// --- Auth Flow & Root Navigators ---
-function AuthFlow() {
-  return (
-    <AuthStackNav.Navigator screenOptions={{ headerShown: false }}>
-      <AuthStackNav.Screen name="Login" component={LoginScreen} />
-      <AuthStackNav.Screen name="Register" component={RegisterScreen} />
-    </AuthStackNav.Navigator>
-  );
-}
-
+// --- Root Navigator with State Machine Logic ---
 export function RootAppNavigator() {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { authStatus } = useAuth();
   const [hasOnboarded, setHasOnboarded] = useState<boolean | null>(null);
-  
-  // This effect checks if the user has completed onboarding
+
+  // This check remains to decide between Onboarding and Auth screens for new visitors.
   useEffect(() => {
     const checkOnboarding = async () => {
-      const value = await AsyncStorage.getItem('hasOnboarded');
-      setHasOnboarded(value === 'true');
+      const onboarded = await AsyncStorage.getItem('hasOnboarded');
+      setHasOnboarded(onboarded === 'true');
     };
     checkOnboarding();
   }, []);
 
-  if (!isLoaded || hasOnboarded === null) {
-    return <SplashScreen />;
-  }
-
-  // Determine initial route based on auth state and onboarding status
-  let initialRouteName: keyof RootStackParamList = 'Auth';
-  if(isSignedIn) {
-    initialRouteName = 'Main';
-  } else if (!hasOnboarded) {
-    initialRouteName = 'Onboarding';
+  // We still need to wait for the async onboarding check to complete
+  if (hasOnboarded === null) {
+      return <SplashScreen />;
   }
 
   return (
     <NavigationContainer>
-      <RootStack.Navigator initialRouteName={initialRouteName} screenOptions={{ headerShown: false }}>
-        <RootStack.Screen name="Auth" component={AuthNavigator} />
-        <RootStack.Screen name="Onboarding" component={OnboardingNavigator} />
-        <RootStack.Screen name="CreateProfile" component={CreateProfileScreen} />
-        <RootStack.Screen name="Main" component={AppDrawer} />
-        <RootStack.Screen 
-            name="LogHealthData" 
-            component={LogHealthDataScreen} 
-            options={{ 
-                presentation: 'modal',
-                headerShown: true,
-                headerTitle: 'Log Your Day',
-                headerBackTitle: 'Cancel',
-                headerStyle: {
-                    backgroundColor: theme.colors.background,
-                    shadowOpacity: 0,
-                    elevation: 0,
-                },
-                headerTitleStyle: {
-                    color: theme.colors.primary,
-                    fontFamily: theme.typography.fontFamilyBold,
-                },
-                headerBackTitleStyle: {
-                    fontFamily: theme.typography.fontFamilyMedium,
-                },
-                headerTintColor: theme.colors.primary,
-            }} 
-        />
+      <RootStack.Navigator screenOptions={{ headerShown: false }}>
+        {authStatus === 'loading' ? (
+            <RootStack.Screen name="Splash" component={SplashScreen} />
+        ) : authStatus === 'unauthenticated' ? (
+            hasOnboarded ? (
+                <RootStack.Screen name="Auth" component={AuthNavigator} />
+            ) : (
+                <RootStack.Screen name="Onboarding" component={OnboardingNavigator} />
+            )
+        ) : authStatus === 'no-profile' ? (
+            <RootStack.Screen name="CreateProfile" component={CreateProfileScreen} />
+        ) : (
+            <RootStack.Group>
+                <RootStack.Screen name="Main" component={AppDrawer} />
+                <RootStack.Screen name="EditProfile" component={EditProfileScreen} />
+            </RootStack.Group>
+        )}
       </RootStack.Navigator>
     </NavigationContainer>
   );

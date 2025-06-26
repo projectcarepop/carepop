@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -14,29 +14,20 @@ import {
   CardHeader,
   CardTitle,
   CardContent,
-  CardDescription,
   Button,
   theme,
 } from '../components';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TabView, SceneMap, TabBar } from 'react-native-tab-view';
-import {
-  useNavigation,
-  CommonActions,
-  DrawerActions,
-} from '@react-navigation/native';
+import { useNavigation, CommonActions, DrawerActions } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { DrawerNavigationProp } from '@react-navigation/drawer';
-import { Menu, Calendar, Clock, MapPin, Stethoscope, AlertCircle } from 'lucide-react-native';
-import type { AppointmentsStackParamList, DrawerParamList } from '../navigation/AppNavigator';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  Easing,
-} from 'react-native-reanimated';
-import api, { type Appointment } from '../utils/api';
+import { Menu, Calendar, Clock, MapPin, AlertCircle } from 'lucide-react-native';
+import type { AppointmentsStackParamList } from '../navigation/AppNavigator';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
+import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
+import { getMyAppointments } from '../services/api';
+import type { DetailedAppointment } from '../lib/types';
 
 type AppointmentsNavigationProp = NativeStackNavigationProp<AppointmentsStackParamList, 'MyAppointments'>;
 
@@ -77,29 +68,29 @@ const StatusIndicator = ({ status }: { status: string }) => {
   );
 };
 
-const AppointmentCard: React.FC<{ item: Appointment; onPress: () => void }> = ({
+const AppointmentCard: React.FC<{ item: DetailedAppointment; onPress: () => void }> = ({
   item,
   onPress,
 }) => (
   <TouchableOpacity onPress={onPress} style={styles.cardTouchable}>
     <View style={styles.appointmentCard}>
        <CardHeader>
-        <CardTitle style={styles.cardTitle}>{item.services.name}</CardTitle>
+        <CardTitle style={styles.cardTitle}>{item.service.name}</CardTitle>
         <StatusIndicator status={item.status} />
        </CardHeader>
        <View style={styles.cardSeparator} />
        <CardContent style={styles.cardContent}>
         <View style={styles.detailRow}>
           <MapPin size={16} color={theme.colors.mutedForeground} />
-          <Text style={styles.cardDetailText} numberOfLines={1}>{item.clinics.name}</Text>
+          <Text style={styles.cardDetailText} numberOfLines={1}>{item.clinic.name}</Text>
         </View>
         <View style={styles.detailRow}>
           <Calendar size={16} color={theme.colors.mutedForeground} />
-          <Text style={styles.cardDetailText}>{format(new Date(item.appointment_date), 'EEEE, MMMM dd, yyyy')}</Text>
+          <Text style={styles.cardDetailText}>{format(new Date(item.appointmentTime), 'EEEE, MMMM dd, yyyy')}</Text>
         </View>
         <View style={styles.detailRow}>
           <Clock size={16} color={theme.colors.mutedForeground} />
-          <Text style={styles.cardDetailText}>{format(new Date(`1970-01-01T${item.start_time}`), 'hh:mm a')}</Text>
+          <Text style={styles.cardDetailText}>{format(new Date(item.appointmentTime), 'hh:mm a')}</Text>
         </View>
       </CardContent>
     </View>
@@ -120,37 +111,13 @@ const EmptyState = ({ onBook }: { onBook: () => void }) => (
 // --- Tab Views ---
 
 const AppointmentsList: React.FC<{
-  fetcher: () => Promise<any>;
+  appointments: DetailedAppointment[];
+  isLoading: boolean;
+  onRefresh: () => void;
+  refreshing: boolean;
   navigation: AppointmentsNavigationProp;
-}> = ({ fetcher, navigation }) => {
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const loadAppointments = useCallback(async () => {
-    try {
-      setLoading(true);
-      const { data } = await fetcher();
-      setAppointments(data || []);
-    } catch (error) {
-      console.error(error);
-      // Handle error display
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [fetcher]);
-
-  useEffect(() => {
-    loadAppointments();
-  }, [loadAppointments]);
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    loadAppointments();
-  }, [loadAppointments]);
-
-  if (loading && !refreshing) {
+}> = ({ appointments, isLoading, onRefresh, refreshing, navigation }) => {
+  if (isLoading && !refreshing) {
     return <ActivityIndicator style={{ marginTop: 40 }} size="large" color={theme.colors.primary} />;
   }
 
@@ -197,6 +164,21 @@ export const MyAppointmentsScreen: React.FC = () => {
     { key: 'past', title: 'Past' },
   ]);
 
+  const { data: allAppointments, isLoading, refetch, isRefetching } = useQuery({
+      queryKey: ['myAppointments'],
+      queryFn: getMyAppointments
+  });
+
+  const { upcomingAppointments, pastAppointments } = useMemo(() => {
+    if (!allAppointments) {
+      return { upcomingAppointments: [], pastAppointments: [] };
+    }
+    const now = new Date();
+    const upcoming = allAppointments.filter(appt => new Date(appt.appointmentTime) >= now);
+    const past = allAppointments.filter(appt => new Date(appt.appointmentTime) < now);
+    return { upcomingAppointments: upcoming, pastAppointments: past };
+  }, [allAppointments]);
+
   // Animation
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(20);
@@ -218,8 +200,8 @@ export const MyAppointmentsScreen: React.FC = () => {
   });
 
   const renderScene = SceneMap({
-    upcoming: () => <AppointmentsList fetcher={() => api.get('/appointments/my/future')} navigation={navigation} />,
-    past: () => <AppointmentsList fetcher={() => api.get('/appointments/my/past')} navigation={navigation} />,
+    upcoming: () => <AppointmentsList appointments={upcomingAppointments} isLoading={isLoading} onRefresh={refetch} refreshing={isRefetching} navigation={navigation} />,
+    past: () => <AppointmentsList appointments={pastAppointments} isLoading={isLoading} onRefresh={refetch} refreshing={isRefetching} navigation={navigation} />,
   });
 
   const renderTabBar = (props: any) => (

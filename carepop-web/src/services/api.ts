@@ -1,7 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { type Profile } from '@/lib/types'; // Uses our stable, Drizzle-generated types
+import { type Profile, type AppointmentBookingPayload } from '@/lib/types'; // Uses our stable, Drizzle-generated types
 import { type ProfileFormData } from '@/lib/validation/profile-schema';
-import { type NewAppointment } from '@/lib/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -323,6 +322,7 @@ export async function getPublicServices(clinicId?: string) {
   const response = await fetch(url);
   if (!response.ok) throw new Error("Failed to fetch services.");
   const result = await response.json();
+  // This endpoint returns data in a 'data' property.
   return result.data || [];
 }
 
@@ -330,6 +330,7 @@ export async function getPublicClinics() {
   const response = await fetch(`${API_BASE_URL}/api/public/clinics`);
   if (!response.ok) throw new Error("Failed to fetch clinics.");
   const result = await response.json();
+  // This endpoint returns data in a 'data' property.
   return result.data || [];
 }
 
@@ -339,7 +340,8 @@ export async function getPublicAvailability(params: { serviceId: string; clinicI
   const response = await fetch(url);
   if (!response.ok) throw new Error("Failed to fetch availability.");
   const result = await response.json();
-  return result.data || [];
+  // The backend for this specific endpoint returns an object with a 'slots' property.
+  return result.slots || [];
 }
 
 export async function getPublicAvailableDates(params: { clinicId: string; serviceId: string; }) {
@@ -350,27 +352,26 @@ export async function getPublicAvailableDates(params: { clinicId: string; servic
         throw new Error(error.message);
     }
     const result = await response.json();
-    return result.data as string[]; // Returns an array of date strings
+    // This endpoint returns data in a 'data' property.
+    return result.data || [];
 }
 
 // --- Authenticated Booking Endpoints ---
 
-export async function createAppointment(supabase: SupabaseClient, payload: NewAppointment) {
-    const headers = await getAuthHeaders(supabase);
-    const response = await fetch(`${API_BASE_URL}/api/me/appointments`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload)
-    });
-    if (!response.ok) {
-        try {
-            const error = await response.json();
-            throw new Error(error.message || "Failed to create appointment.");
-        } catch {
-            throw new Error(`Failed to create appointment: ${response.statusText}`);
-        }
-    }
-    return response.json();
+export async function createAppointment(supabase: SupabaseClient, payload: AppointmentBookingPayload) {
+  const headers = await getAuthHeaders(supabase);
+  const response = await fetch(`${API_BASE_URL}/api/me/appointments`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: "An unknown error occurred while booking." }));
+    throw new Error(error.message || "Failed to create appointment.");
+  }
+
+  return response.json();
 }
 
 export async function getAdminUsers(supabase: SupabaseClient) {

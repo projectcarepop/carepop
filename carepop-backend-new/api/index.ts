@@ -1,5 +1,5 @@
 import app from '../src/app'
-import { handle } from 'hono/vercel'
+import { handle } from '@hono/node-server/vercel'
 
-// Edge runtime is recommended; remove if using node.
+// This file adapts the Hono app for Vercel's Node.js serverless environment.
 export default handle(app) 

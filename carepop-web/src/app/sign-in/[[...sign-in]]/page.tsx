@@ -35,8 +35,7 @@ export default function Page() {
                     <label className="text-sm font-medium" htmlFor="email">Email address</label>
                     <Input id="email" name="email" type="email" placeholder="Enter your email address" required />
                 </div>
-                <div>
-                    
+                <div> 
                     <div className="relative mt-1">
                     <label className="text-sm font-medium" htmlFor="password">Password</label>
                         <Input id="password" name="password" type={showPassword ? "text" : "password"} placeholder="Enter your password" required />
@@ -51,18 +50,14 @@ export default function Page() {
                             {showPassword ? <Icons.eyeOff className="h-4 w-4" /> : <Icons.eye className="h-4 w-4" />}
                         </Button>
                     </div>
-                    
                 </div>
                 <div className="flex items-end justify-end">
-                         
-                         <Link href="/forgot-password"
-                            className="text-sm font-medium text-primary hover:text-primary/90 underline underline-offset-4"
-                         >
+                        <Link href="/forgot-password"
+                            className="text-sm font-medium text-primary hover:text-primary/90 underline underline-offset-4">
                             Forgot password?
                         </Link>
                     </div>
             </div>
-
             {errorMessage && (
               <p className="text-sm font-medium text-destructive text-center">{errorMessage}</p>
             )}

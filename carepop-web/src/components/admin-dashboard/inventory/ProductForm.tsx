@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
-import { type Product, type ProductCategory } from '../page'; // Assuming types are in page.tsx
+import { type Product, type ProductCategory } from '@/lib/types';
 
 
 const formSchema = z.object({

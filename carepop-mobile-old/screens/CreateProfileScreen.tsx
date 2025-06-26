@@ -1,17 +1,18 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, SafeAreaView, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, DimensionValue, TextInput as RNTextInput } from "react-native";
+import React from 'react';
+import { View, Text, SafeAreaView, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { MotiView, AnimatePresence } from 'moti';
-import { useUser, useAuth } from '@clerk/clerk-expo';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../src/components/button.native';
 import { theme } from '../src/components/theme';
-import { Input as CustomInput } from '../src/components/text-input.native';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { Check, Search } from 'lucide-react-native';
-import { Card, CardHeader, CardContent, CardTitle } from '../src/components/card.native';
-import type { RootStackParamList } from '../src/navigation/AppNavigator';
+import { Input } from '../src/components/text-input.native'; // Assuming a reusable Input component
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { profileSchema, type ProfileFormValues } from '../src/lib/validation/profile';
+import { useAuth } from '../src/context/AuthContext';
+import { updateMyProfile } from '../src/services/api';
+import type { UpdateProfilePayload } from '../src/lib/types';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import api, { getClerkHeaders } from '../src/utils/api';
+import type { RootStackParamList } from '../src/navigation/AppNavigator';
 
 // Import location data
 import provinceJson from '../src/data/psgc/provinces.json';
@@ -33,307 +34,113 @@ const pickerTypeToTitleMap: Record<PickerType, string> = {
     assignedSex: "Assigned Sex at Birth"
 };
 
-type CreateProfileScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'CreateProfile'>;
+export default function CreateProfileScreen() {
+    const { user } = useAuth();
+    const queryClient = useQueryClient();
+    const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'CreateProfile'>>();
 
-// --- Helper Components from EditProfileScreen ---
-const CustomToast = ({ message, visible, type }: { message: string, visible: boolean, type: 'success' | 'error' }) => {
-    if (!visible) return null;
-    return <View style={[styles.toastContainer, type === 'success' ? styles.toastSuccess : styles.toastError]}><Text style={styles.toastText}>{message}</Text></View>;
-};
+    const { control, handleSubmit, formState: { errors } } = useForm<ProfileFormValues>({
+        resolver: zodResolver(profileSchema),
+        defaultValues: {
+            firstName: user?.user_metadata?.first_name || '',
+            lastName: user?.user_metadata?.last_name || '',
+            // Initialize other fields as needed
+            middleInitial: '',
+            contactNo: '',
+            street: '',
+            provinceCode: '',
+            cityMunicipalityCode: '',
+            barangayCode: '',
+        }
+    });
 
-const PickerLabel = ({ children, required }: { children: React.ReactNode, required?: boolean }) => (
-    <Text style={styles.pickerLabel}>{children}{required && <Text style={{ color: theme.colors.destructive }}> *</Text>}</Text>
-);
+    const { mutate: submitProfile, isPending } = useMutation({
+        mutationFn: (data: UpdateProfilePayload) => updateMyProfile(data),
+        onSuccess: () => {
+            Alert.alert("Success", "Your profile has been saved.");
+            queryClient.invalidateQueries({ queryKey: ['userProfile'] }); // Optional: if you have a query for the profile
+            navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+        },
+        onError: (error) => {
+            Alert.alert("Error", error.message || "An unexpected error occurred.");
+        }
+    });
 
-const PickerRow = ({ label, isSelected, onPress }: {label: string, isSelected: boolean, onPress: () => void}) => (
-    <TouchableOpacity onPress={onPress} style={[styles.pickerItem, isSelected && styles.pickerItemSelected]}>
-        <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>{isSelected && <Check color={theme.colors.primaryForeground} size={14} />}</View>
-        <Text style={[styles.pickerItemText, isSelected && styles.pickerItemTextSelected]}>{label}</Text>
-    </TouchableOpacity>
-);
-
-const CustomPicker = ({ visible, onClose, children, height = '80%' }: { visible: boolean; onClose: () => void; children: React.ReactNode; height?: DimensionValue; }) => (
-    <AnimatePresence>
-      {visible && (
-        <Pressable onPress={onClose} style={styles.modalBackdrop}>
-          <MotiView from={{ translateY: 800 }} animate={{ translateY: 0 }} exit={{ translateY: 800 }} transition={{ type: 'timing', duration: 400 }} style={[styles.bottomSheetContainer, { height }]} onStartShouldSetResponder={() => true}>
-            <View style={styles.grabber} />
-            {children}
-          </MotiView>
-        </Pressable>
-      )}
-    </AnimatePresence>
-);
-
-// --- Main Component ---
-export const CreateProfileScreen = () => {
-    const { user } = useUser();
-    const { getToken } = useAuth();
-    const navigation = useNavigation<CreateProfileScreenNavigationProp>();
-    
-    // Form State
-    const [firstName, setFirstName] = useState(user?.firstName || '');
-    const [lastName, setLastName] = useState(user?.lastName || '');
-    const [middleInitial, setMiddleInitial] = useState('');
-    const [dateOfBirth, setDateOfBirth] = useState<Date | null>(null);
-    const [contactNo, setContactNo] = useState('');
-    const [street, setStreet] = useState('');
-    const [selectedProvince, setSelectedProvince] = useState('');
-    const [selectedCity, setSelectedCity] = useState('');
-    const [selectedBarangay, setSelectedBarangay] = useState('');
-    const [civilStatus, setCivilStatus] = useState('');
-    const [religion, setReligion] = useState('');
-    const [occupation, setOccupation] = useState('');
-    const [philhealthNo, setPhilhealthNo] = useState('');
-    const [genderIdentity, setGenderIdentity] = useState('');
-    const [pronouns, setPronouns] = useState('');
-    const [assignedSexAtBirth, setAssignedSexAtBirth] = useState('');
-
-    // UI State
-    const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
-    const [tempDate, setTempDate] = useState<Date | null>(null);
-    const [isPickerVisible, setPickerVisible] = useState(false);
-    const [pickerData, setPickerData] = useState<PickerItem[]>([]);
-    const [pickerType, setPickerType] = useState<PickerType | null>(null);
-    const [pickerTitle, setPickerTitle] = useState('');
-    const [searchTerm, setSearchTerm] = useState('');
-    const [tempSelectedItem, setTempSelectedItem] = useState<PickerItem | null>(null);
-    const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
-    const [isSaving, setIsSaving] = useState(false);
-    
-    const provinces: PickerItem[] = useMemo(() => Array.isArray(provinceJson) ? provinceJson.map((p: any) => ({ name: p.province_name, code: p.province_code })) : [], []);
-    const cities: PickerItem[] = useMemo(() => Array.isArray(cityJson) ? cityJson.map((c: any) => ({ name: c.city_name, code: c.city_code })) : [], []);
-    const barangays: PickerItem[] = useMemo(() => Array.isArray(barangayJson) ? barangayJson.map((b: any) => ({ name: b.brgy_name, code: b.brgy_code })) : [], []);
-    
-    const showToast = (message: string, type: 'success' | 'error') => {
-        setToast({ visible: true, message, type });
-        setTimeout(() => setToast({ visible: false, message: '', type }), 3000);
+    const onSubmit = (data: ProfileFormValues) => {
+        // The service function expects an UpdateProfilePayload, so we map the form data.
+        const payload: UpdateProfilePayload = {
+            ...data,
+            birthday: data.birthday.toISOString().split('T')[0], // Map to YYYY-MM-DD string
+        };
+        submitProfile(payload);
     };
-
-    const handleCreateProfile = async () => {
-        if (!firstName || !lastName || !dateOfBirth || !contactNo || !street || !selectedProvince || !selectedCity || !selectedBarangay) {
-            showToast("Please fill in all required fields.", "error");
-            return;
-        }
-    
-        if (!user) {
-            showToast("Authentication error. Please try again.", "error");
-            return;
-        }
-    
-        setIsSaving(true);
-        try {
-            // This is the final, correct method.
-            // We call our own backend, which then calls the Clerk Backend SDK.
-            // This aligns with the architecture of carepop-web.
-            const profileData = {
-                first_name: firstName,
-                last_name: lastName,
-                middle_initial: middleInitial,
-                date_of_birth: dateOfBirth.toISOString().split('T')[0],
-                contact_no: contactNo,
-                street: street,
-                province_code: provinces.find(p => p.name === selectedProvince)?.code || null,
-                city_municipality_code: cities.find(c => c.name === selectedCity)?.code || null,
-                barangay_code: barangays.find(b => b.name === selectedBarangay)?.code || null,
-                civil_status: civilStatus,
-                religion: religion,
-                occupation: occupation,
-                philhealth_no: philhealthNo,
-                gender_identity: genderIdentity,
-                pronouns: pronouns,
-                assigned_sex_at_birth: assignedSexAtBirth,
-                age: new Date(new Date().getTime() - dateOfBirth.getTime()).getUTCFullYear() - 1970,
-            };
-            
-            // This now uses the refactored `api.post` which handles Clerk auth.
-            // The endpoint /profiles is our new upsert endpoint.
-            await api.post('/profiles', profileData, getToken);
-            
-            // We must also reload the user object to get the latest data
-            await user.reload();
-
-            showToast("Profile created successfully!", 'success');
-            
-            // The navigation will automatically reset now that the AppNavigator
-            // is watching the user.publicMetadata.profileComplete flag.
-            // So we can remove the explicit navigation.reset() call.
-
-        } catch (error) {
-            console.error("Failed to create profile:", error);
-            // Let's provide a more specific error if possible
-            const errorMessage = error instanceof Error ? error.message : "Please try again.";
-            showToast(`Failed to create profile: ${errorMessage}`, 'error');
-        } finally {
-            setIsSaving(false);
-        }
-    };
-    // --- Picker Logic ---
-    const showDatePicker = () => { setTempDate(dateOfBirth || new Date()); setDatePickerVisibility(true); };
-    const handleTempDateChange = (_: DateTimePickerEvent, selectedDate?: Date) => { if (selectedDate) setTempDate(selectedDate); };
-    const confirmDateSelection = () => { setDateOfBirth(tempDate); setDatePickerVisibility(false); };
-
-    const openPicker = (type: PickerType) => {
-        setPickerType(type);
-        setPickerTitle(pickerTypeToTitleMap[type]);
-        setSearchTerm('');
-        let data: PickerItem[] = [];
-        let currentSelection: PickerItem | null = null;
-        switch (type) {
-            case 'province': data = provinces; currentSelection = { name: selectedProvince }; break;
-            case 'city':
-                const provinceCode = provinces.find(p => p.name === selectedProvince)?.code;
-                data = provinceCode ? cities.filter(c => c.code?.startsWith(provinceCode)) : [];
-                currentSelection = { name: selectedCity }; break;
-            case 'barangay':
-                const cityCode = cities.find(c => c.name === selectedCity)?.code;
-                data = cityCode ? barangays.filter(b => b.code?.startsWith(cityCode)) : [];
-                currentSelection = { name: selectedBarangay }; break;
-            case 'civilStatus': data = civilStatusOptions.map(name => ({ name })); currentSelection = { name: civilStatus }; break;
-            case 'genderIdentity': data = genderIdentityOptions.map(name => ({ name })); currentSelection = { name: genderIdentity }; break;
-            case 'pronouns': data = pronounsOptions.map(name => ({ name })); currentSelection = { name: pronouns }; break;
-            case 'assignedSex': data = assignedSexOptions.map(name => ({ name })); currentSelection = { name: assignedSexAtBirth }; break;
-        }
-        setPickerData(data);
-        setTempSelectedItem(currentSelection);
-        setPickerVisible(true);
-    };
-
-    const handlePickerSelect = (item: PickerItem) => {
-        switch (pickerType) {
-            case 'province': setSelectedProvince(item.name); setSelectedCity(''); setSelectedBarangay(''); break;
-            case 'city': setSelectedCity(item.name); setSelectedBarangay(''); break;
-            case 'barangay': setSelectedBarangay(item.name); break;
-            case 'civilStatus': setCivilStatus(item.name); break;
-            case 'genderIdentity': setGenderIdentity(item.name); break;
-            case 'pronouns': setPronouns(item.name); break;
-            case 'assignedSex': setAssignedSexAtBirth(item.name); break;
-        }
-    };
-    
-    const handleTempPickerSelect = (item: PickerItem) => setTempSelectedItem(item);
-    const confirmPickerSelection = () => { if (tempSelectedItem) { handlePickerSelect(tempSelectedItem); } setPickerVisible(false); };
 
     return (
-        <SafeAreaView style={{flex: 1, backgroundColor: theme.colors.background}}>
+        <SafeAreaView style={styles.safeArea}>
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-                <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
                     <Text style={styles.screenTitle}>Create Your Profile</Text>
                     <Text style={styles.screenDescription}>This information helps us tailor your experience.</Text>
                     
-                    <Card style={styles.card}>
-                        <CardHeader><CardTitle style={styles.cardTitle}>Personal Information</CardTitle></CardHeader>
-                        <CardContent>
-                            <CustomInput label="First Name" value={firstName} onChangeText={setFirstName} required helperText="Your legal first name." editable={!isSaving} />
-                            <CustomInput label="Middle Initial" value={middleInitial} onChangeText={setMiddleInitial} maxLength={5} editable={!isSaving} />
-                            <CustomInput label="Last Name" value={lastName} onChangeText={setLastName} required helperText="Your legal last name." editable={!isSaving} />
-                            <View style={styles.pickerWrapper}>
-                                <PickerLabel required>Date of Birth</PickerLabel>
-                                <TouchableOpacity onPress={showDatePicker} style={styles.pickerButton} disabled={isSaving}><Text style={styles.pickerText}>{dateOfBirth ? dateOfBirth.toLocaleDateString() : 'Select Date of Birth'}</Text></TouchableOpacity>
-                                <Text style={styles.helperText}>Your date of birth will be used to calculate your age.</Text>
-                            </View>
-                        </CardContent>
-                    </Card>
-                    
-                    <Card style={styles.card}>
-                        <CardHeader><CardTitle style={styles.cardTitle}>Contact & Address</CardTitle></CardHeader>
-                        <CardContent>
-                            <CustomInput label="Contact No." value={contactNo} onChangeText={setContactNo} keyboardType="phone-pad" required helperText="A valid phone number where we can reach you." editable={!isSaving} />
-                            <CustomInput label="Street Address" value={street} onChangeText={setStreet} required helperText="House number, street name, and subdivision." editable={!isSaving} />
-                            <View style={styles.pickerWrapper}>
-                                <PickerLabel required>Province</PickerLabel>
-                                <TouchableOpacity onPress={() => openPicker('province')} style={styles.pickerButton} disabled={isSaving}><Text style={styles.pickerText}>{selectedProvince || 'Select Province'}</Text></TouchableOpacity>
-                            </View>
-                            <View style={styles.pickerWrapper}>
-                                <PickerLabel required>City/Municipality</PickerLabel>
-                                <TouchableOpacity onPress={() => openPicker('city')} style={styles.pickerButton} disabled={isSaving || !selectedProvince}><Text style={styles.pickerText}>{selectedCity || 'Select City/Municipality'}</Text></TouchableOpacity>
-                            </View>
-                             <View style={styles.pickerWrapper}>
-                                <PickerLabel required>Barangay</PickerLabel>
-                                <TouchableOpacity onPress={() => openPicker('barangay')} style={styles.pickerButton} disabled={isSaving || !selectedCity}><Text style={styles.pickerText}>{selectedBarangay || 'Select Barangay'}</Text></TouchableOpacity>
-                            </View>
-                        </CardContent>
-                    </Card>
-                    
-                     <Card style={styles.card}>
-                        <CardHeader><CardTitle style={styles.cardTitle}>Identity & Other Info</CardTitle></CardHeader>
-                        <CardContent>
-                            <View style={styles.pickerWrapper}><PickerLabel>Civil Status</PickerLabel><TouchableOpacity onPress={() => openPicker('civilStatus')} style={styles.pickerButton} disabled={isSaving}><Text style={styles.pickerText}>{civilStatus || 'Select Civil Status'}</Text></TouchableOpacity></View>
-                            <View style={styles.pickerWrapper}><PickerLabel>Gender Identity</PickerLabel><TouchableOpacity onPress={() => openPicker('genderIdentity')} style={styles.pickerButton} disabled={isSaving}><Text style={styles.pickerText}>{genderIdentity || 'Select Gender Identity'}</Text></TouchableOpacity></View>
-                            <View style={styles.pickerWrapper}><PickerLabel>Pronouns</PickerLabel><TouchableOpacity onPress={() => openPicker('pronouns')} style={styles.pickerButton} disabled={isSaving}><Text style={styles.pickerText}>{pronouns || 'Select Pronouns'}</Text></TouchableOpacity></View>
-                            <View style={styles.pickerWrapper}><PickerLabel>Assigned Sex at Birth</PickerLabel><TouchableOpacity onPress={() => openPicker('assignedSex')} style={styles.pickerButton} disabled={isSaving}><Text style={styles.pickerText}>{assignedSexAtBirth || 'Select Assigned Sex at Birth'}</Text></TouchableOpacity></View>
-                            <CustomInput label="Religion" value={religion} onChangeText={setReligion} editable={!isSaving} />
-                            <CustomInput label="Occupation" value={occupation} onChangeText={setOccupation} editable={!isSaving} />
-                            <CustomInput label="PhilHealth No." value={philhealthNo} onChangeText={setPhilhealthNo} helperText="Optional. Used for insurance claims." editable={!isSaving} />
-                        </CardContent>
-                    </Card>
-                     <Button title={isSaving ? "Creating..." : "Create Profile"} onPress={handleCreateProfile} disabled={isSaving} size="xl" style={{marginTop: 8}}/>
+                    <View style={styles.formContainer}>
+                        <Controller
+                            control={control}
+                            name="firstName"
+                            render={({ field: { onChange, onBlur, value } }) => (
+                                <Input label="First Name" onBlur={onBlur} onChangeText={onChange} value={value} error={errors.firstName?.message} required />
+                            )}
+                        />
+                        <Controller
+                            control={control}
+                            name="lastName"
+                            render={({ field: { onChange, onBlur, value } }) => (
+                                <Input label="Last Name" onBlur={onBlur} onChangeText={onChange} value={value} error={errors.lastName?.message} required />
+                            )}
+                        />
+                        {/* Add controllers for all other fields... */}
+                        {/* Example for a non-string field */}
+                        <Controller
+                            control={control}
+                            name="birthday"
+                            render={({ field: { onChange, value } }) => (
+                                // This would be a custom DatePicker input component
+                                <Input label="Birthday" value={value?.toLocaleDateString()} error={errors.birthday?.message} onFocus={() => { /* open date picker */ }} required />
+                            )}
+                        />
+                        <Controller
+                            control={control}
+                            name="contactNo"
+                            render={({ field: { onChange, onBlur, value } }) => (
+                                <Input label="Contact No." onBlur={onBlur} onChangeText={onChange} value={value} error={errors.contactNo?.message} required keyboardType="phone-pad"/>
+                            )}
+                        />
+                         <Controller
+                            control={control}
+                            name="street"
+                            render={({ field: { onChange, onBlur, value } }) => (
+                                <Input label="Street Address" onBlur={onBlur} onChangeText={onChange} value={value} error={errors.street?.message} required />
+                            )}
+                        />
+                        {/* Placeholder for location pickers */}
+                        <Input label="Province" error={errors.provinceCode?.message} required />
+                        <Input label="City/Municipality" error={errors.cityMunicipalityCode?.message} required />
+                        <Input label="Barangay" error={errors.barangayCode?.message} required />
+                    </View>
+
+                    <Button onPress={handleSubmit(onSubmit)} disabled={isPending} style={{ marginTop: 20 }}>
+                        {isPending ? <ActivityIndicator color="white" /> : <Text style={styles.buttonText}>Save Profile</Text>}
+                    </Button>
                 </ScrollView>
             </KeyboardAvoidingView>
-            
-            <CustomPicker visible={isPickerVisible} onClose={() => setPickerVisible(false)} height="50%">
-                <Text style={styles.modalHeader}>Select {pickerTitle}</Text>
-                <View style={styles.searchInputContainer}>
-                  <Search color={theme.colors.mutedForeground} size={20} style={styles.searchIcon} />
-                  <RNTextInput
-                    placeholder="Search..."
-                    value={searchTerm}
-                    onChangeText={setSearchTerm}
-                    style={styles.searchInput}
-                    placeholderTextColor={theme.colors.mutedForeground}
-                  />
-                </View>
-                <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
-                    {pickerData.filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
-                        <PickerRow key={item.name} label={item.name} isSelected={tempSelectedItem?.name === item.name} onPress={() => handleTempPickerSelect(item)} />
-                    ))}
-                </ScrollView>
-                 <Button title="Done" variant="default" size="xl" onPress={confirmPickerSelection} style={{marginTop: 16}} />
-            </CustomPicker>
-
-            <CustomPicker visible={isDatePickerVisible} onClose={() => setDatePickerVisibility(false)} height="45%">
-                <DateTimePicker value={tempDate || new Date()} mode="date" display="spinner" onChange={handleTempDateChange} textColor={theme.colors.foreground} />
-                <Button title="Done" variant="default" size="xl" onPress={confirmDateSelection} style={{marginTop: 16}} />
-            </CustomPicker>
-
-            <CustomToast message={toast.message} visible={toast.visible} type={toast.type} />
         </SafeAreaView>
     );
-};
+}
 
-// --- Styles copied from EditProfileScreen for consistency ---
 const styles = StyleSheet.create({
-    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background },
-    container: { paddingVertical: theme.spacing.xl, paddingHorizontal: theme.spacing.lg, backgroundColor: theme.colors.background, paddingBottom: 40 },
-    screenTitle: { ...theme.typography.h1, textAlign: 'center', marginBottom: theme.spacing.sm, color: theme.colors.secondary },
-    screenDescription: { ...theme.typography.body, textAlign: 'center', color: theme.colors.foreground, marginBottom: theme.spacing.xl },
-    card: { marginBottom: theme.spacing.xl },
-    cardTitle: { color: theme.colors.secondary },
-    pickerWrapper: { width: '100%', marginBottom: theme.spacing.lg },
-    pickerLabel: { ...theme.typography.small, color: theme.colors.foreground, marginBottom: theme.spacing.sm, fontWeight: '500' },
-    pickerButton: { width: '100%', height: 50, justifyContent: 'center', paddingHorizontal: theme.spacing.md, backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md },
-    pickerText: { fontSize: 16, color: theme.colors.foreground },
-    helperText: { ...theme.typography.small, color: theme.colors.mutedForeground, fontSize: 12, marginTop: theme.spacing.xs, paddingHorizontal: 4 },
-    modalBackdrop: { ...StyleSheet.absoluteFillObject, justifyContent: 'flex-end', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 10 },
-    bottomSheetContainer: { width: '100%', backgroundColor: theme.colors.background, borderTopLeftRadius: theme.radius.lg, borderTopRightRadius: theme.radius.lg, paddingHorizontal: theme.spacing.xl, paddingBottom: 40 },
-    grabber: { width: 48, height: 5, backgroundColor: theme.colors.border, borderRadius: theme.radius.full, alignSelf: 'center', marginTop: theme.spacing.sm, marginBottom: theme.spacing.lg },
-    modalHeader: { ...theme.typography.h3, marginBottom: 15, textAlign: 'center', fontFamily: theme.typography.fontFamilySemiBold },
-    searchInputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.card, borderRadius: theme.radius.full, paddingHorizontal: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border, marginBottom: 16 },
-    searchInput: {
-      flex: 1,
-      height: 40,
-      fontSize: 16,
-      color: theme.colors.foreground,
-    },
-    searchIcon: { marginRight: theme.spacing.sm },
-    pickerItem: { flexDirection: 'row', alignItems: 'center', padding: theme.spacing.md, borderRadius: theme.radius.md, marginBottom: theme.spacing.sm },
-    pickerItemSelected: { backgroundColor: 'rgba(255, 77, 109, 0.1)' },
-    radioCircle: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: theme.colors.border, justifyContent: 'center', alignItems: 'center', marginRight: theme.spacing.md },
-    radioCircleSelected: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
-    pickerItemText: { fontSize: 16, color: theme.colors.foreground },
-    pickerItemTextSelected: { fontFamily: theme.typography.fontFamilySemiBold, color: theme.colors.primary },
-    toastContainer: { position: 'absolute', bottom: 40, left: 20, right: 20, padding: 16, borderRadius: theme.radius.md, alignItems: 'center', justifyContent: 'center', opacity: 0.95, elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4 },
-    toastSuccess: { backgroundColor: theme.colors.success },
-    toastError: { backgroundColor: theme.colors.destructive },
-    toastText: { color: theme.colors.primaryForeground, ...theme.typography.small, fontWeight: '500' },
-}); 
+    safeArea: { flex: 1, backgroundColor: theme.colors.background },
+    container: { padding: theme.spacing.lg },
+    screenTitle: { ...theme.typography.h1, textAlign: 'center', marginBottom: theme.spacing.sm },
+    screenDescription: { ...theme.typography.body, textAlign: 'center', color: theme.colors.mutedForeground, marginBottom: theme.spacing.xl },
+    formContainer: { gap: theme.spacing.md },
+    buttonText: { ...theme.typography.body, fontFamily: theme.typography.fontFamilySemiBold, color: theme.colors.primaryForeground },
+});

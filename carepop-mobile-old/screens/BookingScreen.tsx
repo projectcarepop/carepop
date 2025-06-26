@@ -1,13 +1,14 @@
 import React, { useState, useCallback, FC } from 'react';
 import { View, StyleSheet, ActivityIndicator, RefreshControl, useWindowDimensions, FlatList, Text, Modal, Pressable, SafeAreaView, TouchableOpacity } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { TabView, SceneMap, TabBar } from 'react-native-tab-view';
 import { LucideFilter, LucidePlus } from 'lucide-react-native';
 import { Checkbox } from 'react-native-paper';
+import { useAuth } from '@clerk/clerk-expo';
 
-// Import the canonical Appointment type from the API utility
+import { DrawerParamList } from '../src/navigation/AppNavigator';
 import { Appointment, getUpcomingAppointments, getPastAppointments } from '../src/utils/api';
-// Import only the component, not the type from the card file
 import { AppointmentCard } from '../src/components/appointments/AppointmentCard';
 import { theme, Button } from '../src/components'; 
 
@@ -19,7 +20,13 @@ const MOCK_SERVICES = [
     { id: '4', name: 'Mental Wellness Session' },
 ];
 
-const AppointmentsList: FC<{ type: 'upcoming' | 'past', filters: Record<string, any> }> = ({ type, filters }) => {
+type AppointmentsListProps = {
+  type: 'upcoming' | 'past';
+  filters: Record<string, any>;
+  getToken: () => Promise<string | null>;
+};
+
+const AppointmentsList: FC<AppointmentsListProps> = ({ type, filters, getToken }) => {
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
@@ -27,18 +34,17 @@ const AppointmentsList: FC<{ type: 'upcoming' | 'past', filters: Record<string, 
     const fetchAppointments = useCallback(async () => {
         setLoading(true);
         try {
-            // Pass filters to the API call
             const apiCall = type === 'upcoming' 
                 ? getUpcomingAppointments
                 : getPastAppointments;
-            const data = await apiCall(filters);
+            const data = await apiCall(getToken, filters);
             setAppointments(data);
         } catch (error) {
             console.error(`Error fetching ${type} appointments:`, error);
         } finally {
             setLoading(false);
         }
-    }, [type, filters]);
+    }, [type, filters, getToken]);
 
     const onRefresh = useCallback(() => {
         setRefreshing(true);
@@ -73,9 +79,12 @@ const NoAppointments: FC<{ message: string }> = ({ message }) => (
       </View>
 );
 
+type BookingScreenNavigationProp = DrawerNavigationProp<DrawerParamList, 'Appointments'>;
+
 export const BookingScreen: FC = () => {
     const layout = useWindowDimensions();
-    const navigation = useNavigation();
+    const navigation = useNavigation<BookingScreenNavigationProp>();
+    const { getToken } = useAuth();
     const [index, setIndex] = useState(0);
     const [routes] = useState([
         { key: 'upcoming', title: 'Upcoming' },
@@ -101,6 +110,10 @@ export const BookingScreen: FC = () => {
         setFilterModalVisible(false);
     };
 
+    const navigateToBookingFlow = () => {
+        navigation.navigate('Book a Service');
+    };
+
     const handleServiceToggle = (serviceId: string) => {
         setTempFilters(prev => {
             const currentSelectedId = prev.serviceId;
@@ -114,8 +127,8 @@ export const BookingScreen: FC = () => {
     };
 
     const renderScene = SceneMap({
-        upcoming: () => <AppointmentsList type="upcoming" filters={appliedFilters} />,
-        past: () => <AppointmentsList type="past" filters={appliedFilters} />,
+        upcoming: () => <AppointmentsList type="upcoming" filters={appliedFilters} getToken={getToken} />,
+        past: () => <AppointmentsList type="past" filters={appliedFilters} getToken={getToken} />,
     });
 
     return (
@@ -126,7 +139,7 @@ export const BookingScreen: FC = () => {
                     <Pressable onPress={openFilterModal} style={styles.iconButton}>
                         <LucideFilter size={24} color={theme.colors.primary} />
                     </Pressable>
-                    <Pressable onPress={() => console.log("Navigate to Booking Flow")} style={styles.iconButton}>
+                    <Pressable onPress={navigateToBookingFlow} style={styles.iconButton}>
                         <LucidePlus size={24} color={theme.colors.primary} />
                     </Pressable>
                 </View>

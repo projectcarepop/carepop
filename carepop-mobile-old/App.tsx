@@ -1,36 +1,18 @@
 import 'react-native-gesture-handler';
 import React from 'react';
-import { ClerkProvider } from '@clerk/clerk-expo';
-import * as SecureStore from 'expo-secure-store';
-import Constants from 'expo-constants';
-import { RootAppNavigator } from './src/navigation/AppNavigator';
+import { ActivityIndicator, View } from 'react-native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { SpaceGrotesk_400Regular, SpaceGrotesk_500Medium, SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { RootAppNavigator } from './src/navigation/AppNavigator';
 
-const tokenCache = {
-  async getToken(key: string) {
-    try {
-      return SecureStore.getItemAsync(key);
-    } catch (err) {
-      return null;
-    }
-  },
-  async saveToken(key: string, value: string) {
-    try {
-      return SecureStore.setItemAsync(key, value);
-    } catch (err) {
-      return;
-    }
-  },
-};
+// Create a client
+const queryClient = new QueryClient();
 
-const publishableKey = Constants.expoConfig?.extra?.clerkPublishableKey;
+function Root() {
+  const { loading } = useAuth();
 
-if (!publishableKey) {
-  throw new Error('Missing Clerk Publishable Key. Please set it in your app.json');
-}
-
-export default function App() {
   let [fontsLoaded] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -41,16 +23,23 @@ export default function App() {
     SpaceGrotesk_700Bold,
   });
 
-  if (!fontsLoaded) {
-    return null;
+  if (loading || !fontsLoaded) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
   }
 
+  return <RootAppNavigator />;
+}
+
+export default function App() {
   return (
-    <ClerkProvider
-      tokenCache={tokenCache}
-      publishableKey={publishableKey}
-    >
-      <RootAppNavigator />
-    </ClerkProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <Root />
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }

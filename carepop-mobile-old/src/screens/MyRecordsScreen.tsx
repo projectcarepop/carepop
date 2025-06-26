@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, Pressable, Alert, SafeAreaView, TouchableOpacity } from 'react-native';
-// Removed: getMyRecords, getRecordSignedUrl as they are not defined. This will use dummy data.
+import React, { useMemo } from 'react';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, Alert, SafeAreaView, TouchableOpacity } from 'react-native';
 import { format } from 'date-fns';
 import { theme, Button } from '../components';
 import * as Linking from 'expo-linking';
@@ -9,57 +8,39 @@ import { useNavigation } from '@react-navigation/native';
 import type { DrawerScreenProps } from '@react-navigation/drawer';
 import type { DrawerParamList } from '../navigation/AppNavigator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  Easing,
-} from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '../context/AuthContext';
 
-type MyRecordsNavigationProp = DrawerScreenProps<DrawerParamList, 'MyRecords'>['navigation'];
+// Import our new service function and types
+import { getMyMedicalRecords } from '../services/api';
+import type { MedicalRecord } from '../lib/types';
 
-// Dummy data to allow the component to render without a real API
-type MedicalRecord = {
-  id: string;
-  record_type: string;
-  description: string;
-  created_at: string;
-};
+type MyRecordsNavigationProp = DrawerScreenProps<DrawerParamList, 'Records'>['navigation'];
 
 export function MyRecordsScreen() {
-  const [records, setRecords] = useState<MedicalRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const navigation = useNavigation<MyRecordsNavigationProp>();
   const insets = useSafeAreaInsets();
+  const { session } = useAuth(); // Use session to control the query
+
+  const { 
+    data: medicalRecords, 
+    isLoading, 
+    isError, 
+    refetch 
+  } = useQuery<MedicalRecord[], Error>({
+    queryKey: ['myMedicalRecords'],
+    queryFn: getMyMedicalRecords, // Use the new service function directly
+    enabled: !!session, // Only run the query if the user is logged in
+  });
 
   // Animation
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(20);
 
-  useEffect(() => {
+  React.useEffect(() => {
     opacity.value = withTiming(1, { duration: 500, easing: Easing.out(Easing.cubic) });
     translateY.value = withTiming(0, { duration: 500, easing: Easing.out(Easing.cubic) });
-
-    const fetchRecords = async () => {
-      try {
-        setLoading(true);
-        // Using dummy data
-        const fetchedRecords: MedicalRecord[] = [
-          {id: '1', record_type: 'Lab Result', description: 'Annual Checkup', created_at: new Date().toISOString()},
-          {id: '2', record_type: 'Prescription', description: 'Allergy Medication', created_at: new Date().toISOString()},
-        ];
-        setRecords(fetchedRecords);
-        setError(null);
-      } catch (e) {
-        setError('Failed to fetch medical records. Please try again later.');
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchRecords();
   }, []);
 
   const animatedStyle = useAnimatedStyle(() => {
@@ -71,26 +52,30 @@ export function MyRecordsScreen() {
   });
 
   const handleViewRecord = async (recordId: string) => {
-    Alert.alert('View Record', `This would open record with ID: ${recordId}`);
+    Alert.alert('Feature In Development', 'Securely viewing documents is coming soon!');
     // try {
-    //     const { signedUrl } = await getRecordSignedUrl(recordId);
-    //     await Linking.openURL(signedUrl);
+    //   const res = await apiClient.api.me.medicalRecords[':id']['signed-url'].$get({ 
+    //       param: { id: recordId } 
+    //   });
+    //   if (!res.ok) throw new Error('Could not get viewable link.');
+    //   const { signedUrl } = await res.json();
+    //   await Linking.openURL(signedUrl);
     // } catch (err) {
-    //     Alert.alert('Error', 'Could not open the record. Please try again.');
+    //   Alert.alert('Error', 'Could not open the record. Please try again.');
     // }
   };
 
   const renderRecordItem = ({ item }: { item: MedicalRecord }) => (
     <View style={styles.recordItemContainer}>
       <View style={styles.recordInfo}>
-        <Text style={styles.recordType}>{item.record_type}</Text>
-        <Text style={styles.recordDescription} numberOfLines={1}>
-          {item.description || 'No description'}
+        <Text style={styles.recordType}>{item.recordType.replace(/_/g, ' ')}</Text>
+        <Text style={styles.recordDescription} numberOfLines={2}>
+          {typeof item.details === 'string' ? item.details : JSON.stringify(item.details)}
         </Text>
       </View>
       <View style={styles.recordMeta}>
         <Text style={styles.recordDate}>
-          {format(new Date(item.created_at), 'MMM d, yyyy')}
+          {format(new Date(item.createdAt), 'MMM d, yyyy')}
         </Text>
         <Button
           title="View"
@@ -103,19 +88,20 @@ export function MyRecordsScreen() {
   );
 
   const ListContent = () => {
-    if (loading) {
+    if (isLoading) {
       return <ActivityIndicator size="large" color={theme.colors.primary} style={styles.centered} />;
     }
 
-    if (error) {
+    if (isError) {
       return (
         <View style={styles.centered}>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={styles.errorText}>Failed to fetch records.</Text>
+           <Button title="Retry" onPress={() => refetch()} style={{marginTop: 20}} />
         </View>
       );
     }
 
-    if (records.length === 0) {
+    if (!medicalRecords || medicalRecords.length === 0) {
       return (
         <View style={styles.centered}>
           <Text style={styles.emptyText}>You have no medical records.</Text>
@@ -125,7 +111,7 @@ export function MyRecordsScreen() {
 
     return (
       <FlatList
-        data={records}
+        data={medicalRecords}
         renderItem={renderRecordItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContentContainer}

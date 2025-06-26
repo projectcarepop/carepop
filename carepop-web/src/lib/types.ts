@@ -53,6 +53,12 @@ export type ServiceWithCategory = Service & {
 export type Appointment = InferSelectModel<typeof schema.appointments>;
 export type NewAppointment = InferInsertModel<typeof schema.appointments>;
 
+// To satisfy the simplified booking flow, let's make doctorId optional
+// on the type used by the frontend form.
+export type AppointmentBookingPayload = Omit<NewAppointment, 'doctorId'> & {
+  doctorId?: string | null;
+};
+
 // =================================================================
 // HEALTH LOGS & RECORDS
 // =================================================================

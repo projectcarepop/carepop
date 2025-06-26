@@ -8,12 +8,17 @@ import {
   Image,
   StyleSheet,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useMutation } from '@tanstack/react-query';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Mail, ArrowLeft } from 'lucide-react-native';
 
-import { supabase } from '../src/utils/supabase';
+import { forgotPassword } from '../src/services/api';
+import { forgotPasswordSchema, type ForgotPasswordFormValues } from '../src/lib/validation/auth';
 import {
   Button,
   Input,
@@ -28,45 +33,32 @@ type ForgotPasswordScreenNavigationProp = NativeStackNavigationProp<
 
 export const ForgotPasswordScreen: React.FC = () => {
   const navigation = useNavigation<ForgotPasswordScreenNavigationProp>();
-  const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isSuccess, setIsSuccess] = useState(false);
 
-  const handleResetPassword = async () => {
-    setError(null);
-    setSuccessMessage(null);
+  const { control, handleSubmit, formState: { errors }, reset } = useForm<ForgotPasswordFormValues>({
+    resolver: zodResolver(forgotPasswordSchema),
+    defaultValues: { email: '' },
+  });
 
-    if (!email) {
-      setError('Please enter your email address.');
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError('Please enter a valid email address.');
-      return;
-    }
+  const { mutate: sendResetLink, isPending } = useMutation({
+    mutationFn: (data: ForgotPasswordFormValues) => forgotPassword(data.email),
+    onSuccess: () => {
+      reset();
+      setIsSuccess(true);
+    },
+    onError: (error) => {
+      // As a security practice, we often don't want to confirm if an email exists or not.
+      // So, we can show a generic success message even on some errors.
+      // However, for a better developer/user experience in some cases, you might show the error.
+      // Here, we'll alert the error but also set the success UI state.
+      Alert.alert('Error', error.message);
+      setIsSuccess(true); // Show generic message even if the email doesn't exist.
+    },
+  });
 
-    setLoading(true);
-
-    try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email);
-      
-      if (resetError) {
-        setError(resetError.message || 'Failed to send reset instructions.');
-      } else {
-        setSuccessMessage('If an account with this email exists, password reset instructions have been sent.');
-        setEmail('');
-      }
-    } catch (err) {
-      setError('An unexpected error occurred. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const AlertBox = ({ type, message }: { type: 'error' | 'success', message: string }) => (
-    <View style={[styles.alertContainer, type === 'error' ? styles.errorBg : styles.successBg]}>
-      <Text style={type === 'error' ? styles.errorText : styles.successText}>{message}</Text>
+  const AlertBox = ({ message }: { message: string }) => (
+    <View style={[styles.alertContainer, styles.successBg]}>
+      <Text style={styles.successText}>{message}</Text>
     </View>
   );
 
@@ -91,25 +83,32 @@ export const ForgotPasswordScreen: React.FC = () => {
         </View>
 
         <View style={styles.formContainer}>
-            {error && <AlertBox type="error" message={error} />}
-            {successMessage && <AlertBox type="success" message={successMessage} />}
+            {isSuccess && <AlertBox message="If an account with this email exists, password reset instructions have been sent." />}
 
-            <Input
-              placeholder="you@example.com"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              label="Email"
-              editable={!loading}
-              icon={<Mail size={20} color={theme.colors.mutedForeground} />}
+            <Controller
+              control={control}
+              name="email"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <Input
+                  placeholder="you@example.com"
+                  onBlur={onBlur}
+                  onChangeText={onChange}
+                  value={value}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  label="Email"
+                  editable={!isPending && !isSuccess}
+                  error={errors.email?.message}
+                  icon={<Mail size={20} color={theme.colors.mutedForeground} />}
+                />
+              )}
             />
             
             <Button
               title="Send Instructions"
-              onPress={handleResetPassword}
-              isLoading={loading}
-              disabled={loading}
+              onPress={handleSubmit((data) => sendResetLink(data))}
+              isLoading={isPending}
+              disabled={isPending || isSuccess}
               size="lg"
               fullWidth
             />
@@ -170,13 +169,6 @@ const styles = StyleSheet.create({
   alertContainer: {
     padding: theme.spacing.md,
     borderRadius: theme.radius.md,
-  },
-  errorBg: {
-    backgroundColor: theme.colors.destructiveMuted,
-  },
-  errorText: {
-    color: theme.colors.destructive,
-    ...theme.typography.small,
   },
   successBg: {
     backgroundColor: 'rgba(34, 197, 94, 0.1)',

@@ -14,7 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { cancelAppointment } from "@/lib/actions/appointment.actions";
+import { cancelAppointment } from "@/services/api";
 import { useState, useTransition } from "react";
 import { useRouter } from 'next/navigation';
 

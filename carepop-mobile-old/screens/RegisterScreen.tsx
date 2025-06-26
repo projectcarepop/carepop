@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,13 +9,18 @@ import {
   StyleSheet,
   TouchableOpacity,
   Linking,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useMutation } from '@tanstack/react-query';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Eye, EyeOff, AlertCircle, Mail, Check, Circle } from 'lucide-react-native';
 import { AntDesign } from '@expo/vector-icons';
 
-import { useSignUp, useOAuth } from "@clerk/clerk-expo";
+import { signUpWithEmail } from '../src/services/api';
+import { registerSchema, type RegisterFormValues } from '../src/lib/validation/auth';
 import {
   Button,
   Input,
@@ -23,6 +28,7 @@ import {
   theme,
 } from '../src/components';
 import type { AuthStackParamList } from '../src/navigation/AppNavigator';
+import { useAuth } from '../src/context/AuthContext';
 
 type RegisterScreenNavigationProp = NativeStackNavigationProp<
   AuthStackParamList,
@@ -31,161 +37,89 @@ type RegisterScreenNavigationProp = NativeStackNavigationProp<
 
 const GoogleSignInButton: React.FC<{ onPress: () => void; disabled?: boolean }> = ({ onPress, disabled }) => (
     <TouchableOpacity onPress={onPress} disabled={disabled} style={[styles.socialButton, disabled && styles.disabledButton]}>
-        <AntDesign name="google" size={24} color={theme.colors.secondary} style={styles.socialIcon} />
+        <AntDesign name="google" size={24} color={theme.colors.foreground} style={styles.socialIcon} />
         <Text style={styles.socialButtonText}>Sign up with Google</Text>
     </TouchableOpacity>
 );
 
-const AppleSignInButton: React.FC<{ onPress: () => void; disabled?: boolean }> = ({ onPress, disabled }) => (
-    <TouchableOpacity onPress={onPress} disabled={disabled} style={[styles.socialButton, styles.appleButton, disabled && styles.disabledButton]}>
-        <AntDesign name="apple1" size={24} color={theme.colors.background} style={styles.socialIcon} />
-        <Text style={[styles.socialButtonText, styles.appleButtonText]}>Sign up with Apple</Text>
-    </TouchableOpacity>
-);
-
 const StrengthIndicator: React.FC<{
-  label: string;
-  isValid: boolean;
-}> = ({ label, isValid }) => (
-  <View style={styles.strengthItem}>
-    {isValid ? <Check size={16} color={theme.colors.success} /> : <Circle size={16} color={theme.colors.mutedForeground} />}
-    <Text
-      style={[
-        styles.strengthText,
-        { color: isValid ? theme.colors.success : theme.colors.mutedForeground },
-      ]}
-    >
-      {label}
-    </Text>
-  </View>
-);
+  strength: 'weak' | 'medium' | 'strong' | '';
+}> = ({ strength }) => {
+    const getStrengthColor = () => {
+        if (strength === 'strong') return theme.colors.success;
+        if (strength === 'medium') return theme.colors.accent;
+        if (strength === 'weak') return theme.colors.destructive;
+        return theme.colors.mutedForeground;
+    }
+
+    const strengthText = strength ? `${strength.charAt(0).toUpperCase() + strength.slice(1)} password` : '';
+
+    return (
+        <View style={styles.strengthContainer}>
+            <View style={[styles.strengthBar, { width: `${strength === 'strong' ? 100 : strength === 'medium' ? 66 : 33}%`, backgroundColor: getStrengthColor() }]}/>
+            <Text style={[styles.strengthText, { color: getStrengthColor() }]}>{strengthText}</Text>
+        </View>
+    )
+};
 
 const usePasswordStrength = (password: string) => {
   return useMemo(() => {
+    if (!password) return { checks: {}, strengthScore: 0, strength: '' as const };
     const checks = {
       length: password.length >= 8,
       uppercase: /[A-Z]/.test(password),
       lowercase: /[a-z]/.test(password),
       number: /[0-9]/.test(password),
-      specialChar: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~]/.test(password),
+      specialChar: /[^A-Za-z0-9]/.test(password),
     };
-    const strength = Object.values(checks).filter(Boolean).length;
-    const isStrong = strength === 5;
-    return { checks, strength, isStrong };
+    const strengthScore = Object.values(checks).filter(Boolean).length;
+    let strength: 'weak' | 'medium' | 'strong' | '' = '';
+    if (strengthScore <= 2) strength = 'weak';
+    else if (strengthScore <= 4) strength = 'medium';
+    else if (strengthScore === 5) strength = 'strong';
+    return { checks, strengthScore, strength };
   }, [password]);
 };
 
 export const RegisterScreen: React.FC = () => {
   const navigation = useNavigation<RegisterScreenNavigationProp>();
-  const { isLoaded, signUp, setActive } = useSignUp();
+  const { signInWithGoogle } = useAuth();
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  
+  const { control, handleSubmit, watch, formState: { errors } } = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: { email: '', password: '', termsAccepted: false },
+  });
 
-  const [emailAddress, setEmailAddress] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isOAuthLoading, setIsOAuthLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pendingVerification, setPendingVerification] = useState(false);
-  const [code, setCode] = useState('');
-  const [termsAccepted, setTermsAccepted] = useState(false);
+  const password = watch('password');
+  const { strength } = usePasswordStrength(password);
 
-  const { startOAuthFlow: startGoogleOAuthFlow } = useOAuth({ strategy: 'oauth_google' });
-  const { startOAuthFlow: startAppleOAuthFlow } = useOAuth({ strategy: 'oauth_apple' });
+  const { mutate: handleRegister, isPending: isRegistering } = useMutation({
+    mutationFn: (data: RegisterFormValues) => signUpWithEmail(data),
+    onSuccess: () => {
+      Alert.alert('Check your email!', 'We sent you a confirmation link to complete your registration.');
+      navigation.navigate('Login');
+    },
+    onError: (error) => Alert.alert('Registration Error', error.message),
+  });
+  
+  const [isSigningInWithGoogle, setIsSigningInWithGoogle] = useState(false);
 
-  const { checks, isStrong } = usePasswordStrength(password);
-
-  // Clear error when user starts typing
-  useEffect(() => {
-    if (error) {
-      setError(null);
-    }
-  }, [emailAddress, password, code]);
-
-  const handleRegister = async () => {
-    if (!isLoaded || !isStrong || !termsAccepted) return;
-
-    setIsLoading(true);
-    setError(null);
-
+  const handleGoogleSignIn = async () => {
+    setIsSigningInWithGoogle(true);
     try {
-      await signUp.create({
-        emailAddress,
-        password,
-      });
-
-      // start the email verification process
-      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-
-      // setPendingVerification to true to show the verification code input field
-      setPendingVerification(true);
-    } catch (err: any) {
-      console.error(JSON.stringify(err, null, 2));
-      setError(err.errors?.[0]?.message || 'An error occurred during sign up.');
+      await signInWithGoogle();
+      // The auth listener in AuthContext will handle navigation.
+    } catch (error) {
+      Alert.alert('Google Sign-In Error', 'An unexpected error occurred. Please try again.');
     } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const onPressVerify = async () => {
-    if (!isLoaded) return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const completeSignUp = await signUp.attemptEmailAddressVerification({
-        code,
-      });
-      await setActive({ session: completeSignUp.createdSessionId });
-    } catch (err: any) {
-      console.error(JSON.stringify(err, null, 2));
-      setError(err.errors?.[0]?.message || 'An error occurred during verification.');
-    } finally {
-      setIsLoading(false);
+      setIsSigningInWithGoogle(false);
     }
   };
   
-  const handleSignUpWithProvider = React.useCallback(async (strategy: 'google' | 'apple') => {
-    const oauthFlow = strategy === 'google' ? startGoogleOAuthFlow : startAppleOAuthFlow;
-    setIsOAuthLoading(true);
-    try {
-      const { createdSessionId, setActive } = await oauthFlow();
-
-      if (createdSessionId) {
-        setActive?.({ session: createdSessionId });
-      } else {
-        // Use signIn or signUp for next steps such as MFA
-      }
-    } catch (err) {
-      console.error('OAuth error', err);
-      setError('An error occurred during social sign up.');
-    } finally {
-      setIsOAuthLoading(false);
-    }
-  }, [startGoogleOAuthFlow, startAppleOAuthFlow]);
+  const isSubmitting = isRegistering || isSigningInWithGoogle;
 
   const handleOpenLink = (url: string) => Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
-
-  if (pendingVerification) {
-    return (
-        <View style={styles.confirmationContainer}>
-            <Mail size={48} color={theme.colors.primary} />
-            <Text style={styles.title}>Check your email</Text>
-            <Text style={styles.description}>
-              We&apos;ve sent a verification code to {emailAddress}. Please enter it below.
-            </Text>
-            <Input
-              placeholder="Enter verification code"
-              value={code}
-              onChangeText={setCode}
-              keyboardType="numeric"
-              style={{marginTop: theme.spacing.lg}}
-            />
-            {error && <Text style={styles.errorText}>{error}</Text>}
-            <Button title="Verify Email" onPress={onPressVerify} fullWidth size="lg" style={{marginTop: theme.spacing.md}} isLoading={isLoading} />
-      </View>
-    );
-  }
 
   return (
     <KeyboardAvoidingView
@@ -208,80 +142,45 @@ export const RegisterScreen: React.FC = () => {
         </View>
 
         <View style={styles.formContainer}>
-            {error && (
-              <View style={styles.errorContainer}>
-                <AlertCircle size={20} color={theme.colors.destructive} />
-                <Text style={styles.errorText}>{error}</Text>
-              </View>
-            )}
+            <Controller name="email" control={control} render={({ field: { onChange, onBlur, value } }) => (
+                <Input placeholder="you@example.com" value={value} onChangeText={onChange} onBlur={onBlur} keyboardType="email-address" autoCapitalize="none" label="Email" editable={!isSubmitting} icon={<Mail size={20} color={theme.colors.mutedForeground} />} error={errors.email?.message} />
+            )}/>
+            <Controller name="password" control={control} render={({ field: { onChange, onBlur, value } }) => (
+                <View>
+                    <Input placeholder="••••••••" value={value} onChangeText={onChange} onBlur={onBlur} secureTextEntry={!isPasswordVisible} label="Password" editable={!isSubmitting} icon={
+                        <TouchableOpacity onPress={() => setIsPasswordVisible(p => !p)}>
+                            {isPasswordVisible ? <EyeOff size={22} color={theme.colors.mutedForeground} /> : <Eye size={22} color={theme.colors.mutedForeground} />}
+                        </TouchableOpacity>
+                    } error={errors.password?.message} />
+                    {password && <StrengthIndicator strength={strength} />}
+                </View>
+            )}/>
+            
+            <Controller name="termsAccepted" control={control} render={({ field: { onChange, value } }) => (
+                <View style={styles.termsContainer}>
+                  <Checkbox checked={value} onChange={onChange} aria-label="Accept terms and conditions" />
+                  <View style={styles.termsTextContainer}>
+                    <Text style={styles.termsText}>
+                      I agree to the{' '}
+                      <Text style={styles.linkText} onPress={() => handleOpenLink('https://carepop.vercel.app/terms-of-service')}>Terms & Conditions</Text>
+                      {' and '}
+                      <Text style={styles.linkText} onPress={() => handleOpenLink('https://carepop.vercel.app/privacy-policy')}>Privacy Policy</Text>.
+                    </Text>
+                  </View>
+                </View>
+            )}/>
+             {errors.termsAccepted && <Text style={styles.errorText}>{errors.termsAccepted.message}</Text>}
 
-            <Input
-              placeholder="you@example.com"
-              value={emailAddress}
-              onChangeText={setEmailAddress}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              label="Email"
-              editable={!isLoading && !isOAuthLoading}
-              icon={<Mail size={20} color={theme.colors.mutedForeground} />}
-            />
-            <View>
-            <Input
-              placeholder="Create a strong password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              label="Password"
-              editable={!isLoading && !isOAuthLoading}
-              onFocus={() => setShowPassword(true)}
-              onBlur={() => setShowPassword(false)}
-              icon={
-                <TouchableOpacity onPress={() => setShowPassword(p => !p)}>
-                      {showPassword ? (
-                          <EyeOff size={22} color={theme.colors.mutedForeground} />
-                      ) : (
-                          <Eye size={22} color={theme.colors.mutedForeground} />
-                      )}
-                </TouchableOpacity>
-              }
-            />
+            <View style={styles.buttonContainer}>
+                <Button 
+                    title="Create Account" 
+                    onPress={handleSubmit(data => handleRegister(data))} 
+                    isLoading={isSubmitting}
+                    disabled={isSubmitting} 
+                    size="lg"
+                    fullWidth 
+                />
             </View>
-            {password.length > 0 && (
-            <View style={styles.strengthContainer}>
-              <StrengthIndicator label="At least 8 characters" isValid={checks.length} />
-              <StrengthIndicator label="An uppercase letter" isValid={checks.uppercase} />
-              <StrengthIndicator label="A lowercase letter" isValid={checks.lowercase} />
-              <StrengthIndicator label="A number" isValid={checks.number} />
-              <StrengthIndicator label="A special character" isValid={checks.specialChar} />
-            </View>
-            )}
-
-            <View style={styles.termsContainer}>
-              <Checkbox
-                checked={termsAccepted}
-                onChange={setTermsAccepted}
-                disabled={isLoading || isOAuthLoading}
-              />
-              <Text style={styles.termsText}>
-                I agree to the{' '}
-                <Text style={styles.linkText} onPress={() => handleOpenLink('https://carepop.com/terms')}>
-                  Terms of Service
-                </Text>
-                {' '}and{' '}
-                <Text style={styles.linkText} onPress={() => handleOpenLink('https://carepop.com/privacy')}>
-                  Privacy Policy
-                </Text>.
-              </Text>
-            </View>
-
-            <Button
-              title="Create Account"
-              onPress={handleRegister}
-              isLoading={isLoading}
-              disabled={isLoading || isOAuthLoading || !isStrong || !termsAccepted}
-              size="lg"
-              fullWidth
-            />
         </View>
           
         <View style={styles.dividerContainer}>
@@ -291,8 +190,7 @@ export const RegisterScreen: React.FC = () => {
         </View>
 
         <View style={styles.socialLoginContainer}>
-          <GoogleSignInButton onPress={() => handleSignUpWithProvider('google')} disabled={isLoading || isOAuthLoading} />
-          <AppleSignInButton onPress={() => handleSignUpWithProvider('apple')} disabled={isLoading || isOAuthLoading} />
+            <GoogleSignInButton onPress={handleGoogleSignIn} disabled={isSubmitting} />
         </View>
 
         <View style={styles.footer}>
@@ -312,13 +210,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-  },
-  confirmationContainer: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: theme.spacing.xl,
   },
   scrollContent: {
     flexGrow: 1,
@@ -342,7 +233,6 @@ const styles = StyleSheet.create({
       fontWeight: 'bold',
       color: theme.colors.secondary,
       marginBottom: theme.spacing.sm,
-      textAlign: 'center',
   },
   description: {
       ...theme.typography.body,
@@ -351,94 +241,71 @@ const styles = StyleSheet.create({
       maxWidth: '80%',
   },
   formContainer: {
-    gap: theme.spacing.lg,
+    gap: theme.spacing.md,
     width: '100%',
   },
-  errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.destructiveMuted,
-    padding: theme.spacing.md,
-    borderRadius: theme.radius.md,
-    gap: theme.spacing.sm,
-  },
   errorText: {
-    ...theme.typography.body,
+    ...theme.typography.small,
     color: theme.colors.destructive,
-    flexShrink: 1,
+    marginTop: -theme.spacing.sm,
+    marginBottom: theme.spacing.sm,
+    paddingHorizontal: 4,
   },
-  strengthContainer: {
-    gap: theme.spacing.xs,
-  },
-  strengthItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-  },
-  strengthText: {
-    ...theme.typography.xsmall,
+  buttonContainer: {
+    marginTop: theme.spacing.sm,
   },
   termsContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    
-    gap: theme.spacing.sm,
+    alignItems: 'flex-start',
+    gap: theme.spacing.md,
+  },
+  termsTextContainer: {
+    flex: 1,
   },
   termsText: {
-    ...theme.typography.xsmall,
+    ...theme.typography.small,
     color: theme.colors.mutedForeground,
-    flexShrink: 1,
     lineHeight: 18,
   },
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: theme.spacing.xl,
-    width: '100%',
+    gap: theme.spacing.md,
   },
   divider: {
-      flex: 1,
-      height: 1,
-      backgroundColor: theme.colors.border,
+    flex: 1,
+    height: 1,
+    backgroundColor: theme.colors.border,
   },
   dividerText: {
-      marginHorizontal: theme.spacing.md,
-      color: theme.colors.mutedForeground,
-      ...theme.typography.small,
+    ...theme.typography.small,
+    color: theme.colors.mutedForeground,
   },
   socialLoginContainer: {
-      width: '100%',
-      gap: theme.spacing.md,
-      marginBottom: theme.spacing.lg,
+    alignItems: 'center',
   },
   socialButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: theme.spacing.md,
-      backgroundColor: theme.colors.background,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: theme.radius.md,
-      width: '100%',
-  },
-  appleButton: {
-    backgroundColor: '#000000',
-    borderColor: '#000000',
-  },
-  socialIcon: {
-      marginRight: theme.spacing.md,
-  },
-  socialButtonText: {
-      ...theme.typography.body,
-      fontWeight: 'bold',
-      color: theme.colors.secondary,
-  },
-  appleButtonText: {
-    color: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.card,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.xl,
+    borderRadius: theme.radius.full,
+    width: '100%',
   },
   disabledButton: {
-      opacity: 0.5,
+    opacity: 0.6,
+  },
+  socialIcon: {
+    marginRight: theme.spacing.md,
+  },
+  socialButtonText: {
+    ...theme.typography.body,
+    fontFamily: theme.typography.fontFamilySemiBold,
   },
   footer: {
     flexDirection: 'row',
@@ -447,11 +314,14 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.xl,
   },
   footerText: {
-    ...theme.typography.small,
+    ...theme.typography.body,
     color: theme.colors.mutedForeground,
   },
   linkText: {
     color: theme.colors.primary,
     fontWeight: 'bold',
   },
+  strengthContainer: { marginTop: theme.spacing.sm, padding: theme.spacing.md, backgroundColor: theme.colors.background, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, gap: theme.spacing.xs, },
+  strengthBar: { height: 4, borderRadius: 2, },
+  strengthText: { ...theme.typography.small, },
 });

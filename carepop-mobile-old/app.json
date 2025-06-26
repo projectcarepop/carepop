@@ -21,7 +21,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/carepop-logo-blue.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.carepop.mobile",
@@ -29,7 +29,7 @@
       "supabaseUrl": "https://lpaqfvfuzfqsrciawipu.supabase.co"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/carepop-logo-blue.png"
     },
     "assetBundlePatterns": [
       "assets/*",
@@ -38,15 +38,11 @@
     "extra": {
       "eas": {
         "projectId": "42305f69-4bf4-4559-b9d3-500ad85b7a11"
-      },
-      "EXPO_PUBLIC_SUPABASE_URL": "https://zsjlhncowjqzrosatpyk.supabase.co",
-      "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzamxobmNvd2pxenJvc2F0cHlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAzNzA4MDAsImV4cCI6MjA2NTk0NjgwMH0.Xv3a4Fvw3sSiJRhfYhD5pwLAyD9gkDWMjVXs1CrExQA",
-      "EXPO_PUBLIC_BACKEND_API_URL": "https://carepop-backend-new.vercel.app/",
-      "clerkPublishableKey": "pk_test_ZmFuY3ktZ29zaGF3ay05MS5jbGVyay5hY2NvdW50cy5kZXYk"
+      }
     },
     "plugins": [
       "expo-font",
-      "expo-secure-store"
+      "expo-web-browser"
     ]
   }
 }

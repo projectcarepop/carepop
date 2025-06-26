@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View, ScrollView, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Card,
   CardHeader,
@@ -13,67 +14,52 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Calendar, Clock, MapPin, Stethoscope, Building } from 'lucide-react-native';
 import type { AppointmentsStackParamList } from '../navigation/AppNavigator';
-import api, { type Appointment } from '../utils/api';
+import { getAppointmentById, cancelAppointment } from '../services/api';
 import { format } from 'date-fns';
+import type { DetailedAppointment } from '../lib/types';
 
 type AppointmentDetailScreenRouteProp = RouteProp<
   AppointmentsStackParamList,
   'AppointmentDetail'
 >;
 
-const useAppointmentDetails = (appointmentId: string) => {
-  const [appointment, setAppointment] = React.useState<Appointment | null>(null);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    const fetchAppointment = async () => {
-      try {
-        setLoading(true);
-        const { data } = await api.get(`/appointments/my/${appointmentId}`);
-        setAppointment(data);
-      } catch (e: any) {
-        setError(e.message || 'Failed to fetch appointment details.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAppointment();
-  }, [appointmentId]);
-
-  return { appointment, loading, error };
-};
-
 export const AppointmentDetailScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const route = useRoute<AppointmentDetailScreenRouteProp>();
   const navigation = useNavigation();
+  const queryClient = useQueryClient();
   const { appointmentId } = route.params;
 
-  const { appointment, loading, error } = useAppointmentDetails(appointmentId);
+  const { data: appointment, isLoading, isError, error } = useQuery({
+    queryKey: ['appointment', appointmentId],
+    queryFn: () => getAppointmentById(appointmentId),
+    enabled: !!appointmentId,
+  });
 
-  const handleCancelAppointment = async () => {
+  const { mutate: cancel, isPending: isCanceling } = useMutation({
+    mutationFn: () => cancelAppointment(appointmentId),
+    onSuccess: () => {
+      // Invalidate queries to refetch appointments list on the previous screen
+      queryClient.invalidateQueries({ queryKey: ['myAppointments'] });
+      navigation.goBack();
+    },
+    onError: (e) => {
+      Alert.alert("Error", (e as Error).message || "Failed to cancel appointment.");
+    }
+  });
+
+  const handleCancelAppointment = () => {
     Alert.alert(
       "Confirm Cancellation",
       "Are you sure you want to cancel this appointment?",
       [
         { text: "No", style: "cancel" },
-        { text: "Yes, Cancel", style: "destructive", onPress: async () => {
-            try {
-              await api.delete(`/appointments/my/${appointmentId}`);
-              // TODO: Add toast message for success
-              navigation.goBack();
-            } catch (e) {
-              // TODO: Add toast message for error
-              console.error(e);
-            }
-        }}
+        { text: "Yes, Cancel", style: "destructive", onPress: () => cancel() }
       ]
     );
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <View style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -81,10 +67,10 @@ export const AppointmentDetailScreen: React.FC = () => {
     );
   }
 
-  if (error || !appointment) {
+  if (isError || !appointment) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <Text style={styles.errorText}>{error || 'Appointment not found.'}</Text>
+        <Text style={styles.errorText}>{(error as Error)?.message || 'Appointment not found.'}</Text>
       </View>
     );
   }
@@ -104,42 +90,34 @@ export const AppointmentDetailScreen: React.FC = () => {
       >
           <Card>
               <CardHeader>
-                  <CardTitle style={styles.title}>{appointment.services.name}</CardTitle>
-                  <CardDescription style={[styles.status, appointment.status === 'confirmed' && styles.confirmed]}>{appointment.status.replace('_', ' ')}</CardDescription>
+                  <CardTitle style={styles.title}>{appointment.service.name}</CardTitle>
+                  <CardDescription style={[styles.status, appointment.status === 'scheduled' && styles.confirmed]}>{appointment.status.replace(/_/g, ' ')}</CardDescription>
               </CardHeader>
               <CardContent>
                   <View style={styles.detailItem}>
                       <Calendar size={20} color={theme.colors.primary} />
-                      <Text style={styles.detailText}>{format(new Date(appointment.appointment_date), 'MMMM dd, yyyy')} at {format(new Date(`1970-01-01T${appointment.start_time}`), 'hh:mm a')}</Text>
+                      <Text style={styles.detailText}>{format(new Date(appointment.appointmentTime), 'MMMM dd, yyyy')} at {format(new Date(appointment.appointmentTime), 'hh:mm a')}</Text>
                   </View>
                    <View style={styles.detailItem}>
                       <Stethoscope size={20} color={theme.colors.primary} />
-                      <Text style={styles.detailText}>{appointment.providers.first_name} {appointment.providers.last_name}</Text>
+                      <Text style={styles.detailText}>{appointment.doctor.fullName}</Text>
                   </View>
                   <View style={styles.detailItem}>
                       <Building size={20} color={theme.colors.primary} />
-                      <Text style={styles.detailText}>{appointment.clinics.name}</Text>
+                      <Text style={styles.detailText}>{appointment.clinic.name}</Text>
                   </View>
                    <View style={styles.detailItem}>
                       <MapPin size={20} color={theme.colors.primary} />
-                      <Text style={styles.detailText}>{appointment.clinics.address_line_1}</Text>
+                      <Text style={styles.detailText}>{appointment.clinic.address?.street || 'Address not available'}</Text>
                   </View>
               </CardContent>
           </Card>
 
-          {appointment.notes && (
-            <Card style={styles.notesCard}>
-                <CardHeader>
-                    <CardTitle style={styles.notesTitle}>Notes for your visit</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Text style={styles.notesText}>{appointment.notes}</Text>
-                </CardContent>
-            </Card>
-          )}
+          {/* This assumes notes are part of the detailed appointment type */}
+          {/* <Card style={styles.notesCard}> ... </Card> */}
 
           <View style={styles.buttonContainer}>
-              <Button title="Cancel Appointment" variant="destructive" onPress={handleCancelAppointment} />
+              <Button title="Cancel Appointment" variant="destructive" onPress={handleCancelAppointment} isLoading={isCanceling} disabled={isCanceling} />
           </View>
       </ScrollView>
     </View>

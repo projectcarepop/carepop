@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
+import { sql } from 'drizzle-orm';
 import { db } from '../lib/db';
 import { appointments, healthLogs, doctors, clinics, services, medicalRecords, profiles } from '../../../drizzle/schema';
 import { and, eq, exists } from 'drizzle-orm';
@@ -41,15 +42,41 @@ meRoutes.get('/profile', async (c) => {
 meRoutes.get('/appointments', async (c) => {
   const user = c.get('user');
   try {
-    console.log(`Fetching basic appointments for user: ${user.id}`);
-    const userAppointments = await db.query.appointments.findMany({
-      where: eq(appointments.patientId, user.id)
-    });
-    console.log(`Successfully fetched ${userAppointments.length} basic appointments.`);
-    return c.json({ appointments: userAppointments });
+    // Bypassing the Drizzle relational query bug with a simplified raw SQL query.
+    // We are dropping the problematic doctor join as you suggested.
+    const query = sql`
+      SELECT
+        a.id,
+        a.appointment_time as "appointmentTime",
+        a.status,
+        s.name as "serviceName",
+        c.name as "clinicName"
+      FROM
+        appointments a
+      LEFT JOIN services s ON a.service_id = s.id
+      LEFT JOIN clinics c ON a.clinic_id = c.id
+      WHERE
+        a.patient_id = ${user.id}
+      ORDER BY
+        a.appointment_time DESC;
+    `;
+    
+    const userAppointments = await db.execute(query);
+
+    // Reshape the data for the frontend, stubbing the doctor name.
+    const transformedAppointments = userAppointments.map((appt: any) => ({
+      id: appt.id,
+      appointmentTime: appt.appointmentTime,
+      status: appt.status,
+      service: { name: appt.serviceName || 'Unknown Service' },
+      clinic: { name: appt.clinicName || 'Unknown Clinic' },
+      doctor: { fullName: 'Dr. Placeholder' }, // Provide a placeholder as discussed.
+    }));
+
+    return c.json({ appointments: transformedAppointments });
   } catch (error) {
-    console.error("Error during SIMPLIFIED appointment fetch:", error);
-    return c.json({ error: "Internal Server Error during simplified fetch" }, 500);
+    console.error("Error during raw SQL appointment fetch:", error);
+    return c.json({ error: "Internal Server Error during raw SQL fetch" }, 500);
   }
 });
 

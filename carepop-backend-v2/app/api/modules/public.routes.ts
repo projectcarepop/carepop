@@ -297,72 +297,81 @@ publicRoutes.get('/available-dates', zValidator('query', availableDatesQuerySche
 
 /**
  * GET /public/availability
- * Calculates and returns available appointment slots for doctors.
+ * REVISED with diagnostic logging to debug empty slots issue.
  */
 publicRoutes.get('/availability', zValidator('query', availabilityQuerySchema), async (c) => {
-    const { serviceId, clinicId, date } = c.req.valid('query');
-    const targetDate = parseISO(date);
+    const { clinicId, serviceId, date } = c.req.valid('query');
+    console.log(`\n--- [AVAILABILITY CHECK] ---`);
+    console.log(`[1] Received Params: clinicId=${clinicId}, serviceId=${serviceId}, date=${date}`);
 
     try {
-        // Step 1: Get the service duration
-        const serviceDetails = await db.query.services.findFirst({
+        // Step 1: Get service duration.
+        const service = await db.query.services.findFirst({
             where: eq(services.id, serviceId),
             columns: { durationMinutes: true }
         });
 
-        if (!serviceDetails || !serviceDetails.durationMinutes || serviceDetails.durationMinutes <= 0) {
-            return c.json({ error: 'Service not found or has invalid duration' }, 404);
+        if (!service?.durationMinutes) {
+            console.error(`[X] Service not found or has no duration for ID: ${serviceId}`);
+            return c.json({ slots: [] });
         }
-        const slotDuration = serviceDetails.durationMinutes;
+        const serviceDuration = service.durationMinutes;
+        console.log(`[2] Service Duration: ${serviceDuration} minutes`);
 
-        // Step 2: Get all existing appointments for the specific service, clinic, and the selected date.
-        const dayStart = startOfDay(targetDate);
-        const dayEnd = endOfDay(targetDate);
-
-        const existingAppointments = await db
-            .select({ time: appointments.appointmentTime })
+        // Step 2: Define clinic hours and capacity.
+        const openingTime = setHours(parseISO(date), 9);
+        const closingTime = setHours(parseISO(date), 17);
+        const slotCapacity = 3;
+        
+        // Step 3: Get all appointments for this clinic on this day.
+        const existingAppointments = await db.select({ appointmentTime: appointments.appointmentTime })
             .from(appointments)
             .where(and(
                 eq(appointments.clinicId, clinicId),
-                eq(appointments.serviceId, serviceId),
-                sql`"appointment_time" BETWEEN ${dayStart.toISOString()} AND ${dayEnd.toISOString()}`,
-                inArray(appointments.status, ['scheduled'])
+                sql`DATE("appointment_time" AT TIME ZONE 'UTC') = ${date}`
             ));
-        
-        const bookedTimes = new Set(
-            existingAppointments.map(a => format(new Date(a.time), "hh:mm a"))
-        );
+        console.log(`[3] Found ${existingAppointments.length} existing appointments for this day.`);
+        // console.log('[3.1] Existing Appointment Times:', existingAppointments.map(a => a.appointmentTime));
 
-        // Step 3: Generate all potential slots between 9:00 AM and 5:00 PM and filter out booked ones.
-        const availableSlots: string[] = [];
-        const workdayStart = setHours(startOfDay(targetDate), 9); // 9:00 AM
-        const workdayEnd = setHours(startOfDay(targetDate), 17);   // 5:00 PM
-        
-        let currentTime = workdayStart;
-        while (isBefore(currentTime, workdayEnd)) {
-            const timeString = format(currentTime, "hh:mm a");
-            if (!bookedTimes.has(timeString)) {
-                availableSlots.push(timeString);
-            }
-            currentTime = addMinutes(currentTime, slotDuration);
+
+        // Step 4: Generate all possible slots for the day.
+        const allSlots: Date[] = [];
+        let currentSlot = openingTime;
+        while (isBefore(currentSlot, closingTime)) {
+            allSlots.push(currentSlot);
+            currentSlot = addMinutes(currentSlot, serviceDuration);
         }
-        
-        // The frontend expects the same doctor-centric structure, so we mock it
-        // to avoid breaking the UI while delivering the core functionality.
-        const mockDoctorId = "00000000-0000-0000-0000-000000000000";
-        const mockDoctorName = "Any Available Provider";
-        
-        const responseData = availableSlots.length > 0 ? [{
-            doctorId: mockDoctorId,
-            doctorName: mockDoctorName,
-            availableSlots: availableSlots,
-        }] : [];
-        
-        return c.json({ data: responseData });
+        console.log(`[4] Generated ${allSlots.length} possible slots.`);
+        // console.log('[4.1] All Possible Slots (ISO):', allSlots.map(s => s.toISOString()));
+
+
+        // Step 5: Count bookings for each potential slot.
+        const appointmentCounts = existingAppointments.reduce((acc, app) => {
+            const appointmentDate = new Date(app.appointmentTime);
+            // This logic needs to be tolerant of small timezone differences.
+            // We find a slot that is "close enough" to the appointment time.
+            const matchingSlot = allSlots.find(slot => Math.abs(slot.getTime() - appointmentDate.getTime()) < 1000);
+            if(matchingSlot) {
+                const timeStr = matchingSlot.toISOString();
+                acc[timeStr] = (acc[timeStr] || 0) + 1;
+            }
+            return acc;
+        }, {} as Record<string, number>);
+        console.log('[5] Calculated booking counts per slot:', appointmentCounts);
+
+        // Step 6: Filter out full slots.
+        const availableSlots = allSlots.filter(slot => {
+            const count = appointmentCounts[slot.toISOString()] || 0;
+            return count < slotCapacity;
+        });
+        console.log(`[6] Found ${availableSlots.length} available slots after filtering.`);
+        console.log(`--- [END AVAILABILITY CHECK] ---\n`);
+
+        return c.json({ slots: availableSlots.map(s => s.toISOString()) });
 
     } catch (error) {
-        console.error('Error fetching availability:', error);
-        return c.json({ error: 'Internal Server Error', message: 'Failed to fetch availability' }, 500);
+        console.error("[X] FATAL ERROR in availability check:", error);
+        return c.json({ error: "Internal Server Error" }, 500);
     }
 });
 

@@ -24,13 +24,15 @@ import {
 } from '../components/card.native';
 import { Button } from '../components/button.native';
 import { theme } from '../components/theme';
-import { useUser, useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '../context/AuthContext';
+import { useQuery } from '@tanstack/react-query';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, DrawerActions, CommonActions } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { DrawerParamList } from '../navigation/AppNavigator';
 import { Menu, HeartPulse, Stethoscope, Syringe, PersonStanding, Pill, FileText, User, Droplets, Bell, BookHeart, Calendar, Map, CheckCircle, XCircle, Smile, Meh, Frown, PlusCircle, AlertCircle } from 'lucide-react-native';
-import api from '../utils/api';
+import { getMyAppointments } from '../services/api';
+import type { DetailedAppointment } from '../lib/types';
 
 type DashboardNavigationProp = DrawerNavigationProp<DrawerParamList>;
 type DashboardProps = {};
@@ -235,94 +237,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: theme.colors.background,
   },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing.lg,
+  },
+  errorText: {
+    ...theme.typography.body,
+    color: theme.colors.destructive,
+    textAlign: 'center',
+  },
 });
 
 export const DashboardScreen: React.FC<DashboardProps> = () => {
-  const { user, isLoaded } = useUser();
-  const { getToken } = useAuth();
+  const { user } = useAuth();
   const navigation = useNavigation<DashboardNavigationProp>();
   const insets = useSafeAreaInsets();
-
-  const [healthStatus, setHealthStatus] = useState<HealthStatusData | null>(null);
-  const [isLoadingStatus, setIsLoadingStatus] = useState(true);
-  const [errorStatus, setErrorStatus] = useState<string | null>(null);
-
   const opacity = useSharedValue(0);
-  const translateY = useSharedValue(20);
 
-  useEffect(() => {
-    if (isLoaded) {
-      opacity.value = withTiming(1, { duration: 500 });
-      translateY.value = withTiming(0, {
-        duration: 500,
-        easing: Easing.out(Easing.exp),
-      });
-      fetchHealthStatus();
-    }
-  }, [isLoaded]);
-
-  const fetchHealthStatus = async () => {
-    try {
-      setIsLoadingStatus(true);
-      setErrorStatus(null);
-      const data = await api.get('/health/status/today', getToken);
-      setHealthStatus(data);
-    } catch (error: any) {
-      setErrorStatus(error.message || 'Failed to fetch health status.');
-    } finally {
-      setIsLoadingStatus(false);
-    }
-  };
-
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      opacity: opacity.value,
-      transform: [{ translateY: translateY.value }],
-      flex: 1,
-    };
+  const { data: appointments, isLoading, isError, error } = useQuery<DetailedAppointment[], Error>({
+    queryKey: ['myAppointments'],
+    queryFn: () => getMyAppointments(),
   });
 
-  const HealthStatus = () => {
-      if (isLoadingStatus) {
-          return <ActivityIndicator color={theme.colors.primary} />;
-      }
+  const upcomingAppointment = appointments?.[0];
 
-      if (errorStatus) {
-          return (
-            <View style={styles.statusItem}>
-                <AlertCircle size={32} color={theme.colors.destructive} />
-                <Text style={styles.statusText}>Could not load status</Text>
-            </View>
-          );
-      }
-      
-      return (
-        <View style={styles.healthStatusContainer}>
-          <View style={styles.statusItem}>
-            {healthStatus?.pillLogged ? <CheckCircle size={32} color={theme.colors.primary} /> : <XCircle size={32} color={theme.colors.muted} />}
-            <Text style={styles.statusText}>Pill Taken</Text>
-          </View>
-          <View style={styles.statusItem}>
-            {healthStatus?.cycleLogged ? <CheckCircle size={32} color={theme.colors.primary} /> : <XCircle size={32} color={theme.colors.muted} />}
-            <Text style={styles.statusText}>Period Log</Text>
-          </View>
-          <View style={styles.statusItem}>
-            {healthStatus?.moodLogged ? <CheckCircle size={32} color={theme.colors.primary} /> : <XCircle size={32} color={theme.colors.muted} />}
-            <Text style={styles.statusText}>Mood Logged</Text>
-          </View>
-        </View>
-      );
-  }
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
 
-  if (!isLoaded) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-      </View>
-    );
-  }
+  useEffect(() => {
+    opacity.value = withTiming(1, {
+      duration: 800,
+      easing: Easing.out(Easing.ease),
+    });
+  }, []);
 
-  return (
+  const WelcomeHeader = () => (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <Animated.View style={[styles.container, animatedStyle]}>
         <View style={styles.header}>
@@ -340,53 +292,108 @@ export const DashboardScreen: React.FC<DashboardProps> = () => {
             <Menu size={32} color={theme.colors.foreground} />
           </TouchableOpacity>
         </View>
-
-        <View style={styles.content}>
-          {/* Upcoming Appointment Section */}
-          <View style={[styles.appointmentCard, styles.cardShadow]}>
-            <Text style={styles.appointmentTitle}>Upcoming Appointment</Text>
-            <Text style={styles.appointmentDetails}>
-              No appointments scheduled.
-            </Text>
-            <Button
-              title="Set an appointment"
-              variant="secondary"
-              size="xl"
-              onPress={() => navigation.navigate('Book a Service')}
-              style={{ marginTop: theme.spacing.lg }}
-            />
-          </View>
-
-          {/* Combined Health Buddy & Insight Section */}
-          <View style={[styles.healthBuddyCard, styles.cardShadow]}>
-            <Text style={styles.healthBuddyTitle}>Health Buddy</Text>
-            <HealthStatus />
-            <View style={styles.separator} />
-            <Text style={styles.insightTitle}>Today&apos;s Insight</Text>
-            <Text style={styles.insightText}>
-              You&apos;ve been consistent with your pill tracker. Great job staying on top of it!
-            </Text>
-          </View>
-
-          {/* Quick Actions Section */}
-          <View style={styles.quickActionsContainer}>
-            <View style={styles.quickActionsGrid}>
-              {quickActions.map(action => (
-                <TouchableOpacity
-                  key={action.id}
-                  style={styles.quickActionTouchable}
-                  onPress={() => navigation.navigate(action.screen)}
-                >
-                  <View style={styles.quickActionItem}>
-                    <action.icon size={36} color={action.iconColor} />
-                    <Text style={styles.quickActionText}>{action.name}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </View>
       </Animated.View>
+    </SafeAreaView>
+  );
+
+  const UpcomingAppointment = () => {
+    if (isLoading) {
+      return (
+        <View style={styles.appointmentCard}>
+          <ActivityIndicator color={theme.colors.primary} />
+        </View>
+      );
+    }
+
+    if (isError) {
+      return (
+        <View style={[styles.appointmentCard, { backgroundColor: theme.colors.destructiveMuted }]}>
+          <Text style={styles.appointmentTitle}>Error</Text>
+          <Text style={styles.appointmentDetails}>
+            Could not load appointments. Please try again later.
+          </Text>
+        </View>
+        
+      );
+    }
+
+    if (!upcomingAppointment) {
+      return (
+        <View style={styles.appointmentCard}>
+          <Text style={styles.appointmentTitle}>No Upcoming Appointments</Text>
+          <Text style={styles.appointmentDetails}>You&apos;re all clear! Book a new appointment anytime.</Text>
+          <Button
+            title="Set an appointment"
+            variant="secondary"
+            size="xl"
+            onPress={() => navigation.navigate('Book a Service')}
+            style={{ marginTop: theme.spacing.lg }}
+          />
+        </View>
+      );
+    }
+    
+    return (
+      <View style={styles.appointmentCard}>
+        <Text style={styles.appointmentTitle}>Next Appointment</Text>
+        <Text style={styles.appointmentDetails}>
+          {new Date(upcomingAppointment.appointmentTime).toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+        </Text>
+         <Text style={styles.appointmentDetails}>
+           With {upcomingAppointment.doctor.fullName} at {upcomingAppointment.clinic.name}
+        </Text>
+      </View>
+    );
+  };
+
+  const QuickActions = () => (
+    <View style={styles.quickActionsContainer}>
+      <Text style={styles.quickActionsTitle}>Quick Actions</Text>
+      <View style={styles.quickActionsGrid}>
+        {quickActions.map((action) => (
+          <TouchableOpacity 
+            key={action.id}
+            style={styles.quickActionTouchable}
+            onPress={() => navigation.navigate(action.screen)}
+          >
+            <View style={styles.quickActionItem}>
+              <action.icon size={32} color={action.iconColor} />
+              <Text style={styles.quickActionText}>{action.name}</Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+
+  if (isLoading) {
+    return <View style={styles.loadingContainer}><ActivityIndicator size="large" /></View>;
+  }
+
+  if (isError) {
+    return <View style={styles.errorContainer}><Text style={styles.errorText}>Error: {(error as Error).message}</Text></View>;
+  }
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <WelcomeHeader />
+        <Animated.View style={[styles.content, animatedStyle]}>
+          <UpcomingAppointment />
+          <QuickActions />
+        </Animated.View>
+      </ScrollView>
     </SafeAreaView>
   );
 };

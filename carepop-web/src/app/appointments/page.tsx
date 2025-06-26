@@ -1,39 +1,67 @@
-import React from 'react';
+import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
+import { createClient } from '@/lib/supabase/server';
+import { getMyAppointments } from '@/services/api'; // We'll reuse our API function
+import { AppointmentsTable } from '@/components/main-dashboard/AppointmentsTable'; // Reuse the table
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import { PlusCircle } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import type { Appointment, Clinic, DoctorWithProfile, Service } from '@/lib/types';
 
-const AppointmentsPage = () => {
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <header className="mb-8 text-center">
-        <h1 className="text-4xl font-bold text-pink-600">Your Appointments</h1>
-      </header>
-      <main>
-        <section className="mb-8 p-6 bg-white shadow-lg rounded-lg">
-          <h2 className="text-2xl font-semibold text-gray-700 mb-4 text-center">Manage Your Appointments</h2>
-          <p className="text-gray-600 mb-4 text-center">
-            This is a placeholder page for viewing and managing your appointments. Full functionality will be added soon.
-          </p>
-        </section>
-
-        <section className="grid md:grid-cols-2 gap-6">
-          <div className="p-6 bg-gray-50 shadow-md rounded-lg">
-            <h3 className="text-xl font-semibold text-gray-700 mb-3">Upcoming Appointments</h3>
-            <p className="text-gray-600">
-              A list of upcoming appointments will be displayed here.
-            </p>
-          </div>
-          <div className="p-6 bg-gray-50 shadow-md rounded-lg">
-            <h3 className="text-xl font-semibold text-gray-700 mb-3">Past Appointments</h3>
-            <p className="text-gray-600">
-              A history of past appointments will be available here.
-            </p>
-          </div>
-        </section>
-      </main>
-      <footer className="mt-12 text-center text-gray-500">
-        <p>&copy; {new Date().getFullYear()} CarePop. All rights reserved.</p>
-      </footer>
-    </div>
-  );
+// This is the expected shape of the data after our backend call
+export type AppointmentWithRelations = Appointment & {
+  clinic: Clinic | null;
+  doctor: DoctorWithProfile | null;
+  service: Service | null;
 };
 
-export default AppointmentsPage; 
+export default async function AppointmentsPage() {
+  const cookieStore = cookies();
+  const supabase = createClient(cookieStore);
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect('/sign-in');
+  }
+
+  // Fetch all appointments. Our getMyAppointments function is already set up
+  // to fetch the enriched data from the backend.
+  const allAppointments = await getMyAppointments(supabase);
+
+  return (
+    <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Your Appointments</h1>
+          <p className="text-muted-foreground">
+            View and manage all your scheduled visits.
+          </p>
+        </div>
+        <Button asChild>
+          <Link href="/book-appointment">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Book New Appointment
+          </Link>
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Appointment History</CardTitle>
+          <CardDescription>A complete list of your past and upcoming appointments.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {allAppointments && allAppointments.length > 0 ? (
+            <AppointmentsTable appointments={allAppointments} />
+          ) : (
+            <div className="text-center py-10">
+              <p className="text-muted-foreground">You have no appointments scheduled.</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+} 
