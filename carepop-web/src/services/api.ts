@@ -8,6 +8,10 @@ let rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 if (rawApiUrl && !rawApiUrl.startsWith('http')) {
   rawApiUrl = `https://${rawApiUrl}`;
 }
+// Remove trailing slash if it exists, to prevent double slashes in URLs
+if (rawApiUrl.endsWith('/')) {
+  rawApiUrl = rawApiUrl.slice(0, -1);
+}
 const API_BASE_URL = rawApiUrl;
 
 // The getAuthHeaders function now takes the authenticated client as an argument.

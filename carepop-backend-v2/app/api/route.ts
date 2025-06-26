@@ -14,6 +14,8 @@ const app = new Hono().basePath('/api');
 app.use('*', cors({
   origin: [
     'http://localhost:3000', // Your Next.js frontend development origin
+    'https://www.carepop.online', // Production frontend
+    'https://carepop.online'      // Production frontend (non-www)
     // Add your production frontend URL here when you deploy
   ],
   allowHeaders: [
