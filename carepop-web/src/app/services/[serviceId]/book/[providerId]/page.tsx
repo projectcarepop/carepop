@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getProviderAvailability } from '@/lib/api/services';
-import { createAppointment } from '@/lib/api/appointments';
+import { getPublicAvailability, createAppointment } from '@/services/api';
 import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { useAuth } from '@/lib/contexts/auth-context';
 
 interface BookingPageProps {
     params: {
@@ -19,6 +19,7 @@ interface BookingPageProps {
 
 export default function BookingPage({ params }: BookingPageProps) {
     const { serviceId, providerId } = params;
+    const { supabase, user } = useAuth();
     const [date, setDate] = useState<Date | undefined>(new Date());
     const [availability, setAvailability] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -33,8 +34,12 @@ export default function BookingPage({ params }: BookingPageProps) {
                 setAvailability([]);
                 setSelectedSlot(null);
                 try {
-                    const startDate = format(date, 'yyyy-MM-dd');
-                    const slots = await getProviderAvailability(providerId, serviceId, startDate, startDate);
+                    const formattedDate = format(date, 'yyyy-MM-dd');
+                    const slots = await getPublicAvailability({
+                        clinicId: providerId,
+                        serviceId,
+                        date: formattedDate
+                    });
                     setAvailability(slots);
                 } catch (error) {
                     console.error(error);
@@ -48,17 +53,21 @@ export default function BookingPage({ params }: BookingPageProps) {
     }, [date, providerId, serviceId, toast]);
     
     const handleBooking = async () => {
-        if (!selectedSlot) return;
+        if (!selectedSlot || !supabase || !user) {
+            toast({ title: 'Error', description: 'You must be logged in to book.', variant: 'destructive' });
+            return;
+        }
 
         try {
             const appointmentDetails = {
-                providerId,
+                patientId: user.id,
+                clinicId: providerId,
                 serviceId,
-                startTime: selectedSlot.start_time,
+                appointmentTime: selectedSlot.start_time,
             };
-            const newAppointment = await createAppointment(appointmentDetails);
+            await createAppointment(supabase, appointmentDetails);
             toast({ title: 'Success!', description: 'Your appointment has been booked.' });
-            router.push(`/booking-confirmation/${newAppointment.id}`);
+            router.push(`/appointments`);
 
         } catch (error: any) {
             console.error(error);
@@ -76,7 +85,7 @@ export default function BookingPage({ params }: BookingPageProps) {
                         selected={date}
                         onSelect={setDate}
                         className="rounded-md border"
-                        disabled={(date) => date < new Date(new Date().toDateString())}
+                        disabled={(d) => d < new Date(new Date().toDateString())}
                     />
                 </div>
                 <div className="md:col-span-2">

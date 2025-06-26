@@ -3,12 +3,12 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { db } from '../lib/db';
 import { clinics, profiles, doctors, services } from '../../../drizzle/schema';
-import { eq, sql } from 'drizzle-orm';
+import { eq, sql, count } from 'drizzle-orm';
 import { authMiddleware, adminMiddleware, AuthEnv } from '../middleware/auth';
 
 const adminRoutes = new Hono<AuthEnv>();
 
-// Apply auth and admin middleware to all routes in this module
+// Apply middleware to all routes in this file
 adminRoutes.use('*', authMiddleware, adminMiddleware);
 
 // --- Zod Schemas for Validation ---
@@ -150,9 +150,41 @@ adminRoutes.get('/appointments', async (c) => {
 
 // --- User Management Endpoints ---
 
+/**
+ * GET /api/admin/users
+ * Fetches a list of all users. Protected admin route.
+ */
 adminRoutes.get('/users', async (c) => {
-  const allUsers = await db.query.profiles.findMany();
-  return c.json(allUsers);
+  try {
+    const allUsers = await db.select().from(profiles);
+    return c.json(allUsers);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    return c.json({ error: 'Internal Server Error', message: 'Failed to fetch users.' }, 500);
+  }
+});
+
+/**
+ * GET /api/admin/stats
+ * Fetches dashboard stats. Protected admin route.
+ */
+adminRoutes.get('/stats', async (c) => {
+  try {
+    const [userStats] = await db.select({ value: count() }).from(profiles);
+    const [clinicStats] = await db.select({ value: count() }).from(clinics);
+
+    const stats = {
+      totalUsers: userStats.value,
+      totalClinics: clinicStats.value,
+      appointmentsToday: 0, // Placeholder
+      pendingApprovals: 0,  // Placeholder
+    };
+
+    return c.json(stats);
+  } catch (error) {
+    console.error('Error fetching admin stats:', error);
+    return c.json({ error: 'Internal Server Error', message: 'Failed to fetch stats.' }, 500);
+  }
 });
 
 adminRoutes.put('/users/:id/role', zValidator('json', updateUserRoleSchema), async (c) => {
@@ -171,5 +203,6 @@ adminRoutes.put('/users/:id/role', zValidator('json', updateUserRoleSchema), asy
   return c.json(updatedUser);
 });
 
+// Add other admin routes here in the future...
 
 export default adminRoutes;
