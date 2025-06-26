@@ -4,20 +4,12 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MapPin, Award, Route } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-// Define a minimal Clinic type for this component's needs.
-// The parent component is responsible for providing objects that match this shape.
-type Clinic = {
-  id: string; // Used implicitly by React keys
-  name: string;
-  full_address: string | null;
-  distance_km?: number | null; // Optional because it's added on the client
-};
+import type { ClinicForFinder } from './ClinicFinderClient';
 
 interface ClinicListItemProps {
-  clinic: Clinic;
-  onViewDetails: (clinic: Clinic) => void;
-  onShowRoute: (clinic: Clinic) => void;
+  clinic: ClinicForFinder;
+  onViewDetails: (clinic: ClinicForFinder) => void;
+  onShowRoute: (clinic: ClinicForFinder) => void;
   isHighlighted: boolean;
 }
 

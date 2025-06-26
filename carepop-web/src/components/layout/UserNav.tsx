@@ -72,9 +72,6 @@ export function UserNav() {
             <Link href="/main-dashboard">Dashboard</Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link href="/user-profile">Profile</Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
             <Link href="/appointments">My Appointments</Link>
           </DropdownMenuItem>
         </DropdownMenuGroup>

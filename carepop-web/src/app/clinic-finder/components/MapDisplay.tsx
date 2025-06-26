@@ -1,150 +1,88 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { toast } from 'sonner';
-import {
-  APIProvider,
-  AdvancedMarker,
-  Pin,
-} from '@vis.gl/react-google-maps';
-import { DirectionsService, DirectionsRenderer, GoogleMap, useJsApiLoader } from '@react-google-maps/api';
-import { Loader2 } from 'lucide-react';
+import React from 'react';
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
+import { PanelState } from './SlidingPanel';
 
-// Define a minimal Clinic type for this component's needs.
-// The parent component is responsible for providing objects that match this shape.
 type Clinic = {
   id: string;
   name: string;
   latitude: number | null;
   longitude: number | null;
-  is_active: boolean;
 };
-
-const GOOGLE_MAPS_LIBRARIES: ("geometry" | "places")[] = ["geometry", "places"];
-
-const DEFAULT_CENTER = { lat: 14.5995, lng: 120.9842 }; // Metro Manila
-const DEFAULT_ZOOM = 11;
-const LOCATION_ZOOM = 14;
 
 interface MapDisplayProps {
   clinics: Clinic[];
   userLocation: { lat: number; lon: number } | null;
-  routeDestination: Clinic | null;
-  onHighlightChange: (clinicId: string | null) => void;
   highlightedClinic: string | null;
+  onHighlightChange: (clinicId: string | null) => void;
+  panelState: PanelState;
 }
 
-const DirectionsComponent = ({ origin, destination }: { origin: { lat: number; lon: number }, destination: Clinic }) => {
-  const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
-  
-  const directionsServiceOptions = useMemo(() => {
-    if (!destination.latitude || !destination.longitude) return null;
-    return {
-      destination: { lat: destination.latitude, lng: destination.longitude },
-      origin: { lat: origin.lat, lng: origin.lon },
-      travelMode: 'DRIVING' as google.maps.TravelMode,
-    };
-  }, [origin, destination]);
-
-  const directionsCallback = (
-    result: google.maps.DirectionsResult | null,
-    status: google.maps.DirectionsStatus
-  ) => {
-    if (status === 'OK' && result) {
-      setDirections(result);
-    } else {
-      console.error(`Directions request failed due to ${status}`);
-      toast.error('Could not fetch directions.', {
-        description: `Google API Error: ${status}. Please check API key, billing, and enabled APIs.`,
-        duration: 10000,
-      });
-    }
-  };
-
-  if (!directionsServiceOptions) return null;
-
-  return (
-    <>
-      <DirectionsService options={directionsServiceOptions} callback={directionsCallback} />
-      {directions && <DirectionsRenderer options={{ directions, suppressMarkers: true, polylineOptions: { strokeColor: "#FF0000", strokeWeight: 5, strokeOpacity: 0.8 } }} />}
-    </>
-  );
+const containerStyle = {
+  width: '100%',
+  height: '100%',
 };
 
-export default function MapDisplay({ clinics, userLocation, routeDestination, onHighlightChange, highlightedClinic }: MapDisplayProps) {
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+// Default center is Metro Manila
+const defaultCenter = {
+  lat: 14.5995,
+  lng: 120.9842
+};
 
+export default function MapDisplay({ clinics, userLocation, highlightedClinic, onHighlightChange }: MapDisplayProps) {
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: apiKey || "",
-    libraries: GOOGLE_MAPS_LIBRARIES,
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
   });
-  
-  const [center, setCenter] = useState(DEFAULT_CENTER);
-  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
 
-  useEffect(() => {
-    if (userLocation) {
-      setCenter({ lat: userLocation.lat, lng: userLocation.lon });
-      setZoom(LOCATION_ZOOM);
-    }
-  }, [userLocation]);
+  const [selected, setSelected] = React.useState<Clinic | null>(null);
+
+  const mapCenter = userLocation
+    ? { lat: userLocation.lat, lng: userLocation.lon }
+    : defaultCenter;
 
   if (loadError) {
-    console.error("Google Maps API script failed to load:", loadError);
-    return <div className="h-full w-full flex items-center justify-center bg-red-100 text-red-700 p-4 rounded-lg">Error loading Google Maps. Please check your API key and network connection.</div>;
-  }
-  
-  if (!isLoaded || !apiKey) {
-    return <div className="h-full w-full flex items-center justify-center bg-gray-100"><Loader2 className="animate-spin" size={48} /></div>;
+    return <div>Error loading maps</div>;
   }
 
-  const activeClinics = clinics.filter(clinic => clinic.is_active && clinic.latitude && clinic.longitude);
-  
+  if (!isLoaded) {
+    return <div>Loading...</div>;
+  }
+
   return (
-    <div style={{ height: '100%', width: '100%' }} className="rounded-lg overflow-hidden shadow-md">
-      <GoogleMap
-        mapContainerStyle={{ width: '100%', height: '100%' }}
-        center={center}
-        zoom={zoom}
-        options={{
-            gestureHandling: 'greedy',
-            disableDefaultUI: true,
-            mapId: "carepopClinicFinderMap"
-        }}
-      >
-        {/* We wrap the vis.gl components with APIProvider as they need it, but the main map is now from @react-google-maps/api */}
-        <APIProvider apiKey={apiKey}>
-            {activeClinics.map((clinic) => {
-                const isHighlighted = clinic.id === highlightedClinic;
-                return (
-                <AdvancedMarker
-                    key={clinic.id}
-                    position={{ lat: clinic.latitude!, lng: clinic.longitude! }}
-                    title={clinic.name}
-                    onClick={() => onHighlightChange(clinic.id)}
-                >
-                    <Pin
-                    background={isHighlighted ? '#F472B6' : '#FBCFE8'}
-                    borderColor={isHighlighted ? '#EC4899' : '#F9A8D4'}
-                    glyphColor={isHighlighted ? '#FFFFFF' : '#9D174D'}
-                    scale={isHighlighted ? 1.5 : 1}
-                    />
-                </AdvancedMarker>
-                );
-            })}
-            
-            {userLocation && (
-                <AdvancedMarker position={{ lat: userLocation.lat, lng: userLocation.lon }} title={"Your Location"}>
-                <Pin background={'#1E90FF'} borderColor={'#1872CC'} glyphColor={'#FFFFFF'} />
-                </AdvancedMarker>
-            )}
+    <GoogleMap
+      mapContainerStyle={containerStyle}
+      center={mapCenter}
+      zoom={12}
+    >
+      {clinics.map((clinic) => (
+        clinic.latitude && clinic.longitude && (
+          <Marker
+            key={clinic.id}
+            position={{ lat: clinic.latitude, lng: clinic.longitude }}
+            onClick={() => {
+              setSelected(clinic);
+              onHighlightChange(clinic.id);
+            }}
+            opacity={highlightedClinic === clinic.id ? 1 : 0.7}
+          />
+        )
+      ))}
 
-            {userLocation && routeDestination && (
-                <DirectionsComponent origin={userLocation} destination={routeDestination} />
-            )}
-        </APIProvider>
-      </GoogleMap>
-    </div>
+      {selected ? (
+        <InfoWindow
+          position={{ lat: selected.latitude!, lng: selected.longitude! }}
+          onCloseClick={() => {
+            setSelected(null);
+            onHighlightChange(null);
+          }}
+        >
+          <div>
+            <h4>{selected.name}</h4>
+          </div>
+        </InfoWindow>
+      ) : null}
+    </GoogleMap>
   );
 } 

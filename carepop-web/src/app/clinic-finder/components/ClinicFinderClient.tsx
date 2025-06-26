@@ -16,7 +16,7 @@ import { Loader2 } from 'lucide-react';
 // --- CANONICAL TYPE DEFINITIONS ---
 // This is the single, consistent shape we will use for all clinic-related
 // state within this component and its children. It satisfies all child prop requirements.
-type ClinicForFinder = {
+export type ClinicForFinder = {
   id: string;
   name: string;
   full_address: string | null;
@@ -98,6 +98,7 @@ export default function ClinicFinderClient({ initialClinics, initialServices }: 
   const { toast } = useToast();
   const [panelState, setPanelState] = useState<PanelState>('partial');
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
 
   const [clinics, setClinics] = useState<ClinicForFinder[]>(() =>
     initialClinics.map(transformToClinicForFinder)
@@ -107,6 +108,13 @@ export default function ClinicFinderClient({ initialClinics, initialServices }: 
   const [highlightedClinic, setHighlightedClinic] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
   const [routeDestination, setRouteDestination] = useState<ClinicForFinder | null>(null);
+
+  const filteredClinics = clinics.filter(clinic => {
+    if (selectedServiceIds.length === 0) return true;
+    // A clinic's services_offered is an array of service IDs.
+    // Check if there is an intersection between the clinic's services and the selected services.
+    return clinic.services_offered?.some(serviceId => selectedServiceIds.includes(serviceId));
+  });
 
   const handleSearch = async (lat: number, lon: number) => {
       setIsLoading(true);
@@ -150,7 +158,11 @@ export default function ClinicFinderClient({ initialClinics, initialServices }: 
 
       <SlidingPanel panelState={panelState} setPanelState={setPanelState}>
         <div className="p-4 h-full flex flex-col">
-          <ServiceFilter services={initialServices} onFilterChange={() => { /* Implement filtering logic here */ }} />
+          <ServiceFilter 
+            services={initialServices} 
+            selectedServices={selectedServiceIds}
+            onServiceChange={setSelectedServiceIds} 
+          />
           <div className="flex items-center justify-between my-4">
              <h2 className="text-xl font-bold">Nearby Clinics</h2>
              <Button onClick={() => userLocation && handleSearch(userLocation.lat, userLocation.lon)} disabled={isLoading || !userLocation}>
@@ -161,11 +173,11 @@ export default function ClinicFinderClient({ initialClinics, initialServices }: 
 
           <div className="flex-grow overflow-y-auto">
             <ClinicList
-              clinics={clinics}
-              onViewDetails={(c) => setSelectedClinic(c)}
-              onShowRoute={(c) => setRouteDestination(c)}
+              clinics={filteredClinics}
+              onViewDetails={setSelectedClinic}
+              onShowRoute={setRouteDestination}
               highlightedClinic={highlightedClinic}
-              onHighlightChange={(id) => setHighlightedClinic(id)}
+              onHighlightChange={setHighlightedClinic}
             />
           </div>
         </div>

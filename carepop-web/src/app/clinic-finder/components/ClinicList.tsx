@@ -1,22 +1,12 @@
 'use client';
 
-// import { mockClinics, MockClinic } from "@/lib/mockData/clinicMockData"; // Remove mock data import
-import { Clinic } from "@/lib/types/clinic"; // Import the new Clinic type
 import ClinicListItem from './ClinicListItem';
-
-// Define a minimal Clinic type for this component's needs.
-// This should match the props expected by the wrapped ClinicListItem component.
-type Clinic = {
-  id: string;
-  name: string;
-  full_address: string | null;
-  distance_km?: number | null;
-};
+import type { ClinicForFinder } from './ClinicFinderClient';
 
 interface ClinicListProps {
-  clinics: Clinic[];
-  onViewDetails: (clinic: Clinic) => void;
-  onShowRoute: (clinic: Clinic) => void;
+  clinics: ClinicForFinder[];
+  onViewDetails: (clinic: ClinicForFinder) => void;
+  onShowRoute: (clinic: ClinicForFinder) => void;
   highlightedClinic: string | null;
   onHighlightChange: (clinicId: string | null) => void;
 }
