@@ -3,6 +3,7 @@
 import { ColumnDef } from '@tanstack/react-table';
 import { MoreHorizontal } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -45,6 +46,14 @@ export const columns: ColumnDef<AdminAppointment>[] = [
   {
     accessorKey: 'patientName',
     header: 'Patient',
+    cell: ({ row }) => {
+      const appointment = row.original;
+      return (
+        <Link href={`/admin/appointments/${appointment.id}`} className="hover:underline">
+          {row.getValue('patientName')}
+        </Link>
+      );
+    },
   },
   {
     accessorKey: 'doctorName',

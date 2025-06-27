@@ -2,10 +2,11 @@ import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getAdminAppointments } from '@/services/api';
 import AppointmentsClient from './_components/AppointmentsClient';
-import AccessDenied from "@/components/layout/AccessDenied";
 
-async function getAdminAppointmentsData(cookieStore: ReturnType<typeof cookies>) {
+async function getAdminAppointmentsData() {
+    const cookieStore = await cookies();
     const supabase = createClient(cookieStore);
+    
     const { data: { session } } = await supabase.auth.getSession();
 
     if (!session) {

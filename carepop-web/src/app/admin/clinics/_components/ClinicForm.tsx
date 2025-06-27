@@ -27,17 +27,15 @@ const formSchema = z.object({
     city: z.string().min(2, 'City must be at least 2 characters.'),
     zip: z.string().min(5, 'ZIP code must be at least 5 characters.'),
   }),
-  location: z.object({
-    lat: z.coerce.number().min(-90, 'Invalid Latitude').max(90, 'Invalid Latitude'),
-    lon: z.coerce.number().min(-180, 'Invalid Longitude').max(180, 'Invalid Longitude'),
-  }),
+  latitude: z.coerce.number().min(-90, 'Invalid Latitude').max(90, 'Invalid Latitude'),
+  longitude: z.coerce.number().min(-180, 'Invalid Longitude').max(180, 'Invalid Longitude'),
   isActive: z.boolean(),
 });
 
 type ClinicFormValues = z.infer<typeof formSchema>;
 
 interface ClinicFormProps {
-  initialData?: Clinic;
+  initialData?: Clinic & { latitude?: number; longitude?: number };
   onSubmit: (values: ClinicFormValues) => void;
   isPending: boolean;
 }
@@ -58,10 +56,8 @@ export function ClinicForm({
             city: typeof initialData.address === 'object' && initialData.address !== null ? (initialData.address as any).city : '',
             zip: typeof initialData.address === 'object' && initialData.address !== null ? (initialData.address as any).zip : '',
           },
-          location: {
-            lat: (initialData.location as any)?.y || 0,
-            lon: (initialData.location as any)?.x || 0,
-          },
+          latitude: initialData.latitude || 0,
+          longitude: initialData.longitude || 0,
           isActive: initialData.isActive,
         }
       : {
@@ -72,17 +68,19 @@ export function ClinicForm({
             city: '',
             zip: '',
           },
-          location: {
-            lat: 0,
-            lon: 0,
-          },
+          latitude: 0,
+          longitude: 0,
           isActive: true,
         },
   });
 
+  const handleFormSubmit = (values: ClinicFormValues) => {
+    onSubmit(values);
+  };
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+      <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-8">
         <FormField
           control={form.control}
           name="name"
@@ -169,7 +167,7 @@ export function ClinicForm({
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="location.lat"
+            name="latitude"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Latitude</FormLabel>
@@ -187,7 +185,7 @@ export function ClinicForm({
           />
           <FormField
             control={form.control}
-            name="location.lon"
+            name="longitude"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Longitude</FormLabel>

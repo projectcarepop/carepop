@@ -163,12 +163,22 @@ export async function getMyMedicalRecords(accessToken: string, params?: { limit?
 // When calling from a server component, pass the access token directly.
 // When calling from a client component, get the token from the session context.
 
-export async function getAdminAppointments(accessToken: string, filters?: Record<string, string | number>) {
+export async function getAdminAppointments(accessToken: string, filters?: Record<string, any>) {
+  // Make sure filters are string-based for URLSearchParams
+  const stringFilters: Record<string, string> = {};
+  if (filters) {
+    Object.keys(filters).forEach(key => {
+        if (filters[key] !== undefined) {
+            stringFilters[key] = String(filters[key]);
+        }
+    });
+  }
+
   const headers = {
     'Authorization': `Bearer ${accessToken}`,
     'Content-Type': 'application/json'
   };
-  const queryParams = new URLSearchParams(filters as Record<string, string>);
+  const queryParams = new URLSearchParams(stringFilters);
   const url = `${API_BASE_URL}/api/admin/appointments?${queryParams.toString()}`;
 
   const response = await fetch(url, { headers, cache: 'no-store' });
@@ -179,6 +189,22 @@ export async function getAdminAppointments(accessToken: string, filters?: Record
   const result = await response.json();
   // FIX: The backend returns data nested under a 'data' property.
   return result.data || [];
+}
+
+export async function getAppointmentDetails(appointmentId: string, accessToken: string) {
+  const headers = {
+    'Authorization': `Bearer ${accessToken}`,
+    'Content-Type': 'application/json'
+  };
+  const url = `${API_BASE_URL}/api/admin/appointments/${appointmentId}`;
+
+  const response = await fetch(url, { headers, cache: 'no-store' });
+  if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
+      throw new Error(error.message || `Failed to fetch details for appointment ${appointmentId}.`);
+  }
+  const result = await response.json();
+  return result.data; // The backend wraps this response in a 'data' property
 }
 
 export async function getAdminProducts(accessToken: string) {
@@ -595,4 +621,25 @@ export async function deleteProductCategory(categoryId: string, accessToken: str
         throw new Error(error.message || 'Failed to delete product category.');
     }
     return response.json();
+}
+
+export async function addMedicalRecord(appointmentId: string, payload: { recordType: string; details: { note: string } }, accessToken: string) {
+  const headers = {
+    'Authorization': `Bearer ${accessToken}`,
+    'Content-Type': 'application/json'
+  };
+  const url = `${API_BASE_URL}/api/admin/appointments/${appointmentId}/records`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
+    throw new Error(error.message || `Failed to add medical record.`);
+  }
+  const result = await response.json();
+  return result.data;
 }

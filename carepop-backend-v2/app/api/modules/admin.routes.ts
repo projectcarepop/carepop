@@ -2,8 +2,8 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { db } from '../lib/db';
-import { clinics, profiles, doctors, services, productCategories, products, inventory, serviceCategories, appointments } from '../../../drizzle/schema';
-import { eq, sql, count, asc } from 'drizzle-orm';
+import { clinics, profiles, doctors, services, productCategories, products, inventory, serviceCategories, appointments, medicalRecords } from '../../../drizzle/schema';
+import { eq, sql, count, asc, and, gte, lt, getTableColumns } from 'drizzle-orm';
 import { authMiddleware, adminMiddleware, AuthEnv } from '../middleware/auth';
 
 const adminRoutes = new Hono<AuthEnv>();
@@ -42,7 +42,24 @@ const createClinicSchema = z.object({
   isActive: z.boolean().optional().default(true),
 });
 
-const updateClinicSchema = createClinicSchema.partial();
+const updateClinicSchema = z.object({
+  name: z.string().min(1).optional(),
+  address: z.object({
+    street: z.string(),
+    city: z.string(),
+    zip: z.string(),
+  }).optional(),
+  isActive: z.boolean().optional(),
+  // Add latitude and longitude for location updates
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
+}).refine(data => {
+    // If one of lat/lon is provided, the other must be too.
+    return (data.latitude === undefined && data.longitude === undefined) || (data.latitude !== undefined && data.longitude !== undefined);
+}, {
+    message: "Both latitude and longitude must be provided together for location updates.",
+    path: ["latitude"], // report error on the latitude field
+});
 
 const createDoctorSchema = z.object({
   fullName: z.string().min(1, { message: "Full name is required" }),
@@ -91,12 +108,30 @@ const serviceCategorySchema = z.object({
     description: z.string().optional(),
 });
 
+const medicalRecordSchema = z.object({
+  // Use z.enum to match the database enum definition
+  recordType: z.enum(['PRESCRIPTION', 'LAB_ORDER', 'DOCTOR_NOTE']),
+  // The 'details' field should be an object for jsonb
+  details: z.object({
+    note: z.string().min(1, "Note details cannot be empty"),
+  }),
+  // createdBy will be extracted from the authenticated user context
+});
+
 // --- Clinic Management Endpoints ---
 
 adminRoutes
   .get('/clinics', async (c) => {
-    const allClinics = await db.select().from(clinics);
-    return c.json({ data: allClinics });
+    // Use Drizzle's `sql` to extract coordinates
+    const clinicsWithCoords = await db.select({
+        // Select all original columns
+        ...getTableColumns(clinics),
+        // And add the extracted lat/lon
+        latitude: sql<number>`ST_Y(location::geometry)`,
+        longitude: sql<number>`ST_X(location::geometry)`
+    }).from(clinics);
+
+    return c.json({ data: clinicsWithCoords });
   })
   .post('/clinics', zValidator('json', createClinicSchema), async (c) => {
     const { name, address, location, isActive } = c.req.valid('json');
@@ -121,19 +156,17 @@ adminRoutes
   })
   .put('/clinics/:id', zValidator('json', updateClinicSchema), async (c) => {
     const { id } = c.req.param();
-    const values = c.req.valid('json');
+    const { latitude, longitude, ...clinicData } = c.req.valid('json');
 
-    // Create a mutable copy to transform
-    const updatePayload: any = { ...values };
+    const payloadForDb: Record<string, any> = { ...clinicData };
 
-    // If location is being updated, transform it to the SQL format
-    if (values.location) {
-      const { lon, lat } = values.location;
-      updatePayload.location = sql`ST_GeomFromText(${`POINT(${lon} ${lat})`}, 4326)`;
+    // THIS IS THE CRITICAL FIX: If lat/lon are provided, combine them into a PostGIS point string
+    if (latitude !== undefined && longitude !== undefined) {
+      payloadForDb.location = sql`SRID=4326;POINT(${longitude} ${latitude})`;
     }
 
     const [updatedClinic] = await db.update(clinics)
-      .set(updatePayload)
+      .set(payloadForDb)
       .where(eq(clinics.id, id))
       .returning();
 
@@ -379,7 +412,23 @@ adminRoutes
 // --- Appointment Management Endpoints ---
 adminRoutes.get('/appointments', async (c) => {
     try {
+        const { startDate, endDate } = c.req.query();
+        const conditions = [];
+
+        if (startDate) {
+            // Records on or after the beginning of the start date
+            conditions.push(gte(appointments.appointmentTime, new Date(startDate).toISOString()));
+        }
+
+        if (endDate) {
+            // To include the entire end date, we look for records *before* the start of the *next* day.
+            const endOfDay = new Date(endDate);
+            endOfDay.setDate(endOfDay.getDate() + 1);
+            conditions.push(lt(appointments.appointmentTime, endOfDay.toISOString()));
+        }
+        
         const allAppointments = await db.query.appointments.findMany({
+            where: conditions.length > 0 ? and(...conditions) : undefined,
             with: {
                 patient: {
                     columns: {
@@ -422,49 +471,66 @@ adminRoutes.get('/appointments', async (c) => {
 });
 
 adminRoutes.get('/appointments/:id', async (c) => {
-    const { id } = c.req.param();
     try {
-        const [appointment] = await db.query.appointments.findMany({
+        const { id } = c.req.param();
+        const user = c.get('user');
+
+        console.log(`[GET /appointments/:id] Admin user ${user?.id} fetching appointment ${id}`);
+
+        const appointment = await db.query.appointments.findFirst({
             where: eq(appointments.id, id),
             with: {
                 patient: {
                     columns: {
+                        id: true,
                         firstName: true,
                         lastName: true,
                         email: true,
-                        contactNo: true,
+                        birthday: true,
+                        genderIdentity: true,
                     }
                 },
-                doctor: {
-                    columns: {
-                        fullName: true,
-                        specialtyText: true,
-                    }
-                },
-                service: {
-                    columns: {
-                        name: true,
-                        price: true,
-                        durationMinutes: true,
-                    }
-                },
-                clinic: {
-                    columns: {
-                        name: true,
-                        address: true,
-                    }
+                doctor: true,
+                service: true,
+                clinic: true,
+                medicalRecords: {
+                    orderBy: (medicalRecords, { desc }) => [desc(medicalRecords.createdAt)],
                 }
             }
         });
 
-        if (!appointment) return c.json({ error: 'Not Found' }, 404);
-        
-        return c.json(appointment);
+        if (!appointment) {
+            console.warn(`[GET /appointments/:id] Appointment ${id} not found.`);
+            return c.json({ error: 'Appointment not found' }, 404);
+        }
+
+        console.log(`[GET /appointments/:id] Successfully found appointment ${id}.`);
+        return c.json({ data: appointment });
 
     } catch (error: any) {
-        console.error(`Error fetching appointment ${id}:`, error);
-        return c.json({ message: `Error fetching appointment ${id}`, error: error.message }, 500);
+        console.error(`[GET /appointments/:id] CRASH:`, error);
+        return c.json({ message: "Error fetching appointment details", error: error.message }, 500);
     }
+});
+
+adminRoutes.post('/appointments/:id/records', zValidator('json', medicalRecordSchema), async (c) => {
+    const { id: appointmentId } = c.req.param();
+    const { recordType, details } = c.req.valid('json');
+    const user = c.get('user');
+
+    // Double-check if the appointment exists
+    const [appointment] = await db.select({ id: appointments.id }).from(appointments).where(eq(appointments.id, appointmentId));
+    if (!appointment) {
+        return c.json({ error: 'Appointment not found' }, 404);
+    }
+    
+    const [newRecord] = await db.insert(medicalRecords).values({
+        appointmentId,
+        recordType,
+        details, // 'details' is now an object, which Drizzle will correctly serialize to JSONB
+    }).returning();
+
+    return c.json({ data: newRecord }, 201);
 });
 
 // --- User Management Endpoints ---
