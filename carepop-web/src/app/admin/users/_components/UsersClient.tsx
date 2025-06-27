@@ -13,8 +13,10 @@ import { UserRoleForm } from './UserRoleForm';
 import {
   Dialog,
   DialogContent,
+  DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface UsersClientProps {
@@ -27,6 +29,7 @@ export default function UsersClient({ initialUsers }: UsersClientProps) {
 
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [selectedUser, setSelectedUser] = React.useState<AdminUser | undefined>(undefined);
+  const [globalFilter, setGlobalFilter] = React.useState('');
 
   const {
     data: users,
@@ -72,17 +75,38 @@ export default function UsersClient({ initialUsers }: UsersClientProps) {
   if (isError) return <div>Failed to load users: {error?.message}</div>;
 
   return (
-    <>
-      <CardHeader>
+    <div className="p-4 md:p-8 space-y-6">
+      <CardHeader className="p-0">
         <CardTitle>Manage Users</CardTitle>
         <CardDescription>
           View all registered users and manage their roles on the platform.
         </CardDescription>
       </CardHeader>
 
+      <div className="flex items-center">
+         <Input
+            placeholder="Filter by name..."
+            value={globalFilter}
+            onChange={(event) => setGlobalFilter(event.target.value)}
+            className="max-w-sm"
+          />
+      </div>
+      
+      <DataTable
+        columns={dynamicColumns}
+        data={users || []}
+        filterColumn="fullName"
+        filterPlaceholder="Filter by name..."
+        isLoading={isLoading}
+        globalFilter={globalFilter}
+        setGlobalFilter={setGlobalFilter}
+      />
+
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-[425px]">
-          <DialogTitle>Edit User Role</DialogTitle>
+          <DialogHeader>
+            <DialogTitle>Edit User Role</DialogTitle>
+          </DialogHeader>
           <UserRoleForm
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}
@@ -96,14 +120,6 @@ export default function UsersClient({ initialUsers }: UsersClientProps) {
           />
         </DialogContent>
       </Dialog>
-      
-      <DataTable
-        columns={dynamicColumns}
-        data={users || []}
-        filterColumn="fullName"
-        filterPlaceholder="Filter by name..."
-        isLoading={isLoading}
-      />
-    </>
+    </div>
   );
 } 

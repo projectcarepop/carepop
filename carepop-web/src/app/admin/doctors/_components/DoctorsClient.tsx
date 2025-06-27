@@ -30,6 +30,7 @@ import {
 import { DoctorForm } from './DoctorForm';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 
 interface DoctorsClientProps {
   initialDoctors: Doctor[];
@@ -44,6 +45,7 @@ export default function DoctorsClient({ initialDoctors }: DoctorsClientProps) {
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [doctorToDelete, setDoctorToDelete] = React.useState<Doctor | undefined>(undefined);
+  const [globalFilter, setGlobalFilter] = React.useState('');
 
   const {
     data: doctors,
@@ -123,20 +125,35 @@ export default function DoctorsClient({ initialDoctors }: DoctorsClientProps) {
   if (isError) return <div>Failed to load doctors: {error?.message}</div>;
 
   return (
-    <>
-      <CardHeader>
+    <div className="p-4 md:p-8 space-y-6">
+      <CardHeader className="p-0">
           <CardTitle>Manage Doctors</CardTitle>
           <CardDescription>
               This page allows you to create, view, edit, and delete doctor profiles.
           </CardDescription>
       </CardHeader>
-      <div className="flex items-center justify-between py-4">
-        <div /> 
+
+      <div className="flex items-center justify-between">
+        <Input
+            placeholder="Filter by name..."
+            value={globalFilter}
+            onChange={(event) => setGlobalFilter(event.target.value)}
+            className="max-w-sm"
+        />
         <Button onClick={handleCreateNew}>
           <PlusCircle className="mr-2 h-4 w-4" />
           Create Doctor
         </Button>
       </div>
+      
+      <DataTable
+        columns={dynamicColumns}
+        data={doctors || []}
+        filterColumn="fullName"
+        globalFilter={globalFilter}
+        setGlobalFilter={setGlobalFilter}
+        isLoading={isLoading}
+      />
       
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-[425px]">
@@ -179,14 +196,6 @@ export default function DoctorsClient({ initialDoctors }: DoctorsClientProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      
-      <DataTable
-        columns={dynamicColumns}
-        data={doctors || []}
-        filterColumn="fullName"
-        filterPlaceholder="Filter by name..."
-        isLoading={isLoading}
-      />
-    </>
+    </div>
   );
 } 

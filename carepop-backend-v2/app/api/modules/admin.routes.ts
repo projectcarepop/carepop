@@ -701,6 +701,27 @@ adminRoutes.delete('/users/:id', async (c) => {
     return c.json({ success: true });
 });
 
+adminRoutes.get('/stats', async (c) => {
+    try {
+        const [userCount] = await db.select({ count: count() }).from(profiles);
+        const [doctorCount] = await db.select({ count: count() }).from(doctors);
+        const [clinicCount] = await db.select({ count: count() }).from(clinics);
+        const [appointmentCount] = await db.select({ count: count() }).from(appointments);
+
+        return c.json({
+            data: {
+                users: userCount.count,
+                doctors: doctorCount.count,
+                clinics: clinicCount.count,
+                appointments: appointmentCount.count,
+            },
+        });
+    } catch (error: any) {
+        console.error('Error fetching admin stats:', error);
+        return c.json({ error: 'Failed to fetch stats', details: error.message }, 500);
+    }
+});
+
 // Add other admin routes here in the future...
 
 export default adminRoutes;

@@ -32,7 +32,7 @@ export default function Header() {
             height={24}
             className="h-6 w-6 mr-1"
           />
-          <span className="text-2xl font-bold text-primary hover:text-primary/90 font-space-grotesk">
+          <span className="text-xl font-medium text-primary hover:text-primary/90 font-space-grotesk">
             {isAdminPage ? 'carepop admin' : 'carepop'}
           </span>
         </Link>

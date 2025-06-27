@@ -30,6 +30,7 @@ import {
 import { ClinicForm } from './ClinicForm';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 
 interface ClinicsClientProps {
   initialClinics: Clinic[];
@@ -46,6 +47,7 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
   // State for controlling the Delete confirmation dialog
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [clinicToDelete, setClinicToDelete] = React.useState<Clinic | undefined>(undefined);
+  const [globalFilter, setGlobalFilter] = React.useState('');
 
   const {
     data: clinics,
@@ -126,21 +128,36 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
   if (isError) return <div>Failed to load clinics: {error?.message}</div>;
 
   return (
-    <>
-      <CardHeader>
+    <div className="p-4 md:p-8 space-y-6">
+      <CardHeader className="p-0">
         <CardTitle>Manage Clinics</CardTitle>
         <CardDescription>
           This page allows you to create, view, edit, and delete all clinic locations on the platform.
         </CardDescription>
       </CardHeader>
-      <div className="flex items-center justify-between py-4">
-        <div /> {/* Placeholder to push button to the right */}
+      
+      <div className="flex items-center justify-between">
+        <Input
+          placeholder="Filter by name..."
+          value={globalFilter}
+          onChange={(event) => setGlobalFilter(event.target.value)}
+          className="max-w-sm"
+        />
         <Button onClick={handleCreateNew}>
           <PlusCircle className="mr-2 h-4 w-4" />
           Create Clinic
         </Button>
       </div>
 
+      <DataTable
+        columns={dynamicColumns}
+        data={clinics || []}
+        filterColumn="name"
+        globalFilter={globalFilter}
+        setGlobalFilter={setGlobalFilter}
+        isLoading={isLoading}
+      />
+      
       {/* Create/Edit Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-[600px]">
@@ -185,14 +202,6 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      
-      <DataTable
-        columns={dynamicColumns}
-        data={clinics || []}
-        filterColumn="name"
-        filterPlaceholder="Filter by name..."
-        isLoading={isLoading}
-      />
-    </>
+    </div>
   );
 } 

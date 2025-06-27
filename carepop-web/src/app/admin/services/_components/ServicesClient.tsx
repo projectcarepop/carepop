@@ -16,6 +16,7 @@ import { CategoryForm } from './CategoryForm';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 
 interface ServicesClientProps {
   initialServices: AdminService[];
@@ -34,6 +35,8 @@ export default function ServicesClient({ initialServices, initialCategories }: S
   const [categoryModal, setCategoryModal] = React.useState(false);
   const [selectedService, setSelectedService] = React.useState<AdminService | undefined>(undefined);
   const [selectedCategory, setSelectedCategory] = React.useState<ServiceCategory | undefined>(undefined);
+  const [globalFilter, setGlobalFilter] = React.useState('');
+  const [activeTab, setActiveTab] = React.useState('services');
 
   // Queries
   const { data: services, isError: isErrorServices } = useQuery({ queryKey: ['adminServices'], queryFn: () => getAdminServices(session!.access_token), initialData: initialServices, enabled: !!session });
@@ -83,30 +86,58 @@ export default function ServicesClient({ initialServices, initialCategories }: S
 
   if (isErrorServices || isErrorCategories) return <div>Error loading data...</div>;
 
+  const filterConfig = {
+    services: {
+      column: 'name',
+      placeholder: 'Filter services...',
+    },
+    categories: {
+      column: 'name',
+      placeholder: 'Filter categories...',
+    },
+  };
+
+  const currentFilterColumn = activeTab === 'services' ? filterConfig.services.column : filterConfig.categories.column;
+  const currentFilterPlaceholder = activeTab === 'services' ? filterConfig.services.placeholder : filterConfig.categories.placeholder;
+
   return (
-    <>
-      <CardHeader>
+    <div className="p-4 md:p-8 space-y-6">
+      <CardHeader className="p-0">
         <CardTitle>Manage Services</CardTitle>
         <CardDescription>
           Define and manage the medical services and service categories offered.
         </CardDescription>
       </CardHeader>
-      <Tabs defaultValue="services" className="w-full">
+      <Tabs defaultValue="services" className="w-full" onValueChange={setActiveTab}>
         <div className='flex justify-between items-center'>
           <TabsList>
             <TabsTrigger value="services">Manage Services</TabsTrigger>
             <TabsTrigger value="categories">Manage Categories</TabsTrigger>
           </TabsList>
           <div className='flex space-x-2'>
-            <Button onClick={() => { setSelectedService(undefined); setServiceModal(true); }}><PlusCircle className="mr-2 h-4 w-4" />Create Service</Button>
-            <Button onClick={() => { setSelectedCategory(undefined); setCategoryModal(true); }}><PlusCircle className="mr-2 h-4 w-4" />Create Category</Button>
+            {activeTab === 'services' && (
+                <Button onClick={() => { setSelectedService(undefined); setServiceModal(true); }}><PlusCircle className="mr-2 h-4 w-4" />Create Service</Button>
+            )}
+            {activeTab === 'categories' && (
+                <Button onClick={() => { setSelectedCategory(undefined); setCategoryModal(true); }}><PlusCircle className="mr-2 h-4 w-4" />Create Category</Button>
+            )}
           </div>
         </div>
-        <TabsContent value="services" className="mt-4">
-          <DataTable columns={serviceColumns({ onEdit: handleEditService, onDelete: (s) => deleteService(s.id) })} data={services || []} filterColumn="name" filterPlaceholder="Filter services..."/>
+
+        <div className="flex items-center py-4">
+            <Input
+                placeholder={currentFilterPlaceholder}
+                value={globalFilter}
+                onChange={(e) => setGlobalFilter(e.target.value)}
+                className="max-w-sm"
+            />
+        </div>
+
+        <TabsContent value="services">
+          <DataTable columns={serviceColumns({ onEdit: handleEditService, onDelete: (s) => deleteService(s.id) })} data={services || []} filterColumn={currentFilterColumn} globalFilter={globalFilter} setGlobalFilter={setGlobalFilter}/>
         </TabsContent>
-        <TabsContent value="categories" className="mt-4">
-          <DataTable columns={categoryColumns({ onEdit: handleEditCategory, onDelete: (c) => deleteCategory(c.id) })} data={categories || []} filterColumn="name" filterPlaceholder="Filter categories..."/>
+        <TabsContent value="categories">
+          <DataTable columns={categoryColumns({ onEdit: handleEditCategory, onDelete: (c) => deleteCategory(c.id) })} data={categories || []} filterColumn={currentFilterColumn} globalFilter={globalFilter} setGlobalFilter={setGlobalFilter}/>
         </TabsContent>
       </Tabs>
 
@@ -138,6 +169,7 @@ export default function ServicesClient({ initialServices, initialCategories }: S
           />
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }
+

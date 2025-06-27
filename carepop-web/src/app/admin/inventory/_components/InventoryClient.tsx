@@ -40,6 +40,7 @@ import { UpdateStockForm } from './UpdateStockForm';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 
 interface InventoryClientProps {
   initialProducts: AdminProduct[];
@@ -57,6 +58,8 @@ export default function InventoryClient({ initialProducts, initialCategories }: 
 
   const [selectedProduct, setSelectedProduct] = React.useState<AdminProduct | undefined>(undefined);
   const [selectedCategory, setSelectedCategory] = React.useState<ProductCategory | undefined>(undefined);
+  const [globalFilter, setGlobalFilter] = React.useState('');
+  const [activeTab, setActiveTab] = React.useState('products');
 
   // Queries
   const { data: products, isError: isErrorProducts } = useQuery({ queryKey: ['adminProducts'], queryFn: () => getAdminProducts(session!.access_token), initialData: initialProducts, enabled: !!session });
@@ -140,30 +143,58 @@ export default function InventoryClient({ initialProducts, initialCategories }: 
 
   if (isErrorProducts || isErrorCategories) return <div>Error loading data...</div>;
 
+  const filterConfig = {
+    products: {
+      column: 'name',
+      placeholder: 'Filter products...',
+    },
+    categories: {
+      column: 'name',
+      placeholder: 'Filter categories...',
+    },
+  };
+
+  const currentFilterColumn = activeTab === 'products' ? filterConfig.products.column : filterConfig.categories.column;
+  const currentFilterPlaceholder = activeTab === 'products' ? filterConfig.products.placeholder : filterConfig.categories.placeholder;
+
   return (
-    <>
-      <CardHeader>
+    <div className="p-4 md:p-8 space-y-6">
+      <CardHeader className="p-0">
         <CardTitle>Manage Inventory</CardTitle>
         <CardDescription>
           Track and manage product stock and inventory categories.
         </CardDescription>
       </CardHeader>
-      <Tabs defaultValue="products" className="w-full">
+      <Tabs defaultValue="products" className="w-full" onValueChange={setActiveTab}>
         <div className='flex justify-between items-center'>
           <TabsList>
             <TabsTrigger value="products">Manage Products</TabsTrigger>
             <TabsTrigger value="categories">Manage Categories</TabsTrigger>
           </TabsList>
           <div className='flex space-x-2'>
-            <Button onClick={() => { setSelectedProduct(undefined); setProductModal(true); }}><PlusCircle className="mr-2 h-4 w-4" />Create Product</Button>
-            <Button onClick={() => { setSelectedCategory(undefined); setCategoryModal(true); }}><PlusCircle className="mr-2 h-4 w-4" />Create Category</Button>
+            {activeTab === 'products' && (
+                <Button onClick={() => { setSelectedProduct(undefined); setProductModal(true); }}><PlusCircle className="mr-2 h-4 w-4" />Create Product</Button>
+            )}
+            {activeTab === 'categories' && (
+                <Button onClick={() => { setSelectedCategory(undefined); setCategoryModal(true); }}><PlusCircle className="mr-2 h-4 w-4" />Create Category</Button>
+            )}
           </div>
         </div>
-        <TabsContent value="products" className="mt-4">
-          <DataTable columns={productColumns({ onEdit: handleEditProduct, onDelete: handleDeleteProduct, onUpdateStock: handleUpdateStock })} data={products || []} filterColumn="name" filterPlaceholder="Filter products..."/>
+
+        <div className="flex items-center py-4">
+            <Input
+                placeholder={currentFilterPlaceholder}
+                value={globalFilter}
+                onChange={(e) => setGlobalFilter(e.target.value)}
+                className="max-w-sm"
+            />
+        </div>
+
+        <TabsContent value="products">
+          <DataTable columns={productColumns({ onEdit: handleEditProduct, onDelete: handleDeleteProduct, onUpdateStock: handleUpdateStock })} data={products || []} filterColumn={currentFilterColumn} globalFilter={globalFilter} setGlobalFilter={setGlobalFilter}/>
         </TabsContent>
-        <TabsContent value="categories" className="mt-4">
-          <DataTable columns={categoryColumns({ onEdit: handleEditCategory, onDelete: handleDeleteCategory })} data={categories || []} filterColumn="name" filterPlaceholder="Filter categories..."/>
+        <TabsContent value="categories">
+          <DataTable columns={categoryColumns({ onEdit: handleEditCategory, onDelete: handleDeleteCategory })} data={categories || []} filterColumn={currentFilterColumn} globalFilter={globalFilter} setGlobalFilter={setGlobalFilter}/>
         </TabsContent>
       </Tabs>
 
@@ -172,7 +203,7 @@ export default function InventoryClient({ initialProducts, initialCategories }: 
         <DialogContent>
           <DialogHeader><DialogTitle>{selectedProduct ? 'Edit Product' : 'Create New Product'}</DialogTitle></DialogHeader>
           <ProductForm 
-            initialData={selectedProduct ? {...selectedProduct, categoryId: selectedProduct.categoryId || ''} : undefined} 
+            initialData={selectedProduct} 
             onSubmit={handleProductSubmit} 
             isPending={productMutation.isPending} 
             categories={categories || []} 
@@ -224,6 +255,6 @@ export default function InventoryClient({ initialProducts, initialCategories }: 
               </AlertDialogFooter>
           </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 }

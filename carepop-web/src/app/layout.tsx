@@ -1,4 +1,4 @@
-import { Inter, Space_Grotesk as SpaceGrotesk } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import type { Metadata } from "next";
 import './globals.css'
 import { Analytics } from "@vercel/analytics/react";
@@ -11,10 +11,6 @@ import ConditionalFooter from '@/components/layout/ConditionalFooter';
 import { cn } from '@/lib/utils';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
-const spaceGrotesk = SpaceGrotesk({
-  subsets: ['latin'],
-  variable: '--font-space-grotesk',
-})
 
 export const metadata: Metadata = {
   title: 'Carepop',
@@ -27,12 +23,10 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${spaceGrotesk.variable} ${inter.variable} h-full`} suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} h-full`} suppressHydrationWarning>
         <head />
         <body className={cn(
-          "flex flex-col min-h-full bg-background text-foreground antialiased",
-          spaceGrotesk.variable,
-          inter.variable
+          "flex flex-col min-h-full bg-background text-foreground antialiased font-inter"
         )}>
             <AuthProvider>
               <QueryProvider>

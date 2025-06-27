@@ -63,10 +63,10 @@ export default function AdminSidebar() {
             key={item.href}
             href={item.href}
             className={cn(
-              'flex items-center rounded-lg px-3 py-2 text-gray-900 transition-colors hover:bg-gray-200 dark:text-gray-50 dark:hover:bg-gray-800',
+              'flex items-center rounded-lg px-3 py-2 text-slate-700 transition-colors hover:bg-primary/10 hover:text-primary dark:text-gray-50 dark:hover:bg-primary/20',
               pathname === item.href
-                ? 'bg-gray-200 dark:bg-gray-800'
-                : 'hover:bg-gray-200/50 dark:hover:bg-gray-800/50'
+                ? 'bg-primary/20 text-primary font-semibold'
+                : 'hover:bg-primary/5'
             )}
           >
             <item.icon className="mr-2 h-4 w-4" />
