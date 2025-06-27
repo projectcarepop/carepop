@@ -16,11 +16,11 @@ import { AdminProduct } from '@/lib/types';
 
 interface ColumnActions {
   onEdit: (product: AdminProduct) => void;
-  onDelete: (id: string) => void;
-  // onUpdateStock: (product: AdminProduct) => void; // For future implementation
+  onDelete: (product: AdminProduct) => void;
+  onUpdateStock: (product: AdminProduct) => void;
 }
 
-export const columns = ({ onEdit, onDelete }: ColumnActions): ColumnDef<AdminProduct>[] => [
+export const columns = ({ onEdit, onDelete, onUpdateStock }: ColumnActions): ColumnDef<AdminProduct>[] => [
   {
     accessorKey: 'name',
     header: 'Name',
@@ -47,7 +47,12 @@ export const columns = ({ onEdit, onDelete }: ColumnActions): ColumnDef<AdminPro
     header: 'Stock',
     cell: ({ row }) => {
         const stock = row.getValue('quantityOnHand') as number;
-        return <Badge variant={stock > 0 ? 'default' : 'destructive'}>{stock}</Badge>
+        const lowStockThreshold = 10;
+        return (
+            <div className={stock < lowStockThreshold ? "text-red-600 font-medium" : ""}>
+                {stock}
+            </div>
+        )
     }
   },
   {
@@ -80,9 +85,11 @@ export const columns = ({ onEdit, onDelete }: ColumnActions): ColumnDef<AdminPro
             <DropdownMenuItem onClick={() => onEdit(product)}>
               Edit Product
             </DropdownMenuItem>
-            {/* <DropdownMenuItem>Update Stock</DropdownMenuItem> */}
+            <DropdownMenuItem onClick={() => onUpdateStock(product)}>
+                Update Stock
+            </DropdownMenuItem>
             <DropdownMenuItem
-              onClick={() => onDelete(product.id)}
+              onClick={() => onDelete(product)}
               className="text-red-600"
             >
               Delete Product

@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { PlusCircle } from 'lucide-react';
 
-import { getAdminDoctors, upsertDoctor } from '@/services/api'; // Assuming deleteDoctor will be added to api.ts
+import { getAdminDoctors, upsertDoctor, deleteDoctor } from '@/services/api';
 import { DataTable } from '@/components/ui/data-table';
 import { type Doctor } from '@/lib/types';
 import { columns } from './columns';
@@ -29,18 +29,11 @@ import {
 } from '@/components/ui/dialog';
 import { DoctorForm } from './DoctorForm';
 import { useAuth } from '@/lib/contexts/auth-context';
+import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface DoctorsClientProps {
   initialDoctors: Doctor[];
 }
-
-// A placeholder delete function until it's added to the API service.
-const deleteDoctor = async (doctorId: string, token: string) => {
-  console.warn(`deleteDoctor not implemented. Tried to delete ${doctorId} with token ${token}`);
-  // In a real scenario, this would make an API call:
-  // await fetch(`/api/admin/doctors/${doctorId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
-  return { success: true };
-};
 
 export default function DoctorsClient({ initialDoctors }: DoctorsClientProps) {
   const { session } = useAuth();
@@ -66,8 +59,6 @@ export default function DoctorsClient({ initialDoctors }: DoctorsClientProps) {
 
   const upsertMutation = useMutation({
     mutationFn: (doctorData: Partial<Doctor>) => {
-      // The API service function for upsertDoctor needs to be created or confirmed.
-      // For now, assuming it takes (data, token, id)
       return upsertDoctor(doctorData as any, session!.access_token, doctorData.id);
     },
     onSuccess: () => {
@@ -133,16 +124,22 @@ export default function DoctorsClient({ initialDoctors }: DoctorsClientProps) {
 
   return (
     <>
+      <CardHeader>
+          <CardTitle>Manage Doctors</CardTitle>
+          <CardDescription>
+              This page allows you to create, view, edit, and delete doctor profiles.
+          </CardDescription>
+      </CardHeader>
       <div className="flex items-center justify-between py-4">
-        <h1 className="text-2xl font-bold">Manage Doctors</h1>
+        <div /> 
         <Button onClick={handleCreateNew}>
           <PlusCircle className="mr-2 h-4 w-4" />
           Create Doctor
         </Button>
       </div>
-
+      
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>
               {selectedDoctor ? 'Edit Doctor' : 'Create New Doctor'}
@@ -167,7 +164,7 @@ export default function DoctorsClient({ initialDoctors }: DoctorsClientProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete 
+              This action cannot be undone. This will permanently delete the doctor:
               <span className="font-semibold"> {doctorToDelete?.fullName}</span>.
             </AlertDialogDescription>
           </AlertDialogHeader>

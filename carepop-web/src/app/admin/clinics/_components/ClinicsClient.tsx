@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/dialog';
 import { ClinicForm } from './ClinicForm';
 import { useAuth } from '@/lib/contexts/auth-context';
+import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface ClinicsClientProps {
   initialClinics: Clinic[];
@@ -126,8 +127,14 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
 
   return (
     <>
+      <CardHeader>
+        <CardTitle>Manage Clinics</CardTitle>
+        <CardDescription>
+          This page allows you to create, view, edit, and delete all clinic locations on the platform.
+        </CardDescription>
+      </CardHeader>
       <div className="flex items-center justify-between py-4">
-        <h1 className="text-2xl font-bold">Manage Clinics</h1>
+        <div /> {/* Placeholder to push button to the right */}
         <Button onClick={handleCreateNew}>
           <PlusCircle className="mr-2 h-4 w-4" />
           Create Clinic

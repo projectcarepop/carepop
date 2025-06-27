@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { db } from '../lib/db';
-import { clinics, profiles, doctors, services, productCategories, products, inventory, serviceCategories } from '../../../drizzle/schema';
+import { clinics, profiles, doctors, services, productCategories, products, inventory, serviceCategories, appointments } from '../../../drizzle/schema';
 import { eq, sql, count, asc } from 'drizzle-orm';
 import { authMiddleware, adminMiddleware, AuthEnv } from '../middleware/auth';
 
@@ -381,17 +381,43 @@ adminRoutes.get('/appointments', async (c) => {
     try {
         const allAppointments = await db.query.appointments.findMany({
             with: {
-                profile: { columns: { fullName: true } },
-                doctor: { columns: { fullName: true } },
-                service: { columns: { name: true } },
-                clinic: { columns: { name: true } },
+                patient: {
+                    columns: {
+                        firstName: true,
+                        lastName: true,
+                    }
+                },
+                doctor: {
+                    columns: {
+                        fullName: true,
+                    }
+                },
+                service: {
+                    columns: {
+                        name: true,
+                    }
+                },
+                clinic: {
+                    columns: {
+                        name: true,
+                    }
+                }
             },
             orderBy: (appointments, { desc }) => [desc(appointments.appointmentTime)],
         });
-        return c.json({ data: allAppointments });
-    } catch (error) {
-        console.error('Error fetching all appointments:', error);
-        return c.json({ error: 'Internal Server Error' }, 500);
+
+        const responseData = allAppointments.map((a: any) => ({
+            ...a,
+            patientName: `${a.patient.firstName || ''} ${a.patient.lastName || ''}`.trim(),
+            doctorName: a.doctor.fullName,
+            serviceName: a.service.name,
+            clinicName: a.clinic.name,
+        }));
+
+        return c.json({ data: responseData });
+    } catch (error: any) {
+        console.error("Error fetching appointments:", error);
+        return c.json({ message: "Error fetching appointments", error: error.message }, 500);
     }
 });
 
@@ -399,23 +425,45 @@ adminRoutes.get('/appointments/:id', async (c) => {
     const { id } = c.req.param();
     try {
         const [appointment] = await db.query.appointments.findMany({
-            where: (table, { eq }) => eq(table.id, id),
+            where: eq(appointments.id, id),
             with: {
-                profile: { columns: { fullName: true, email: true, contactNo: true } },
-                doctor: { columns: { fullName: true, specialtyText: true } },
-                service: { columns: { name: true, price: true, durationMinutes: true } },
-                clinic: { columns: { name: true, address: true } },
-            },
+                patient: {
+                    columns: {
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        contactNo: true,
+                    }
+                },
+                doctor: {
+                    columns: {
+                        fullName: true,
+                        specialtyText: true,
+                    }
+                },
+                service: {
+                    columns: {
+                        name: true,
+                        price: true,
+                        durationMinutes: true,
+                    }
+                },
+                clinic: {
+                    columns: {
+                        name: true,
+                        address: true,
+                    }
+                }
+            }
         });
 
-        if (!appointment) {
-            return c.json({ error: 'Appointment not found' }, 404);
-        }
-
+        if (!appointment) return c.json({ error: 'Not Found' }, 404);
+        
         return c.json(appointment);
-    } catch (error) {
+
+    } catch (error: any) {
         console.error(`Error fetching appointment ${id}:`, error);
-        return c.json({ error: 'Internal Server Error' }, 500);
+        return c.json({ message: `Error fetching appointment ${id}`, error: error.message }, 500);
     }
 });
 
@@ -441,20 +489,22 @@ adminRoutes.get('/users', async (c) => {
  */
 adminRoutes.get('/stats', async (c) => {
   try {
-    const [userStats] = await db.select({ value: count() }).from(profiles);
-    const [clinicStats] = await db.select({ value: count() }).from(clinics);
+    const [userCount] = await db.select({ count: count() }).from(profiles);
+    const [doctorCount] = await db.select({ count: count() }).from(doctors);
+    const [clinicCount] = await db.select({ count: count() }).from(clinics);
+    const [appointmentCount] = await db.select({ count: count() }).from(appointments);
 
-    const stats = {
-      totalUsers: userStats.value,
-      totalClinics: clinicStats.value,
-      appointmentsToday: 0, // Placeholder
-      pendingApprovals: 0,  // Placeholder
-    };
-
-    return c.json(stats);
-  } catch (error) {
+    return c.json({
+      data: {
+        users: userCount.count,
+        doctors: doctorCount.count,
+        clinics: clinicCount.count,
+        appointments: appointmentCount.count,
+      },
+    });
+  } catch (error: any) {
     console.error('Error fetching admin stats:', error);
-    return c.json({ error: 'Internal Server Error', message: 'Failed to fetch stats.' }, 500);
+    return c.json({ error: 'Failed to fetch stats', details: error.message }, 500);
   }
 });
 

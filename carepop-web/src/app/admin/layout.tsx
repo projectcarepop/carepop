@@ -27,9 +27,20 @@ export default async function AdminLayout({
     .select('role')
     .eq('id', user.id)
     .single();
+
+  // --- START ENHANCED DEBUG LOGGING ---
+  console.log('--- Admin Layout Auth Check ---');
+  console.log('[User Object from JWT]:', JSON.stringify(user, null, 2));
+  console.log('[Profile from DB]:', JSON.stringify(profile, null, 2));
+  if (profileError) {
+    console.error('[Profile Fetch Error]:', JSON.stringify(profileError, null, 2));
+  }
+  console.log('--- End Admin Layout Auth Check ---');
+  // --- END ENHANCED DEBUG LOGGING ---
   
   if (profileError || profile?.role !== 'admin') {
     // If there's an error fetching the profile or the role is not admin, redirect.
+    console.log(`Redirecting to /forbidden. Reason: ${profileError ? 'Profile Error' : `Role is not admin, it is '${profile?.role}'`}`);
     return redirect('/forbidden');
   }
 

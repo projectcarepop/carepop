@@ -10,6 +10,12 @@ import { type AdminUser } from '@/services/api';
 import { columns } from './columns';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { UserRoleForm } from './UserRoleForm';
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface UsersClientProps {
   initialUsers: AdminUser[];
@@ -67,21 +73,29 @@ export default function UsersClient({ initialUsers }: UsersClientProps) {
 
   return (
     <>
-      <div className="flex items-center justify-between py-4">
-        <h1 className="text-2xl font-bold">Manage Users</h1>
-      </div>
+      <CardHeader>
+        <CardTitle>Manage Users</CardTitle>
+        <CardDescription>
+          View all registered users and manage their roles on the platform.
+        </CardDescription>
+      </CardHeader>
 
-      <UserRoleForm
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        user={selectedUser}
-        onSubmit={(values) => {
-          if (selectedUser) {
-            updateRoleMutation.mutate({ userId: selectedUser.id, role: values.role });
-          }
-        }}
-        isPending={updateRoleMutation.isPending}
-      />
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogTitle>Edit User Role</DialogTitle>
+          <UserRoleForm
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            user={selectedUser}
+            onSubmit={(values) => {
+              if (selectedUser) {
+                updateRoleMutation.mutate({ userId: selectedUser.id, role: values.role });
+              }
+            }}
+            isPending={updateRoleMutation.isPending}
+          />
+        </DialogContent>
+      </Dialog>
       
       <DataTable
         columns={dynamicColumns}

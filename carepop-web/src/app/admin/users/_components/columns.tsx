@@ -21,7 +21,7 @@ interface ColumnActions {
 
 export const columns = ({ onEditRole }: ColumnActions): ColumnDef<AdminUser>[] => [
   {
-    accessorKey: 'fullName',
+    id: 'fullName',
     header: ({ column }) => {
       return (
         <Button
@@ -33,6 +33,12 @@ export const columns = ({ onEditRole }: ColumnActions): ColumnDef<AdminUser>[] =
         </Button>
       );
     },
+    accessorFn: row => `${row.firstName || ''} ${row.lastName || ''}`,
+    cell: ({ row }) => {
+        const firstName = row.original.firstName || '';
+        const lastName = row.original.lastName || '';
+        return `${firstName} ${lastName}`.trim();
+    }
   },
   {
     accessorKey: 'email',

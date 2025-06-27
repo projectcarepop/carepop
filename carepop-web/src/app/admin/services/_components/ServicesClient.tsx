@@ -15,6 +15,7 @@ import { ServiceForm } from './ServiceForm';
 import { CategoryForm } from './CategoryForm';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface ServicesClientProps {
   initialServices: AdminService[];
@@ -35,8 +36,8 @@ export default function ServicesClient({ initialServices, initialCategories }: S
   const [selectedCategory, setSelectedCategory] = React.useState<ServiceCategory | undefined>(undefined);
 
   // Queries
-  const { data: services } = useQuery({ queryKey: ['adminServices'], queryFn: () => getAdminServices(session!.access_token), initialData: initialServices, enabled: !!session });
-  const { data: categories } = useQuery({ queryKey: ['adminServiceCategories'], queryFn: () => getAdminServiceCategories(session!.access_token), initialData: initialCategories, enabled: !!session });
+  const { data: services, isError: isErrorServices } = useQuery({ queryKey: ['adminServices'], queryFn: () => getAdminServices(session!.access_token), initialData: initialServices, enabled: !!session });
+  const { data: categories, isError: isErrorCategories } = useQuery({ queryKey: ['adminServiceCategories'], queryFn: () => getAdminServiceCategories(session!.access_token), initialData: initialCategories, enabled: !!session });
 
   // Mutations
   const serviceMutation = useMutation({
@@ -80,17 +81,25 @@ export default function ServicesClient({ initialServices, initialCategories }: S
       })
   }
 
+  if (isErrorServices || isErrorCategories) return <div>Error loading data...</div>;
+
   return (
     <>
-      <Tabs defaultValue="services">
-        <div className="flex justify-between items-center py-4">
+      <CardHeader>
+        <CardTitle>Manage Services</CardTitle>
+        <CardDescription>
+          Define and manage the medical services and service categories offered.
+        </CardDescription>
+      </CardHeader>
+      <Tabs defaultValue="services" className="w-full">
+        <div className='flex justify-between items-center'>
           <TabsList>
             <TabsTrigger value="services">Manage Services</TabsTrigger>
             <TabsTrigger value="categories">Manage Categories</TabsTrigger>
           </TabsList>
-          <div className="flex gap-2">
-             <Button onClick={() => { setSelectedService(undefined); setServiceModal(true); }}><PlusCircle className="mr-2 h-4 w-4" />Create Service</Button>
-             <Button onClick={() => { setSelectedCategory(undefined); setCategoryModal(true); }}><PlusCircle className="mr-2 h-4 w-4" />Create Category</Button>
+          <div className='flex space-x-2'>
+            <Button onClick={() => { setSelectedService(undefined); setServiceModal(true); }}><PlusCircle className="mr-2 h-4 w-4" />Create Service</Button>
+            <Button onClick={() => { setSelectedCategory(undefined); setCategoryModal(true); }}><PlusCircle className="mr-2 h-4 w-4" />Create Category</Button>
           </div>
         </div>
         <TabsContent value="services" className="mt-4">
@@ -106,7 +115,11 @@ export default function ServicesClient({ initialServices, initialCategories }: S
         <DialogContent>
           <DialogHeader><DialogTitle>{selectedService ? 'Edit Service' : 'Create New Service'}</DialogTitle></DialogHeader>
           <ServiceForm 
-            initialData={selectedService} 
+            initialData={selectedService ? {
+                ...selectedService,
+                categoryId: selectedService.serviceCategory?.id || null,
+                durationMinutes: selectedService.durationMinutes || 30,
+            } : undefined} 
             onSubmit={handleServiceSubmit} 
             isPending={serviceMutation.isPending} 
             categories={categories || []} 

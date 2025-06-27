@@ -1,5 +1,7 @@
 import { type Profile, type AppointmentBookingPayload } from '@/lib/types'; // Uses our stable, Drizzle-generated types
 import { type ProfileFormData } from '@/lib/validation/profile-schema';
+import { cookies } from 'next/headers';
+import { createClient } from '@/lib/supabase/server';
 
 // Simple type for AdminUser until we have a more formal definition
 export type AdminUser = {
@@ -246,6 +248,20 @@ export async function getAdminServices(accessToken: string) {
     return result.data || [];
 }
 
+export async function deleteService(serviceId: string, accessToken: string) {
+  const headers = await getAuthHeaders(accessToken);
+  const response = await fetch(`${API_BASE_URL}/api/admin/services/${serviceId}`, {
+    method: 'DELETE',
+    headers,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
+    throw new Error(error.message || 'Failed to delete service.');
+  }
+  return response.json();
+}
+
 export async function upsertService(serviceData: any, accessToken: string, serviceId?: string) {
     const headers = {
       'Authorization': `Bearer ${accessToken}`,
@@ -256,6 +272,19 @@ export async function upsertService(serviceData: any, accessToken: string, servi
     const response = await fetch(url, { method, headers, body: JSON.stringify(serviceData) });
     if (!response.ok) throw new Error(`Failed to ${method === 'POST' ? 'create' : 'update'} service.`);
     return response.json();
+}
+
+export async function deleteServiceCategory(categoryId: string, accessToken:string) {
+  const headers = await getAuthHeaders(accessToken);
+  const response = await fetch(`${API_BASE_URL}/api/admin/service-categories/${categoryId}`, {
+    method: 'DELETE',
+    headers,
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
+    throw new Error(error.message || 'Failed to delete service category.');
+  }
+  return response.json();
 }
 
 export async function upsertServiceCategory(categoryData: any, accessToken: string, categoryId?: string) {
@@ -339,8 +368,8 @@ export async function upsertProductCategory(categoryData: any, accessToken: stri
 
 export async function updateStock(productId: string, quantity: number, accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
-    const url = `${API_BASE_URL}/api/admin/products/${productId}/stock`;
-    const payload = { productId, quantity };
+    const url = `${API_BASE_URL}/api/admin/inventory/${productId}`;
+    const payload = { quantityOnHand: quantity };
     const response = await fetch(url, {
         method: 'PUT',
         headers,
@@ -428,14 +457,36 @@ export async function createAppointment(payload: AppointmentBookingPayload, acce
   return response.json();
 }
 
-export async function getAdminStats(accessToken: string) {
-    const headers = await getAuthHeaders(accessToken);
+export async function getAdminStats(cookieStore: ReturnType<typeof cookies>) {
+  const supabase = createClient(cookieStore);
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) {
+    return { data: null, error: 'Not Authenticated' };
+  }
+
+  const headers = {
+    Authorization: `Bearer ${session.access_token}`,
+    'Content-Type': 'application/json',
+  };
+    
+  try {
     const response = await fetch(`${API_BASE_URL}/api/admin/stats`, { headers, cache: 'no-store' });
     if (!response.ok) {
-        // It's better to throw an error so React Query or SWR can handle it
-        throw new Error('Failed to fetch admin stats.');
+        const errorBody = await response.json().catch(() => ({ message: `HTTP Error: ${response.status} ${response.statusText}` }));
+        console.error("API Error in getAdminStats:", errorBody);
+        return { data: null, error: errorBody.message || 'Failed to fetch admin stats' };
     }
-    return response.json();
+    const result = await response.json();
+    // The backend nests the stats inside a 'data' property
+    return { data: result.data, error: null };
+  } catch (error: any) {
+    console.error("Network or parsing error in getAdminStats:", error);
+    return { data: null, error: "A network error occurred. Please check your connection and try again." };
+  }
 }
 
 export async function getAdminUsers(accessToken: string): Promise<AdminUser[]> {
@@ -503,5 +554,45 @@ export async function deleteClinic(clinicId: string, accessToken: string) {
         throw new Error(error.message || `Failed to delete clinic`);
     }
     // The backend now returns a JSON object. We must parse it.
+    return response.json();
+}
+
+export async function deleteDoctor(doctorId: string, accessToken: string) {
+  const headers = await getAuthHeaders(accessToken);
+  const response = await fetch(`${API_BASE_URL}/api/admin/doctors/${doctorId}`, {
+    method: 'DELETE',
+    headers,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
+    throw new Error(error.message || 'Failed to delete doctor.');
+  }
+  return response.json();
+}
+
+export async function deleteProduct(productId: string, accessToken: string) {
+    const headers = await getAuthHeaders(accessToken);
+    const response = await fetch(`${API_BASE_URL}/api/admin/products/${productId}`, {
+        method: 'DELETE',
+        headers,
+    });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
+        throw new Error(error.message || 'Failed to delete product.');
+    }
+    return response.json();
+}
+
+export async function deleteProductCategory(categoryId: string, accessToken: string) {
+    const headers = await getAuthHeaders(accessToken);
+    const response = await fetch(`${API_BASE_URL}/api/admin/product-categories/${categoryId}`, {
+        method: 'DELETE',
+        headers,
+    });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
+        throw new Error(error.message || 'Failed to delete product category.');
+    }
     return response.json();
 }
