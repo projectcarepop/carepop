@@ -44,7 +44,7 @@ const updateUserRoleSchema = z.object({
 adminRoutes
   .get('/clinics', async (c) => {
     const allClinics = await db.select().from(clinics);
-    return c.json(allClinics);
+    return c.json({ data: allClinics });
   })
   .post('/clinics', zValidator('json', createClinicSchema), async (c) => {
     const { name, address, location, isActive } = c.req.valid('json');
@@ -92,16 +92,16 @@ adminRoutes
     const { id } = c.req.param();
     const [deletedClinic] = await db.delete(clinics).where(eq(clinics.id, id)).returning();
     if (!deletedClinic) return c.json({ error: 'Not Found' }, 404);
-    return c.body(null, 204);
+    return c.json({ success: true });
   });
 
 // --- Doctor Management Endpoints ---
 
 adminRoutes.get('/doctors', async (c) => {
-    // This endpoint is currently broken due to a complex type issue with Drizzle.
-    // Returning an empty array for now to prevent server crashes.
-    // TODO: Fix the Drizzle query and data mapping for doctors.
-    return c.json({ data: [] });
+    // TODO: This query needs to be fleshed out with joins for services, clinics etc.
+    // For now, fetching the basic doctor profiles.
+    const allDoctors = await db.select().from(doctors);
+    return c.json({ data: allDoctors });
 });
 
 adminRoutes.post('/doctors', zValidator('json', createDoctorSchema), async (c) => {
@@ -165,7 +165,7 @@ adminRoutes.get('/appointments', async (c) => {
 adminRoutes.get('/users', async (c) => {
   try {
     const allUsers = await db.select().from(profiles);
-    return c.json(allUsers);
+    return c.json({ data: allUsers });
   } catch (error) {
     console.error('Error fetching users:', error);
     return c.json({ error: 'Internal Server Error', message: 'Failed to fetch users.' }, 500);

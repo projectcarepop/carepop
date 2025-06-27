@@ -27,6 +27,10 @@ const formSchema = z.object({
     city: z.string().min(2, 'City must be at least 2 characters.'),
     zip: z.string().min(5, 'ZIP code must be at least 5 characters.'),
   }),
+  location: z.object({
+    lat: z.coerce.number().min(-90, 'Invalid Latitude').max(90, 'Invalid Latitude'),
+    lon: z.coerce.number().min(-180, 'Invalid Longitude').max(180, 'Invalid Longitude'),
+  }),
   isActive: z.boolean(),
 });
 
@@ -50,9 +54,13 @@ export function ClinicForm({
           name: initialData.name,
           phoneNumber: initialData.phoneNumber || '',
           address: {
-            street: (initialData.address as any)?.street || '',
-            city: (initialData.address as any)?.city || '',
-            zip: (initialData.address as any)?.zip || '',
+            street: typeof initialData.address === 'object' && initialData.address !== null ? (initialData.address as any).street : '',
+            city: typeof initialData.address === 'object' && initialData.address !== null ? (initialData.address as any).city : '',
+            zip: typeof initialData.address === 'object' && initialData.address !== null ? (initialData.address as any).zip : '',
+          },
+          location: {
+            lat: (initialData.location as any)?.y || 0,
+            lon: (initialData.location as any)?.x || 0,
           },
           isActive: initialData.isActive,
         }
@@ -63,6 +71,10 @@ export function ClinicForm({
             street: '',
             city: '',
             zip: '',
+          },
+          location: {
+            lat: 0,
+            lon: 0,
           },
           isActive: true,
         },
@@ -148,6 +160,44 @@ export function ClinicForm({
                 <FormLabel>ZIP Code</FormLabel>
                 <FormControl>
                   <Input placeholder="1100" {...field} disabled={isPending} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="location.lat"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Latitude</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    placeholder="e.g., 14.6760"
+                    {...field}
+                    disabled={isPending}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="location.lon"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Longitude</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    placeholder="e.g., 121.0437"
+                    {...field}
+                    disabled={isPending}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

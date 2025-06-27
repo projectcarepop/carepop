@@ -470,6 +470,6 @@ export async function deleteClinic(clinicId: string, accessToken: string) {
         const error = await response.json().catch(() => ({ message: "An unknown error occurred" }));
         throw new Error(error.message || `Failed to delete clinic`);
     }
-    // DELETE requests might not return a body, so we return a success indicator.
-    return { success: true };
+    // The backend now returns a JSON object. We must parse it.
+    return response.json();
 }

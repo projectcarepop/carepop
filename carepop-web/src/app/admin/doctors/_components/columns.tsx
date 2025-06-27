@@ -9,50 +9,35 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { Clinic } from '@/lib/types';
+import { Doctor } from '@/lib/types';
 
 interface ColumnActions {
-  onEdit: (clinic: Clinic) => void;
-  onDelete: (clinic: Clinic) => void;
+  onEdit: (doctor: Doctor) => void;
+  onDelete: (doctor: Doctor) => void;
 }
 
-// The columns definition is now a function that accepts handlers for edit and delete
-export const columns = ({ onEdit, onDelete }: ColumnActions): ColumnDef<Clinic>[] => [
+export const columns = ({ onEdit, onDelete }: ColumnActions): ColumnDef<Doctor>[] => [
   {
-    accessorKey: 'name',
+    accessorKey: 'fullName',
     header: ({ column }) => {
       return (
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
         >
-          Name
+          Full Name
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       );
     },
   },
   {
-    accessorKey: 'address',
-    header: 'Address',
-    cell: ({ row }) => {
-      const address = row.original.address as { street?: string; city?: string; zip?: string };
-      return `${address?.street || ''}, ${address?.city || ''} ${address?.zip || ''}`;
-    },
-  },
-  {
-    accessorKey: 'location',
-    header: 'Location (Lat, Lon)',
-    cell: ({ row }) => {
-      const location = row.original.location as { x?: number; y?: number };
-      if (location?.y && location?.x) {
-        return `${location.y.toFixed(4)}, ${location.x.toFixed(4)}`;
-      }
-      return 'N/A';
-    }
+    accessorKey: 'specialtyText',
+    header: 'Specialty',
   },
   {
     accessorKey: 'isActive',
@@ -77,7 +62,7 @@ export const columns = ({ onEdit, onDelete }: ColumnActions): ColumnDef<Clinic>[
   {
     id: 'actions',
     cell: ({ row }) => {
-      const clinic = row.original;
+      const doctor = row.original;
 
       return (
         <DropdownMenu>
@@ -90,18 +75,19 @@ export const columns = ({ onEdit, onDelete }: ColumnActions): ColumnDef<Clinic>[
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuItem
-              onClick={() => navigator.clipboard.writeText(clinic.id)}
+              onClick={() => navigator.clipboard.writeText(doctor.id)}
             >
-              Copy Clinic ID
+              Copy Doctor ID
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onEdit(clinic)}>
-              Edit Clinic
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onEdit(doctor)}>
+              Edit Doctor
             </DropdownMenuItem>
             <DropdownMenuItem
-              onClick={() => onDelete(clinic)}
+              onClick={() => onDelete(doctor)}
               className="text-red-600"
             >
-              Delete Clinic
+              Delete Doctor
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

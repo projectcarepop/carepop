@@ -3,6 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
+import React from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -12,7 +13,6 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage,
 } from '@/components/ui/form';
 import {
   Select,
@@ -21,70 +21,97 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AdminUser } from '@/lib/types';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { AdminUser } from '@/services/api';
 import { Loader2 } from 'lucide-react';
-import { userRoleEnum } from '@/lib/types';
 
 const formSchema = z.object({
-  role: z.enum(userRoleEnum),
+  role: z.enum(['patient', 'admin'], {
+    required_error: 'Please select a role.',
+  }),
 });
 
-type UserRoleFormValues = z.infer<typeof formSchema>;
+type FormValues = z.infer<typeof formSchema>;
 
 interface UserRoleFormProps {
-  initialData: AdminUser;
-  onSubmit: (values: UserRoleFormValues) => void;
+  isOpen: boolean;
+  onClose: () => void;
+  user?: AdminUser;
+  onSubmit: (values: FormValues) => void;
   isPending: boolean;
 }
 
 export function UserRoleForm({
-  initialData,
+  isOpen,
+  onClose,
+  user,
   onSubmit,
   isPending,
 }: UserRoleFormProps) {
-  const form = useForm<UserRoleFormValues>({
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      role: initialData.role as 'patient' | 'admin',
-    },
+    defaultValues: { role: user?.role },
   });
 
+  // Reset the form when the user changes
+  React.useEffect(() => {
+    if (user) {
+      form.reset({ role: user.role });
+    }
+  }, [user, form]);
+
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        <FormField
-          control={form.control}
-          name="role"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>User Role</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a role" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {userRoleEnum.map((role) => (
-                    <SelectItem key={role} value={role}>
-                      {role}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormDescription>
-                Changing this will alter the user&apos;s permissions across the
-                platform.
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <Button type="submit" disabled={isPending}>
-          {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Save changes
-        </Button>
-      </form>
-    </Form>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit User Role</DialogTitle>
+          <DialogDescription>
+            Select a new role for{' '}
+            <span className="font-semibold">{user?.fullName}</span>.
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            <FormField
+              control={form.control}
+              name="role"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Role</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                    disabled={isPending}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a role" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="patient">Patient</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    This will change the user&apos;s permissions across the application.
+                  </FormDescription>
+                </FormItem>
+              )}
+            />
+            <Button type="submit" disabled={isPending}>
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Changes
+            </Button>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
   );
 } 

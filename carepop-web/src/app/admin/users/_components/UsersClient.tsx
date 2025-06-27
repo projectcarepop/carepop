@@ -2,29 +2,25 @@
 
 import * as React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAdmin } from '@/lib/contexts/AdminContext';
 import { toast } from '@/hooks/use-toast';
 
 import { getAdminUsers, updateUserRole } from '@/services/api';
 import { DataTable } from '@/components/ui/data-table';
-import { type AdminUser } from '@/lib/types';
+import { type AdminUser } from '@/services/api';
 import { columns } from './columns';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { useAuth } from '@/lib/contexts/auth-context';
 import { UserRoleForm } from './UserRoleForm';
 
-export default function UsersClient() {
-  const { session } = useAdmin();
+interface UsersClientProps {
+  initialUsers: AdminUser[];
+}
+
+export default function UsersClient({ initialUsers }: UsersClientProps) {
+  const { session } = useAuth();
   const queryClient = useQueryClient();
+
   const [isModalOpen, setIsModalOpen] = React.useState(false);
-  const [selectedUser, setSelectedUser] = React.useState<AdminUser | undefined>(
-    undefined
-  );
+  const [selectedUser, setSelectedUser] = React.useState<AdminUser | undefined>(undefined);
 
   const {
     data: users,
@@ -33,14 +29,15 @@ export default function UsersClient() {
     error,
   } = useQuery({
     queryKey: ['adminUsers'],
-    queryFn: () => getAdminUsers(session?.access_token),
-    enabled: !!session, // Ensures query does not run until session is loaded
-    staleTime: 1000 * 60, // 1 minute
+    queryFn: () => getAdminUsers(session!.access_token),
+    initialData: initialUsers,
+    enabled: !!session,
   });
 
   const updateRoleMutation = useMutation({
-    mutationFn: (userData: { userId: string, role: 'admin' | 'patient' }) =>
-      updateUserRole(userData, session?.access_token),
+    mutationFn: (data: { userId: string; role: 'patient' | 'admin' }) => {
+      return updateUserRole(data, session!.access_token);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
       toast({
@@ -50,7 +47,7 @@ export default function UsersClient() {
       setIsModalOpen(false);
       setSelectedUser(undefined);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: 'Error',
         description: `Failed to update role: ${error.message}`,
@@ -64,36 +61,28 @@ export default function UsersClient() {
     setIsModalOpen(true);
   };
 
-  const dynamicColumns = React.useMemo(() => columns(handleEditRole), []);
+  const dynamicColumns = React.useMemo(() => columns({ onEditRole: handleEditRole }), []);
 
   if (isError) return <div>Failed to load users: {error?.message}</div>;
 
   return (
     <>
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Edit User Role</DialogTitle>
-            <DialogDescription>
-              Select a new role for{' '}
-              <span className="font-semibold">{selectedUser?.fullName}</span>.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedUser && (
-            <UserRoleForm
-              initialData={selectedUser}
-              onSubmit={(values) => {
-                updateRoleMutation.mutate({
-                  userId: selectedUser.id,
-                  role: values.role,
-                });
-              }}
-              isPending={updateRoleMutation.isPending}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      <div className="flex items-center justify-between py-4">
+        <h1 className="text-2xl font-bold">Manage Users</h1>
+      </div>
 
+      <UserRoleForm
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        user={selectedUser}
+        onSubmit={(values) => {
+          if (selectedUser) {
+            updateRoleMutation.mutate({ userId: selectedUser.id, role: values.role });
+          }
+        }}
+        isPending={updateRoleMutation.isPending}
+      />
+      
       <DataTable
         columns={dynamicColumns}
         data={users || []}
