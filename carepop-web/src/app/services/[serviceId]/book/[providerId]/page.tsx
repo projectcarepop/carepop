@@ -8,7 +8,7 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { useSupabase } from '@/lib/contexts/auth-context';
+import { useAuth } from '@/lib/contexts/auth-context';
 
 interface BookingPageProps {
     params: {
@@ -19,7 +19,7 @@ interface BookingPageProps {
 
 export default function BookingPage({ params }: BookingPageProps) {
     const { serviceId, providerId } = params;
-    const { user } = useSupabase();
+    const { user } = useAuth();
     const [date, setDate] = useState<Date | undefined>(new Date());
     const [availability, setAvailability] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);

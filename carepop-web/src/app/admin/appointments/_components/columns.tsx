@@ -59,11 +59,18 @@ export const columns: ColumnDef<AdminAppointment>[] = [
     header: 'Service',
   },
   {
-    accessorKey: 'appointment_date',
+    accessorKey: 'appointmentTime',
     header: 'Date & Time',
     cell: ({ row }) => {
-      const date = new Date(row.getValue('appointment_date'));
-      return date.toLocaleString();
+      const date = new Date(row.getValue('appointmentTime'));
+      return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
     },
   },
   {

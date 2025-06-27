@@ -177,8 +177,8 @@ export async function getAdminAppointments(accessToken: string, filters?: Record
       throw new Error(error.message || 'Failed to fetch appointments.');
   }
   const result = await response.json();
-  // Backend returns the full array, not nested under a 'data' property for this specific endpoint
-  return result || [];
+  // FIX: The backend returns data nested under a 'data' property.
+  return result.data || [];
 }
 
 export async function getAdminProducts(accessToken: string) {

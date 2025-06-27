@@ -15,7 +15,7 @@ import { ProductCategory } from '@/lib/types';
 
 interface ColumnActions {
   onEdit: (category: ProductCategory) => void;
-  onDelete: (id: string) => void;
+  onDelete: (category: ProductCategory) => void;
 }
 
 export const columns = ({ onEdit, onDelete }: ColumnActions): ColumnDef<ProductCategory>[] => [
@@ -46,7 +46,7 @@ export const columns = ({ onEdit, onDelete }: ColumnActions): ColumnDef<ProductC
               Edit Category
             </DropdownMenuItem>
             <DropdownMenuItem
-              onClick={() => onDelete(category.id)}
+              onClick={() => onDelete(category)}
               className="text-red-600"
             >
               Delete Category

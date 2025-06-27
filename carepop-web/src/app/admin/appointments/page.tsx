@@ -1,50 +1,36 @@
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getAdminAppointments } from '@/services/api';
 import AppointmentsClient from './_components/AppointmentsClient';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Terminal } from 'lucide-react';
+import AccessDenied from "@/components/layout/AccessDenied";
 
-/**
- * This is the main server component for the Admin Appointments page.
- * It securely fetches the initial data for all appointments and passes it 
- * to the client component for interactive display and filtering.
- */
+async function getAdminAppointmentsData(cookieStore: ReturnType<typeof cookies>) {
+    const supabase = createClient(cookieStore);
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) {
+        console.log("No session found, cannot fetch appointments.");
+        return { appointments: [], error: 'Not authenticated' };
+    }
+    
+    try {
+        const appointments = await getAdminAppointments(session.access_token);
+        console.log(`[Admin Appointments Page] Passing ${appointments.length} appointments to the client component.`);
+        console.log("[Admin Appointments Page] Sample record:", JSON.stringify(appointments[0], null, 2));
+        return { appointments, error: null };
+    } catch (error: any) {
+        console.error("Failed to fetch admin appointments:", error.message);
+        return { appointments: [], error: error.message };
+    }
+}
+
 export default async function AdminAppointmentsPage() {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+    const cookieStore = cookies();
+    const { appointments, error } = await getAdminAppointmentsData(cookieStore);
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
-    redirect('/sign-in?redirect=/admin/appointments');
-  }
-  
-  // Explicitly check for admin role before making the API call
-  if (session.user.user_metadata?.role !== 'admin') {
-    redirect('/forbidden');
-  }
-
-  try {
-    const appointments = await getAdminAppointments(session.access_token, {});
-    return <AppointmentsClient initialAppointments={appointments} />;
-  } catch (error: any) {
-    console.error(`[AdminAppointmentsPage] Error fetching appointments:`, error);
-    if (error.message.includes('Forbidden') || error.message.includes('Unauthorized')) {
-        redirect('/forbidden');
+    if (error) {
+        return <div className="p-4 text-red-500">Error: {error}</div>;
     }
 
-    return (
-      <div className="container mx-auto p-4">
-        <Alert variant="destructive">
-          <Terminal className="h-4 w-4" />
-          <AlertTitle>Failed to Load Appointments</AlertTitle>
-          <AlertDescription>
-            <p>There was an error fetching the appointment data from the server.</p>
-            <p className="mt-2 font-mono text-xs">Error: {error.message}</p>
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
+    return <AppointmentsClient initialAppointments={appointments} />;
 }
