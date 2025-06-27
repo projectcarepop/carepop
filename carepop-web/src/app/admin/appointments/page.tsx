@@ -19,6 +19,11 @@ export default async function AdminAppointmentsPage() {
   if (!session) {
     redirect('/sign-in?redirect=/admin/appointments');
   }
+  
+  // Explicitly check for admin role before making the API call
+  if (session.user.user_metadata?.role !== 'admin') {
+    redirect('/forbidden');
+  }
 
   try {
     const appointments = await getAdminAppointments(session.access_token, {});
