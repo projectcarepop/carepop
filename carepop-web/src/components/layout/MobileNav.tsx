@@ -11,12 +11,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { User } from '@supabase/supabase-js';
 
-type User = {
-  email?: string;
-} | null;
-
-export default function MobileNav({ user }: { user: User }) {
+export default function MobileNav({ user }: { user: User | null }) {
   return (
     <div className="md:hidden">
       <DropdownMenu>

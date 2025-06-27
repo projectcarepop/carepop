@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { signOutUser } from '@/app/auth/actions';
-import { useAuth } from '@/lib/contexts/auth-context';
+import { useSupabase } from '@/lib/contexts/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const navItems = [
@@ -35,7 +35,7 @@ const NavLink = ({ href, label, icon: Icon, isActive }: { href: string; label: s
 
 export default function AdminSidebar() {
     const pathname = usePathname();
-    const { user, isLoading } = useAuth();
+    const { user, isLoading } = useSupabase();
 
     if (isLoading) {
         return (

@@ -6,7 +6,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 export async function signOutAction() {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
   const { error } = await supabase.auth.signOut();
@@ -22,7 +22,7 @@ export async function signOutAction() {
 }
 
 export async function updateAvatarAction(formData: FormData) {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const supabase = createClient(cookieStore);
 
     const { data: { user } } = await supabase.auth.getUser();

@@ -1,60 +1,16 @@
 "use client";
 
-import { useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import * as z from 'zod'
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Icons } from '@/components/icons'
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form'
-import { MailCheck } from 'lucide-react'
-
-const formSchema = z.object({
-  email: z.string().email({ message: 'Please enter a valid email address.' }),
-})
+import { requestPasswordReset } from './actions';
+import { MailCheck } from 'lucide-react';
 
 export default function ForgotPasswordPage() {
-  const [supabase] = useState(() => createClient());
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isSuccess, setIsSuccess] = useState(false)
-  const [formError, setFormError] = useState<string | null>(null);
-  
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      email: '',
-    },
-  })
-
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsSubmitting(true)
-    setFormError(null);
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
-        redirectTo: `${location.origin}/auth/callback?next=/update-password`,
-      })
-
-      if (error) {
-        setFormError(error.message);
-      } else {
-        setIsSuccess(true);
-      }
-    } catch {
-      setFormError('An unexpected error occurred. Please try again.');
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
+  const searchParams = useSearchParams();
+  const message = searchParams.get('message');
+  const isSuccess = message === 'Password reset link has been sent to your email.';
 
   if (isSuccess) {
     return (
@@ -63,7 +19,7 @@ export default function ForgotPasswordPage() {
             <MailCheck className="mx-auto h-12 w-12 text-primary" />
             <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-space-grotesk)' }}>Check your email</h1>
             <p className="text-muted-foreground">
-              We&apos;ve sent a password reset link to your email address. Please check your inbox.
+              {message}
             </p>
             <Button asChild>
                 <Link href="/sign-in">Back to Sign In</Link>
@@ -84,37 +40,16 @@ export default function ForgotPasswordPage() {
             Enter your email and we&apos;ll send you a link to reset your password.
           </p>
         </div>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email address</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Enter your email address"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            {formError && <p className="text-sm font-medium text-destructive">{formError}</p>}
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                'Send Reset Link'
-              )}
+        <form action={requestPasswordReset} className="space-y-4">
+            <div>
+                <label className="text-sm font-medium" htmlFor="email">Email address</label>
+                <Input id="email" name="email" type="email" placeholder="Enter your email address" required />
+            </div>
+            {message && <p className="text-sm font-medium text-destructive">{message}</p>}
+            <Button type="submit" className="w-full">
+                Send Reset Link
             </Button>
-          </form>
-        </Form>
+        </form>
         <p className="px-8 text-center text-sm text-muted-foreground">
           <Link
             href="/sign-in"

@@ -1,6 +1,6 @@
 'use client'
 
-import { useAuth } from "@/lib/contexts/auth-context"
+import { useSupabase } from "@/lib/contexts/auth-context"
 import {
   Avatar,
   AvatarFallback,
@@ -22,7 +22,7 @@ import { signOutUser } from "@/app/auth/actions"
 import { Skeleton } from "@/components/ui/skeleton"
 
 export function UserNav() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading } = useSupabase();
 
   if (isLoading) {
     return <Skeleton className="h-8 w-8 rounded-full" />;

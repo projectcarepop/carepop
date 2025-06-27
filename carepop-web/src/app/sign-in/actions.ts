@@ -1,13 +1,13 @@
 'use server'
 
-import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
 
 export async function signIn(formData: FormData) {
-  const cookieStore = await cookies()
   const email = formData.get('email') as string
   const password = formData.get('password') as string
+  const cookieStore = await cookies()
   const supabase = createClient(cookieStore)
 
   const { error } = await supabase.auth.signInWithPassword({
@@ -48,7 +48,7 @@ export async function signOut() {
 
 export async function googleSignIn() {
     const cookieStore = await cookies()
-    const supabase = createClient(cookieStore);
+    const supabase = createClient(cookieStore)
     const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {

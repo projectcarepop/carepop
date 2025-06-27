@@ -7,16 +7,17 @@
     "strict": true,
     "skipLibCheck": true,
     "outDir": "dist",
-    "rootDir": "app",
+    "rootDir": ".",
     "composite": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
     "baseUrl": ".",
     "paths": {
-      "~/*": ["./app/*"]
+      "~/*": ["./app/*"],
+      "@/drizzle/*": ["./drizzle/*"]
     }
   },
-  "include": ["app/**/*.ts"],
+  "include": ["app/**/*.ts", "drizzle/**/*.ts"],
   "exclude": ["node_modules"]
 } 

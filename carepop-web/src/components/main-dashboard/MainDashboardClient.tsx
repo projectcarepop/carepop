@@ -1,15 +1,14 @@
 'use client';
 
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { getMyAppointments, getMyMedicalRecords } from '@/services/api';
-import { createClient } from '@/lib/supabase/client';
+import { useSupabase } from '@/lib/contexts/auth-context';
 import type { Profile, Appointment, MedicalRecord } from '@/lib/types';
 import { AppointmentsTable } from './AppointmentsTable';
-import { Book, FileText, Calendar, LogOut, ArrowRight } from 'lucide-react';
+import { Book, FileText, Calendar, LogOut, ArrowRight, Loader2 } from 'lucide-react';
 import { signOutAction } from '@/app/main-dashboard/actions';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format } from 'date-fns';
@@ -36,25 +35,31 @@ export function MainDashboardClient({
   initialAppointments,
   initialMedicalRecords
 }: MainDashboardClientProps) {
-  const [supabase] = useState(() => createClient());
+  const { isInitialized, session } = useSupabase();
 
-  const { data: appointments } = useQuery({
-    queryKey: ['myAppointments'],
-    queryFn: () => getMyAppointments(supabase),
+  // The queries are now enabled only when the auth context is initialized AND there's a session.
+  const { data: appointments, isLoading: isLoadingAppointments } = useQuery({
+    queryKey: ['myAppointments', session?.user?.id],
+    queryFn: () => getMyAppointments(),
     initialData: initialAppointments,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    staleTime: 1000 * 60 * 5,
+    enabled: isInitialized && !!session,
   });
 
-  const { data: medicalRecords } = useQuery({
-    queryKey: ['myMedicalRecords'],
-    queryFn: () => getMyMedicalRecords(supabase),
+  const { data: medicalRecords, isLoading: isLoadingRecords } = useQuery({
+    queryKey: ['myMedicalRecords', session?.user?.id],
+    queryFn: () => getMyMedicalRecords(),
     initialData: initialMedicalRecords,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    staleTime: 1000 * 60 * 5,
+    enabled: isInitialized && !!session,
   });
+
+  // Display a loading spinner until the initial auth check is complete.
+  if (!isInitialized) {
+    return (
+      <div className="flex justify-center items-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!profile) {
     // This case should ideally be handled by the server component redirect,
@@ -128,8 +133,14 @@ export function MainDashboardClient({
                         <CardTitle className="flex items-center gap-2"><Calendar className="h-5 w-5 text-primary"/> Upcoming Appointments</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-3xl font-bold">{appointments?.length || 0}</p>
-                        <CardDescription>appointments scheduled</CardDescription>
+                        {isLoadingAppointments ? (
+                            <p className="text-lg text-muted-foreground">Loading...</p>
+                        ) : (
+                            <>
+                                <p className="text-3xl font-bold">{appointments?.length || 0}</p>
+                                <CardDescription>appointments scheduled</CardDescription>
+                            </>
+                        )}
                     </CardContent>
                 </Card>
                 <Card>
@@ -137,8 +148,14 @@ export function MainDashboardClient({
                         <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-primary"/> Medical Records</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-3xl font-bold">{medicalRecords?.length || 0}</p>
-                        <CardDescription>total records found</CardDescription>
+                        {isLoadingRecords ? (
+                            <p className="text-lg text-muted-foreground">Loading...</p>
+                        ) : (
+                            <>
+                                <p className="text-3xl font-bold">{medicalRecords?.length || 0}</p>
+                                <CardDescription>total records found</CardDescription>
+                            </>
+                        )}
                     </CardContent>
                 </Card>
             </div>

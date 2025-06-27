@@ -1,82 +1,17 @@
 "use client";
 
 import { useState } from 'react';
-import Link from 'next/link';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { createClient } from '@/lib/supabase/client';
-
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Icons } from '@/components/icons';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { CheckCircle } from 'lucide-react';
-
-const formSchema = z.object({
-  password: z.string().min(8, { message: 'Password must be at least 8 characters long.' }),
-  confirmPassword: z.string()
-}).refine(data => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
+import { updateUserPassword } from './actions';
 
 export default function UpdatePasswordPage() {
-  const [supabase] = useState(() => createClient());
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const message = searchParams.get('message');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      password: '',
-      confirmPassword: '',
-    },
-  });
-
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsSubmitting(true);
-    setError(null);
-    
-    const { error } = await supabase.auth.updateUser({ password: values.password });
-
-    if (error) {
-      setError(error.message);
-    } else {
-      setIsSuccess(true);
-    }
-
-    setIsSubmitting(false);
-  }
-  
-  if (isSuccess) {
-    return (
-      <div className="flex justify-center items-center h-screen bg-gray-50">
-        <div className="w-full max-w-md p-10 space-y-6 bg-white rounded-lg shadow-md border border-gray-200 text-center">
-          <CheckCircle className="mx-auto h-12 w-12 text-green-500" />
-          <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
-            Password Reset Successful
-          </h1>
-          <p className="text-muted-foreground">
-            Your password has been changed. You can now sign in with your new password.
-          </p>
-          <Button asChild className="w-full">
-            <Link href="/sign-in">Go to Sign In</Link>
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex justify-center items-center min-h-screen bg-gray-50">
@@ -89,73 +24,48 @@ export default function UpdatePasswordPage() {
             Please enter your new password below.
           </p>
         </div>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>New Password</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Input
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Enter your new password"
-                        {...field}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 flex items-center pr-3"
-                      >
-                        {showPassword ? <Icons.eyeOff className="h-5 w-5" /> : <Icons.eye className="h-5 w-5" />}
-                      </button>
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="confirmPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Confirm New Password</FormLabel>
-                   <FormControl>
-                    <div className="relative">
-                      <Input
-                        type={showConfirmPassword ? "text" : "password"}
-                        placeholder="Confirm your new password"
-                        {...field}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute inset-y-0 right-0 flex items-center pr-3"
-                      >
-                        {showConfirmPassword ? <Icons.eyeOff className="h-5 w-5" /> : <Icons.eye className="h-5 w-5" />}
-                      </button>
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            {error && <p className="text-sm font-medium text-destructive">{error}</p>}
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-                  Resetting Password...
-                </>
-              ) : (
-                'Reset Password'
-              )}
+        <form action={updateUserPassword} className="space-y-4">
+            <div className="relative">
+                <label className="text-sm font-medium" htmlFor="password">New Password</label>
+                <Input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your new password"
+                    required
+                />
+                <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3"
+                    style={{ top: '1.75rem' }} // Adjust based on label height
+                >
+                    {showPassword ? <Icons.eyeOff className="h-5 w-5" /> : <Icons.eye className="h-5 w-s" />}
+                </button>
+            </div>
+            <div className="relative">
+                <label className="text-sm font-medium" htmlFor="confirmPassword">Confirm New Password</label>
+                <Input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Confirm your new password"
+                    required
+                />
+                 <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3"
+                    style={{ top: '1.75rem' }}
+                >
+                    {showConfirmPassword ? <Icons.eyeOff className="h-5 w-5" /> : <Icons.eye className="h-5 w-5" />}
+                </button>
+            </div>
+            {message && <p className="text-sm font-medium text-destructive">{message}</p>}
+            <Button type="submit" className="w-full">
+                Reset Password
             </Button>
-          </form>
-        </Form>
+        </form>
       </div>
     </div>
   );

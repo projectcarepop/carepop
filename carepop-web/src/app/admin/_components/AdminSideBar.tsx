@@ -1,0 +1,79 @@
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+
+import { cn } from '@/lib/utils';
+import {
+  LayoutDashboard,
+  Users,
+  Hospital,
+  Stethoscope,
+  Pill,
+  Calendar,
+  Package,
+} from 'lucide-react';
+
+const sidebarNavItems = [
+  {
+    title: 'Dashboard',
+    href: '/admin',
+    icon: LayoutDashboard,
+  },
+  {
+    title: 'Users',
+    href: '/admin/users',
+    icon: Users,
+  },
+  {
+    title: 'Clinics',
+    href: '/admin/clinics',
+    icon: Hospital,
+  },
+  {
+    title: 'Doctors',
+    href: '/admin/doctors',
+    icon: Stethoscope,
+  },
+  {
+    title: 'Services',
+    href: '/admin/services',
+    icon: Pill,
+  },
+  {
+    title: 'Appointments',
+    href: '/admin/appointments',
+    icon: Calendar,
+  },
+  {
+    title: 'Inventory',
+    href: '/admin/inventory',
+    icon: Package,
+  },
+];
+
+export default function AdminSidebar() {
+  const pathname = usePathname();
+
+  return (
+    <aside className="hidden h-full w-64 flex-col border-r bg-gray-100/40 p-4 dark:bg-gray-800/40 lg:flex">
+      <nav className="flex flex-col space-y-2">
+        {sidebarNavItems.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              'flex items-center rounded-lg px-3 py-2 text-gray-900 transition-colors hover:bg-gray-200 dark:text-gray-50 dark:hover:bg-gray-800',
+              pathname === item.href
+                ? 'bg-gray-200 dark:bg-gray-800'
+                : 'hover:bg-gray-200/50 dark:hover:bg-gray-800/50'
+            )}
+          >
+            <item.icon className="mr-2 h-4 w-4" />
+            {item.title}
+          </Link>
+        ))}
+      </nav>
+    </aside>
+  );
+}

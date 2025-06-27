@@ -1,24 +1,27 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
-import { getMyAppointments } from '@/services/api'; // We'll reuse our API function
-import { AppointmentsTable } from '@/components/main-dashboard/AppointmentsTable'; // Reuse the table
+import { getMyAppointments } from '@/services/api';
+import { AppointmentsTable } from '@/components/main-dashboard/AppointmentsTable';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { PlusCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AppointmentsPage() {
-  const supabase = createClient(await cookies());
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { session } } = await supabase.auth.getSession();
 
-  if (!user) {
+  if (!session) {
     return redirect('/sign-in?redirect=/appointments');
   }
 
-  // Use the new, robust getMyAppointments function
-  const appointments = await getMyAppointments(supabase);
+  // Pass only the access token to the service function
+  const appointments = await getMyAppointments({ limit: 100 }, session.access_token);
 
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
@@ -40,4 +43,4 @@ export default async function AppointmentsPage() {
       </Card>
     </div>
   );
-} 
+}

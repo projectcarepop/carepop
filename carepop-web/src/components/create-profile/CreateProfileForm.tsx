@@ -11,7 +11,6 @@ import { format, parse, isValid } from 'date-fns';
 import { type Profile } from '@/lib/types';
 import { profileFormSchema, type ProfileFormData } from '@/lib/validation/profile-schema';
 import { updateMyProfile } from '@/services/api';
-import { useAuth } from '@/lib/contexts/auth-context';
 
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -50,7 +49,6 @@ const RequiredLabel = ({ children }: { children: React.ReactNode }) => (
 export function CreateProfileForm({ initialProfile }: { initialProfile: Profile | null }) {
     const router = useRouter();
     const { toast } = useToast();
-    const { supabase } = useAuth();
     const [step, setStep] = React.useState(1);
     const queryClient = useQueryClient();
 
@@ -62,6 +60,9 @@ export function CreateProfileForm({ initialProfile }: { initialProfile: Profile 
     const [isLoadingProvinces, setIsLoadingProvinces] = React.useState(false);
     const [isLoadingCities, setIsLoadingCities] = React.useState(false);
     const [isLoadingBarangays, setIsLoadingBarangays] = React.useState(false);
+
+    // Track if the initial data has been loaded to prevent unwanted resets
+    const [isInitialLoad, setIsInitialLoad] = React.useState(true);
     
     // --- FORM SETUP ---
     const form = useForm<ProfileFormData>({
@@ -121,11 +122,13 @@ export function CreateProfileForm({ initialProfile }: { initialProfile: Profile 
 
         const fetchCities = async () => {
             setIsLoadingCities(true);
-            // Reset downstream state
-            setCities([]);
-            setBarangays([]);
-            form.setValue('cityMunicipalityCode', '');
-            form.setValue('barangayCode', '');
+            // Only reset downstream state if it's NOT the initial load
+            if (!isInitialLoad) {
+                setCities([]);
+                setBarangays([]);
+                form.setValue('cityMunicipalityCode', '');
+                form.setValue('barangayCode', '');
+            }
             try {
                 const response = await fetch('/data/psgc/cities-municipalities.json');
                 if (!response.ok) throw new Error('Network response was not ok');
@@ -140,7 +143,7 @@ export function CreateProfileForm({ initialProfile }: { initialProfile: Profile 
             }
         };
         fetchCities();
-    }, [selectedProvinceCode, form, toast]);
+    }, [selectedProvinceCode, form, toast, isInitialLoad]);
 
     // 3. Fetch and filter barangays when a city/municipality is selected
     React.useEffect(() => {
@@ -152,15 +155,21 @@ export function CreateProfileForm({ initialProfile }: { initialProfile: Profile 
 
         const fetchBarangays = async () => {
             setIsLoadingBarangays(true);
-            // Reset downstream state
-            setBarangays([]);
-            form.setValue('barangayCode', '');
+            // Only reset downstream state if it's NOT the initial load
+            if (!isInitialLoad) {
+                setBarangays([]);
+                form.setValue('barangayCode', '');
+            }
             try {
                 const response = await fetch('/data/psgc/barangays.json');
                 if (!response.ok) throw new Error('Network response was not ok');
                 const allBarangays: Barangay[] = await response.json();
                 const filteredBarangays = allBarangays.filter(brgy => brgy.city_code === selectedCityCode);
                 setBarangays(filteredBarangays);
+                // After the first successful load of barangays, we can consider the initial load complete.
+                if (isInitialLoad && filteredBarangays.length > 0) {
+                    setIsInitialLoad(false);
+                }
             } catch (error) {
                 console.error("Failed to load barangays.json", error);
                 toast({ title: "Error", description: "Could not load barangays.", variant: "destructive" });
@@ -169,13 +178,12 @@ export function CreateProfileForm({ initialProfile }: { initialProfile: Profile 
             }
         };
         fetchBarangays();
-    }, [selectedCityCode, form, toast]);
+    }, [selectedCityCode, form, toast, isInitialLoad]);
 
     // --- MUTATION & SUBMISSION ---
     const { mutate: submitProfile, isPending } = useMutation({
         mutationFn: (formData: ProfileFormData) => {
-            if (!supabase) throw new Error("Authentication context is not available.");
-            return updateMyProfile(supabase, formData);
+            return updateMyProfile(formData);
         },
         onSuccess: (data) => {
             toast({

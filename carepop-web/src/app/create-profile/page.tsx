@@ -5,7 +5,10 @@ import { CreateProfileForm } from '@/components/create-profile/CreateProfileForm
 import type { Profile } from '@/lib/types';
 import type { Session } from '@supabase/supabase-js';
 
-// This function securely fetches the session and any existing profile data.
+// This line tells Next.js to always render this page on-demand,
+// which is necessary because it uses dynamic functions like `cookies` and `searchParams`.
+export const dynamic = 'force-dynamic';
+
 async function getInitialProfile(): Promise<{ session: Session | null, profile: Profile | null }> {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
@@ -23,14 +26,13 @@ async function getInitialProfile(): Promise<{ session: Session | null, profile: 
     const headers = { 'Authorization': `Bearer ${session.access_token}` };
     const res = await fetch(`${apiUrl}/api/me/profile`, { headers, cache: 'no-store' });
 
-    // A 404 is not an error in this context; it just means the profile doesn't exist yet.
     if (!res.ok && res.status !== 404) {
       console.error(`Failed to fetch profile, status: ${res.status}`);
       return { session, profile: null };
     }
     
-    // If the profile doesn't exist (404), res.json() will fail, so we handle that.
-    const profile = res.ok ? await res.json() : null;
+    // The response might not have a body if the profile doesn't exist (404)
+    const profile = (res.ok && res.status !== 204) ? await res.json() : null;
     return { session, profile };
 
   } catch (error) {
@@ -40,30 +42,19 @@ async function getInitialProfile(): Promise<{ session: Session | null, profile: 
 }
 
 export default async function CreateProfilePage({ searchParams }: { searchParams: { mode?: string } }) {
-  console.log("--- CREATE PROFILE PAGE ---");
-  console.log("Received searchParams:", searchParams);
-  console.log("Value of searchParams.mode:", searchParams.mode);
-  console.log("Is mode !== 'edit'?", searchParams.mode !== 'edit');
-
   const { session, profile } = await getInitialProfile();
+  
+  // It's safer to get the mode from searchParams after the initial async work.
+  const isEditMode = searchParams?.mode === 'edit';
 
-  // This is the ONLY security check this page needs.
-  // If the user is not logged in, send them to the sign-in page.
   if (!session) {
     return redirect('/sign-in');
   }
 
-  // However, if the user *is* logged in and *has* a profile, but is NOT in "edit" mode,
-  // we can assume they ended up here by mistake. In this case, send them to the dashboard.
-  console.log("Checking redirect condition...");
-  if (profile && searchParams.mode !== 'edit') {
-    console.log("CONDITION MET - REDIRECTING NOW");
+  if (profile && !isEditMode) {
     return redirect('/main-dashboard');
   }
 
-  // The user is logged in. Now, we render the form.
-  // We pass the profile data (even if it's null or partial) to the form.
-  // The form component itself will handle pre-populating fields.
   return (
     <main className="container mx-auto py-12">
       <div className="flex justify-center">
@@ -71,4 +62,4 @@ export default async function CreateProfilePage({ searchParams }: { searchParams
       </div>
     </main>
   );
-} 
+}

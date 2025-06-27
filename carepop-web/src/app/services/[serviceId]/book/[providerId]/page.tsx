@@ -8,7 +8,7 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { useAuth } from '@/lib/contexts/auth-context';
+import { useSupabase } from '@/lib/contexts/auth-context';
 
 interface BookingPageProps {
     params: {
@@ -19,7 +19,7 @@ interface BookingPageProps {
 
 export default function BookingPage({ params }: BookingPageProps) {
     const { serviceId, providerId } = params;
-    const { supabase, user } = useAuth();
+    const { user } = useSupabase();
     const [date, setDate] = useState<Date | undefined>(new Date());
     const [availability, setAvailability] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -53,7 +53,7 @@ export default function BookingPage({ params }: BookingPageProps) {
     }, [date, providerId, serviceId, toast]);
     
     const handleBooking = async () => {
-        if (!selectedSlot || !supabase || !user) {
+        if (!selectedSlot || !user) {
             toast({ title: 'Error', description: 'You must be logged in to book.', variant: 'destructive' });
             return;
         }
@@ -65,7 +65,7 @@ export default function BookingPage({ params }: BookingPageProps) {
                 serviceId,
                 appointmentTime: selectedSlot.start_time,
             };
-            await createAppointment(supabase, appointmentDetails);
+            await createAppointment(appointmentDetails);
             toast({ title: 'Success!', description: 'Your appointment has been booked.' });
             router.push(`/appointments`);
 

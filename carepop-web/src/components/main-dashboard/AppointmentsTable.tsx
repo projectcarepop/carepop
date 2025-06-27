@@ -25,7 +25,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/lib/contexts/auth-context';
 import { cancelAppointment } from '@/services/api';
 import type { Appointment, AppointmentWithRelations } from "@/lib/types";
 
@@ -65,14 +64,12 @@ const getStatusVariant = (status: Appointment['status']) => {
 export function AppointmentsTable({ appointments }: AppointmentsTableProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { supabase } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
 
   const { mutate: handleCancel, isPending } = useMutation({
     mutationFn: (appointmentId: string) => {
-      if (!supabase) throw new Error("Supabase client not available.");
-      return cancelAppointment(supabase, appointmentId);
+      return cancelAppointment(appointmentId);
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Your appointment has been canceled." });

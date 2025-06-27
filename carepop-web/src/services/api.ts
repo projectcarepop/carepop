@@ -1,6 +1,15 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
 import { type Profile, type AppointmentBookingPayload } from '@/lib/types'; // Uses our stable, Drizzle-generated types
 import { type ProfileFormData } from '@/lib/validation/profile-schema';
+
+// Simple type for AdminUser until we have a more formal definition
+export type AdminUser = {
+  id: string;
+  email?: string;
+  role: 'admin' | 'patient';
+  fullName?: string | null;
+  // Add other fields as necessary from your 'get_all_users_with_roles' RPC or profiles table
+};
 
 // Defensively construct the API base URL
 let rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -14,23 +23,28 @@ if (rawApiUrl.endsWith('/')) {
 }
 const API_BASE_URL = rawApiUrl;
 
-// The getAuthHeaders function now takes the authenticated client as an argument.
-async function getAuthHeaders(supabase: SupabaseClient) {
+// This function is now self-sufficient. It creates its own client
+// to get the current session, ensuring it's always up-to-date.
+// It is intended for CLIENT-SIDE use only.
+async function getAuthHeaders(accessToken?: string) {
+  // If an access token is provided, use it. This is for server-side calls.
+  if (accessToken) {
+    return {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    };
+  }
+
+  // Otherwise, fall back to the browser client for client-side calls.
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+  
   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-  if (sessionError) {
-    console.error("Auth Error: Could not get session.", sessionError);
-  }
-  if (!session) {
-    console.error("Auth Error: No session found. User is likely logged out or session expired.");
-  } else if (!session.access_token) {
-    console.error("Auth Error: Session found, but access token is missing.");
-  } else {
-    // This log can be noisy, so let's comment it out for now.
-    // console.log("Auth Success: Session and access token found.");
-  }
-
-  if (!session?.access_token) {
+  if (sessionError || !session?.access_token) {
+    console.error("Auth Error:", sessionError?.message || "No session or access token found.");
     throw new Error("User not authenticated.");
   }
 
@@ -41,8 +55,8 @@ async function getAuthHeaders(supabase: SupabaseClient) {
 }
 
 // --- Profile Service ---
-export async function getMyProfile(supabase: SupabaseClient): Promise<Profile> {
-  const headers = await getAuthHeaders(supabase);
+export async function getMyProfile(accessToken?: string): Promise<Profile> {
+  const headers = await getAuthHeaders(accessToken);
   try {
     const response = await fetch(`${API_BASE_URL}/api/me/profile`, { headers });
     if (!response.ok) {
@@ -57,8 +71,8 @@ export async function getMyProfile(supabase: SupabaseClient): Promise<Profile> {
   }
 }
 
-export async function updateMyProfile(supabase: SupabaseClient, profileData: Partial<ProfileFormData>): Promise<Profile> {
-  const headers = await getAuthHeaders(supabase);
+export async function updateMyProfile(profileData: Partial<ProfileFormData>, accessToken?: string): Promise<Profile> {
+  const headers = await getAuthHeaders(accessToken);
   const response = await fetch(`${API_BASE_URL}/api/me/profile`, {
     method: 'PUT',
     headers,
@@ -86,8 +100,7 @@ export async function getProvinces() {
 }
 
 export async function getNearbyClinics(lat: number, lon: number, radius = 25000) {
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-  const url = `${baseUrl}/api/public/clinics/nearby?lat=${lat}&lon=${lon}&radius=${radius}`;
+  const url = `${API_BASE_URL}/api/public/clinics/nearby?lat=${lat}&lon=${lon}&radius=${radius}`;
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Failed to fetch nearby clinics: ${response.statusText}`);
@@ -108,8 +121,8 @@ export async function getBarangays(cityCode: string) {
 }
 
 // --- Appointment Service ---
-export async function getMyAppointments(supabase: SupabaseClient, params?: { limit?: number }) {
-  const headers = await getAuthHeaders(supabase);
+export async function getMyAppointments(params?: { limit?: number }, accessToken?: string) {
+  const headers = await getAuthHeaders(accessToken);
   let url = `${API_BASE_URL}/api/me/appointments`;
 
   const queryParams = new URLSearchParams();
@@ -140,8 +153,8 @@ export async function getMyAppointments(supabase: SupabaseClient, params?: { lim
   }
 }
 
-export async function getMyMedicalRecords(supabase: SupabaseClient, params?: { limit?: number }) {
-  const headers = await getAuthHeaders(supabase);
+export async function getMyMedicalRecords(params?: { limit?: number }, accessToken?: string) {
+  const headers = await getAuthHeaders(accessToken);
   let url = `${API_BASE_URL}/api/me/medical-records`;
 
   const queryParams = new URLSearchParams();
@@ -169,8 +182,8 @@ export async function getMyMedicalRecords(supabase: SupabaseClient, params?: { l
 
 // --- Admin Service (Requires Admin Role) ---
 
-export async function getAdminProducts(supabase: SupabaseClient) {
-    const headers = await getAuthHeaders(supabase);
+export async function getAdminProducts(accessToken?: string) {
+    const headers = await getAuthHeaders(accessToken);
     const response = await fetch(`${API_BASE_URL}/api/admin/products`, { headers });
     if (!response.ok) {
         const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
@@ -180,8 +193,8 @@ export async function getAdminProducts(supabase: SupabaseClient) {
     return result.data || [];
 }
 
-export async function getAdminAppointments(supabase: SupabaseClient, filters: Record<string, string>) {
-    const headers = await getAuthHeaders(supabase);
+export async function getAdminAppointments(filters: Record<string, string>, accessToken?: string) {
+    const headers = await getAuthHeaders(accessToken);
     const queryParams = new URLSearchParams(filters);
     const url = `${API_BASE_URL}/api/admin/appointments?${queryParams.toString()}`;
 
@@ -194,8 +207,8 @@ export async function getAdminAppointments(supabase: SupabaseClient, filters: Re
     return result.data || [];
 }
 
-export async function getAdminClinics(supabase: SupabaseClient) {
-    const headers = await getAuthHeaders(supabase);
+export async function getAdminClinics(accessToken?: string) {
+    const headers = await getAuthHeaders(accessToken);
     const response = await fetch(`${API_BASE_URL}/api/admin/clinics`, { headers });
     if (!response.ok) {
         const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
@@ -205,8 +218,8 @@ export async function getAdminClinics(supabase: SupabaseClient) {
     return result.data || [];
 }
 
-export async function getAdminDoctors(supabase: SupabaseClient) {
-    const headers = await getAuthHeaders(supabase);
+export async function getAdminDoctors(accessToken?: string) {
+    const headers = await getAuthHeaders(accessToken);
     const response = await fetch(`${API_BASE_URL}/api/admin/doctors`, { headers });
     if (!response.ok) {
         const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
@@ -216,15 +229,15 @@ export async function getAdminDoctors(supabase: SupabaseClient) {
     return result.data || [];
 }
 
-export async function getAdminServiceCategories(supabase: SupabaseClient) {
-    const headers = await getAuthHeaders(supabase);
-    const response = await fetch(`${API_BASE_URL}/api/service-categories`, { headers });
+export async function getAdminServiceCategories(accessToken?: string) {
+    const headers = await getAuthHeaders(accessToken);
+    const response = await fetch(`${API_BASE_URL}/api/admin/service-categories`, { headers });
     if (!response.ok) throw new Error("Failed to fetch service categories.");
     return response.json();
 }
 
-export async function getAdminServices(supabase: SupabaseClient) {
-    const headers = await getAuthHeaders(supabase);
+export async function getAdminServices(accessToken?: string) {
+    const headers = await getAuthHeaders(accessToken);
     const response = await fetch(`${API_BASE_URL}/api/admin/services`, { headers });
     if (!response.ok) {
         const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
@@ -234,8 +247,8 @@ export async function getAdminServices(supabase: SupabaseClient) {
     return result.data || [];
 }
 
-export async function upsertService(supabase: SupabaseClient, serviceData: any, serviceId?: string) {
-    const headers = await getAuthHeaders(supabase);
+export async function upsertService(serviceData: any, serviceId?: string, accessToken?: string) {
+    const headers = await getAuthHeaders(accessToken);
     const url = serviceId ? `${API_BASE_URL}/api/admin/services/${serviceId}` : `${API_BASE_URL}/api/admin/services`;
     const method = serviceId ? 'PUT' : 'POST';
     const response = await fetch(url, { method, headers, body: JSON.stringify(serviceData) });
@@ -243,8 +256,8 @@ export async function upsertService(supabase: SupabaseClient, serviceData: any, 
     return response.json();
 }
 
-export async function upsertServiceCategory(supabase: SupabaseClient, categoryData: any, categoryId?: string) {
-    const headers = await getAuthHeaders(supabase);
+export async function upsertServiceCategory(categoryData: any, categoryId?: string, accessToken?: string) {
+    const headers = await getAuthHeaders(accessToken);
     const url = categoryId ? `${API_BASE_URL}/api/admin/service-categories/${categoryId}` : `${API_BASE_URL}/api/admin/service-categories`;
     const method = categoryId ? 'PUT' : 'POST';
     const response = await fetch(url, { method, headers, body: JSON.stringify(categoryData) });
@@ -252,24 +265,15 @@ export async function upsertServiceCategory(supabase: SupabaseClient, categoryDa
     return response.json();
 }
 
-export async function upsertDoctor(supabase: SupabaseClient, data: { userId: string; serviceCategoryId: string; clinicIds: string[]; serviceIds: string[]; }, doctorId?: string) {
-    const headers = await getAuthHeaders(supabase);
-    const url = doctorId 
-        ? `${API_BASE_URL}/api/admin/doctors/${doctorId}` 
-        : `${API_BASE_URL}/api/admin/doctors`;
+export async function upsertDoctor(data: { userId: string; serviceCategoryId: string; clinicIds: string[]; serviceIds: string[]; }, doctorId?: string, accessToken?: string) {
+    const headers = await getAuthHeaders(accessToken);
+    const url = doctorId ? `${API_BASE_URL}/api/admin/doctors/${doctorId}` : `${API_BASE_URL}/api/admin/doctors`;
+    const method = doctorId ? 'PUT' : 'POST';
     
-    // The backend expects a specific structure. Let's build it.
-    const payload = {
-        user_id: data.userId,
-        service_category_id: data.serviceCategoryId,
-        clinic_ids: data.clinicIds,
-        service_ids: data.serviceIds
-    };
-
-    const response = await fetch(url, {
-        method: 'POST', // Backend handles upsert logic via POST
-        headers,
-        body: JSON.stringify(payload),
+    const response = await fetch(url, { 
+       method, 
+       headers, 
+       body: JSON.stringify(data) 
     });
 
     if (!response.ok) {
@@ -279,8 +283,8 @@ export async function upsertDoctor(supabase: SupabaseClient, data: { userId: str
     return response.json();
 }
 
-export async function upsertClinic(supabase: SupabaseClient, clinicData: any, clinicId?: string) {
-    const headers = await getAuthHeaders(supabase);
+export async function upsertClinic(clinicData: any, clinicId?: string, accessToken?: string) {
+    const headers = await getAuthHeaders(accessToken);
     const url = clinicId ? `${API_BASE_URL}/api/admin/clinics/${clinicId}` : `${API_BASE_URL}/api/admin/clinics`;
     const method = clinicId ? 'PUT' : 'POST';
 
@@ -292,16 +296,16 @@ export async function upsertClinic(supabase: SupabaseClient, clinicData: any, cl
     return response.json();
 }
 
-export async function getAdminProductCategories(supabase: SupabaseClient) {
-    const headers = await getAuthHeaders(supabase);
+export async function getAdminProductCategories(accessToken?: string) {
+    const headers = await getAuthHeaders(accessToken);
     const response = await fetch(`${API_BASE_URL}/api/admin/product-categories`, { headers });
     if (!response.ok) throw new Error("Failed to fetch product categories.");
     const result = await response.json();
     return result.data;
 }
 
-export async function upsertProduct(supabase: SupabaseClient, productData: any, productId?: string) {
-    const headers = await getAuthHeaders(supabase);
+export async function upsertProduct(productData: any, productId?: string, accessToken?: string) {
+    const headers = await getAuthHeaders(accessToken);
     const url = productId ? `${API_BASE_URL}/api/admin/products/${productId}` : `${API_BASE_URL}/api/admin/products`;
     const method = productId ? 'PUT' : 'POST';
 
@@ -313,8 +317,8 @@ export async function upsertProduct(supabase: SupabaseClient, productData: any, 
     return response.json();
 }
 
-export async function upsertProductCategory(supabase: SupabaseClient, categoryData: any, categoryId?: string) {
-    const headers = await getAuthHeaders(supabase);
+export async function upsertProductCategory(categoryData: any, categoryId?: string, accessToken?: string) {
+    const headers = await getAuthHeaders(accessToken);
     const url = categoryId ? `${API_BASE_URL}/api/admin/product-categories/${categoryId}` : `${API_BASE_URL}/api/admin/product-categories`;
     const method = categoryId ? 'PUT' : 'POST';
 
@@ -326,12 +330,14 @@ export async function upsertProductCategory(supabase: SupabaseClient, categoryDa
     return response.json();
 }
 
-export async function updateStock(supabase: SupabaseClient, productId: string, quantity: number) {
-    const headers = await getAuthHeaders(supabase);
-    const response = await fetch(`${API_BASE_URL}/api/admin/inventory/${productId}`, {
+export async function updateStock(productId: string, quantity: number, accessToken?: string) {
+    const headers = await getAuthHeaders(accessToken);
+    const url = `${API_BASE_URL}/api/admin/inventory`;
+    const payload = { productId, quantity };
+    const response = await fetch(url, {
         method: 'PUT',
         headers,
-        body: JSON.stringify({ quantity })
+        body: JSON.stringify(payload)
     });
     if (!response.ok) {
         const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
@@ -399,8 +405,8 @@ export async function getProvidersForService(serviceId: string) {
 
 // --- Authenticated Booking Endpoints ---
 
-export async function createAppointment(supabase: SupabaseClient, payload: AppointmentBookingPayload) {
-  const headers = await getAuthHeaders(supabase);
+export async function createAppointment(payload: AppointmentBookingPayload, accessToken?: string) {
+  const headers = await getAuthHeaders(accessToken);
   const response = await fetch(`${API_BASE_URL}/api/me/appointments`, {
     method: 'POST',
     headers,
@@ -415,8 +421,8 @@ export async function createAppointment(supabase: SupabaseClient, payload: Appoi
   return response.json();
 }
 
-export async function getAdminStats(supabase: SupabaseClient) {
-    const headers = await getAuthHeaders(supabase);
+export async function getAdminStats(accessToken?: string) {
+    const headers = await getAuthHeaders(accessToken);
     const response = await fetch(`${API_BASE_URL}/api/admin/stats`, { headers, cache: 'no-store' });
     if (!response.ok) {
         // It's better to throw an error so React Query or SWR can handle it
@@ -425,63 +431,55 @@ export async function getAdminStats(supabase: SupabaseClient) {
     return response.json();
 }
 
-export async function getAdminUsers(supabase: SupabaseClient) {
-    const headers = await getAuthHeaders(supabase);
+export async function getAdminUsers(accessToken?: string): Promise<AdminUser[]> {
+    const headers = await getAuthHeaders(accessToken);
     const response = await fetch(`${API_BASE_URL}/api/admin/users`, { headers });
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: "Failed to fetch users."}));
-        throw new Error(error.message || "An unknown error occurred.");
+        const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
+        throw new Error(error.message || 'Failed to fetch users.');
     }
     const result = await response.json();
     return result.data || [];
 }
 
-export async function updateUserRole(supabase: SupabaseClient, userId: string, role: 'admin' | 'patient') {
-    const headers = await getAuthHeaders(supabase);
-    const url = `${API_BASE_URL}/api/admin/users/${userId}/role`;
-    const response = await fetch(url, {
+export async function updateUserRole(
+  { userId, role }: { userId: string; role: 'patient' | 'admin' },
+  accessToken?: string
+) {
+    const headers = await getAuthHeaders(accessToken);
+    const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/role`, {
         method: 'PUT',
         headers,
-        body: JSON.stringify({ role }),
+        body: JSON.stringify({ role })
     });
-    if (!response.ok) throw new Error("Failed to update user role.");
-    return response.json();
+
+    if (response.ok) {
+        return response.json();
+    } else {
+        const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
+        throw new Error(error.message || 'Failed to update user role.');
+    }
 }
 
-export async function addNoteToAppointment(supabase: SupabaseClient, appointmentId: string, note: string) {
-    const headers = await getAuthHeaders(supabase);
-    const url = `${API_BASE_URL}/api/admin/appointments/${appointmentId}/records`;
-    const payload = {
-        recordType: 'DOCTOR_NOTE',
-        details: { content: note },
-    };
-    const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
-    });
-    if (!response.ok) throw new Error("Failed to add note.");
-    return response.json();
-}
-
-export async function getAdminUsersByRole(supabase: SupabaseClient, role: 'doctor' | 'patient') {
-     const headers = await getAuthHeaders(supabase);
+export async function getAdminUsersByRole(role: 'doctor' | 'patient', accessToken?: string) {
+    const headers = await getAuthHeaders(accessToken);
     const response = await fetch(`${API_BASE_URL}/api/admin/users?role=${role}`, { headers });
     if (!response.ok) throw new Error(`Failed to fetch users with role: ${role}.`);
     return response.json();
 }
 
-export async function cancelAppointment(supabase: SupabaseClient, appointmentId: string) {
-  const headers = await getAuthHeaders(supabase);
-  const response = await fetch(`${API_BASE_URL}/api/me/appointments/${appointmentId}/cancel`, {
-    method: 'PATCH',
-    headers,
-  });
+export async function cancelAppointment(appointmentId: string, accessToken?: string) {
+    const headers = await getAuthHeaders(accessToken);
+    const url = `${API_BASE_URL}/api/me/appointments/${appointmentId}/cancel`;
+    const response = await fetch(url, {
+        method: 'PATCH',
+        headers,
+    });
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: "An unknown error occurred." }));
-    throw new Error(error.message || "Failed to cancel appointment.");
-  }
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: "An unknown error occurred." }));
+        throw new Error(error.message || "Failed to cancel appointment.");
+    }
 
-  return response.json();
+    return response.json();
 } 

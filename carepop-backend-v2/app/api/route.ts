@@ -10,22 +10,34 @@ export const runtime = 'edge';
 
 const app = new Hono().basePath('/api');
 
-// VITAL: CORS middleware applied globally and early
+// --- DYNAMIC CORS CONFIGURATION FOR VERCEL ---
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://www.carepop.online',
+  'https://carepop.online',
+  'https://carepop.vercel.app'
+];
+
 app.use('*', cors({
-  origin: [
-    'http://localhost:3000', // Your Next.js frontend development origin
-    'https://www.carepop.online', // Production frontend
-    'https://carepop.online'      // Production frontend (non-www)
-    // Add your production frontend URL here when you deploy
-  ],
+  origin: (origin, c) => {
+    // Allow requests from Vercel preview deployments
+    if (origin.endsWith('.vercel.app')) {
+      return origin;
+    }
+    // Allow requests from the defined list
+    if (allowedOrigins.includes(origin)) {
+      return origin;
+    }
+    // Block all other origins by returning null
+    return null;
+  },
   allowHeaders: [
     'Authorization',
     'Content-Type',
-    // Add any other custom headers your frontend might send
   ],
-  allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], // Add PATCH here
+  allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   credentials: true,
-  maxAge: 86400, // Optional: How long the preflight response can be cached (in seconds)
+  maxAge: 86400,
 }));
 
 // Mount the modular routes
