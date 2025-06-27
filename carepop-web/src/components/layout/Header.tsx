@@ -11,13 +11,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useSupabase } from '@/lib/contexts/auth-context';
+import { useAuth } from '@/lib/contexts/auth-context';
 import { UserNav } from './UserNav';
 import GetStartedBtn from './GetStartedBtn';
 import MobileNav from './MobileNav';
 
 export default function Header() {
-  const { user } = useSupabase();
+  const { user } = useAuth();
   const pathname = usePathname();
   const isAdminPage = pathname.startsWith('/admin');
 

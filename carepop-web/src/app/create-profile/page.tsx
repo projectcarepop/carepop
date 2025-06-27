@@ -31,7 +31,6 @@ async function getInitialProfile(): Promise<{ session: Session | null, profile: 
       return { session, profile: null };
     }
     
-    // The response might not have a body if the profile doesn't exist (404)
     const profile = (res.ok && res.status !== 204) ? await res.json() : null;
     return { session, profile };
 
@@ -44,7 +43,6 @@ async function getInitialProfile(): Promise<{ session: Session | null, profile: 
 export default async function CreateProfilePage({ searchParams }: { searchParams: { mode?: string } }) {
   const { session, profile } = await getInitialProfile();
   
-  // It's safer to get the mode from searchParams after the initial async work.
   const isEditMode = searchParams?.mode === 'edit';
 
   if (!session) {

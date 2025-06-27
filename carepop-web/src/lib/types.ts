@@ -215,6 +215,19 @@ export const adminProductSchema = z.object({
 });
 export type AdminProduct = z.infer<typeof adminProductSchema>;
 
+// =================================================================
+// API & CUSTOM DTOs
+// =================================================================
+
+export type AdminStats = {
+  totalUsers: number;
+  totalClinics: number;
+  totalDoctors: number;
+  totalServices: number;
+  upcomingAppointments: number;
+  productsOutOfStock: number;
+};
+
 export const adminUserSchema = z.object({
     id: z.string(),
     // ... existing code ...

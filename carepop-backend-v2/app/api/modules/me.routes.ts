@@ -249,12 +249,15 @@ meRoutes.put('/profile', zValidator('json', updateProfileSchema), async (c) => {
     const [result] = await db.insert(profiles).values({
       id: user.id,
       email: user.email,
+      role: 'patient', // Set default role on initial creation
       ...validatedProfileData,
     }).onConflictDoUpdate({
       target: profiles.id,
       set: {
         ...validatedProfileData,
         updatedAt: new Date().toISOString()
+        // The role should not be updated here, it's set once on creation
+        // or managed by an admin.
       }
     }).returning();
     

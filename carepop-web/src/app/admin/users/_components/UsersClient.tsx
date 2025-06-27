@@ -2,12 +2,12 @@
 
 import * as React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useSupabase } from '@/lib/contexts/auth-context';
+import { useAdmin } from '@/lib/contexts/AdminContext';
 import { toast } from '@/hooks/use-toast';
 
 import { getAdminUsers, updateUserRole } from '@/services/api';
 import { DataTable } from '@/components/ui/data-table';
-import { AdminUser } from '@/lib/types';
+import { type AdminUser } from '@/lib/types';
 import { columns } from './columns';
 import {
   Dialog,
@@ -18,12 +18,8 @@ import {
 } from '@/components/ui/dialog';
 import { UserRoleForm } from './UserRoleForm';
 
-interface UsersClientProps {
-  data: AdminUser[];
-}
-
-export default function UsersClient({ data }: UsersClientProps) {
-  const supabase = useSupabase();
+export default function UsersClient() {
+  const { session } = useAdmin();
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [selectedUser, setSelectedUser] = React.useState<AdminUser | undefined>(
@@ -34,16 +30,17 @@ export default function UsersClient({ data }: UsersClientProps) {
     data: users,
     isLoading,
     isError,
+    error,
   } = useQuery({
     queryKey: ['adminUsers'],
-    queryFn: () => getAdminUsers(supabase),
-    initialData: data,
+    queryFn: () => getAdminUsers(session?.access_token),
+    enabled: !!session, // Ensures query does not run until session is loaded
     staleTime: 1000 * 60, // 1 minute
   });
 
   const updateRoleMutation = useMutation({
-    mutationFn: (userData: Parameters<typeof updateUserRole>[1]) =>
-      updateUserRole(supabase, userData),
+    mutationFn: (userData: { userId: string, role: 'admin' | 'patient' }) =>
+      updateUserRole(userData, session?.access_token),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
       toast({
@@ -69,7 +66,7 @@ export default function UsersClient({ data }: UsersClientProps) {
 
   const dynamicColumns = React.useMemo(() => columns(handleEditRole), []);
 
-  if (isError) return <div>Failed to load users.</div>;
+  if (isError) return <div>Failed to load users: {error?.message}</div>;
 
   return (
     <>

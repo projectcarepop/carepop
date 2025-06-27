@@ -14,10 +14,13 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Clinic } from '@/lib/types';
 
-// The columns definition is now a function that accepts a handler
-export const columns = (
-  onEdit: (clinic: Clinic) => void
-): ColumnDef<Clinic>[] => [
+interface ColumnActions {
+  onEdit: (clinic: Clinic) => void;
+  onDelete: (clinic: Clinic) => void;
+}
+
+// The columns definition is now a function that accepts handlers for edit and delete
+export const columns = ({ onEdit, onDelete }: ColumnActions): ColumnDef<Clinic>[] => [
   {
     accessorKey: 'name',
     header: ({ column }) => {

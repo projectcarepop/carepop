@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { getMyAppointments, getMyMedicalRecords } from '@/services/api';
-import { useSupabase } from '@/lib/contexts/auth-context';
+import { useAuth } from '@/lib/contexts/auth-context';
 import type { Profile, Appointment, MedicalRecord } from '@/lib/types';
 import { AppointmentsTable } from './AppointmentsTable';
 import { Book, FileText, Calendar, LogOut, ArrowRight, Loader2 } from 'lucide-react';
@@ -35,7 +35,7 @@ export function MainDashboardClient({
   initialAppointments,
   initialMedicalRecords
 }: MainDashboardClientProps) {
-  const { isInitialized, session } = useSupabase();
+  const { isInitialized, session } = useAuth();
 
   // The queries are now enabled only when the auth context is initialized AND there's a session.
   const { data: appointments, isLoading: isLoadingAppointments } = useQuery({

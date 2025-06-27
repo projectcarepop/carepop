@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { signOutUser } from '@/app/auth/actions';
-import { useSupabase } from '@/lib/contexts/auth-context';
+import { useAuth } from '@/lib/contexts/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const navItems = [
@@ -33,19 +33,23 @@ const NavLink = ({ href, label, icon: Icon, isActive }: { href: string; label: s
     </Link>
 );
 
-export default function AdminSidebar() {
+function SidebarSkeleton() {
+    return (
+        <aside className="hidden w-64 flex-col border-r bg-muted/40 p-4 sm:flex space-y-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+        </aside>
+    );
+}
+
+export function AdminSidebar() {
     const pathname = usePathname();
-    const { user, isLoading } = useSupabase();
+    const { user, isLoading } = useAuth();
 
     if (isLoading) {
-        return (
-            <aside className="hidden w-64 flex-col border-r bg-muted/40 sm:flex p-4 space-y-2">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-            </aside>
-        );
+        return <SidebarSkeleton />;
     }
 
     // This is the crucial security check. If the user is not an admin, render nothing.

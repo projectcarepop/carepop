@@ -1,4 +1,3 @@
-import { createBrowserClient } from '@supabase/ssr';
 import { type Profile, type AppointmentBookingPayload } from '@/lib/types'; // Uses our stable, Drizzle-generated types
 import { type ProfileFormData } from '@/lib/validation/profile-schema';
 
@@ -23,39 +22,16 @@ if (rawApiUrl.endsWith('/')) {
 }
 const API_BASE_URL = rawApiUrl;
 
-// This function is now self-sufficient. It creates its own client
-// to get the current session, ensuring it's always up-to-date.
 // It is intended for CLIENT-SIDE use only.
-async function getAuthHeaders(accessToken?: string) {
-  // If an access token is provided, use it. This is for server-side calls.
-  if (accessToken) {
+async function getAuthHeaders(accessToken: string) {
     return {
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json'
     };
-  }
-
-  // Otherwise, fall back to the browser client for client-side calls.
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-  
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-  if (sessionError || !session?.access_token) {
-    console.error("Auth Error:", sessionError?.message || "No session or access token found.");
-    throw new Error("User not authenticated.");
-  }
-
-  return {
-    'Authorization': `Bearer ${session.access_token}`,
-    'Content-Type': 'application/json'
-  };
 }
 
 // --- Profile Service ---
-export async function getMyProfile(accessToken?: string): Promise<Profile> {
+export async function getMyProfile(accessToken: string): Promise<Profile> {
   const headers = await getAuthHeaders(accessToken);
   try {
     const response = await fetch(`${API_BASE_URL}/api/me/profile`, { headers });
@@ -71,7 +47,7 @@ export async function getMyProfile(accessToken?: string): Promise<Profile> {
   }
 }
 
-export async function updateMyProfile(profileData: Partial<ProfileFormData>, accessToken?: string): Promise<Profile> {
+export async function updateMyProfile(profileData: Partial<ProfileFormData>, accessToken: string): Promise<Profile> {
   const headers = await getAuthHeaders(accessToken);
   const response = await fetch(`${API_BASE_URL}/api/me/profile`, {
     method: 'PUT',
@@ -121,7 +97,7 @@ export async function getBarangays(cityCode: string) {
 }
 
 // --- Appointment Service ---
-export async function getMyAppointments(params?: { limit?: number }, accessToken?: string) {
+export async function getMyAppointments(accessToken: string, params?: { limit?: number }) {
   const headers = await getAuthHeaders(accessToken);
   let url = `${API_BASE_URL}/api/me/appointments`;
 
@@ -153,7 +129,7 @@ export async function getMyAppointments(params?: { limit?: number }, accessToken
   }
 }
 
-export async function getMyMedicalRecords(params?: { limit?: number }, accessToken?: string) {
+export async function getMyMedicalRecords(accessToken: string, params?: { limit?: number }) {
   const headers = await getAuthHeaders(accessToken);
   let url = `${API_BASE_URL}/api/me/medical-records`;
 
@@ -182,7 +158,7 @@ export async function getMyMedicalRecords(params?: { limit?: number }, accessTok
 
 // --- Admin Service (Requires Admin Role) ---
 
-export async function getAdminProducts(accessToken?: string) {
+export async function getAdminProducts(accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
     const response = await fetch(`${API_BASE_URL}/api/admin/products`, { headers });
     if (!response.ok) {
@@ -193,7 +169,7 @@ export async function getAdminProducts(accessToken?: string) {
     return result.data || [];
 }
 
-export async function getAdminAppointments(filters: Record<string, string>, accessToken?: string) {
+export async function getAdminAppointments(filters: Record<string, string>, accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
     const queryParams = new URLSearchParams(filters);
     const url = `${API_BASE_URL}/api/admin/appointments?${queryParams.toString()}`;
@@ -207,7 +183,7 @@ export async function getAdminAppointments(filters: Record<string, string>, acce
     return result.data || [];
 }
 
-export async function getAdminClinics(accessToken?: string) {
+export async function getAdminClinics(accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
     const response = await fetch(`${API_BASE_URL}/api/admin/clinics`, { headers });
     if (!response.ok) {
@@ -218,7 +194,7 @@ export async function getAdminClinics(accessToken?: string) {
     return result.data || [];
 }
 
-export async function getAdminDoctors(accessToken?: string) {
+export async function getAdminDoctors(accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
     const response = await fetch(`${API_BASE_URL}/api/admin/doctors`, { headers });
     if (!response.ok) {
@@ -229,14 +205,14 @@ export async function getAdminDoctors(accessToken?: string) {
     return result.data || [];
 }
 
-export async function getAdminServiceCategories(accessToken?: string) {
+export async function getAdminServiceCategories(accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
     const response = await fetch(`${API_BASE_URL}/api/admin/service-categories`, { headers });
     if (!response.ok) throw new Error("Failed to fetch service categories.");
     return response.json();
 }
 
-export async function getAdminServices(accessToken?: string) {
+export async function getAdminServices(accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
     const response = await fetch(`${API_BASE_URL}/api/admin/services`, { headers });
     if (!response.ok) {
@@ -247,29 +223,28 @@ export async function getAdminServices(accessToken?: string) {
     return result.data || [];
 }
 
-export async function upsertService(serviceData: any, serviceId?: string, accessToken?: string) {
+export async function upsertService(serviceData: any, accessToken: string, serviceId?: string) {
     const headers = await getAuthHeaders(accessToken);
-    const url = serviceId ? `${API_BASE_URL}/api/admin/services/${serviceId}` : `${API_BASE_URL}/api/admin/services`;
     const method = serviceId ? 'PUT' : 'POST';
+    const url = serviceId ? `${API_BASE_URL}/api/admin/services/${serviceId}` : `${API_BASE_URL}/api/admin/services`;
     const response = await fetch(url, { method, headers, body: JSON.stringify(serviceData) });
     if (!response.ok) throw new Error(`Failed to ${method === 'POST' ? 'create' : 'update'} service.`);
     return response.json();
 }
 
-export async function upsertServiceCategory(categoryData: any, categoryId?: string, accessToken?: string) {
+export async function upsertServiceCategory(categoryData: any, accessToken: string, categoryId?: string) {
     const headers = await getAuthHeaders(accessToken);
-    const url = categoryId ? `${API_BASE_URL}/api/admin/service-categories/${categoryId}` : `${API_BASE_URL}/api/admin/service-categories`;
     const method = categoryId ? 'PUT' : 'POST';
+    const url = categoryId ? `${API_BASE_URL}/api/admin/service-categories/${categoryId}` : `${API_BASE_URL}/api/admin/service-categories`;
     const response = await fetch(url, { method, headers, body: JSON.stringify(categoryData) });
     if (!response.ok) throw new Error(`Failed to ${method === 'POST' ? 'create' : 'update'} category.`);
     return response.json();
 }
 
-export async function upsertDoctor(data: { userId: string; serviceCategoryId: string; clinicIds: string[]; serviceIds: string[]; }, doctorId?: string, accessToken?: string) {
+export async function upsertDoctor(data: { userId: string; serviceCategoryId: string; clinicIds: string[]; serviceIds: string[]; }, accessToken: string, doctorId?: string) {
     const headers = await getAuthHeaders(accessToken);
-    const url = doctorId ? `${API_BASE_URL}/api/admin/doctors/${doctorId}` : `${API_BASE_URL}/api/admin/doctors`;
     const method = doctorId ? 'PUT' : 'POST';
-    
+    const url = doctorId ? `${API_BASE_URL}/api/admin/doctors/${doctorId}` : `${API_BASE_URL}/api/admin/doctors`;
     const response = await fetch(url, { 
        method, 
        headers, 
@@ -283,7 +258,7 @@ export async function upsertDoctor(data: { userId: string; serviceCategoryId: st
     return response.json();
 }
 
-export async function upsertClinic(clinicData: any, clinicId?: string, accessToken?: string) {
+export async function upsertClinic(clinicData: any, accessToken: string, clinicId?: string) {
     const headers = await getAuthHeaders(accessToken);
     const url = clinicId ? `${API_BASE_URL}/api/admin/clinics/${clinicId}` : `${API_BASE_URL}/api/admin/clinics`;
     const method = clinicId ? 'PUT' : 'POST';
@@ -296,7 +271,7 @@ export async function upsertClinic(clinicData: any, clinicId?: string, accessTok
     return response.json();
 }
 
-export async function getAdminProductCategories(accessToken?: string) {
+export async function getAdminProductCategories(accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
     const response = await fetch(`${API_BASE_URL}/api/admin/product-categories`, { headers });
     if (!response.ok) throw new Error("Failed to fetch product categories.");
@@ -304,7 +279,7 @@ export async function getAdminProductCategories(accessToken?: string) {
     return result.data;
 }
 
-export async function upsertProduct(productData: any, productId?: string, accessToken?: string) {
+export async function upsertProduct(productData: any, accessToken: string, productId?: string) {
     const headers = await getAuthHeaders(accessToken);
     const url = productId ? `${API_BASE_URL}/api/admin/products/${productId}` : `${API_BASE_URL}/api/admin/products`;
     const method = productId ? 'PUT' : 'POST';
@@ -317,7 +292,7 @@ export async function upsertProduct(productData: any, productId?: string, access
     return response.json();
 }
 
-export async function upsertProductCategory(categoryData: any, categoryId?: string, accessToken?: string) {
+export async function upsertProductCategory(categoryData: any, accessToken: string, categoryId?: string) {
     const headers = await getAuthHeaders(accessToken);
     const url = categoryId ? `${API_BASE_URL}/api/admin/product-categories/${categoryId}` : `${API_BASE_URL}/api/admin/product-categories`;
     const method = categoryId ? 'PUT' : 'POST';
@@ -330,9 +305,9 @@ export async function upsertProductCategory(categoryData: any, categoryId?: stri
     return response.json();
 }
 
-export async function updateStock(productId: string, quantity: number, accessToken?: string) {
+export async function updateStock(productId: string, quantity: number, accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
-    const url = `${API_BASE_URL}/api/admin/inventory`;
+    const url = `${API_BASE_URL}/api/admin/products/${productId}/stock`;
     const payload = { productId, quantity };
     const response = await fetch(url, {
         method: 'PUT',
@@ -405,7 +380,7 @@ export async function getProvidersForService(serviceId: string) {
 
 // --- Authenticated Booking Endpoints ---
 
-export async function createAppointment(payload: AppointmentBookingPayload, accessToken?: string) {
+export async function createAppointment(payload: AppointmentBookingPayload, accessToken: string) {
   const headers = await getAuthHeaders(accessToken);
   const response = await fetch(`${API_BASE_URL}/api/me/appointments`, {
     method: 'POST',
@@ -421,7 +396,7 @@ export async function createAppointment(payload: AppointmentBookingPayload, acce
   return response.json();
 }
 
-export async function getAdminStats(accessToken?: string) {
+export async function getAdminStats(accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
     const response = await fetch(`${API_BASE_URL}/api/admin/stats`, { headers, cache: 'no-store' });
     if (!response.ok) {
@@ -431,7 +406,7 @@ export async function getAdminStats(accessToken?: string) {
     return response.json();
 }
 
-export async function getAdminUsers(accessToken?: string): Promise<AdminUser[]> {
+export async function getAdminUsers(accessToken: string): Promise<AdminUser[]> {
     const headers = await getAuthHeaders(accessToken);
     const response = await fetch(`${API_BASE_URL}/api/admin/users`, { headers });
     if (!response.ok) {
@@ -444,7 +419,7 @@ export async function getAdminUsers(accessToken?: string): Promise<AdminUser[]> 
 
 export async function updateUserRole(
   { userId, role }: { userId: string; role: 'patient' | 'admin' },
-  accessToken?: string
+  accessToken: string
 ) {
     const headers = await getAuthHeaders(accessToken);
     const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/role`, {
@@ -461,14 +436,14 @@ export async function updateUserRole(
     }
 }
 
-export async function getAdminUsersByRole(role: 'doctor' | 'patient', accessToken?: string) {
+export async function getAdminUsersByRole(role: 'doctor' | 'patient', accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
     const response = await fetch(`${API_BASE_URL}/api/admin/users?role=${role}`, { headers });
     if (!response.ok) throw new Error(`Failed to fetch users with role: ${role}.`);
     return response.json();
 }
 
-export async function cancelAppointment(appointmentId: string, accessToken?: string) {
+export async function cancelAppointment(appointmentId: string, accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
     const url = `${API_BASE_URL}/api/me/appointments/${appointmentId}/cancel`;
     const response = await fetch(url, {
@@ -482,4 +457,19 @@ export async function cancelAppointment(appointmentId: string, accessToken?: str
     }
 
     return response.json();
-} 
+}
+
+export async function deleteClinic(clinicId: string, accessToken: string) {
+    const headers = await getAuthHeaders(accessToken);
+    const response = await fetch(`${API_BASE_URL}/api/admin/clinics/${clinicId}`, {
+        method: 'DELETE',
+        headers,
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: "An unknown error occurred" }));
+        throw new Error(error.message || `Failed to delete clinic`);
+    }
+    // DELETE requests might not return a body, so we return a success indicator.
+    return { success: true };
+}

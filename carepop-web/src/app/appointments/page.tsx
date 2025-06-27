@@ -21,7 +21,7 @@ export default async function AppointmentsPage() {
   }
 
   // Pass only the access token to the service function
-  const appointments = await getMyAppointments({ limit: 100 }, session.access_token);
+  const appointments = await getMyAppointments(session.access_token, { limit: 100 });
 
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">

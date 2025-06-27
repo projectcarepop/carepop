@@ -22,6 +22,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Calendar } from '@/components/ui/calendar';
 import { Loader2, Check, ChevronsUpDown } from 'lucide-react';
+import { useAuth } from '@/lib/contexts/auth-context';
 
 // --- TYPE DEFINITIONS ---
 interface Province {
@@ -49,6 +50,7 @@ const RequiredLabel = ({ children }: { children: React.ReactNode }) => (
 export function CreateProfileForm({ initialProfile }: { initialProfile: Profile | null }) {
     const router = useRouter();
     const { toast } = useToast();
+    const { session } = useAuth();
     const [step, setStep] = React.useState(1);
     const queryClient = useQueryClient();
 
@@ -60,7 +62,7 @@ export function CreateProfileForm({ initialProfile }: { initialProfile: Profile 
     const [isLoadingProvinces, setIsLoadingProvinces] = React.useState(false);
     const [isLoadingCities, setIsLoadingCities] = React.useState(false);
     const [isLoadingBarangays, setIsLoadingBarangays] = React.useState(false);
-
+    
     // Track if the initial data has been loaded to prevent unwanted resets
     const [isInitialLoad, setIsInitialLoad] = React.useState(true);
     
@@ -183,7 +185,11 @@ export function CreateProfileForm({ initialProfile }: { initialProfile: Profile 
     // --- MUTATION & SUBMISSION ---
     const { mutate: submitProfile, isPending } = useMutation({
         mutationFn: (formData: ProfileFormData) => {
-            return updateMyProfile(formData);
+            if (!session?.access_token) {
+                // Throw an error or return a rejected promise if the token is missing.
+                return Promise.reject(new Error("Not authenticated. Cannot update profile."));
+            }
+            return updateMyProfile(formData, session.access_token);
         },
         onSuccess: (data) => {
             toast({

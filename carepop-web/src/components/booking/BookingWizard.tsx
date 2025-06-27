@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { format, startOfDay } from "date-fns";
 
-import { useSupabase } from '@/lib/contexts/auth-context';
+import { useAuth } from '@/lib/contexts/auth-context';
 import {
   getPublicClinics,
   getPublicServices,
@@ -50,7 +50,7 @@ const BookingWizard = () => {
   const router = useRouter();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { user } = useSupabase();
+  const { user, session } = useAuth();
 
   // State reflects the new "Clinic-first" flow
   const [step, setStep] = useState(1);
@@ -197,7 +197,10 @@ const BookingWizard = () => {
 
   const { mutate: submitAppointment, isPending: isBooking } = useMutation({
     mutationFn: async (payload: AppointmentBookingPayload) => {
-      return createAppointment(payload);
+      if (!session?.access_token) {
+        throw new Error("Authentication error: You are not signed in.");
+      }
+      return createAppointment(payload, session.access_token);
     },
     onSuccess: () => {
       toast({ title: "Success!", description: "Your appointment has been booked." });

@@ -58,11 +58,25 @@ export const adminMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
     return c.json({ error: 'Forbidden', message: 'Authentication required' }, 403);
   }
 
-  // NOTE: For a backend service, you MUST re-fetch the user's profile to get
-  // up-to-date custom claims or roles, as the JWT may be stale.
-  // However, for simplicity and to match the existing logic, we will trust
-  // the user_metadata from the JWT for now.
-  if (user.user_metadata?.role !== 'admin') {
+  // The CORRECT and SECURE way to check roles for a backend service.
+  // The JWT can be stale. Always query the database for the authoritative role.
+  const supabase = createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (error || !profile) {
+    console.error('Error fetching user profile for admin check:', error?.message);
+    return c.json({ error: 'Forbidden', message: 'Could not verify user role.' }, 403);
+  }
+
+  if (profile.role !== 'admin') {
     return c.json({ error: 'Forbidden', message: 'Admin access required' }, 403);
   }
 
