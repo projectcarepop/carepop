@@ -1,4 +1,4 @@
-import { Inter } from 'next/font/google';
+import { Inter, Space_Grotesk as SpaceGrotesk } from 'next/font/google';
 import type { Metadata } from "next";
 import './globals.css'
 import { Analytics } from "@vercel/analytics/react";
@@ -11,6 +11,10 @@ import ConditionalFooter from '@/components/layout/ConditionalFooter';
 import { cn } from '@/lib/utils';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
+const spaceGrotesk = SpaceGrotesk({
+  subsets: ['latin'],
+  variable: '--font-space-grotesk',
+})
 
 export const metadata: Metadata = {
   title: 'Carepop',

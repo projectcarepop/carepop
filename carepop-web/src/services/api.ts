@@ -428,22 +428,28 @@ export async function getPublicServices(clinicId?: string) {
   return result.data || [];
 }
 
-export async function getPublicClinics() {
-  const response = await fetch(`${API_BASE_URL}/api/public/clinics`);
-  if (!response.ok) throw new Error("Failed to fetch clinics.");
+export async function getPublicClinics(serviceId?: string) {
+  let url = `${API_BASE_URL}/api/public/clinics`;
+  if (serviceId) {
+    url += `?serviceId=${serviceId}`;
+  }
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error('Failed to fetch clinics');
+  }
   const result = await response.json();
-  // This endpoint returns data in a 'data' property.
+  // The backend nests the array in a 'data' property.
   return result.data || [];
 }
 
 export async function getPublicAvailability(params: { serviceId: string; clinicId: string; date: string; }) {
-  const queryParams = new URLSearchParams(params);
-  const url = `${API_BASE_URL}/api/public/availability?${queryParams.toString()}`;
+  const { serviceId, clinicId, date } = params;
+  const url = `${API_BASE_URL}/api/public/availability?serviceId=${serviceId}&clinicId=${clinicId}&date=${date}`;
   const response = await fetch(url);
+  const responseText = await response.text(); // Get response as text first
+  console.log(`[API Service] Raw response for availability:`, responseText); // LOG IT
   if (!response.ok) throw new Error("Failed to fetch availability.");
-  const result = await response.json();
-  // The backend for this specific endpoint returns an object with a 'slots' property.
-  return result.slots || [];
+  return JSON.parse(responseText); // Now parse it
 }
 
 export async function getPublicAvailableDates(params: { clinicId: string; serviceId: string; }) {

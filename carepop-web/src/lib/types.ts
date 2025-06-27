@@ -20,9 +20,14 @@ export type NewProfile = InferInsertModel<typeof schema.profiles>;
 // CLINICS
 // =================================================================
 export type Clinic = InferSelectModel<typeof schema.clinics> & {
-    status?: 'pending' | 'approved' | 'rejected';
-    city?: string;
-    province?: string;
+    latitude: number;
+    longitude: number;
+    address: {
+        street: string;
+        city: string;
+        province: string;
+        zip: string;
+    } | null;
 };
 export type NewClinic = InferInsertModel<typeof schema.clinics>;
 
@@ -78,12 +83,6 @@ export type NewPrescription = InferInsertModel<typeof schema.recordPrescriptions
 export type ClinicalDocument = InferSelectModel<typeof schema.recordDocuments>;
 export type NewClinicalDocument = InferInsertModel<typeof schema.recordDocuments>;
 
-export type HealthLog = InferSelectModel<typeof schema.healthLogs>;
-export type NewHealthLog = InferInsertModel<typeof schema.healthLogs>;
-
-export type MenstrualLog = InferSelectModel<typeof schema.menstrualLogs>;
-export type NewMenstrualLog = InferInsertModel<typeof schema.menstrualLogs>;
-
 // =================================================================
 // REVIEWS
 // =================================================================
@@ -104,22 +103,9 @@ export type NewProduct = InferInsertModel<typeof schema.products>;
 export type Inventory = InferSelectModel<typeof schema.inventory>;
 export type NewInventory = InferInsertModel<typeof schema.inventory>;
 
-export type PatientOrder = InferSelectModel<typeof schema.patientOrders>;
-export type NewPatientOrder = InferInsertModel<typeof schema.patientOrders>;
-
-export type PatientOrderItem = InferSelectModel<typeof schema.patientOrderItems>;
-export type NewPatientOrderItem = InferInsertModel<
-  typeof schema.patientOrderItems
->;
-
 // =================================================================
 // RELATIONAL / JOIN TABLES
 // =================================================================
-export type DoctorClinic = InferSelectModel<typeof schema.doctorClinics>;
-export type NewDoctorClinic = InferInsertModel<typeof schema.doctorClinics>;
-
-export type DoctorService = InferSelectModel<typeof schema.doctorServices>;
-export type NewDoctorService = InferInsertModel<typeof schema.doctorServices>;
 
 // --- Custom Types with Relations (for specific component needs) ---
 

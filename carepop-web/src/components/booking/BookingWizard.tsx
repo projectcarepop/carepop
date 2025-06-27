@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { format, startOfDay } from "date-fns";
+import { format, startOfDay, setSeconds, setMinutes, setHours } from "date-fns";
 
 import { useAuth } from '@/lib/contexts/auth-context';
 import {
@@ -21,6 +21,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -34,16 +35,15 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
-// Define a type for the address object to resolve the 'unknown' type error.
+// This interface needs to match the actual address object from the backend/DB
 interface Address {
   street: string;
   barangay: string;
   city: string;
   province: string;
-  postalCode: string;
+  zip: string;
 }
 
 const BookingWizard = () => {
@@ -69,38 +69,17 @@ const BookingWizard = () => {
     isLoading: isLoadingClinics,
   } = useQuery<Clinic[]>({
     queryKey: ['clinics'],
-    queryFn: getPublicClinics,
+    queryFn: () => getPublicClinics(),
   });
 
   const {
     data: services,
     isLoading: isLoadingServices,
   } = useQuery<ServiceWithCategory[], Error>({
-    queryKey: ['services', selectedClinicId],
-    queryFn: async () => {
-      if (!selectedClinicId) {
-        return [];
-      }
-      try {
-        console.log(`Fetching services for clinic: ${selectedClinicId}`);
-        const result = await getPublicServices(selectedClinicId);
-        console.log("Successfully fetched services:", result);
-        return result;
-      } catch (error) {
-        console.error("Error inside getPublicServices queryFn:", error);
-        toast({
-          title: "Error Fetching Services",
-          description: (error as Error).message || "Could not load services for the selected clinic.",
-          variant: "destructive",
-        });
-        throw error;
-      }
-    },
+    queryKey: ['publicServices', selectedClinicId],
+    queryFn: () => getPublicServices(selectedClinicId!),
     enabled: !!selectedClinicId,
   });
-
-  // ADD THIS DIAGNOSTIC LOG
-  console.log("Raw services data from backend:", services);
 
   const {
     data: categories,
@@ -111,47 +90,31 @@ const BookingWizard = () => {
     initialData: [],
   });
 
-  const { data: availableDates } = useQuery<string[]>({
+  const {
+    data: availableDates,
+    isLoading: isLoadingDates,
+  } = useQuery({
     queryKey: ['availableDates', selectedClinicId, selectedServiceId],
-    queryFn: () => getPublicAvailableDates({
-      clinicId: selectedClinicId!,
-      serviceId: selectedServiceId!,
-    }),
+    queryFn: () => getPublicAvailableDates({ clinicId: selectedClinicId!, serviceId: selectedServiceId! }),
     enabled: !!(selectedClinicId && selectedServiceId),
+    select: (response: any) => response.data || [],
   });
 
-   const {
+  // --- LOG #2: The Query Hook ---
+  const {
     data: availableSlots,
     isLoading: isLoadingAvailability,
-    isError,
-    error,
-  } = useQuery<string[], Error>({ // Specify Error type for the hook
+  } = useQuery<{ availableSlots: string[] }>({
     queryKey: ['availability', selectedClinicId, selectedServiceId, selectedDate],
-    queryFn: async () => {
-      console.log('[ReactQuery - Availability] Starting queryFn...');
-      if (!selectedClinicId || !selectedServiceId || !selectedDate) {
-        console.log('[ReactQuery - Availability] Aborting: Missing dependencies.');
-        return []; // Return an empty array if dependencies are not met
-      }
-      
-      console.log('[ReactQuery - Availability] All dependencies present. Fetching...');
+    queryFn: () => {
       return getPublicAvailability({
-        clinicId: selectedClinicId,
-        serviceId: selectedServiceId,
-        date: format(selectedDate, 'yyyy-MM-dd'),
+        clinicId: selectedClinicId!,
+        serviceId: selectedServiceId!,
+        date: format(selectedDate!, 'yyyy-MM-dd'),
       });
     },
-    // The enabled check is still good practice, but the internal check makes it safer.
     enabled: !!(selectedClinicId && selectedServiceId && selectedDate),
   });
-
-  // --- [DIAGNOSTIC LOGS] ---
-  console.log(`[ReactQuery - Availability] Is Loading: ${isLoadingAvailability}`);
-  console.log(`[ReactQuery - Availability] Is Error: ${isError}`);
-  if (isError) {
-    console.error('[ReactQuery - Availability] Error: ', error);
-  }
-  console.log('[ReactQuery - Availability] Data: ', availableSlots);
 
   // --- CLIENT-SIDE FILTERING LOGIC ---
 
@@ -169,11 +132,6 @@ const BookingWizard = () => {
     if (selectedCategoryId === 'all') {
       return services;
     }
-    // This filter is intentionally strict. It relies on the backend providing a correct
-    // serviceCategory object with a valid ID. If a service is being filtered out,
-    // it's likely because the data from the `GET /api/public/services` endpoint
-    // has a `null` serviceCategory for that service, indicating a data integrity
-    // issue in the database (e.g., the service has a null or incorrect `categoryId`).
     return services.filter(service => service.serviceCategory?.id === selectedCategoryId);
   }, [services, selectedCategoryId]);
 
@@ -184,14 +142,7 @@ const BookingWizard = () => {
     );
   }, [filteredServicesByCategory, serviceSearch]);
 
-  const availableDateObjects = useMemo(() => {
-    if (!availableDates) return [];
-    // The calendar component expects Date objects.
-    // The dates from the API are strings like '2023-12-25'.
-    // We need to parse them, being mindful of timezones.
-    // Appending 'T00:00:00' ensures they are parsed in the local timezone.
-    return availableDates.map(dateStr => new Date(dateStr + 'T00:00:00'));
-  }, [availableDates]);
+  const availableDateSet = useMemo(() => new Set(availableDates || []), [availableDates]);
 
   // --- MUTATION ---
 
@@ -235,20 +186,23 @@ const BookingWizard = () => {
       return;
     }
 
-    // This is a TEMPORARY FIX to unblock the booking process.
+    const [hours, minutes] = selectedTime.split(':').map(Number);
+    const appointmentDateTime = setSeconds(setMinutes(setHours(startOfDay(selectedDate), hours), minutes), 0);
+
     const backendPayload = {
-      patientId: user.id, // Add patientId to satisfy frontend type
+      patientId: user.id,
       clinicId: selectedClinicId,
       serviceId: selectedServiceId,
-      appointmentTime: selectedTime,
-      // Using a real doctor ID to satisfy the foreign key constraint.
+      appointmentTime: appointmentDateTime.toISOString(),
       doctorId: '02ab0a6b-b366-4c10-9b75-623a5be46f1d', 
     };
 
     submitAppointment(backendPayload);
   };
   
-  const progressValue = (step - 1) * (100 / 3);
+  const progressValue = useMemo(() => {
+    return (step - 1) * (100 / 4);
+  }, [step]);
 
   const selectedClinic = useMemo(() => clinics?.find(c => c.id === selectedClinicId), [clinics, selectedClinicId]);
   const selectedService = useMemo(() => services?.find(s => s.id === selectedServiceId), [services, selectedServiceId]);
@@ -257,211 +211,213 @@ const BookingWizard = () => {
 
   const renderStep = () => {
     switch (step) {
-      case 1: // Select Clinic
+      case 1:
         return (
           <Card>
-            <CardHeader><CardTitle>Step 1: Select a Clinic</CardTitle><CardDescription>Choose your preferred clinic location to begin.</CardDescription></CardHeader>
+            <CardHeader>
+              <CardTitle className="text-xl font-semibold">Step 1: Select a Clinic</CardTitle>
+              <CardDescription>Choose your preferred clinic location to begin.</CardDescription>
+            </CardHeader>
             <CardContent>
               <div className="mb-4">
                 <Input
                   placeholder="Search for a clinic by name..."
                   value={clinicSearch}
                   onChange={(e) => setClinicSearch(e.target.value)}
-                  className="max-w-sm"
                 />
               </div>
-              {isLoadingClinics && <p>Loading clinics...</p>}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredClinics.map((clinic) => {
-                  const address = clinic.address as { street?: string; city?: string; };
-                  const formattedAddress = [address?.street, address?.city].filter(Boolean).join(', ');
-
-                  return (
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-2">
+                {isLoadingClinics ? (
+                  <p>Loading clinics...</p>
+                ) : (
+                  filteredClinics.map((clinic) => (
                     <Button
                       key={clinic.id}
-                      variant={selectedClinicId === clinic.id ? "default" : "outline"}
+                      variant="outline"
+                      className="w-full justify-start h-auto"
                       onClick={() => handleSelectClinic(clinic.id)}
-                      className="h-auto text-left justify-start"
                     >
-                      <div>
+                      <div className="text-left">
                         <p className="font-semibold">{clinic.name}</p>
-                        <p className="text-sm text-muted-foreground">{formattedAddress}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {(clinic.address as Address)?.street}, {(clinic.address as Address)?.city}
+                        </p>
                       </div>
                     </Button>
-                  );
-                })}
+                  ))
+                )}
               </div>
             </CardContent>
+            <CardFooter className="flex justify-end">
+                <Button onClick={() => setStep(2)} disabled={!selectedClinicId}>Next</Button>
+            </CardFooter>
           </Card>
         );
-      case 2: // Select Service
+      case 2:
         return (
           <Card>
             <CardHeader>
-              <CardTitle>Step 2: Select a Service</CardTitle>
-              <CardDescription>What type of service do you need today?</CardDescription>
+              <CardTitle className="text-xl font-semibold">Step 2: Select a Service</CardTitle>
+              <CardDescription>What type of service do you need today at {selectedClinic?.name}?</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-4 mb-4">
-                <Input
-                  placeholder="Search for a service..."
-                  value={serviceSearch}
-                  onChange={(e) => setServiceSearch(e.target.value)}
-                  className="flex-1"
-                />
-                <Select
-                  value={selectedCategoryId}
-                  onValueChange={setSelectedCategoryId}
-                >
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="All Categories" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    {categories?.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {isLoadingServices && <p>Loading services...</p>}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredServicesByName.map((service) => (
-                  <Button
-                    key={service.id}
-                    variant={selectedServiceId === service.id ? "default" : "outline"}
-                    onClick={() => handleSelectService(service.id)}
-                    className="h-auto text-left justify-start"
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="md:w-1/3">
+                  <Input
+                    placeholder="Search for a service..."
+                    value={serviceSearch}
+                    onChange={(e) => setServiceSearch(e.target.value)}
+                  />
+                </div>
+                <div className="md:w-1/3">
+                  <Select
+                    value={selectedCategoryId}
+                    onValueChange={(value) => setSelectedCategoryId(value)}
                   >
-                    <div>
-                      <p className="font-semibold">{service.name}</p>
-                      <p className="text-sm text-muted-foreground">{service.serviceCategory?.name}</p>
-                    </div>
-                  </Button>
-                ))}
+                    <SelectTrigger>
+                      <SelectValue placeholder="Filter by category..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {categories?.map((cat: ServiceCategory) => (
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              {!isLoadingServices && filteredServicesByName.length === 0 && (
-                <Alert>
-                  <Terminal className="h-4 w-4" />
-                  <AlertTitle>No Services Found</AlertTitle>
-                  <AlertDescription>
-                    There are no services matching your criteria at this clinic. Try changing the category or search term.
-                  </AlertDescription>
-                </Alert>
-              )}
+              <div className="mt-4 space-y-2 max-h-72 overflow-y-auto pr-2">
+                {isLoadingServices ? (
+                  <p>Loading services...</p>
+                ) : (
+                  filteredServicesByName.map((service) => (
+                    <Button
+                      key={service.id}
+                      variant="outline"
+                      className="w-full justify-start h-auto"
+                      onClick={() => handleSelectService(service.id)}
+                    >
+                      <div className="text-left">
+                        <p className="font-semibold">{service.name}</p>
+                        <p className="text-sm text-muted-foreground">{service.description}</p>
+                      </div>
+                    </Button>
+                  ))
+                )}
+              </div>
             </CardContent>
+            <CardFooter className="flex justify-between">
+                <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
+                <Button onClick={() => setStep(3)} disabled={!selectedServiceId}>Next</Button>
+            </CardFooter>
           </Card>
         );
-      case 3: // Select Date & Time
+      case 3:
         return (
           <Card>
             <CardHeader>
-              <CardTitle>Step 3: Select Date & Time</CardTitle>
-              <CardDescription>
-                Choose a date to see available time slots for your selected service.
-              </CardDescription>
+              <CardTitle className="text-xl font-semibold">Step 3: Choose a Date & Time</CardTitle>
+              <CardDescription>Select a date to see available time slots for your chosen service.</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col md:flex-row gap-4">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={setSelectedDate}
-                disabled={(date) => date < startOfDay(new Date())} // Disable past dates
-                modifiers={{ available: availableDateObjects }}
-                modifiersStyles={{ available: { fontWeight: 'bold' } }}
-              />
-              <div className="flex-1 border-l border-border pl-4">
-                <h4 className="font-semibold mb-2">
-                  Available Times for {selectedDate ? format(selectedDate, 'PPP') : '...'}
-                </h4>
-                {isLoadingAvailability && <p>Loading times...</p>}
-                
-                {/* --- [DIAGNOSTIC RENDERING] --- */}
-                <div className="grid grid-cols-3 gap-2">
-                  {availableSlots && availableSlots.length > 0 ? (
-                    availableSlots.map((time) => {
-                      // 'time' is a full ISO string from the backend (e.g., "2025-06-27T01:00:00.000Z")
-                      // It can be directly used to create a valid Date object.
-                      const fullDateTime = new Date(time);
-                      return (
+            <CardContent className="flex flex-col md:flex-row gap-8">
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold mb-2 text-center">Select a Date</h3>
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={setSelectedDate}
+                  disabled={(date) => {
+                    if (date < startOfDay(new Date())) return true;
+                    if (isLoadingDates) return true;
+                    return !availableDateSet.has(format(date, 'yyyy-MM-dd'));
+                  }}
+                  initialFocus
+                />
+              </div>
+              <div className="flex-1">
+                <div className="flex-1 border-l border-border pl-4 ml-4">
+                  <h4 className="font-semibold mb-2 text-center">Select a Time</h4>
+                  <div className="grid grid-cols-3 gap-2">
+                    {isLoadingAvailability ? (
+                      <p>Loading times...</p>
+                    ) : availableSlots && availableSlots.availableSlots && availableSlots.availableSlots.length > 0 ? (
+                      availableSlots.availableSlots.map((time) => (
                         <Button
                           key={time}
                           variant={selectedTime === time ? "default" : "outline"}
                           onClick={() => handleSelectTime(time)}
                         >
-                          {format(fullDateTime, "h:mm a")}
+                          {time}
                         </Button>
-                      );
-                    })
-                  ) : (
-                    !isLoadingAvailability && (
-                      <p className="text-sm text-muted-foreground mt-2">
-                        No available slots for this day. Please try another date.
-                      </p>
-                    )
-                  )}
+                      ))
+                    ) : (
+                      <p>No available slots for this day.</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </CardContent>
+            <CardFooter className="flex justify-between">
+                <Button variant="outline" onClick={() => setStep(2)}>Back</Button>
+                <Button onClick={() => setStep(4)} disabled={!selectedTime}>Next</Button>
+            </CardFooter>
           </Card>
         );
-      case 4: // Confirmation
-        if (!selectedClinic || !selectedService || !selectedDate || !selectedTime) {
-          return (
-            <Alert variant="destructive">
-              <Terminal className="h-4 w-4" />
-              <AlertTitle>Missing Information</AlertTitle>
-              <AlertDescription>
-                Something went wrong. Please start over.
-                <Button variant="link" onClick={() => setStep(1)}>Go to Step 1</Button>
-              </AlertDescription>
-            </Alert>
-          );
-        }
+      case 4:
         return (
           <Card>
             <CardHeader>
-              <CardTitle>Step 4: Confirm Your Appointment</CardTitle>
+              <CardTitle className="text-xl font-semibold">Step 4: Confirm Your Appointment</CardTitle>
               <CardDescription>Please review the details below before confirming.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <h3 className="font-semibold">Clinic:</h3>
-                <p>{selectedClinic.name}</p>
-                <p className="text-sm text-muted-foreground">
-                  {(selectedClinic.address as Address).street}, {(selectedClinic.address as Address).barangay}, {(selectedClinic.address as Address).city}
-                </p>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-semibold">Clinic:</h3>
+                  <p className="text-muted-foreground">{selectedClinic?.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {(selectedClinic?.address as Address)?.street}, {(selectedClinic?.address as Address)?.city}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="font-semibold">Service</h4>
+                  <p className="text-muted-foreground">{selectedService?.name}</p>
+                </div>
+                <div>
+                  <h4 className="font-semibold">Date & Time</h4>
+                  <p className="text-muted-foreground">
+                    {selectedDate && selectedTime ? 
+                      `${format(selectedDate, 'EEEE, MMMM d, yyyy')} at ${selectedTime}` 
+                      : 'Not selected'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold">Service:</h3>
-                <p>{selectedService.name}</p>
-              </div>
-              <div>
-                <h3 className="font-semibold">Date & Time:</h3>
-                {/* Format the full date-time string from selectedTime */}
-                <p>{selectedTime ? format(new Date(selectedTime), 'EEEE, MMMM dd, yyyy \'at\' h:mm a') : 'Not selected'}</p>
-              </div>
-              <Button onClick={handleConfirmBooking} disabled={isBooking} className="w-full">
-                {isBooking ? 'Booking...' : 'Confirm Booking'}
-              </Button>
+              <Alert className="mt-6">
+                <AlertTitle>Thank you for your booking request!</AlertTitle>
+                <AlertDescription>
+                  {`Your request for a '${selectedService?.name}' at ${selectedClinic?.name} has been sent. The clinic will confirm your appointment shortly.`}
+                </AlertDescription>
+              </Alert>
             </CardContent>
+            <CardFooter className="flex justify-between">
+                <Button variant="outline" onClick={() => setStep(3)}>Go Back</Button>
+                <Button onClick={handleConfirmBooking} disabled={isBooking}>
+                  {isBooking ? 'Booking...' : 'Confirm Appointment'}
+                </Button>
+            </CardFooter>
           </Card>
         );
       default:
-        return <div>Invalid step</div>;
+        return null;
     }
   };
 
   return (
-    <div className="space-y-8">
-      <Progress value={progressValue} className="w-full" />
+    <div className="max-w-4xl mx-auto p-4 md:p-8">
+      <Progress value={progressValue} className="mb-8" />
       {renderStep()}
-      <div className="flex justify-between">
-        <Button variant="outline" onClick={() => setStep(s => Math.max(s - 1, 1))} disabled={step === 1}>
-          Back
-        </Button>
-        {/* The 'Next' button is implicitly handled by the selections */}
-      </div>
     </div>
   );
 };

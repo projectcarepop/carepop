@@ -58,7 +58,7 @@ export default function Header() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem asChild className="hover:bg-transparent focus:bg-transparent">
-                  <Link href="/clinic-finder" className="hover:text-primary focus:text-primary">Find a Clinic</Link>
+                  <Link href="/find-a-clinic" className="hover:text-primary focus:text-primary">Find a Clinic</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild className="hover:bg-transparent focus:bg-transparent">
                   <Link href="/book-appointment" className="hover:text-primary focus:text-primary">Book a Service</Link>

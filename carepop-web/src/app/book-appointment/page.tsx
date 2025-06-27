@@ -23,9 +23,9 @@ export default async function BookAppointmentPage() {
   // This page is now just a protected shell.
   return (
     <Container>
-      <div className="py-8">
-        <h1 className="text-3xl font-bold tracking-tight mb-4">Book Your Appointment</h1>
-        <p className="text-muted-foreground mb-8">
+      <div className="py-10 justify-center">
+        <h1 className="text-3xl font-bold tracking-tight mb-4 text-center">Book Your Appointment</h1>
+        <p className="text-muted-foreground mb-8 text-center">
           Follow the steps below to find a service, clinic, and time that works for you.
         </p>
         <BookingWizard />
