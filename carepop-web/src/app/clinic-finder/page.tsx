@@ -1,9 +1,11 @@
-import React from 'react';
-import { Metadata } from 'next';
-import ClinicFinderClient from './components/ClinicFinderClient';
-import { createClient } from '@/lib/supabase/server';
-import { cookies } from 'next/headers';
-import { Tables } from '@/types/supabase';
+'use client';
+
+import React, { useState, useEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Search, MapPin, Navigation } from 'lucide-react';
 
 // Components that are part of the page layout but don't require client interactivity directly here
 // import LocationSearchInput from './components/LocationSearchInput'; 
@@ -11,117 +13,145 @@ import { Tables } from '@/types/supabase';
 // import SearchClinicsButton from './components/SearchClinicsButton';
 // The above will be rendered by ClinicFinderClient.tsx
 
-// --- Start: New Inferred Types ---
-type Clinic = Tables<'clinics'>;
-type Service = Tables<'services'>;
-// --- End: New Inferred Types ---
-
-export const dynamic = 'force-dynamic';
-
-export const metadata: Metadata = {
-  title: 'Find a Clinic - CarePoP',
-  description: 'Search for FPOP clinics and other healthcare providers near you. Filter by services and location to find the care you need.',
-  alternates: {
-    canonical: '/clinic-finder',
-  },
-  openGraph: {
-    title: 'Clinic Finder - CarePoP',
-    description: 'Search for clinics and healthcare providers near you.',
-    url: '/clinic-finder',
-  },
-  twitter: {
-    title: 'Clinic Finder - CarePoP',
-    description: 'Search for clinics and healthcare providers near you.',
-  }
-};
-
-const pageSchema = {
-  '@context': 'https://schema.org',
-  '@type': 'WebSite',
-  url: 'https://www.carepop.ph/clinic-finder',
-  potentialAction: {
-    '@type': 'SearchAction',
-    target: {
-      '@type': 'EntryPoint',
-      urlTemplate: 'https://www.carepop.ph/clinic-finder?q={search_term_string}'
-    },
-    'query-input': 'required name=search_term_string'
-  }
-};
-
-const exampleClinicSchema = {
-  '@context': 'https://schema.org',
-  '@type': 'MedicalClinic',
-  name: 'CarePoP Sample Clinic',
-  address: {
-    '@type': 'PostalAddress',
-    streetAddress: '123 Health St',
-    addressLocality: 'Manila',
-    addressRegion: 'NCR',
-    postalCode: '1000',
-    addressCountry: 'PH'
-  },
-  telephone: '+63288887777',
-  url: 'https://www.carepop.ph/clinic/sample-clinic'
-};
-
-export default async function ClinicFinderPage() {
-  const cookieStore = cookies();
-  const supabase = createClient(cookieStore);
-
-  let clinics: Clinic[] = [];
-  let services: Service[] = [];
-  let fetchError: string | null = null;
-
-  try {
-    // Fetch both clinics and services in parallel
-    const clinicsPromise = supabase.from('clinics').select('*').eq('is_active', true);
-    const servicesPromise = supabase.from('services').select('*').eq('is_active', true);
-
-    const [clinicsResult, servicesResult] = await Promise.all([
-      clinicsPromise,
-      servicesPromise,
-    ]);
-
-    if (clinicsResult.error) {
-      console.error('Error fetching clinics:', clinicsResult.error.message);
-      // Throwing the error to be caught by the catch block below
-      throw new Error(`Failed to fetch clinics: ${clinicsResult.error.message}`);
+// --- API Fetching Function ---
+const searchClinics = async (query: string, lat?: number, lon?: number) => {
+    const params = new URLSearchParams();
+    if (query) params.set('q', query);
+    if (lat !== undefined && lon !== undefined) {
+        params.set('lat', String(lat));
+        params.set('lon', String(lon));
     }
-    clinics = clinicsResult.data || [];
+
+    // This assumes the backend is running on the same host or is proxied.
+    // In a real app, use an environment variable for the API base URL.
+    const response = await fetch(`/api/public/search/clinics?${params.toString()}`);
     
-    if (servicesResult.error) {
-      console.error('Error fetching services:', servicesResult.error.message);
-      // Throwing the error to be caught by the catch block below
-      throw new Error(`Failed to fetch services: ${servicesResult.error.message}`);
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch clinics');
     }
-    services = servicesResult.data || [];
+    const result = await response.json();
+    return result.data; // Assuming backend wraps in { data: [...] }
+};
 
-  } catch (error) {
-    console.error("Error in ClinicFinderPage (Server Component) while fetching initial data:", error);
-    fetchError = error instanceof Error ? error.message : "An unknown error occurred while loading page data.";
-    // clinics and services will remain empty
-    clinics = [];
-    services = [];
-  }
+// --- Main Client Component ---
+function ClinicFinderClient() {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
+    const [activeClinic, setActiveClinic] = useState<any>(null);
+    
+    const mapRef = useRef<google.maps.Map | null>(null);
 
-  return (
-    <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(pageSchema) }}
-      />
-      <script 
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(exampleClinicSchema) }}
-      />
-      
-      {/* The ClinicFinderClient now controls the entire page layout below the header */}
-      <ClinicFinderClient 
-        initialClinics={clinics} 
-        initialServices={services}
-        initialFetchError={fetchError} 
-      />
-    </>
-  );
+    const { isLoaded, loadError } = useJsApiLoader({
+        googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+        libraries: ['places'],
+    });
+
+    const { data: clinics, isLoading, error, refetch } = useQuery({
+        queryKey: ['clinics', searchQuery, userLocation],
+        queryFn: () => searchClinics(searchQuery, userLocation?.lat, userLocation?.lng),
+        enabled: true,
+    });
+
+    useEffect(() => {
+        if (searchQuery || userLocation) {
+            refetch();
+        }
+    }, [searchQuery, userLocation, refetch]);
+    
+    const handleSearch = (e: React.FormEvent) => {
+        e.preventDefault();
+        setUserLocation(null); // Clear location search when doing a text search
+        setSearchQuery(searchTerm);
+    };
+
+    const handleFindNearMe = () => {
+        setSearchTerm('');
+        setSearchQuery('');
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+            },
+            (error) => {
+                console.error("Geolocation error:", error);
+                alert("Could not get your location. Please enable location services in your browser.");
+            }
+        );
+    };
+    
+    const onMapLoad = (map: google.maps.Map) => {
+        mapRef.current = map;
+    };
+    
+    if (loadError) return <div>Error loading maps. Please check your API key and network connection.</div>;
+    if (!isLoaded) return <div>Loading...</div>;
+
+    return (
+        <div className="flex h-[calc(100vh-80px)]"> {/* Adjust height based on your header */}
+            <div className="w-1/3 p-4 overflow-y-auto bg-white shadow-lg">
+                <h1 className="text-2xl font-bold mb-4">Find a Clinic</h1>
+                <form onSubmit={handleSearch} className="flex gap-2 mb-4">
+                    <Input 
+                        placeholder="Search by name or service..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                    <Button type="submit" size="icon"><Search className="h-4 w-4"/></Button>
+                </form>
+                <Button onClick={handleFindNearMe} className="w-full mb-4" variant="outline">
+                    <MapPin className="h-4 w-4 mr-2"/> Find Near Me
+                </Button>
+                <div className="space-y-3">
+                    {isLoading && <p>Searching...</p>}
+                    {error && <p className="text-red-500">{error.message}</p>}
+                    {clinics && clinics.map((clinic: any) => (
+                        <div key={clinic.id} className="p-3 border rounded-md cursor-pointer hover:bg-gray-100" onClick={() => setActiveClinic(clinic)}>
+                            <h3 className="font-semibold">{clinic.name}</h3>
+                            <p className="text-sm text-gray-600">{clinic.address?.street}</p>
+                            {clinic.distanceKm !== null && <p className="text-xs text-blue-600 font-medium">Approx. {clinic.distanceKm.toFixed(1)} km away</p>}
+                        </div>
+                    ))}
+                </div>
+            </div>
+            <div className="w-2/3">
+                <GoogleMap
+                    mapContainerStyle={{ width: '100%', height: '100%' }}
+                    center={userLocation || { lat: 12.8797, lng: 121.7740 }} // Default to Philippines center
+                    zoom={userLocation ? 12 : 6}
+                    onLoad={onMapLoad}
+                >
+                    {clinics && clinics.map((clinic: any) => (
+                        <Marker 
+                            key={clinic.id} 
+                            position={{ lat: clinic.location.y, lng: clinic.location.x }} // Assuming PostGIS point {x, y}
+                            onClick={() => setActiveClinic(clinic)}
+                        />
+                    ))}
+                    {activeClinic && (
+                        <InfoWindow
+                            position={{ lat: activeClinic.location.y, lng: activeClinic.location.x }}
+                            onCloseClick={() => setActiveClinic(null)}
+                        >
+                            <div className="p-1 max-w-xs">
+                                <h4 className="font-bold text-md mb-1">{activeClinic.name}</h4>
+                                <p className="text-sm mb-2">{activeClinic.address?.street}</p>
+                                {activeClinic.phoneNumber && <p className="text-sm mb-2">{activeClinic.phoneNumber}</p>}
+                                <Button asChild size="sm">
+                                    <a href={`https://www.google.com/maps/dir/?api=1&destination=${activeClinic.location.y},${activeClinic.location.x}`} target="_blank" rel="noopener noreferrer">
+                                        <Navigation className="h-4 w-4 mr-2"/> Get Directions
+                                    </a>
+                                </Button>
+                            </div>
+                        </InfoWindow>
+                    )}
+                </GoogleMap>
+            </div>
+        </div>
+    );
+}
+
+// The page is now just a wrapper for the client component.
+export default function ClinicFinderPage() {
+    return <ClinicFinderClient />;
 } 

@@ -12,7 +12,7 @@ export const usersInAuth = pgTable("users", {
 });
 
 export const appointmentStatus = pgEnum("appointment_status", ['scheduled', 'completed', 'canceled_by_patient', 'canceled_by_admin', 'no_show'])
-export const medicalRecordType = pgEnum("medical_record_type", ['PRESCRIPTION', 'LAB_ORDER', 'DOCTOR_NOTE'])
+export const medicalRecordType = pgEnum("medical_record_type", ['PRESCRIPTION', 'LAB_ORDER', 'DOCTOR_NOTE', 'LAB_RESULT', 'CLINICAL_DOCUMENT'])
 export const orderStatus = pgEnum("order_status", ['pending_payment', 'processing', 'shipped', 'delivered', 'canceled'])
 export const userRole = pgEnum("user_role", ['patient', 'admin'])
 export const dayOfWeekEnum = pgEnum("day_of_week", [
@@ -73,6 +73,35 @@ export const services = pgTable("services", {
     durationCheck: check("services_duration_minutes_check", sql`duration_minutes > 0`),
 }));
 
+export const clinicServices = pgTable("clinic_services", {
+	clinicId: uuid("clinic_id").notNull().references(() => clinics.id, { onDelete: 'cascade' }),
+	serviceId: uuid("service_id").notNull().references(() => services.id, { onDelete: 'cascade' }),
+}, (table) => ({
+	compoundKey: primaryKey({ columns: [table.clinicId, table.serviceId] }),
+}));
+
+export const doctorClinics = pgTable("doctor_clinics", {
+	doctorId: uuid("doctor_id").notNull().references(() => doctors.id, { onDelete: 'cascade' }),
+	clinicId: uuid("clinic_id").notNull().references(() => clinics.id, { onDelete: 'cascade' }),
+}, (table) => ({
+	compoundKey: primaryKey({ columns: [table.doctorId, table.clinicId] }),
+}));
+
+export const doctorServices = pgTable("doctor_services", {
+	doctorId: uuid("doctor_id").notNull().references(() => doctors.id, { onDelete: 'cascade' }),
+	serviceId: uuid("service_id").notNull().references(() => services.id, { onDelete: 'cascade' }),
+}, (table) => ({
+	compoundKey: primaryKey({ columns: [table.doctorId, table.serviceId] }),
+}));
+
+export const providerAvailability = pgTable("provider_availability", {
+    id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+    doctorId: uuid("doctor_id").notNull().references(() => doctors.id, { onDelete: 'cascade' }),
+    dayOfWeek: dayOfWeekEnum("day_of_week").notNull(),
+    startTime: text("start_time").notNull(), // "HH:MM:SS"
+    endTime: text("end_time").notNull(),   // "HH:MM:SS"
+});
+
 export const profiles = pgTable("profiles", {
 	id: uuid('id').primaryKey().notNull().references(() => usersInAuth.id, { onDelete: 'cascade' }),
 	firstName: text("first_name"),
@@ -119,8 +148,35 @@ export const medicalRecords = pgTable("medical_records", {
 	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
 	appointmentId: uuid("appointment_id").notNull().references(() => appointments.id, { onDelete: 'cascade' }),
 	recordType: medicalRecordType("record_type").notNull(),
-	details: jsonb("details").notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+});
+
+export const recordDoctorNotes = pgTable("record_doctor_notes", {
+    id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+    recordId: uuid("record_id").notNull().references(() => medicalRecords.id, { onDelete: 'cascade' }),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+});
+
+export const recordPrescriptions = pgTable("record_prescriptions", {
+    id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+    recordId: uuid("record_id").notNull().references(() => medicalRecords.id, { onDelete: 'cascade' }),
+    medication: text("medication").notNull(),
+    dosage: text("dosage"),
+    frequency: text("frequency"),
+    startDate: date("start_date"),
+    endDate: date("end_date"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+});
+
+export const recordDocuments = pgTable("record_documents", {
+    id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+    recordId: uuid("record_id").notNull().references(() => medicalRecords.id, { onDelete: 'cascade' }),
+    documentName: text("document_name").notNull(),
+    filePath: text("file_path").notNull(),
+    fileType: text("file_type"),
+    uploadedAt: timestamp("uploaded_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 });
 
 export const reviews = pgTable("reviews", {

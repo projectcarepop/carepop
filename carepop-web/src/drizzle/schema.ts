@@ -1,15 +1,29 @@
-import { pgTable, index, uuid, text, jsonb, boolean, timestamp, foreignKey, check, numeric, integer, date, unique, primaryKey, pgEnum, customType } from "drizzle-orm/pg-core"
-import { sql } from "drizzle-orm"
+import { pgTable, index, pgPolicy, uuid, text, jsonb, boolean, timestamp, check, numeric, integer, date, unique, primaryKey, pgEnum, customType } from "drizzle-orm/pg-core"
+import { sql, relations } from "drizzle-orm"
 
 // Placeholder for auth.users table
 export const usersInAuth = pgTable("users", {
-  id: uuid().primaryKey(),
+  id: uuid('id').primaryKey(),
+}, (table) => {
+    return {
+        tableName: "users",
+        schemaName: "auth"
+    }
 });
 
 export const appointmentStatus = pgEnum("appointment_status", ['scheduled', 'completed', 'canceled_by_patient', 'canceled_by_admin', 'no_show'])
-export const medicalRecordType = pgEnum("medical_record_type", ['PRESCRIPTION', 'LAB_ORDER', 'DOCTOR_NOTE'])
+export const medicalRecordType = pgEnum("medical_record_type", ['PRESCRIPTION', 'LAB_ORDER', 'DOCTOR_NOTE', 'LAB_RESULT', 'CLINICAL_DOCUMENT'])
 export const orderStatus = pgEnum("order_status", ['pending_payment', 'processing', 'shipped', 'delivered', 'canceled'])
 export const userRole = pgEnum("user_role", ['patient', 'admin'])
+export const dayOfWeekEnum = pgEnum("day_of_week", [
+  "SUNDAY",
+  "MONDAY",
+  "TUESDAY",
+  "WEDNESDAY",
+  "THURSDAY",
+  "FRIDAY",
+  "SATURDAY",
+]);
 
 const geographyPoint = customType<{ data: string }>({
     dataType() {
@@ -18,55 +32,49 @@ const geographyPoint = customType<{ data: string }>({
 });
 
 export const clinics = pgTable("clinics", {
-	id: uuid().default(sql`uuid_generate_v4()`).primaryKey().notNull(),
-	name: text().notNull(),
-	address: jsonb(),
+	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+	name: text("name").notNull(),
+	address: jsonb("address"),
 	phoneNumber: text("phone_number"),
 	logoUrl: text("logo_url"),
-	// TODO: failed to parse database type 'geography'
 	location: geographyPoint("location"),
 	isActive: boolean("is_active").default(true).notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => ({
-	clinicsLocationIdx: index("clinics_location_idx").using("gist", table.location),
+	locationIdx: index("clinics_location_idx").using("gist", table.location),
 }));
 
 export const doctors = pgTable("doctors", {
-	id: uuid().default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
 	fullName: text("full_name").notNull(),
 	specialtyText: text("specialty_text"),
-	bio: text(),
+	bio: text("bio"),
 	avatarUrl: text("avatar_url"),
 	isActive: boolean("is_active").default(true).notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 });
 
 export const serviceCategories = pgTable("service_categories", {
-	id: uuid().default(sql`uuid_generate_v4()`).primaryKey().notNull(),
-	name: text().notNull(),
-	description: text(),
+	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+	name: text("name").notNull(),
+	description: text("description"),
 });
 
 export const services = pgTable("services", {
-	id: uuid().default(sql`uuid_generate_v4()`).primaryKey().notNull(),
-	categoryId: uuid("category_id"),
-	name: text().notNull(),
-	description: text(),
-	price: numeric({ precision: 10, scale:  2 }).notNull(),
+	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+	categoryId: uuid("category_id").references(() => serviceCategories.id, { onDelete: 'set null' }),
+	name: text("name").notNull(),
+	description: text("description"),
+	price: numeric("price", { precision: 10, scale:  2 }).notNull(),
 	durationMinutes: integer("duration_minutes").notNull(),
 	isActive: boolean("is_active").default(true).notNull(),
 }, (table) => ({
-	servicesCategoryIdFk: foreignKey({
-			columns: [table.categoryId],
-			foreignColumns: [serviceCategories.id],
-			name: "fk_services_category_id"
-		}).onDelete("set null"),
-	servicesDurationMinutesCheck: check("services_duration_minutes_check", sql`duration_minutes > 0`),
-	servicesPriceCheck: check("services_price_check", sql`price >= (0)::numeric`),
+	priceCheck: check("services_price_check", sql`price >= 0`),
+    durationCheck: check("services_duration_minutes_check", sql`duration_minutes > 0`),
 }));
 
 export const profiles = pgTable("profiles", {
-	id: uuid().primaryKey().notNull(),
+	id: uuid('id').primaryKey().notNull().references(() => usersInAuth.id, { onDelete: 'cascade' }),
 	firstName: text("first_name"),
 	middleInitial: text("middle_initial"),
 	lastName: text("last_name"),
@@ -85,230 +93,197 @@ export const profiles = pgTable("profiles", {
 	cityMunicipalityCode: text("city_municipality_code"),
 	provinceCode: text("province_code"),
 	avatarUrl: text("avatar_url"),
-	role: userRole("user_role").default('patient').notNull(),
+	role: userRole("role").default('patient').notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => ({
-	profilesIdFk: foreignKey({
-			columns: [table.id],
-			foreignColumns: [usersInAuth.id],
-			name: "fk_profiles_id"
-		}).onDelete("cascade"),
-}));
+});
 
 export const appointments = pgTable("appointments", {
-	id: uuid().default(sql`uuid_generate_v4()`).primaryKey().notNull(),
-	patientId: uuid("patient_id").notNull(),
-	doctorId: uuid("doctor_id").notNull(),
-	serviceId: uuid("service_id").notNull(),
-	clinicId: uuid("clinic_id").notNull(),
+	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+	patientId: uuid("patient_id").notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+	doctorId: uuid("doctor_id").notNull().references(() => doctors.id, { onDelete: 'restrict' }),
+	serviceId: uuid("service_id").notNull().references(() => services.id, { onDelete: 'restrict' }),
+	clinicId: uuid("clinic_id").notNull().references(() => clinics.id, { onDelete: 'restrict' }),
 	appointmentTime: timestamp("appointment_time", { withTimezone: true, mode: 'string' }).notNull(),
-	status: appointmentStatus().default('scheduled').notNull(),
+	status: appointmentStatus("status").default('scheduled').notNull(),
 	reasonForVisit: text("reason_for_visit"),
 	visitSummary: text("visit_summary"),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => ({
-	idxAppointmentsClinicId: index("idx_appointments_clinic_id").on(table.clinicId),
-	idxAppointmentsDoctorId: index("idx_appointments_doctor_id").on(table.doctorId),
-	idxAppointmentsPatientId: index("idx_appointments_patient_id").on(table.patientId),
-	appointmentsClinicIdFk: foreignKey({
-			columns: [table.clinicId],
-			foreignColumns: [clinics.id],
-			name: "fk_appointments_clinic_id"
-		}).onDelete("restrict"),
-	appointmentsDoctorIdFk: foreignKey({
-			columns: [table.doctorId],
-			foreignColumns: [doctors.id],
-			name: "fk_appointments_doctor_id"
-		}).onDelete("restrict"),
-	appointmentsPatientIdFk: foreignKey({
-			columns: [table.patientId],
-			foreignColumns: [profiles.id],
-			name: "fk_appointments_patient_id"
-		}).onDelete("cascade"),
-	appointmentsServiceIdFk: foreignKey({
-			columns: [table.serviceId],
-			foreignColumns: [services.id],
-			name: "fk_appointments_service_id"
-		}).onDelete("restrict"),
+    patientIdx: index("idx_appointments_patient_id").on(table.patientId),
+    doctorIdx: index("idx_appointments_doctor_id").on(table.doctorId),
+    clinicIdx: index("idx_appointments_clinic_id").on(table.clinicId),
 }));
 
 export const medicalRecords = pgTable("medical_records", {
-	id: uuid().default(sql`uuid_generate_v4()`).primaryKey().notNull(),
-	appointmentId: uuid("appointment_id").notNull(),
+	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+	appointmentId: uuid("appointment_id").notNull().references(() => appointments.id, { onDelete: 'cascade' }),
 	recordType: medicalRecordType("record_type").notNull(),
-	details: jsonb().notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => ({
-	medicalRecordsAppointmentIdFk: foreignKey({
-			columns: [table.appointmentId],
-			foreignColumns: [appointments.id],
-			name: "fk_medical_records_appointment_id"
-		}).onDelete("cascade"),
-}));
+});
+
+export const recordDoctorNotes = pgTable("record_doctor_notes", {
+    id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+    recordId: uuid("record_id").notNull().references(() => medicalRecords.id, { onDelete: 'cascade' }),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+});
+
+export const recordPrescriptions = pgTable("record_prescriptions", {
+    id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+    recordId: uuid("record_id").notNull().references(() => medicalRecords.id, { onDelete: 'cascade' }),
+    medication: text("medication").notNull(),
+    dosage: text("dosage"),
+    frequency: text("frequency"),
+    startDate: date("start_date"),
+    endDate: date("end_date"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+});
+
+export const recordDocuments = pgTable("record_documents", {
+    id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+    recordId: uuid("record_id").notNull().references(() => medicalRecords.id, { onDelete: 'cascade' }),
+    documentName: text("document_name").notNull(),
+    filePath: text("file_path").notNull(),
+    fileType: text("file_type"),
+    uploadedAt: timestamp("uploaded_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+});
 
 export const reviews = pgTable("reviews", {
-	id: uuid().default(sql`uuid_generate_v4()`).primaryKey().notNull(),
-	appointmentId: uuid("appointment_id").notNull(),
-	patientId: uuid("patient_id").notNull(),
-	doctorId: uuid("doctor_id"),
-	rating: integer().notNull(),
-	comment: text(),
+	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+	appointmentId: uuid("appointment_id").notNull().unique().references(() => appointments.id, { onDelete: 'cascade' }),
+	patientId: uuid("patient_id").notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+	doctorId: uuid("doctor_id").references(() => doctors.id, { onDelete: 'set null' }),
+	rating: integer("rating").notNull(),
+	comment: text("comment"),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => ({
-	reviewsAppointmentIdFk: foreignKey({
-			columns: [table.appointmentId],
-			foreignColumns: [appointments.id],
-			name: "fk_reviews_appointment_id"
-		}).onDelete("cascade"),
-	reviewsDoctorIdFk: foreignKey({
-			columns: [table.doctorId],
-			foreignColumns: [doctors.id],
-			name: "fk_reviews_doctor_id"
-		}).onDelete("set null"),
-	reviewsPatientIdFk: foreignKey({
-			columns: [table.patientId],
-			foreignColumns: [profiles.id],
-			name: "fk_reviews_patient_id"
-		}).onDelete("cascade"),
-	reviewsAppointmentIdKey: unique("reviews_appointment_id_key").on(table.appointmentId),
-	reviewsRatingCheck: check("reviews_rating_check", sql`(rating >= 1) AND (rating <= 5)`),
+    ratingCheck: check("reviews_rating_check", sql`rating >= 1 AND rating <= 5`),
 }));
 
 export const productCategories = pgTable("product_categories", {
-	id: uuid().default(sql`uuid_generate_v4()`).primaryKey().notNull(),
-	name: text().notNull(),
-	description: text(),
+	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+	name: text("name").notNull(),
+	description: text("description"),
 });
 
 export const products = pgTable("products", {
-	id: uuid().default(sql`uuid_generate_v4()`).primaryKey().notNull(),
-	categoryId: uuid("category_id"),
-	name: text().notNull(),
-	description: text(),
-	sku: text(),
-	price: numeric({ precision: 10, scale:  2 }).notNull(),
+	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+	categoryId: uuid("category_id").references(() => productCategories.id, { onDelete: 'set null' }),
+	name: text("name").notNull(),
+	description: text("description"),
+	sku: text("sku").unique(),
+	price: numeric("price", { precision: 10, scale:  2 }).notNull(),
 	requiresPrescription: boolean("requires_prescription").default(false).notNull(),
 	isActive: boolean("is_active").default(true).notNull(),
 }, (table) => ({
-	productsCategoryIdFk: foreignKey({
-			columns: [table.categoryId],
-			foreignColumns: [productCategories.id],
-			name: "fk_products_category_id"
-		}).onDelete("set null"),
-	productsSkuKey: unique("products_sku_key").on(table.sku),
-	productsPriceCheck: check("products_price_check", sql`price >= (0)::numeric`),
+    priceCheck: check("products_price_check", sql`price >= 0`),
 }));
 
 export const inventory = pgTable("inventory", {
-	productId: uuid("product_id").primaryKey().notNull(),
+	productId: uuid("product_id").primaryKey().notNull().references(() => products.id, { onDelete: 'cascade' }),
 	quantityOnHand: integer("quantity_on_hand").default(0).notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => ({
-	inventoryProductIdFk: foreignKey({
-			columns: [table.productId],
-			foreignColumns: [products.id],
-			name: "fk_inventory_product_id"
-		}).onDelete("cascade"),
-	inventoryQuantityOnHandCheck: check("inventory_quantity_on_hand_check", sql`quantity_on_hand >= 0`),
+    quantityCheck: check("inventory_quantity_on_hand_check", sql`quantity_on_hand >= 0`),
 }));
 
-export const patientOrders = pgTable("patient_orders", {
-	id: uuid().default(sql`uuid_generate_v4()`).primaryKey().notNull(),
-	patientId: uuid("patient_id").notNull(),
-	status: orderStatus().default('pending_payment').notNull(),
-	shippingAddress: jsonb().notNull(),
-	trackingNumber: text("tracking_number"),
-	totalAmount: numeric({ precision: 10, scale:  2 }).notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => ({
-	patientOrdersPatientIdFk: foreignKey({
-			columns: [table.patientId],
-			foreignColumns: [profiles.id],
-			name: "fk_patient_orders_patient_id"
-		}).onDelete("cascade"),
-	patientOrdersTotalAmountCheck: check("patient_orders_total_amount_check", sql`total_amount >= (0)::numeric`),
+
+// --- RELATIONS ---
+
+export const profilesRelations = relations(profiles, ({ many, one }) => ({
+	appointments: many(appointments),
+	reviews: many(reviews),
+    user: one(usersInAuth, {
+        fields: [profiles.id],
+        references: [usersInAuth.id],
+    })
 }));
 
-export const healthLogs = pgTable("health_logs", {
-	id: uuid().default(sql`uuid_generate_v4()`).primaryKey().notNull(),
-	patientId: uuid("patient_id").notNull(),
-	logDate: date("log_date").notNull(),
-	mood: text(),
-	symptoms: text("symptoms").array(),
-	notes: text(),
-}, (table) => ({
-	healthLogsPatientIdLogDateKey: unique("health_logs_patient_id_log_date_key").on(table.patientId, table.logDate),
-	healthLogsPatientIdFk: foreignKey({
-			columns: [table.patientId],
-			foreignColumns: [profiles.id],
-			name: "fk_health_logs_patient_id"
-		}).onDelete("cascade"),
+export const usersInAuthRelations = relations(usersInAuth, ({ one }) => ({
+    profile: one(profiles),
 }));
 
-export const menstrualLogs = pgTable("menstrual_logs", {
-	id: uuid().default(sql`uuid_generate_v4()`).primaryKey().notNull(),
-	patientId: uuid("patient_id").notNull(),
-	startDate: date("start_date").notNull(),
-	endDate: date("end_date"),
-}, (table) => ({
-	menstrualLogsPatientIdFk: foreignKey({
-			columns: [table.patientId],
-			foreignColumns: [profiles.id],
-			name: "fk_menstrual_logs_patient_id"
-		}).onDelete("cascade"),
+export const clinicsRelations = relations(clinics, ({ many }) => ({
+	appointments: many(appointments),
 }));
 
-export const doctorClinics = pgTable("doctor_clinics", {
-	doctorId: uuid("doctor_id").notNull(),
-	clinicId: uuid("clinic_id").notNull(),
-}, (table) => ({
-	pk: primaryKey({ columns: [table.doctorId, table.clinicId] }),
-	doctorClinicsClinicIdFk: foreignKey({
-			columns: [table.clinicId],
-			foreignColumns: [clinics.id],
-			name: "fk_doctor_clinics_clinic_id"
-		}).onDelete("cascade"),
-	doctorClinicsDoctorIdFk: foreignKey({
-			columns: [table.doctorId],
-			foreignColumns: [doctors.id],
-			name: "fk_doctor_clinics_doctor_id"
-		}).onDelete("cascade"),
+export const doctorsRelations = relations(doctors, ({ many }) => ({
+	appointments: many(appointments),
+	reviews: many(reviews),
 }));
 
-export const doctorServices = pgTable("doctor_services", {
-	doctorId: uuid("doctor_id").notNull(),
-	serviceId: uuid("service_id").notNull(),
-}, (table) => ({
-	pk: primaryKey({ columns: [table.doctorId, table.serviceId] }),
-	doctorServicesDoctorIdFk: foreignKey({
-			columns: [table.doctorId],
-			foreignColumns: [doctors.id],
-			name: "fk_doctor_services_doctor_id"
-		}).onDelete("cascade"),
-	doctorServicesServiceIdFk: foreignKey({
-			columns: [table.serviceId],
-			foreignColumns: [services.id],
-			name: "fk_doctor_services_service_id"
-		}).onDelete("cascade"),
+export const servicesRelations = relations(services, ({ one, many }) => ({
+	serviceCategory: one(serviceCategories, {
+		fields: [services.categoryId],
+		references: [serviceCategories.id]
+	}),
+	appointments: many(appointments),
 }));
 
-export const patientOrderItems = pgTable("patient_order_items", {
-	orderId: uuid("order_id").notNull(),
-	productId: uuid("product_id").notNull(),
-	quantity: integer().notNull(),
-	pricePerItem: numeric({ precision: 10, scale:  2 }).notNull(),
-}, (table) => ({
-	patientOrderItemsOrderIdFk: foreignKey({
-			columns: [table.orderId],
-			foreignColumns: [patientOrders.id],
-			name: "fk_patient_order_items_order_id"
-		}).onDelete("cascade"),
-	patientOrderItemsProductIdFk: foreignKey({
-			columns: [table.productId],
-			foreignColumns: [products.id],
-			name: "fk_patient_order_items_product_id"
-		}).onDelete("restrict"),
-	patientOrderItemsPricePerItemCheck: check("patient_order_items_price_per_item_check", sql`price_per_item >= (0)::numeric`),
-	patientOrderItemsQuantityCheck: check("patient_order_items_quantity_check", sql`quantity > 0`),
+export const serviceCategoriesRelations = relations(serviceCategories, ({ many }) => ({
+	services: many(services),
+}));
+
+export const appointmentsRelations = relations(appointments, ({ one, many }) => ({
+	patient: one(profiles, {
+		fields: [appointments.patientId],
+		references: [profiles.id]
+	}),
+	doctor: one(doctors, {
+		fields: [appointments.doctorId],
+		references: [doctors.id]
+	}),
+	service: one(services, {
+		fields: [appointments.serviceId],
+		references: [services.id]
+	}),
+	clinic: one(clinics, {
+		fields: [appointments.clinicId],
+		references: [clinics.id]
+	}),
+	medicalRecords: many(medicalRecords),
+	review: one(reviews),
+}));
+
+export const medicalRecordsRelations = relations(medicalRecords, ({ one }) => ({
+	appointment: one(appointments, {
+		fields: [medicalRecords.appointmentId],
+		references: [appointments.id]
+	}),
+}));
+
+export const reviewsRelations = relations(reviews, ({ one }) => ({
+	appointment: one(appointments, {
+		fields: [reviews.appointmentId],
+		references: [appointments.id]
+	}),
+	patient: one(profiles, {
+		fields: [reviews.patientId],
+		references: [profiles.id]
+	}),
+	doctor: one(doctors, {
+		fields: [reviews.doctorId],
+		references: [doctors.id]
+	}),
+}));
+
+export const productsRelations = relations(products, ({ one }) => ({
+	productCategory: one(productCategories, {
+		fields: [products.categoryId],
+		references: [productCategories.id]
+	}),
+	inventory: one(inventory),
+}));
+
+export const productCategoriesRelations = relations(productCategories, ({ many }) => ({
+	products: many(products),
+}));
+
+export const inventoryRelations = relations(inventory, ({ one }) => ({
+	product: one(products, {
+		fields: [inventory.productId],
+		references: [products.id]
+	}),
 }));

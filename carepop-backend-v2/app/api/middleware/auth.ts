@@ -1,10 +1,11 @@
 import { createMiddleware } from 'hono/factory';
-import { createClient, User } from '@supabase/supabase-js';
+import { createClient, User, SupabaseClient } from '@supabase/supabase-js';
 
 // Define the type for Hono's context variables
 export type AuthEnv = {
   Variables: {
     user: User;
+    supabase: SupabaseClient;
   };
 };
 
@@ -40,8 +41,9 @@ export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
     return c.json({ error: 'Unauthorized', message: 'Invalid token or user not found' }, 401);
   }
 
-  // 4. Set the user in the context and proceed.
+  // 4. Set the user and the supabase client in the context and proceed.
   c.set('user', data.user);
+  c.set('supabase', supabase);
   await next();
 });
 
@@ -60,10 +62,7 @@ export const adminMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
 
   // The CORRECT and SECURE way to check roles for a backend service.
   // The JWT can be stale. Always query the database for the authoritative role.
-  const supabase = createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const supabase = c.get('supabase'); // Get client from context instead of creating a new one
 
   const { data: profile, error } = await supabase
     .from('profiles')

@@ -69,6 +69,15 @@ export type AppointmentBookingPayload = Omit<NewAppointment, 'doctorId'> & {
 export type MedicalRecord = InferSelectModel<typeof schema.medicalRecords>;
 export type NewMedicalRecord = InferInsertModel<typeof schema.medicalRecords>;
 
+export type DoctorNote = InferSelectModel<typeof schema.recordDoctorNotes>;
+export type NewDoctorNote = InferInsertModel<typeof schema.recordDoctorNotes>;
+
+export type Prescription = InferSelectModel<typeof schema.recordPrescriptions>;
+export type NewPrescription = InferInsertModel<typeof schema.recordPrescriptions>;
+
+export type ClinicalDocument = InferSelectModel<typeof schema.recordDocuments>;
+export type NewClinicalDocument = InferInsertModel<typeof schema.recordDocuments>;
+
 export type HealthLog = InferSelectModel<typeof schema.healthLogs>;
 export type NewHealthLog = InferInsertModel<typeof schema.healthLogs>;
 
@@ -126,7 +135,7 @@ export type AppointmentWithRelations = Appointment & {
   doctor: DoctorWithProfile | null;
   clinic: Clinic | null;
   service: Service | null;
-  medicalRecords?: MedicalRecord[];
+  medicalRecords?: MedicalRecordWithDetails[];
 };
 
 export type AppointmentDetails = Appointment & {
@@ -134,12 +143,13 @@ export type AppointmentDetails = Appointment & {
   doctor: Doctor;
   clinic: Clinic;
   service: Service;
-  medicalRecords: MedicalRecord[];
+  medicalRecords: MedicalRecordWithDetails[];
 };
 
 export type ProductWithStockAndCategory = Product & {
   categoryName: string;
   quantityOnHand: number;
+  serviceName: string;
 };
 
 export type AdminAppointment = Appointment & {
@@ -232,3 +242,8 @@ export const adminUserSchema = z.object({
     id: z.string(),
     // ... existing code ...
 });
+
+// --- Custom Types for Enriched Data ---
+export type MedicalRecordWithDetails = MedicalRecord & {
+    details: DoctorNote | Prescription | ClinicalDocument | null;
+}

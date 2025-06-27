@@ -44,27 +44,37 @@ const CellActions = ({ row }: { row: Row<AdminAppointment> }) => {
 
 export const columns: ColumnDef<AdminAppointment>[] = [
   {
-    accessorKey: 'patientName',
+    id: 'patientName',
     header: 'Patient',
-    cell: ({ row }) => {
-      const appointment = row.original;
-      return (
-        <Link href={`/admin/appointments/${appointment.id}`} className="hover:underline">
-          {row.getValue('patientName')}
-        </Link>
-      );
+    accessorFn: row => {
+      const firstName = row.patient?.firstName || '';
+      const lastName = row.patient?.lastName || '';
+      return `${firstName} ${lastName}`.trim();
     },
+    cell: ({ row }) => {
+      const patient = row.original.patient;
+      if (!patient) return <span className="text-muted-foreground">No Patient Info</span>;
+      
+      const patientName = `${patient.firstName || ''} ${patient.lastName || ''}`.trim();
+      
+      return (
+        <div>
+          <Link href={`/admin/appointments/${row.original.id}`} className="font-medium hover:underline">{patientName}</Link>
+          <div className="text-sm text-muted-foreground">{patient.email}</div>
+        </div>
+      );
+    }
   },
   {
-    accessorKey: 'doctorName',
+    accessorKey: 'doctor.fullName',
     header: 'Doctor',
   },
   {
-    accessorKey: 'clinicName',
+    accessorKey: 'clinic.name',
     header: 'Clinic',
   },
   {
-    accessorKey: 'serviceName',
+    accessorKey: 'service.name',
     header: 'Service',
   },
   {
@@ -88,8 +98,8 @@ export const columns: ColumnDef<AdminAppointment>[] = [
     cell: ({ row }) => {
       const status = row.getValue('status') as typeof appointmentStatusEnum[number];
       let variant: "default" | "secondary" | "destructive" | "outline" = 'secondary';
-      if (status === 'scheduled') variant = 'default';
-      if (status.startsWith('canceled')) variant = 'destructive';
+      if (status === 'SCHEDULED') variant = 'default';
+      if (status?.startsWith('CANCELLED')) variant = 'destructive';
 
       return <Badge variant={variant}>{status}</Badge>;
     },

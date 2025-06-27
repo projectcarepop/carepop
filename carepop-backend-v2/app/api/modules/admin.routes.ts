@@ -2,9 +2,10 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { db } from '../lib/db';
-import { clinics, profiles, doctors, services, productCategories, products, inventory, serviceCategories, appointments, medicalRecords } from '../../../drizzle/schema';
-import { eq, sql, count, asc, and, gte, lt, getTableColumns } from 'drizzle-orm';
+import { clinics, profiles, doctors, services, productCategories, products, inventory, serviceCategories, appointments, medicalRecords, recordDoctorNotes, recordPrescriptions, recordDocuments } from '../../../drizzle/schema';
+import { eq, sql, count, asc, and, gte, lt, getTableColumns, desc } from 'drizzle-orm';
 import { authMiddleware, adminMiddleware, AuthEnv } from '../middleware/auth';
+import { createClient } from '@supabase/supabase-js';
 
 const adminRoutes = new Hono<AuthEnv>();
 
@@ -108,15 +109,33 @@ const serviceCategorySchema = z.object({
     description: z.string().optional(),
 });
 
-const medicalRecordSchema = z.object({
-  // Use z.enum to match the database enum definition
-  recordType: z.enum(['PRESCRIPTION', 'LAB_ORDER', 'DOCTOR_NOTE']),
-  // The 'details' field should be an object for jsonb
-  details: z.object({
-    note: z.string().min(1, "Note details cannot be empty"),
-  }),
-  // createdBy will be extracted from the authenticated user context
+// --- NEW Medical Record Schemas ---
+
+const noteSchema = z.object({
+    recordType: z.literal('DOCTOR_NOTE'),
+    details: z.object({
+        note: z.string().min(1, "Note cannot be empty."),
+    }),
 });
+
+const prescriptionSchema = z.object({
+    recordType: z.literal('PRESCRIPTION'),
+    details: z.object({
+        medication: z.string().min(1, "Medication is required."),
+        dosage: z.string().optional(),
+        frequency: z.string().optional(),
+        startDate: z.string().optional(), // Using string for date from client
+        endDate: z.string().optional(),
+        notes: z.string().optional(),
+    }),
+});
+
+// A new union schema for validation. We will only handle notes and prescriptions here.
+// Document uploads will have their own route.
+const newMedicalRecordSchema = z.discriminatedUnion("recordType", [
+    noteSchema,
+    prescriptionSchema,
+]);
 
 // --- Clinic Management Endpoints ---
 
@@ -155,23 +174,31 @@ adminRoutes
     return c.json(clinic);
   })
   .put('/clinics/:id', zValidator('json', updateClinicSchema), async (c) => {
-    const { id } = c.req.param();
+    const id = c.req.param('id');
     const { latitude, longitude, ...clinicData } = c.req.valid('json');
 
     const payloadForDb: Record<string, any> = { ...clinicData };
 
-    // THIS IS THE CRITICAL FIX: If lat/lon are provided, combine them into a PostGIS point string
     if (latitude !== undefined && longitude !== undefined) {
-      payloadForDb.location = sql`SRID=4326;POINT(${longitude} ${latitude})`;
+        payloadForDb.location = sql`ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography`;
     }
 
-    const [updatedClinic] = await db.update(clinics)
-      .set(payloadForDb)
-      .where(eq(clinics.id, id))
-      .returning();
+    if (Object.keys(payloadForDb).length === 0) {
+        return c.json({ error: 'No fields to update' }, 400);
+    }
 
-    if (!updatedClinic) return c.json({ error: 'Not Found' }, 404);
-    return c.json(updatedClinic);
+    try {
+        const [updatedClinic] = await db.update(clinics)
+            .set(payloadForDb)
+            .where(eq(clinics.id, id))
+            .returning();
+
+        if (!updatedClinic) return c.json({ error: 'Not Found' }, 404);
+        return c.json(updatedClinic);
+    } catch (error: any) {
+        console.error("Error updating clinic:", error);
+        return c.json({ error: 'Failed to update clinic', message: error.message }, 500);
+    }
   })
   .delete('/clinics/:id', async (c) => {
     const { id } = c.req.param();
@@ -284,7 +311,8 @@ adminRoutes
       const { productId } = c.req.param();
       const { quantityOnHand } = c.req.valid('json');
 
-      const [updatedStock] = await db.update(inventory)
+      const [updatedStock] = await db
+        .update(inventory)
         .set({ quantityOnHand, updatedAt: new Date().toISOString() })
         .where(eq(inventory.productId, productId))
         .returning();
@@ -410,63 +438,43 @@ adminRoutes
   });
 
 // --- Appointment Management Endpoints ---
-adminRoutes.get('/appointments', async (c) => {
+const getAppointmentsSchema = z.object({
+    date_from: z.string().optional(),
+    date_to: z.string().optional(),
+    clinicId: z.string().optional(),
+});
+
+adminRoutes.get('/appointments', zValidator('query', getAppointmentsSchema), async (c) => {
     try {
-        const { startDate, endDate } = c.req.query();
+        const { date_from, date_to, clinicId } = c.req.valid('query');
         const conditions = [];
 
-        if (startDate) {
-            // Records on or after the beginning of the start date
-            conditions.push(gte(appointments.appointmentTime, new Date(startDate).toISOString()));
+        if (date_from) {
+            conditions.push(gte(appointments.appointmentTime, date_from));
         }
-
-        if (endDate) {
-            // To include the entire end date, we look for records *before* the start of the *next* day.
-            const endOfDay = new Date(endDate);
-            endOfDay.setDate(endOfDay.getDate() + 1);
-            conditions.push(lt(appointments.appointmentTime, endOfDay.toISOString()));
+        if (date_to) {
+            const toDate = new Date(date_to);
+            toDate.setDate(toDate.getDate() + 1);
+            conditions.push(lt(appointments.appointmentTime, toDate.toISOString().split('T')[0]));
+        }
+        if (clinicId) {
+            conditions.push(eq(appointments.clinicId, clinicId));
         }
         
         const allAppointments = await db.query.appointments.findMany({
             where: conditions.length > 0 ? and(...conditions) : undefined,
             with: {
-                patient: {
-                    columns: {
-                        firstName: true,
-                        lastName: true,
-                    }
-                },
-                doctor: {
-                    columns: {
-                        fullName: true,
-                    }
-                },
-                service: {
-                    columns: {
-                        name: true,
-                    }
-                },
-                clinic: {
-                    columns: {
-                        name: true,
-                    }
-                }
+                clinic: { columns: { name: true } },
+                doctor: { columns: { fullName: true } },
+                patient: { columns: { firstName: true, lastName: true } },
             },
-            orderBy: (appointments, { desc }) => [desc(appointments.appointmentTime)],
+            orderBy: [desc(appointments.appointmentTime)],
         });
 
-        const responseData = allAppointments.map((a: any) => ({
-            ...a,
-            patientName: `${a.patient.firstName || ''} ${a.patient.lastName || ''}`.trim(),
-            doctorName: a.doctor.fullName,
-            serviceName: a.service.name,
-            clinicName: a.clinic.name,
-        }));
-
-        return c.json({ data: responseData });
+        return c.json({ data: allAppointments });
     } catch (error: any) {
         console.error("Error fetching appointments:", error);
-        return c.json({ message: "Error fetching appointments", error: error.message }, 500);
+        return c.json({ error: 'Failed to fetch appointments', message: error.message }, 500);
     }
 });
 
@@ -477,6 +485,7 @@ adminRoutes.get('/appointments/:id', async (c) => {
 
         console.log(`[GET /appointments/:id] Admin user ${user?.id} fetching appointment ${id}`);
 
+        // Step 1: Fetch the core appointment details and simple relations
         const appointment = await db.query.appointments.findFirst({
             where: eq(appointments.id, id),
             with: {
@@ -493,6 +502,7 @@ adminRoutes.get('/appointments/:id', async (c) => {
                 doctor: true,
                 service: true,
                 clinic: true,
+                // Fetch base medical records. We will enrich them below.
                 medicalRecords: {
                     orderBy: (medicalRecords, { desc }) => [desc(medicalRecords.createdAt)],
                 }
@@ -504,8 +514,44 @@ adminRoutes.get('/appointments/:id', async (c) => {
             return c.json({ error: 'Appointment not found' }, 404);
         }
 
-        console.log(`[GET /appointments/:id] Successfully found appointment ${id}.`);
-        return c.json({ data: appointment });
+        // Step 2 & 3: Enrich medical records with details from specialized tables
+        const enrichedMedicalRecords = await Promise.all(
+            appointment.medicalRecords.map(async (record) => {
+                let details: any = null;
+                switch (record.recordType) {
+                    case 'DOCTOR_NOTE':
+                        details = await db.query.recordDoctorNotes.findFirst({
+                            where: eq(recordDoctorNotes.recordId, record.id)
+                        });
+                        break;
+                    case 'PRESCRIPTION':
+                        details = await db.query.recordPrescriptions.findFirst({
+                            where: eq(recordPrescriptions.recordId, record.id)
+                        });
+                        break;
+                    case 'LAB_RESULT':
+                    case 'CLINICAL_DOCUMENT':
+                        details = await db.query.recordDocuments.findFirst({
+                            where: eq(recordDocuments.recordId, record.id)
+                        });
+                        break;
+                    default:
+                        // Handle 'LAB_ORDER' or other unknown types if necessary
+                        break;
+                }
+                return { ...record, details };
+            })
+        );
+        
+        // Step 4: Replace the original medical records with the enriched ones
+        const finalAppointmentData = {
+            ...appointment,
+            medicalRecords: enrichedMedicalRecords
+        };
+
+        console.log(`[GET /appointments/:id] Successfully found and enriched appointment ${id}.`);
+        // Step 5: Return the fully composed appointment object
+        return c.json({ data: finalAppointmentData });
 
     } catch (error: any) {
         console.error(`[GET /appointments/:id] CRASH:`, error);
@@ -513,66 +559,123 @@ adminRoutes.get('/appointments/:id', async (c) => {
     }
 });
 
-adminRoutes.post('/appointments/:id/records', zValidator('json', medicalRecordSchema), async (c) => {
+adminRoutes.post('/appointments/:id/records', zValidator('json', newMedicalRecordSchema), async (c) => {
     const { id: appointmentId } = c.req.param();
     const { recordType, details } = c.req.valid('json');
-    const user = c.get('user');
 
-    // Double-check if the appointment exists
-    const [appointment] = await db.select({ id: appointments.id }).from(appointments).where(eq(appointments.id, appointmentId));
-    if (!appointment) {
-        return c.json({ error: 'Appointment not found' }, 404);
+    try {
+        const newRecord = await db.transaction(async (tx) => {
+            // Step 1: Create the base medical record entry
+            const [baseRecord] = await tx.insert(medicalRecords).values({
+                appointmentId,
+                recordType,
+            }).returning();
+
+            // Step 2: Create the entry in the specialized table
+            switch(baseRecord.recordType) {
+                case 'DOCTOR_NOTE':
+                    // We know 'details' matches the noteSchema here because of the validator
+                    const noteDetails = details as z.infer<typeof noteSchema>['details'];
+                    await tx.insert(recordDoctorNotes).values({
+                        recordId: baseRecord.id,
+                        note: noteDetails.note,
+                    });
+                    break;
+                case 'PRESCRIPTION':
+                    const presDetails = details as z.infer<typeof prescriptionSchema>['details'];
+                    await tx.insert(recordPrescriptions).values({
+                        recordId: baseRecord.id,
+                        ...presDetails,
+                    });
+                    break;
+                default:
+                    // This case should not be hit due to the zod schema, but it's good practice
+                    console.error(`Invalid record type processed: ${baseRecord.recordType}`);
+                    throw new Error("Invalid record type for this endpoint.");
+            }
+            return baseRecord;
+        });
+
+        // We can re-fetch the full record here if we want to return it,
+        // but for now, returning the base record is sufficient.
+        return c.json({ data: newRecord }, 201);
+        
+    } catch (error: any) {
+        console.error(`[POST /appointments/:id/records] CRASH:`, error);
+        if (error.message.includes("Invalid record type")) {
+             return c.json({ error: error.message }, 400);
+        }
+        return c.json({ message: "Error creating medical record", error: error.message }, 500);
     }
-    
-    const [newRecord] = await db.insert(medicalRecords).values({
-        appointmentId,
-        recordType,
-        details, // 'details' is now an object, which Drizzle will correctly serialize to JSONB
-    }).returning();
-
-    return c.json({ data: newRecord }, 201);
 });
 
-// --- User Management Endpoints ---
-
-/**
- * GET /api/admin/users
- * Fetches a list of all users. Protected admin route.
- */
-adminRoutes.get('/users', async (c) => {
-  try {
-    const allUsers = await db.select().from(profiles);
-    return c.json({ data: allUsers });
-  } catch (error) {
-    console.error('Error fetching users:', error);
-    return c.json({ error: 'Internal Server Error', message: 'Failed to fetch users.' }, 500);
-  }
+const documentUploadSchema = z.object({
+  documentName: z.string().min(1, "Document name is required."),
+  file: z.instanceof(File, { message: "File is required." }),
 });
 
-/**
- * GET /api/admin/stats
- * Fetches dashboard stats. Protected admin route.
- */
-adminRoutes.get('/stats', async (c) => {
-  try {
-    const [userCount] = await db.select({ count: count() }).from(profiles);
-    const [doctorCount] = await db.select({ count: count() }).from(doctors);
-    const [clinicCount] = await db.select({ count: count() }).from(clinics);
-    const [appointmentCount] = await db.select({ count: count() }).from(appointments);
+adminRoutes.post('/appointments/:id/documents', 
+    zValidator('form', documentUploadSchema),
+    async (c) => {
+        const appointmentId = c.req.param('id');
+        const { documentName, file } = c.req.valid('form');
+        const user = c.get('user');
 
-    return c.json({
-      data: {
-        users: userCount.count,
-        doctors: doctorCount.count,
-        clinics: clinicCount.count,
-        appointments: appointmentCount.count,
-      },
+        // WORKAROUND: Create a new Supabase client to ensure correct storage types
+        const env = c.env as AuthEnv['Variables'];
+        const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
+        
+        // 1. Upload file to Supabase Storage
+        const filePath = `${appointmentId}/${Date.now()}_${file.name}`;
+        
+        const { error: uploadError } = await supabase.storage
+            .from('medical_documents')
+            .upload(filePath, file);
+
+        if (uploadError) {
+            console.error("Supabase upload error:", uploadError);
+            return c.json({ error: 'Failed to upload file to storage.' }, 500);
+        }
+
+        // 2. Create records in the database in a transaction
+        try {
+            const newDocumentRecord = await db.transaction(async (tx) => {
+                const [baseRecord] = await tx.insert(medicalRecords).values({
+                    appointmentId,
+                    recordType: 'CLINICAL_DOCUMENT',
+                    // createdBy: user.id, // Temporarily remove due to schema mismatch
+                }).returning();
+
+                const [documentDetail] = await tx.insert(recordDocuments).values({
+                    recordId: baseRecord.id,
+                    documentName: documentName,
+                    filePath: filePath, 
+                    fileType: file.type,
+                }).returning();
+
+                return { ...baseRecord, details: documentDetail };
+            });
+
+            return c.json({ success: true, data: newDocumentRecord }, 201);
+        } catch (error: any) {
+            console.error("Error creating document record in DB:", error);
+            // Attempt to delete the orphaned file from storage
+            await supabase.storage.from('medical_documents').remove([filePath]);
+            return c.json({ error: 'Failed to save document record.', message: error.message }, 500);
+        }
+    }
+);
+
+adminRoutes
+    .get('/users', async (c) => {
+        try {
+            const allUsers = await db.select().from(profiles);
+            return c.json({ data: allUsers });
+        } catch (error) {
+            console.error('Error fetching users:', error);
+            return c.json({ error: 'Internal Server Error', message: 'Failed to fetch users.' }, 500);
+        }
     });
-  } catch (error: any) {
-    console.error('Error fetching admin stats:', error);
-    return c.json({ error: 'Failed to fetch stats', details: error.message }, 500);
-  }
-});
 
 adminRoutes.put('/users/:id/role', zValidator('json', updateUserRoleSchema), async (c) => {
   const { id } = c.req.param();

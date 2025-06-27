@@ -643,3 +643,17 @@ export async function addMedicalRecord(appointmentId: string, payload: { recordT
   const result = await response.json();
   return result.data;
 }
+
+export async function uploadDocument(appointmentId: string, documentName: string, file: File, token: string) {
+    const formData = new FormData();
+    formData.append('documentName', documentName);
+    formData.append('file', file);
+
+    return api.post(`admin/appointments/${appointmentId}/documents`, {
+        body: formData,
+        headers: { 
+            Authorization: `Bearer ${token}` 
+            // Content-Type is not set here; the browser adds it with the correct boundary for FormData
+        }
+    }).json();
+}
