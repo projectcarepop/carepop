@@ -55,7 +55,7 @@ const AboutPage = () => {
         <div className="container mx-auto px-4 md:px-6">
           <div className="flex flex-col items-center space-y-4 text-center">
             <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none font-space-grotesk text-primary">
-              About CarePoP
+              About Carepop
             </h1>
             <p className="max-w-[800px] text-muted-foreground md:text-xl font-inter">
               We are dedicated to revolutionizing healthcare in the Philippines by providing a safe, inclusive, and accessible platform for everyone.
@@ -74,10 +74,10 @@ const AboutPage = () => {
                 </div>
                 <div className="space-y-4 text-muted-foreground font-inter">
                     <p>
-                        CarePoP was born from a collaboration with the Family Planning Organization of the Philippines (FPOP), the country&apos;s leading provider of sexual and reproductive health services. We saw a critical need to bridge the gap between healthcare providers and the communities that need them most, especially the underserved and marginalized.
+                        Carepop was born from a collaboration with the Family Planning Organization of the Philippines (FPOP), the country&apos;s leading provider of sexual and reproductive health services. We saw a critical need to bridge the gap between healthcare providers and the communities that need them most, especially the underserved and marginalized.
                     </p>
                     <p>
-                        Manual workflows, stigma, and lack of access to affirming providers create significant barriers to care. CarePoP is our answer: a modern, user-friendly digital platform designed to empower individuals on their health journey.
+                        Manual workflows, stigma, and lack of access to affirming providers create significant barriers to care. Carepop is our answer: a modern, user-friendly digital platform designed to empower individuals on their health journey.
                     </p>
                 </div>
             </div>
@@ -193,7 +193,7 @@ const AboutPage = () => {
                     Ready to Take Control of Your Health?
                 </h2>
                 <p className="mx-auto max-w-[700px] text-muted-foreground md:text-xl">
-                    Join CarePoP today. Register on the web or download our mobile app to get started.
+                    Join Carepop today. Register on the web or download our mobile app to get started.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-4 mt-4">

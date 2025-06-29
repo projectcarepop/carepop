@@ -1,160 +1,171 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
-import { getPublicClinics, getPublicServiceCategories, getPublicServices } from '@/services/api';
-import { type Clinic, type ServiceCategory, type AdminService } from '@/lib/types';
-
+import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-maps/api';
+import { searchClinics, getPublicServices } from '@/services/api';
+import { type Clinic, type AdminService } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Navigation } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Navigation, Loader2, MapPin, X } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/components/ui/use-toast';
 
-// Components that are part of the page layout but don't require client interactivity directly here
-// import LocationSearchInput from './components/LocationSearchInput'; 
-// import ServiceFilter from './components/ServiceFilter';
-// import SearchClinicsButton from './components/SearchClinicsButton';
-// The above will be rendered by ClinicFinderClient.tsx
+const containerStyle = { width: '100%', height: '100%' };
+const defaultCenter = { lat: 12.8797, lng: 121.7740 };
 
-// --- Main Client Component ---
+interface ClinicFilters {
+  serviceId: string | null;
+  userLocation: { lat: number; lon: number } | null;
+}
+
 function ClinicFinderClient() {
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
-  const [activeClinic, setActiveClinic] = useState<Clinic | null>(null);
+  const [filters, setFilters] = useState<ClinicFilters>({ serviceId: null, userLocation: null });
+  const [selectedClinic, setSelectedClinic] = useState<Clinic | null>(null);
+  const [userMarker, setUserMarker] = useState<{ lat: number; lng: number } | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
+  const { toast } = useToast();
+  const mapRef = React.useRef<google.maps.Map | null>(null);
 
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
     libraries: ['places'],
   });
 
-  // --- Data Fetching ---
-  const { data: categories = [], isLoading: isLoadingCategories } = useQuery<ServiceCategory[]>({
-    queryKey: ['publicServiceCategories'],
-    queryFn: getPublicServiceCategories,
-  });
-
-  const { data: allServices = [], isLoading: isLoadingServices } = useQuery<AdminService[]>({
+  const { data: services = [], isLoading: isLoadingServices } = useQuery<AdminService[]>({
     queryKey: ['publicServices'],
     queryFn: getPublicServices,
+    enabled: isLoaded,
   });
 
   const { data: clinics = [], isLoading: isLoadingClinics } = useQuery<Clinic[]>({
-    queryKey: ['publicClinics', selectedServiceId],
-    queryFn: () => getPublicClinics(selectedServiceId),
-    enabled: isLoaded, // Only fetch clinics once the map is ready
+    queryKey: ['clinics', filters],
+    queryFn: () => searchClinics(filters),
+    enabled: isLoaded,
   });
 
-  // --- Memoized Filtering for Cascading Dropdown ---
-  const filteredServices = useMemo(() => {
-    if (!selectedCategoryId) return [];
-    return allServices.filter(service => service.serviceCategory?.id === selectedCategoryId);
-  }, [selectedCategoryId, allServices]);
+  const handleGetDirections = useCallback(() => {
+    if (!selectedClinic?.latitude || !selectedClinic?.longitude) return;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${selectedClinic.latitude},${selectedClinic.longitude}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }, [selectedClinic]);
 
-  // --- Event Handlers ---
-  const handleCategoryChange = (categoryId: string) => {
-    setSelectedCategoryId(categoryId);
-    setSelectedServiceId(null); // Reset service when category changes
+  const handleFindNearMe = () => {
+    setIsLocating(true);
+    if (!navigator.geolocation) {
+      setIsLocating(false);
+      toast({ title: "Geolocation Not Supported", variant: "destructive" });
+      return;
+    }
+    const options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const newPos = { lat: position.coords.latitude, lon: position.coords.longitude };
+        setFilters(prev => ({ ...prev, userLocation: newPos }));
+        setUserMarker({ lat: newPos.lat, lng: newPos.lon });
+        if (mapRef.current) {
+          mapRef.current.panTo({lat: newPos.lat, lng: newPos.lon});
+          mapRef.current.setZoom(12);
+        }
+        setIsLocating(false);
+        toast({ title: "Location Found", description: "Clinics sorted by nearest to you." });
+      },
+      (err) => {
+        setIsLocating(false);
+        toast({ title: "Location Error", description: err.message, variant: "destructive" });
+      },
+      options
+    );
+  };
+
+  const handleServiceFilter = (serviceId: string) => {
+    setFilters(prev => ({ ...prev, serviceId: serviceId === 'all' ? null : serviceId }));
   };
   
-  const handleClearFilters = () => {
-    setSelectedCategoryId(null);
-    setSelectedServiceId(null);
+  const handleClearLocationSort = () => {
+    setFilters(prev => ({ ...prev, userLocation: null }));
+    setUserMarker(null);
+  }
+
+  const handleListSelect = (clinic: Clinic) => {
+    setSelectedClinic(clinic);
+    if (mapRef.current && clinic.latitude && clinic.longitude) {
+      mapRef.current.panTo({ lat: clinic.latitude, lng: clinic.longitude });
+      mapRef.current.setZoom(14);
+    }
   };
-  
-  if (loadError) return <div className="p-4 text-center">Error loading maps. Please check your API key and network connection.</div>;
+
+  const onMapLoad = useCallback((map: google.maps.Map) => { mapRef.current = map; }, []);
+  const onUnmount = useCallback(() => { mapRef.current = null; }, []);
+
+  if (loadError) return <div className="p-4 text-center">Error loading maps.</div>;
 
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-80px)]"> {/* Adjust height based on header */}
-      {/* --- Controls & List Panel --- */}
-      <div className="w-full md:w-1/3 p-4 overflow-y-auto bg-white shadow-lg flex flex-col">
-        <h1 className="text-2xl font-bold mb-4">Find a Clinic</h1>
-        <div className="space-y-4 mb-4 pb-4 border-b">
-            <Select onValueChange={handleCategoryChange} value={selectedCategoryId || ''}>
-              <SelectTrigger><SelectValue placeholder="1. Select a Service Category" /></SelectTrigger>
+    <div className="flex flex-col md:flex-row h-[calc(100vh-80px)]">
+      <div className="w-full md:w-1/3 p-4 overflow-y-auto bg-white shadow-lg flex flex-col space-y-4">
+        <h1 className="text-2xl font-bold">Find a Clinic</h1>
+        <div className='space-y-2'>
+            <Select onValueChange={handleServiceFilter} disabled={isLoadingServices}>
+              <SelectTrigger><SelectValue placeholder="Filter by Service..." /></SelectTrigger>
               <SelectContent>
-                {isLoadingCategories ? <SelectItem value="loading" disabled>Loading...</SelectItem> : categories.map(cat => (
-                  <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                ))}
+                <SelectItem value="all">All Services</SelectItem>
+                {services.map(service => <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Select onValueChange={setSelectedServiceId} value={selectedServiceId || ''} disabled={!selectedCategoryId}>
-              <SelectTrigger><SelectValue placeholder="2. Select a Service" /></SelectTrigger>
-              <SelectContent>
-                {filteredServices.length > 0 ? filteredServices.map(service => (
-                  <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>
-                )) : <SelectItem value="none" disabled>No services in this category</SelectItem>}
-              </SelectContent>
-            </Select>
-            <Button onClick={handleClearFilters} variant="ghost" className="w-full">Clear Filters</Button>
+            <Button onClick={handleFindNearMe} disabled={isLocating} className="w-full">
+              {isLocating ? <Loader2 className="h-4 w-4 mr-2 animate-spin"/> : <MapPin className="h-4 w-4 mr-2"/>}
+              Sort by Nearest Location
+            </Button>
+            {filters.userLocation && (
+              <Button onClick={handleClearLocationSort} variant="ghost" size="sm" className="w-full text-xs">
+                <X className="h-3 w-3 mr-1"/> Clear Location Sort
+              </Button>
+            )}
         </div>
-        
-        {/* --- Clinic List --- */}
-        <div className="flex-grow overflow-y-auto space-y-3">
-            {isLoadingClinics ? (
-              Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)
-            ) : clinics.length > 0 ? (
-                clinics.map((clinic) => (
-                    <Card key={clinic.id} className="cursor-pointer hover:bg-gray-100" onClick={() => setActiveClinic(clinic)}>
-                      <CardHeader className="p-4">
-                        <CardTitle className="text-lg">{clinic.name}</CardTitle>
-                      </CardHeader>
+        <div className="flex-grow overflow-y-auto space-y-3 border-t pt-4">
+            {isLoadingClinics ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)
+             : clinics.length > 0 ? clinics.map((clinic) => (
+                    <Card key={clinic.id} className="cursor-pointer hover:bg-gray-100" onClick={() => handleListSelect(clinic)}>
+                      <CardHeader className="p-4"><CardTitle className="text-lg">{clinic.name}</CardTitle></CardHeader>
                       <CardContent className="p-4 pt-0 text-sm text-gray-600">
                         {clinic.address?.street}, {clinic.address?.city}
+                        {clinic.distance && <p className="text-xs text-blue-600 font-semibold mt-1">{(clinic.distance / 1000).toFixed(2)} km away</p>}
                       </CardContent>
                     </Card>
                 ))
-            ) : (
-                <div className="text-center text-gray-500 py-10">
-                    <p>No clinics found.</p>
-                    <p className="text-sm">Try clearing the filters to see all clinics.</p>
-                </div>
-            )}
+             : <div className="text-center text-gray-500 py-10"><p>No clinics found for the selected criteria.</p></div>
+            }
         </div>
       </div>
       
-      {/* --- Map Panel --- */}
       <div className="w-full md:w-2/3 h-full">
-        {!isLoaded ? (
-          <Skeleton className="h-full w-full" />
-        ) : (
-          <GoogleMap
-              mapContainerStyle={{ width: '100%', height: '100%' }}
-              center={{ lat: 12.8797, lng: 121.7740 }} // Default to Philippines center
-              zoom={6}
-          >
+        {!isLoaded ? <div className='w-full h-full flex justify-center items-center'><Loader2 className='h-10 w-10 animate-spin'/></div>
+         : <GoogleMap mapContainerStyle={containerStyle} center={defaultCenter} zoom={6} onLoad={onMapLoad} onUnmount={onUnmount} options={{ streetViewControl: false, mapTypeControl: false }}>
               {clinics.map((clinic) => (
-                  <Marker 
-                      key={clinic.id} 
-                      position={{ lat: clinic.latitude, lng: clinic.longitude }}
-                      onClick={() => setActiveClinic(clinic)}
-                  />
+                  clinic.latitude && clinic.longitude && (
+                    <MarkerF key={clinic.id} position={{ lat: clinic.latitude, lng: clinic.longitude }} onClick={() => setSelectedClinic(clinic)} />
+                  )
               ))}
-              {activeClinic && (
-                  <InfoWindow
-                      position={{ lat: activeClinic.latitude, lng: activeClinic.longitude }}
-                      onCloseClick={() => setActiveClinic(null)}
-                  >
+              {userMarker && (
+                <MarkerF position={userMarker} icon={{ url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%234285F4"><circle cx="12" cy="12" r="10" fill="white" stroke="%234285F4" stroke-width="0.5" /><circle cx="12" cy="12" r="6" fill="%234285F4"/></svg>'), scaledSize: new window.google.maps.Size(30, 30),}} zIndex={10} />
+              )}
+              {selectedClinic && selectedClinic.latitude && selectedClinic.longitude && (
+                  <InfoWindowF position={{ lat: selectedClinic.latitude, lng: selectedClinic.longitude }} onCloseClick={() => setSelectedClinic(null)} zIndex={1}>
                       <div className="p-1 max-w-xs">
-                          <h4 className="font-bold text-md mb-1">{activeClinic.name}</h4>
-                          <p className="text-sm mb-2">{activeClinic.address?.street}</p>
-                          <Button asChild size="sm">
-                              <a href={`https://www.google.com/maps/dir/?api=1&destination=${activeClinic.latitude},${activeClinic.longitude}`} target="_blank" rel="noopener noreferrer">
-                                  <Navigation className="h-4 w-4 mr-2"/> Get Directions
-                              </a>
-                          </Button>
+                          <h4 className="font-bold text-md mb-1">{selectedClinic.name}</h4>
+                          <p className="text-sm mb-2">{selectedClinic.address?.street}</p>
+                          <Button onClick={handleGetDirections} size="sm"><Navigation className="h-4 w-4 mr-2"/> Get Directions</Button>
                       </div>
-                  </InfoWindow>
+                  </InfoWindowF>
               )}
           </GoogleMap>
-        )}
+        }
       </div>
     </div>
   );
 }
 
-// The page is now just a wrapper for the client component.
 export default function ClinicFinderPage() {
     return <ClinicFinderClient />;
 } 

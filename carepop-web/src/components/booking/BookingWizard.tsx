@@ -83,11 +83,9 @@ const BookingWizard = () => {
 
   const {
     data: categories,
-  } = useQuery<any, Error, ServiceCategory[]>({
+  } = useQuery<ServiceCategory[], Error>({
     queryKey: ['serviceCategories'],
     queryFn: getPublicServiceCategories,
-    select: (response: { data: ServiceCategory[] }) => response.data || [],
-    initialData: [],
   });
 
   const {

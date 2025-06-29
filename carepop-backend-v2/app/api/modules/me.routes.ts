@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { sql } from 'drizzle-orm';
+import { sql, desc } from 'drizzle-orm';
 import { db } from '../lib/db';
-import { appointments, healthLogs, doctors, clinics, services, medicalRecords, profiles } from '../../../drizzle/schema';
+import { appointments, doctors, clinics, services, medicalRecords, recordDoctorNotes, recordPrescriptions, recordDocuments, profiles } from '../../../drizzle/schema';
 import { and, eq, exists } from 'drizzle-orm';
 import { authMiddleware, AuthEnv } from '../middleware/auth';
 // Mock Vertex AI import for demonstration purposes
@@ -81,27 +81,129 @@ meRoutes.get('/appointments', async (c) => {
 });
 
 /**
- * GET /me/medical-records
- * Fetches all medical records for the authenticated user, grouped by appointment.
+ * GET /me/records
+ * Fetches all medical records for the authenticated user, enriched with
+ * details from appointments, doctors, clinics, and services.
  */
-meRoutes.get('/medical-records', async (c) => {
-  const user = c.get('user');
-  try {
-    console.log(`Fetching basic medical records for user: ${user.id}`);
-    // This is a more complex query, as we need to find records via appointments
-    const userMedicalRecords = await db
-      .select()
-      .from(medicalRecords)
-      .innerJoin(appointments, eq(medicalRecords.appointmentId, appointments.id))
-      .where(eq(appointments.patientId, user.id));
+meRoutes.get('/records', async (c) => {
+    const user = c.get('user');
+    try {
+        const baseRecords = await db.select({
+            recordId: medicalRecords.id,
+            recordType: medicalRecords.recordType,
+            createdAt: medicalRecords.createdAt,
+            appointment: {
+                id: appointments.id,
+                appointmentTime: appointments.appointmentTime,
+            },
+            doctor: {
+                fullName: doctors.fullName,
+            },
+            clinic: {
+                name: clinics.name,
+            },
+            service: {
+                name: services.name,
+            },
+        })
+        .from(medicalRecords)
+        .innerJoin(appointments, eq(medicalRecords.appointmentId, appointments.id))
+        .innerJoin(doctors, eq(appointments.doctorId, doctors.id))
+        .innerJoin(clinics, eq(appointments.clinicId, clinics.id))
+        .innerJoin(services, eq(appointments.serviceId, services.id))
+        .where(eq(appointments.patientId, user.id))
+        .orderBy(desc(appointments.appointmentTime));
 
-    console.log(`Successfully fetched ${userMedicalRecords.length} basic records.`);
-    return c.json({ records: userMedicalRecords.map(r => r.medical_records) }); // Return just the record part
+        const enrichedRecords = await Promise.all(baseRecords.map(async (record) => {
+            let details = null;
+            switch (record.recordType) {
+                case 'DOCTOR_NOTE':
+                    details = await db.query.recordDoctorNotes.findFirst({ where: eq(recordDoctorNotes.recordId, record.recordId) });
+                    break;
+                case 'PRESCRIPTION':
+                    details = await db.query.recordPrescriptions.findFirst({ where: eq(recordPrescriptions.recordId, record.recordId) });
+                    break;
+                case 'CLINICAL_DOCUMENT':
+                    details = await db.query.recordDocuments.findFirst({ where: eq(recordDocuments.recordId, record.recordId) });
+                    break;
+                // Add cases for LAB_ORDER, LAB_RESULT if needed
+            }
+            return { ...record, details };
+        }));
 
-  } catch (error) {
-    console.error("Error during SIMPLIFIED medical records fetch:", error);
-    return c.json({ error: "Internal Server Error" }, 500);
-  }
+        return c.json(enrichedRecords);
+
+    } catch (error) {
+        console.error("Error fetching enriched medical records:", error);
+        return c.json({ error: "Internal Server Error" }, 500);
+    }
+});
+
+/**
+ * GET /me/records/:recordId
+ * Fetches a single medical record by its ID, ensuring it belongs to the authenticated user.
+ */
+meRoutes.get('/records/:recordId', async (c) => {
+    const user = c.get('user');
+    const { recordId } = c.req.param();
+
+    try {
+        // First, fetch the base record and join with appointments to verify ownership.
+        const [baseRecord] = await db.select({
+            recordId: medicalRecords.id,
+            recordType: medicalRecords.recordType,
+            createdAt: medicalRecords.createdAt,
+            appointment: {
+                id: appointments.id,
+                appointmentTime: appointments.appointmentTime,
+            },
+            doctor: {
+                fullName: doctors.fullName,
+            },
+            clinic: {
+                name: clinics.name,
+            },
+            service: {
+                name: services.name,
+            },
+        })
+        .from(medicalRecords)
+        .innerJoin(appointments, eq(medicalRecords.appointmentId, appointments.id))
+        .innerJoin(doctors, eq(appointments.doctorId, doctors.id))
+        .innerJoin(clinics, eq(appointments.clinicId, clinics.id))
+        .innerJoin(services, eq(appointments.serviceId, services.id))
+        .where(
+            and(
+                eq(medicalRecords.id, recordId), // The specific record
+                eq(appointments.patientId, user.id) // That belongs to the auth'd user
+            )
+        );
+
+        if (!baseRecord) {
+            return c.json({ error: 'Record not found or you do not have permission to view it.' }, 404);
+        }
+
+        // Now, fetch the specific details for the found record
+        let details = null;
+        switch (baseRecord.recordType) {
+            case 'DOCTOR_NOTE':
+                details = await db.query.recordDoctorNotes.findFirst({ where: eq(recordDoctorNotes.recordId, baseRecord.recordId) });
+                break;
+            case 'PRESCRIPTION':
+                details = await db.query.recordPrescriptions.findFirst({ where: eq(recordPrescriptions.recordId, baseRecord.recordId) });
+                break;
+            case 'CLINICAL_DOCUMENT':
+                details = await db.query.recordDocuments.findFirst({ where: eq(recordDocuments.recordId, baseRecord.recordId) });
+                break;
+        }
+
+        const enrichedRecord = { ...baseRecord, details };
+        return c.json(enrichedRecord);
+
+    } catch (error) {
+        console.error(`Error fetching single medical record ${recordId}:`, error);
+        return c.json({ error: "Internal Server Error" }, 500);
+    }
 });
 
 // Zod schema for creating a new appointment
@@ -130,47 +232,6 @@ meRoutes.post('/appointments', zValidator('json', createAppointmentSchema), asyn
   } catch (error) {
     console.error('Error creating appointment:', error);
     return c.json({ error: 'Internal Server Error', message: 'Failed to create appointment' }, 500);
-  }
-});
-
-/**
- * POST /me/ai/insight
- * Generates a health insight based on the user's health logs using an AI model.
- * NOTE: This is a simplified demonstration.
- */
-meRoutes.post('/ai/insight', async (c) => {
-  const user = c.get('user');
-
-  try {
-    // 1. Fetch user's health logs from the database
-    const logs = await db.query.healthLogs.findMany({
-      where: eq(healthLogs.patientId, user.id),
-      orderBy: (healthLogs, { asc }) => [asc(healthLogs.logDate)],
-      limit: 30, // Get the last 30 logs for context
-    });
-
-    if (logs.length === 0) {
-      return c.json({ insight: "We don't have enough data to provide an insight. Start logging your health daily!" });
-    }
-
-    // 2. Construct a prompt for the AI model
-    const prompt = `Based on the following recent health logs, provide a brief, supportive, and non-medical insight for the user. Logs: ${JSON.stringify(logs)}`;
-    
-    // 3. Call the Vertex AI SDK (or any other AI service)
-    // const ai = new VertexAI({project: 'your-gcp-project', location: 'us-central1'});
-    // const model = ai.getGenerativeModel({ model: 'gemini-pro' });
-    // const result = await model.generateContent(prompt);
-    // const insight = result.response.candidates[0].content.parts[0].text;
-    
-    // MOCK RESPONSE FOR DEMONSTRATION
-    const insight = "Based on your recent logs, you've been consistently tracking your symptoms. Keep up the great work! Noticing patterns is the first step to understanding your health better.";
-
-    // 4. Return the response
-    return c.json({ insight });
-
-  } catch (error) {
-    console.error('Error generating AI insight:', error);
-    return c.json({ error: 'Internal Server Error' }, 500);
   }
 });
 

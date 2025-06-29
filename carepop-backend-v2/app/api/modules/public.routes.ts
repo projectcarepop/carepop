@@ -14,7 +14,7 @@ import {
     doctorClinics, 
     providerAvailability 
 } from '../../../drizzle/schema';
-import { and, eq, sql, inArray, SQL, asc, getTableColumns } from 'drizzle-orm';
+import { and, eq, sql, inArray, SQL, asc, getTableColumns, type AnyColumn } from 'drizzle-orm';
 import { getDay, parseISO, format, startOfDay, endOfDay, setHours, setMinutes, setSeconds, isBefore, addMinutes, isEqual } from 'date-fns';
 import fs from 'fs/promises';
 import path from 'path';
@@ -57,6 +57,14 @@ const searchClinicsSchema = z.object({
   lat: z.coerce.number().min(-90).max(90).optional(),
   lon: z.coerce.number().min(-180).max(180).optional(),
   radius: z.coerce.number().positive().optional().default(25000), // In meters
+});
+
+// --- NEW --- Schema for the universal clinic search
+const universalSearchSchema = z.object({
+    serviceId: z.string().uuid().optional(),
+    lat: z.coerce.number().min(-90).max(90).optional(),
+    lon: z.coerce.number().min(-180).max(180).optional(),
+    radius: z.coerce.number().positive().optional(), // In meters
 });
 
 // Helper function to read PSGC data
@@ -107,27 +115,21 @@ publicRoutes.get('/clinics', zValidator('query', clinicsQuerySchema), async (c) 
   try {
     // If a serviceId is provided, find clinics that have a doctor who offers that service.
     if (serviceId) {
-      const doctorsWithServiceSubQuery = db
-        .select({ doctorId: doctorServices.doctorId })
-        .from(doctorServices)
-        .where(eq(doctorServices.serviceId, serviceId));
-
-      const clinicsWithDoctorSubQuery = db
-        .select({ clinicId: doctorClinics.clinicId })
-        .from(doctorClinics)
-        .where(inArray(doctorClinics.doctorId, doctorsWithServiceSubQuery));
-      
+      // --- CORRECTED LOGIC ---
+      // Use direct JOINs to efficiently find clinics offering a specific service.
       const filteredClinics = await db
-        .select({
+        .selectDistinct({ // Use DISTINCT to avoid duplicate clinics
           ...getTableColumns(clinics),
           latitude: sql<number>`ST_Y(location::geometry)`,
           longitude: sql<number>`ST_X(location::geometry)`
         })
         .from(clinics)
+        .innerJoin(doctorClinics, eq(clinics.id, doctorClinics.clinicId))
+        .innerJoin(doctorServices, eq(doctorClinics.doctorId, doctorServices.doctorId))
         .where(
           and(
             eq(clinics.isActive, true),
-            inArray(clinics.id, clinicsWithDoctorSubQuery)
+            eq(doctorServices.serviceId, serviceId)
           )
         );
       return c.json({ data: filteredClinics });
@@ -145,6 +147,54 @@ publicRoutes.get('/clinics', zValidator('query', clinicsQuerySchema), async (c) 
     console.error("Failed to fetch public clinics:", error);
     return c.json({ error: "Internal Server Error" }, 500);
   }
+});
+
+/**
+ * GET /public/clinics/:id
+ * Fetches a single clinic by its ID, including a list of all services offered.
+ */
+publicRoutes.get('/clinics/:id', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
+    const { id } = c.req.valid('param');
+
+    try {
+        // Step 1: Fetch the clinic details
+        const clinicDetails = await db.query.clinics.findFirst({
+            where: eq(clinics.id, id),
+        });
+
+        if (!clinicDetails) {
+            return c.json({ error: "Clinic not found" }, 404);
+        }
+
+        // Step 2: Fetch all services offered at this clinic
+        const clinicServicesList = await db.selectDistinct({
+            id: services.id,
+            name: services.name,
+            description: services.description,
+            price: services.price,
+            durationMinutes: services.durationMinutes,
+        })
+        .from(services)
+        .innerJoin(doctorServices, eq(services.id, doctorServices.serviceId))
+        .innerJoin(doctorClinics, eq(doctorServices.doctorId, doctorClinics.doctorId))
+        .where(and(
+            eq(doctorClinics.clinicId, id),
+            eq(services.isActive, true)
+        ))
+        .orderBy(asc(services.name));
+
+        // Step 3: Combine into the final response shape
+        const response = {
+            ...clinicDetails,
+            services: clinicServicesList,
+        };
+
+        return c.json(response);
+
+    } catch (error) {
+        console.error(`Failed to fetch details for clinic ${id}:`, error);
+        return c.json({ error: "Internal Server Error" }, 500);
+    }
 });
 
 /**
@@ -192,19 +242,21 @@ publicRoutes.get('/doctors', async (c) => {
                 return c.json({ data: servicesInClinic });
 
             } else {
-                // If no clinicId, return all active services (original logic)
-                const allServices = await db.query.services.findMany({
-                    where: eq(services.isActive, true),
-                    with: {
+                // --- CORRECTED LOGIC for fetching ALL services ---
+                // If no clinicId, return all active services, ensuring those without
+                // a category are included by using a LEFT JOIN.
+                const allServices = await db.select({
+                        ...getTableColumns(services),
                         serviceCategory: {
-                            columns: {
-                                id: true,
-                                name: true,
-                            },
-                        },
-                    },
-                    orderBy: [asc(services.name)],
-                });
+                            id: serviceCategories.id,
+                            name: serviceCategories.name,
+                        }
+                    })
+                    .from(services)
+                    .leftJoin(serviceCategories, eq(services.categoryId, serviceCategories.id))
+                    .where(eq(services.isActive, true))
+                    .orderBy(asc(services.name));
+
                 return c.json({ data: allServices });
             }
         } catch (error) {
@@ -224,10 +276,8 @@ publicRoutes.get('/service-categories', async (c) => {
       orderBy: (serviceCategories, { asc }) => [asc(serviceCategories.name)],
     });
 
-    console.log(`Backend: Successfully fetched ${categories.length} service categories.`);
-
-    // The frontend expects a 'data' property, let's wrap it for consistency
-    return c.json({ data: categories });
+    // This endpoint should return the array directly for the frontend service to consume.
+    return c.json(categories);
 
   } catch (error) {
     console.error("Backend Error: Failed to fetch service categories.", error);
@@ -554,50 +604,80 @@ publicRoutes.get('/psgc/barangays/:cityMunicipalityCode', async (c) => {
 
 /**
  * GET /public/search/clinics
- * Performs a universal search for clinics by text and/or location.
+ * A powerful, unified endpoint for finding clinics.
+ * Can filter by service and/or sort by distance from a point.
  */
-publicRoutes.get('/search/clinics', zValidator('query', searchClinicsSchema), async (c) => {
-    const { q, lat, lon, radius } = c.req.valid('query');
-
-    const conditions: SQL[] = [eq(clinics.isActive, true)];
-    let distanceSelection: any = sql`null`.as('distance_km');
-    let orderBy: any = asc(clinics.name);
-
-    if (q) {
-        conditions.push(sql`${clinics.name} ILIKE ${'%' + q + '%'}`);
-    }
-
-    if (lat !== undefined && lon !== undefined) {
-        const userPoint = sql`ST_SetSRID(ST_MakePoint(${lon}, ${lat}), 4326)::geography`;
-        distanceSelection = sql`ST_Distance(${userPoint}, ${clinics.location}) / 1000`.as('distance_km');
-        orderBy = asc(sql`distance_km`);
-
-        // If radius is provided, add a distance condition to the query
-        if (radius) {
-            conditions.push(sql`ST_DWithin(${clinics.location}, ${userPoint}, ${radius})`);
-        }
-    }
+publicRoutes.get('/search/clinics', zValidator('query', universalSearchSchema), async (c) => {
+    const { serviceId, lat, lon, radius } = c.req.valid('query');
+    console.log(`[Clinic Search] Received params: serviceId=${serviceId}, lat=${lat}, lon=${lon}, radius=${radius}`);
 
     try {
-        const results = await db
-            .select({
-                id: clinics.id,
-                name: clinics.name,
-                address: clinics.address,
-                phoneNumber: clinics.phoneNumber,
-                logoUrl: clinics.logoUrl,
-                isActive: clinics.isActive,
-                location: clinics.location,
-                distanceKm: distanceSelection,
-            })
-            .from(clinics)
-            .where(and(...conditions))
-            .orderBy(orderBy);
+        const hasLocation = lat !== undefined && lon !== undefined;
+        let distanceCalculation: SQL | undefined = undefined;
+
+        // Define the distance calculation if location is provided
+        if (hasLocation) {
+            distanceCalculation = sql<number>`ST_Distance(
+                ${clinics.location}, 
+                ST_MakePoint(${lon}, ${lat})::geography
+            )`;
+        }
+        
+        // Base columns to select, including latitude and longitude
+        const columnsToSelect: { [key: string]: any } = {
+            ...getTableColumns(clinics),
+            latitude: sql<number>`ST_Y(location::geometry)`,
+            longitude: sql<number>`ST_X(location::geometry)`
+        };
+
+        // If location is provided, add the distance calculation to the select
+        if (distanceCalculation) {
+            columnsToSelect.distance = distanceCalculation;
+        }
+
+        // Start building the query
+        let query = db.select(columnsToSelect).from(clinics).$dynamic();
+
+        const conditions: SQL[] = [eq(clinics.isActive, true)];
+
+        // Conditionally add filtering by serviceId
+        if (serviceId) {
+            // --- CORRECTED LOGIC ---
+            // Create a single, more efficient subquery to find all clinic IDs
+            // that are associated with the given serviceId.
+            const clinicIdsWithService = db
+                .selectDistinct({ clinicId: doctorClinics.clinicId })
+                .from(doctorServices)
+                .innerJoin(doctorClinics, eq(doctorServices.doctorId, doctorClinics.doctorId))
+                .where(eq(doctorServices.serviceId, serviceId));
             
+            conditions.push(inArray(clinics.id, clinicIdsWithService));
+        }
+
+        // Conditionally add radius filtering
+        if (hasLocation && radius) {
+            conditions.push(sql`ST_DWithin(
+                ${clinics.location},
+                ST_MakePoint(${lon}, ${lat})::geography,
+                ${radius}
+            )`);
+        }
+
+        query = query.where(and(...conditions));
+
+        // Conditionally add sorting by distance, using the raw calculation
+        if (distanceCalculation) {
+            query = query.orderBy(distanceCalculation);
+        } else {
+            query = query.orderBy(asc(clinics.name));
+        }
+
+        const results = await query;
         return c.json({ data: results });
-    } catch (error: any) {
-        console.error("Error searching clinics:", error);
-        return c.json({ error: 'Failed to search clinics', message: error.message }, 500);
+
+    } catch (error) {
+        console.error("Clinic search query failed:", error);
+        return c.json({ error: "Internal Server Error" }, 500);
     }
 });
 

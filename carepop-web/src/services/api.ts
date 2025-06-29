@@ -98,6 +98,41 @@ export async function getBarangays(cityCode: string) {
     return response.json();
 }
 
+// --- NEW UNIFIED CLINIC SEARCH ---
+interface ClinicSearchFilters {
+  serviceId?: string | null;
+  userLocation?: {
+    lat: number;
+    lon: number;
+  } | null;
+}
+
+export async function searchClinics(filters: ClinicSearchFilters) {
+  const params = new URLSearchParams();
+  if (filters.serviceId) {
+    params.append('serviceId', filters.serviceId);
+  }
+  if (filters.userLocation) {
+    params.append('lat', String(filters.userLocation.lat));
+    params.append('lon', String(filters.userLocation.lon));
+  }
+
+  const url = `${API_BASE_URL}/api/public/search/clinics?${params.toString()}`;
+  
+  try {
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.status}`}));
+        throw new Error(error.message || `Failed to search clinics.`);
+    }
+    const result = await response.json();
+    return result.data || [];
+  } catch(error) {
+    console.error("Network or parsing error in searchClinics:", error);
+    throw new Error("A network error occurred while searching for clinics.");
+  }
+}
+
 // --- Appointment Service ---
 export async function getMyAppointments(accessToken: string, params?: { limit?: number }) {
   const headers = await getAuthHeaders(accessToken);
@@ -156,6 +191,31 @@ export async function getMyMedicalRecords(accessToken: string, params?: { limit?
   const result = await response.json();
   // This endpoint returns the array in a 'records' property
   return result.records || [];
+}
+
+export async function getMyEnrichedRecords(accessToken: string) {
+    const headers = await getAuthHeaders(accessToken);
+    const response = await fetch(`${API_BASE_URL}/api/me/records`, { headers, cache: 'no-store' });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: "Failed to fetch medical records." }));
+        throw new Error(error.message);
+    }
+    return response.json();
+}
+
+export async function getSingleMedicalRecord(recordId: string, accessToken: string) {
+    const headers = await getAuthHeaders(accessToken);
+    const url = `${API_BASE_URL}/api/me/records/${recordId}`;
+    const response = await fetch(url, { headers, cache: 'no-store' });
+
+    if (!response.ok) {
+        if (response.status === 404) {
+            return null; // Return null if not found, allowing the page to handle it gracefully.
+        }
+        const error = await response.json().catch(() => ({ message: "Failed to fetch medical record." }));
+        throw new Error(error.message);
+    }
+    return response.json();
 }
 
 // --- Admin Service (Requires Admin Role) ---
@@ -442,6 +502,29 @@ export async function getPublicClinics(serviceId?: string) {
   return result.data || [];
 }
 
+export async function getPublicClinicDetails(clinicId: string) {
+  const url = `${API_BASE_URL}/api/public/clinics/${clinicId}`;
+  const response = await fetch(url, { cache: 'no-store' }); // No cache for fresh data
+  if (!response.ok) {
+    if (response.status === 404) {
+      return null; // Return null if not found, for the server component to handle
+    }
+    const error = await response.json().catch(() => ({ message: `An error occurred fetching clinic details.` }));
+    throw new Error(error.message);
+  }
+  return response.json();
+}
+
+export async function getClinicDetails(clinicId: string) {
+  const url = `${API_BASE_URL}/api/public/clinics/${clinicId}`;
+  const response = await fetch(url, { cache: 'no-store' });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: `Clinic not found.` }));
+    throw new Error(error.message);
+  }
+  return response.json();
+}
+
 export async function getPublicAvailability(params: { serviceId: string; clinicId: string; date: string; }) {
   const { serviceId, clinicId, date } = params;
   const url = `${API_BASE_URL}/api/public/availability?serviceId=${serviceId}&clinicId=${clinicId}&date=${date}`;
@@ -490,7 +573,7 @@ export async function createAppointment(payload: AppointmentBookingPayload, acce
 }
 
 export async function getAdminStats(cookieStore: ReturnType<typeof cookies>) {
-  const supabase = createClient(cookieStore);
+  const supabase = createClient(await cookieStore);
 
   const {
     data: { session },
@@ -652,14 +735,22 @@ export async function addMedicalRecord(appointmentId: string, payload: { recordT
 
 export async function uploadDocument(appointmentId: string, documentName: string, file: File, token: string) {
     const formData = new FormData();
+    formData.append('document', file);
     formData.append('documentName', documentName);
-    formData.append('file', file);
 
-    return api.post(`admin/appointments/${appointmentId}/documents`, {
+    const response = await fetch(`${API_BASE_URL}/api/me/appointments/${appointmentId}/documents`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            // 'Content-Type': 'multipart/form-data' is set automatically by the browser with FormData
+        },
         body: formData,
-        headers: { 
-            Authorization: `Bearer ${token}` 
-            // Content-Type is not set here; the browser adds it with the correct boundary for FormData
-        }
-    }).json();
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.status}`}));
+        throw new Error(error.message || 'Failed to upload document.');
+    }
+
+    return response.json();
 }

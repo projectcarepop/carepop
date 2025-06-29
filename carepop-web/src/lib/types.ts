@@ -19,15 +19,29 @@ export type NewProfile = InferInsertModel<typeof schema.profiles>;
 // =================================================================
 // CLINICS
 // =================================================================
+
+// Basic service shape for nesting inside Clinic
+export type ClinicService = {
+  id: string;
+  name: string;
+  description: string | null;
+  price: string | null;
+};
+
 export type Clinic = InferSelectModel<typeof schema.clinics> & {
     latitude: number;
     longitude: number;
+    phone?: string | null;
+    website?: string | null;
     address: {
         street: string;
+        barangay?: string | null;
         city: string;
         province: string;
-        zip: string;
+        postal_code?: string | null; // Changed from zip
     } | null;
+    distance?: number;
+    services?: ClinicService[]; // Added services array
 };
 export type NewClinic = InferInsertModel<typeof schema.clinics>;
 
@@ -233,3 +247,23 @@ export const adminUserSchema = z.object({
 export type MedicalRecordWithDetails = MedicalRecord & {
     details: DoctorNote | Prescription | ClinicalDocument | null;
 }
+
+export type MedicalRecordWithRelations = {
+  recordId: string;
+  recordType: 'DOCTOR_NOTE' | 'PRESCRIPTION' | 'CLINICAL_DOCUMENT' | 'LAB_ORDER' | 'LAB_RESULT';
+  createdAt: string;
+  details: DoctorNote | Prescription | ClinicalDocument | null;
+  appointment: {
+    id: string;
+    appointmentTime: string;
+  };
+  doctor: {
+    fullName: string | null;
+  };
+  clinic: {
+    name: string | null;
+  };
+  service: {
+    name: string | null;
+  };
+};

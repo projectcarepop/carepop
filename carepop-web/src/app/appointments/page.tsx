@@ -5,7 +5,7 @@ import { getMyAppointments } from '@/services/api';
 import { AppointmentsTable } from '@/components/main-dashboard/AppointmentsTable';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, ChevronLeft } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 export const dynamic = 'force-dynamic';
@@ -25,6 +25,14 @@ export default async function AppointmentsPage() {
 
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+        <div className="mb-6">
+            <Button variant="outline" asChild>
+                <Link href="/main-dashboard">
+                    <ChevronLeft className="mr-2 h-4 w-4" />
+                    Back to Dashboard
+                </Link>
+            </Button>
+        </div>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>

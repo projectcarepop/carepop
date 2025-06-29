@@ -69,7 +69,7 @@ export default function Footer() {
               </span>
             </Link>
             <p className="text-sm text-gray-400 leading-relaxed">
-              Accessible and inclusive healthcare for everyone. Find providers, schedule appointments, and manage your health with ease.
+              Accessible and inclusive healthcare for everyone. Find clinics, schedule appointments, and manage your health with ease.
             </p>
           </div>
 

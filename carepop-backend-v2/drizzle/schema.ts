@@ -1,15 +1,13 @@
-import { pgTable, index, pgPolicy, uuid, text, jsonb, boolean, timestamp, check, numeric, integer, date, unique, primaryKey, pgEnum, customType } from "drizzle-orm/pg-core"
+import { pgTable, index, uuid, text, jsonb, boolean, timestamp, check, numeric, integer, date, pgEnum, customType, primaryKey } from "drizzle-orm/pg-core"
 import { sql, relations } from "drizzle-orm"
 
 // Placeholder for auth.users table
 export const usersInAuth = pgTable("users", {
   id: uuid('id').primaryKey(),
-}, (table) => {
-    return {
-        tableName: "users",
-        schemaName: "auth"
-    }
-});
+}, () => ({
+    tableName: "users",
+    schemaName: "auth"
+}));
 
 export const appointmentStatus = pgEnum("appointment_status", ['scheduled', 'completed', 'canceled_by_patient', 'canceled_by_admin', 'no_show'])
 export const medicalRecordType = pgEnum("medical_record_type", ['PRESCRIPTION', 'LAB_ORDER', 'DOCTOR_NOTE', 'LAB_RESULT', 'CLINICAL_DOCUMENT'])
@@ -68,7 +66,7 @@ export const services = pgTable("services", {
 	price: numeric("price", { precision: 10, scale:  2 }).notNull(),
 	durationMinutes: integer("duration_minutes").notNull(),
 	isActive: boolean("is_active").default(true).notNull(),
-}, (table) => ({
+}, () => ({
 	priceCheck: check("services_price_check", sql`price >= 0`),
     durationCheck: check("services_duration_minutes_check", sql`duration_minutes > 0`),
 }));
@@ -187,7 +185,7 @@ export const reviews = pgTable("reviews", {
 	rating: integer("rating").notNull(),
 	comment: text("comment"),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => ({
+}, () => ({
     ratingCheck: check("reviews_rating_check", sql`rating >= 1 AND rating <= 5`),
 }));
 
@@ -195,7 +193,12 @@ export const productCategories = pgTable("product_categories", {
 	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
 	name: text("name").notNull(),
 	description: text("description"),
-});
+	price: numeric("price", { precision: 10, scale:  2 }).notNull(),
+	requiresPrescription: boolean("requires_prescription").default(false).notNull(),
+	isActive: boolean("is_active").default(true).notNull(),
+}, () => ({
+    priceCheck: check("products_price_check", sql`price >= 0`),
+}));
 
 export const products = pgTable("products", {
 	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
@@ -206,7 +209,7 @@ export const products = pgTable("products", {
 	price: numeric("price", { precision: 10, scale:  2 }).notNull(),
 	requiresPrescription: boolean("requires_prescription").default(false).notNull(),
 	isActive: boolean("is_active").default(true).notNull(),
-}, (table) => ({
+}, () => ({
     priceCheck: check("products_price_check", sql`price >= 0`),
 }));
 
@@ -214,7 +217,7 @@ export const inventory = pgTable("inventory", {
 	productId: uuid("product_id").primaryKey().notNull().references(() => products.id, { onDelete: 'cascade' }),
 	quantityOnHand: integer("quantity_on_hand").default(0).notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => ({
+}, () => ({
     quantityCheck: check("inventory_quantity_on_hand_check", sql`quantity_on_hand >= 0`),
 }));
 

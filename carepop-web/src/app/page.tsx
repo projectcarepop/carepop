@@ -13,8 +13,8 @@ import React from "react";
 const features = [
   {
     icon: <Search className="w-10 h-10 text-primary" />,
-    title: "Find Inclusive Providers",
-    description: "Easily search and filter for healthcare providers who understand and cater to your specific needs.",
+    title: "Find Inclusive Clinics",
+    description: "Easily search and filter for healthcare clinics who understand and cater to your specific needs.",
   },
   {
     icon: <Calendar className="w-10 h-10 text-primary" />,
@@ -34,15 +34,15 @@ const features = [
 ];
 
 const howItWorksSteps = [
+  {
+    icon: <Stethoscope />,
+    title: "1. Choose Your Clinic",
+    description: "Select a trusted, vetted healthcare clinic that aligns with your values and needs.",
+  },
     {
       icon: <BriefcaseMedical />,
-      title: "1. Explore Services",
+      title: "2. Explore Services",
       description: "Browse a wide range of health services, from general check-ups to specialized care, all in one place.",
-    },
-    {
-      icon: <Stethoscope />,
-      title: "2. Choose Your Provider",
-      description: "Select a trusted, vetted healthcare professional or clinic that aligns with your values and needs.",
     },
     {
       icon: <CheckCircle />,
@@ -64,7 +64,7 @@ export default function Home() {
                   Healthcare Centered On You
                 </h1>
                 <p className="max-w-[600px] text-muted-foreground md:text-xl font-inter">
-                  CarePoP is your safe space for accessible and inclusive healthcare. Find affirming providers, schedule appointments with ease, and manage your health journey with confidence and dignity.
+                  Carepop is your safe space for accessible and inclusive healthcare. Find affirming clinics, schedule appointments with ease, and manage your health journey with confidence and dignity.
                 </p>
               </div>
               <div className="flex flex-col gap-3 min-[400px]:flex-row">
@@ -100,7 +100,7 @@ export default function Home() {
             <div className="space-y-4">
               <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl font-space-grotesk">A New Standard for Inclusive Healthcare</h2>
               <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed font-inter">
-                We built CarePoP to dismantle barriers and provide a healthcare experience where you feel seen, heard, and respected.
+                We built Carepop to dismantle barriers and provide a healthcare experience where you feel seen, heard, and respected.
               </p>
             </div>
           </div>
@@ -155,11 +155,11 @@ export default function Home() {
                     Ready to Take Control of Your Health?
                 </h2>
                 <p className="mx-auto max-w-[700px] text-muted-foreground md:text-xl">
-                    Join CarePoP today. Register on the web or download our mobile app to get started.
+                    Join Carepop today. Register on the web or download our mobile app to get started.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-4 mt-4">
-                  <Link href="/register">
+                  <Link href="/sign-up">
                   <Button size="lg">Create an Account</Button>
                   </Link>
                   <Link href="/download-app">
