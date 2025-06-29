@@ -513,8 +513,7 @@ publicRoutes.get('/availability', zValidator('query', availabilityQuerySchema), 
         sql`${appointments.appointmentTime} >= ${format(startOfDay(targetDate), 'yyyy-MM-dd HH:mm:ss')}`,
         sql`${appointments.appointmentTime} < ${format(endOfDay(targetDate), 'yyyy-MM-dd HH:mm:ss')}`,
         sql`status != 'canceled_by_patient'`,
-        sql`status != 'canceled_by_admin'`
-    ));
+        sql`status != 'canceled_by_admin'`    ));
 
     console.log(`[AVAILABILITY] Found ${bookedAppointments.length} booked appointments for the given providers on this day.`);
 
@@ -682,3 +681,4 @@ publicRoutes.get('/search/clinics', zValidator('query', universalSearchSchema), 
 });
 
 export default publicRoutes;
+

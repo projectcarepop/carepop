@@ -754,3 +754,34 @@ export async function uploadDocument(appointmentId: string, documentName: string
 
     return response.json();
 }
+
+export async function getAdminClinicServices(clinicId: string, accessToken: string) {
+    const headers = {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    };
+    const response = await fetch(`${API_BASE_URL}/api/admin/clinics/${clinicId}/services`, { headers, cache: 'no-store' });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
+        throw new Error(error.message || 'Failed to fetch assigned services.');
+    }
+    const result = await response.json();
+    return result.data || [];
+}
+
+export async function assignServicesToClinic(clinicId: string, serviceIds: string[], accessToken: string) {
+    const headers = {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    };
+    const response = await fetch(`${API_BASE_URL}/api/admin/clinics/${clinicId}/services`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ serviceIds })
+    });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
+        throw new Error(error.message || 'Failed to assign services to clinic.');
+    }
+    return response.json();
+}

@@ -193,12 +193,7 @@ export const productCategories = pgTable("product_categories", {
 	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
 	name: text("name").notNull(),
 	description: text("description"),
-	price: numeric("price", { precision: 10, scale:  2 }).notNull(),
-	requiresPrescription: boolean("requires_prescription").default(false).notNull(),
-	isActive: boolean("is_active").default(true).notNull(),
-}, () => ({
-    priceCheck: check("products_price_check", sql`price >= 0`),
-}));
+});
 
 export const products = pgTable("products", {
 	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
@@ -239,6 +234,7 @@ export const usersInAuthRelations = relations(usersInAuth, ({ one }) => ({
 
 export const clinicsRelations = relations(clinics, ({ many }) => ({
 	appointments: many(appointments),
+	clinicServices: many(clinicServices),
 }));
 
 export const doctorsRelations = relations(doctors, ({ many }) => ({
@@ -252,10 +248,22 @@ export const servicesRelations = relations(services, ({ one, many }) => ({
 		references: [serviceCategories.id]
 	}),
 	appointments: many(appointments),
+	clinicServices: many(clinicServices),
 }));
 
 export const serviceCategoriesRelations = relations(serviceCategories, ({ many }) => ({
 	services: many(services),
+}));
+
+export const clinicServicesRelations = relations(clinicServices, ({ one }) => ({
+	clinic: one(clinics, {
+		fields: [clinicServices.clinicId],
+		references: [clinics.id],
+	}),
+	service: one(services, {
+		fields: [clinicServices.serviceId],
+		references: [services.id],
+	}),
 }));
 
 export const appointmentsRelations = relations(appointments, ({ one, many }) => ({

@@ -3,6 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
+import React, { useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -16,8 +17,12 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Clinic } from '@/lib/types';
+import { Clinic, Service } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
+import { getAdminServices, assignServicesToClinic } from '@/services/api';
+import { useAuth } from '@/lib/contexts/auth-context';
+import { MultiSelect, MultiSelectOption } from '@/components/ui/MultiSelect';
+import { toast } from '@/hooks/use-toast';
 
 const formSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
@@ -30,13 +35,14 @@ const formSchema = z.object({
   latitude: z.coerce.number().min(-90, 'Invalid Latitude').max(90, 'Invalid Latitude'),
   longitude: z.coerce.number().min(-180, 'Invalid Longitude').max(180, 'Invalid Longitude'),
   isActive: z.boolean(),
+  serviceIds: z.array(z.string()).optional(),
 });
 
 type ClinicFormValues = z.infer<typeof formSchema>;
 
 interface ClinicFormProps {
-  initialData?: Clinic & { latitude?: number; longitude?: number };
-  onSubmit: (values: ClinicFormValues) => void;
+  initialData?: Clinic & { latitude?: number; longitude?: number; serviceIds?: string[] };
+  onSubmit: (values: Omit<ClinicFormValues, 'serviceIds'>) => Promise<Clinic | null>;
   isPending: boolean;
 }
 
@@ -45,37 +51,58 @@ export function ClinicForm({
   onSubmit,
   isPending,
 }: ClinicFormProps) {
+  const { session } = useAuth();
+  const [allServices, setAllServices] = useState<MultiSelectOption[]>([]);
+  const [isServicesLoading, setIsServicesLoading] = useState(false);
+
   const form = useForm<ClinicFormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: initialData
-      ? {
-          name: initialData.name,
-          phoneNumber: initialData.phoneNumber || '',
-          address: {
-            street: typeof initialData.address === 'object' && initialData.address !== null ? (initialData.address as any).street : '',
-            city: typeof initialData.address === 'object' && initialData.address !== null ? (initialData.address as any).city : '',
-            zip: typeof initialData.address === 'object' && initialData.address !== null ? (initialData.address as any).zip : '',
-          },
-          latitude: initialData.latitude || 0,
-          longitude: initialData.longitude || 0,
-          isActive: initialData.isActive,
-        }
-      : {
-          name: '',
-          phoneNumber: '',
-          address: {
-            street: '',
-            city: '',
-            zip: '',
-          },
-          latitude: 0,
-          longitude: 0,
-          isActive: true,
-        },
+    defaultValues: {
+      name: initialData?.name || '',
+      phoneNumber: initialData?.phoneNumber || '',
+      address: {
+        street: typeof initialData?.address === 'object' && initialData.address !== null ? (initialData.address as any).street : '',
+        city: typeof initialData?.address === 'object' && initialData.address !== null ? (initialData.address as any).city : '',
+        zip: typeof initialData?.address === 'object' && initialData.address !== null ? (initialData.address as any).zip : '',
+      },
+      latitude: initialData?.latitude || 0,
+      longitude: initialData?.longitude || 0,
+      isActive: initialData?.isActive ?? true,
+      serviceIds: initialData?.serviceIds || [],
+    },
   });
 
-  const handleFormSubmit = (values: ClinicFormValues) => {
-    onSubmit(values);
+  useEffect(() => {
+    async function fetchAllServices() {
+      if (!session) return;
+      setIsServicesLoading(true);
+      try {
+        const services: Service[] = await getAdminServices(session.access_token);
+        setAllServices(services.map(s => ({ value: s.id, label: s.name })));
+      } catch (error) {
+        console.error("Failed to fetch services", error);
+        toast({ title: "Error", description: "Could not fetch the list of services.", variant: "destructive" });
+      } finally {
+        setIsServicesLoading(false);
+      }
+    }
+    fetchAllServices();
+  }, [session]);
+
+  const handleFormSubmit = async (values: ClinicFormValues) => {
+    const clinicDataToSubmit: Omit<ClinicFormValues, 'serviceIds'> = { ...values };
+    
+    const updatedClinic = await onSubmit(clinicDataToSubmit);
+
+    if (updatedClinic && values.serviceIds && session) {
+      try {
+        await assignServicesToClinic(updatedClinic.id, values.serviceIds, session.access_token);
+        toast({ title: "Success", description: "Clinic services updated successfully." });
+      } catch (error) {
+          console.error("Failed to assign services", error);
+          toast({ title: "Error", description: "Could not update the clinic's services.", variant: "destructive" });
+      }
+    }
   };
 
   return (
@@ -202,6 +229,30 @@ export function ClinicForm({
             )}
           />
         </div>
+
+        <FormField
+          control={form.control}
+          name="serviceIds"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Services Offered</FormLabel>
+              <FormControl>
+                <MultiSelect
+                  options={allServices}
+                  selected={field.value || []}
+                  onChange={field.onChange}
+                  placeholder={isServicesLoading ? "Loading services..." : "Select services"}
+                  className={isServicesLoading ? "cursor-not-allowed" : ""}
+                />
+              </FormControl>
+               <FormDescription>
+                  Select all the services offered by this clinic.
+                </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         <FormField
           control={form.control}
           name="isActive"
@@ -223,8 +274,8 @@ export function ClinicForm({
             </FormItem>
           )}
         />
-        <Button type="submit" disabled={isPending}>
-          {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        <Button type="submit" disabled={isPending || isServicesLoading}>
+          {(isPending || isServicesLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {initialData ? 'Save changes' : 'Create Clinic'}
         </Button>
       </form>

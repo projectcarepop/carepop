@@ -11,11 +11,9 @@ interface PageProps {
     };
 }
 
-export default async function ClinicDetailPage({ params }: PageProps) {
-    // Access params immediately.
-    const { clinicId } = params;
+export default async function ClinicDetailPage({ params: { clinicId } }: PageProps) {
+    // The clinicId is now directly available.
     
-    // Now, perform all other logic.
     const clinic: Clinic | null = await getPublicClinicDetails(clinicId);
 
     if (!clinic) {

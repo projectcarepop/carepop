@@ -2,8 +2,8 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { db } from '../lib/db';
-import { clinics, profiles, doctors, services, productCategories, products, inventory, serviceCategories, appointments, medicalRecords, recordDoctorNotes, recordPrescriptions, recordDocuments } from '../../../drizzle/schema';
-import { eq, sql, count, asc, and, gte, lt, getTableColumns, desc } from 'drizzle-orm';
+import { clinics, profiles, doctors, services, productCategories, products, inventory, serviceCategories, appointments, medicalRecords, recordDoctorNotes, recordPrescriptions, recordDocuments, clinicServices } from '../../../drizzle/schema';
+import { eq, sql, count, asc, and, gte, lt, getTableColumns, desc, inArray } from 'drizzle-orm';
 import { authMiddleware, adminMiddleware, AuthEnv } from '../middleware/auth';
 import { createClient } from '@supabase/supabase-js';
 
@@ -169,9 +169,28 @@ adminRoutes
 adminRoutes
   .get('/clinics/:id', async (c) => {
     const { id } = c.req.param();
+    
+    // Step 1: Get the basic clinic data
     const [clinic] = await db.select().from(clinics).where(eq(clinics.id, id));
-    if (!clinic) return c.json({ error: 'Not Found' }, 404);
-    return c.json(clinic);
+
+    if (!clinic) {
+      return c.json({ error: 'Not Found' }, 404);
+    }
+
+    // Step 2: Get the IDs of all services assigned to this clinic
+    const assignedServices = await db.select({
+      serviceId: clinicServices.serviceId
+    }).from(clinicServices).where(eq(clinicServices.clinicId, id));
+
+    const serviceIds = assignedServices.map(s => s.serviceId);
+
+    // Step 3: Combine and return the data
+    const responseData = {
+      ...clinic,
+      serviceIds: serviceIds,
+    };
+
+    return c.json(responseData);
   })
   .put('/clinics/:id', zValidator('json', updateClinicSchema), async (c) => {
     const id = c.req.param('id');
@@ -206,6 +225,51 @@ adminRoutes
     if (!deletedClinic) return c.json({ error: 'Not Found' }, 404);
     return c.json({ success: true });
   });
+
+// --- Clinic-Service Linking Endpoints ---
+adminRoutes.get('/clinics/:id/services', async (c) => {
+    const { id } = c.req.param();
+    const assignedServices = await db.query.clinicServices.findMany({
+        where: eq(clinicServices.clinicId, id),
+        with: {
+            service: true,
+        }
+    });
+
+    // We only want to return the service objects
+    const servicesOnly = assignedServices.map(cs => cs.service);
+
+    return c.json({ data: servicesOnly });
+});
+
+const assignServicesSchema = z.object({
+  serviceIds: z.array(z.string().uuid()),
+});
+
+adminRoutes.post('/clinics/:id/services', zValidator('json', assignServicesSchema), async (c) => {
+    const { id: clinicId } = c.req.param();
+    const { serviceIds } = c.req.valid('json');
+
+    try {
+        await db.transaction(async (tx) => {
+            // 1. Delete all existing service assignments for this clinic
+            await tx.delete(clinicServices).where(eq(clinicServices.clinicId, clinicId));
+
+            // 2. If there are new service IDs, insert them
+            if (serviceIds.length > 0) {
+                const newAssignments = serviceIds.map((serviceId: string) => ({
+                    clinicId: clinicId,
+                    serviceId: serviceId,
+                }));
+                await tx.insert(clinicServices).values(newAssignments);
+            }
+        });
+        return c.json({ success: true, message: 'Services for clinic updated successfully.' });
+    } catch (error: any) {
+        console.error("Error updating clinic services:", error);
+        return c.json({ error: 'Failed to update services for clinic', message: error.message }, 500);
+    }
+});
 
 // --- Inventory Management Endpoints ---
 
@@ -640,8 +704,9 @@ adminRoutes.post('/appointments/:id/documents',
         const appointmentId = c.req.param('id');
         const { documentName, file } = c.req.valid('form');
         
-        // WORKAROUND: Create a new Supabase client to ensure correct storage types
         const env = c.env as AuthEnv['Variables'];
+        
+        // WORKAROUND: Create a new Supabase client to ensure correct storage types
         const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
         
         // 1. Upload file to Supabase Storage
