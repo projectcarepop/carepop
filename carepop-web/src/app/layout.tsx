@@ -15,6 +15,9 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 export const metadata: Metadata = {
   title: 'Carepop',
   description: 'Your health, your space.',
+  icons: {
+    icon: '/carepop-logo.png',
+  },
 }
 
 export default function RootLayout({
