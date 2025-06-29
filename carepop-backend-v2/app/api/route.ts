@@ -10,6 +10,27 @@ export const runtime = 'edge';
 
 const app = new Hono().basePath('/api');
 
+// ========= TEMPORARY DIAGNOSTIC ECHO ENDPOINT =========
+// This MUST be placed BEFORE the global CORS middleware.
+app.get('/debug/headers', (c) => {
+  console.log("--- DEBUG HEADERS ENDPOINT HIT ---");
+  const requestHeaders = c.req.header();
+  console.log("Received Headers:", requestHeaders);
+
+  // Return the headers as JSON, with a completely open CORS policy FOR THIS ROUTE ONLY.
+  return c.json({
+    message: "These are the headers received by the Hono backend.",
+    headers: requestHeaders,
+    // Vercel-specific headers can also be useful for debugging
+    vercelForwardedHost: c.req.header('x-forwarded-host'),
+    vercelDeploymentUrl: c.req.header('x-vercel-deployment-url')
+  }, 200, {
+    'Access-Control-Allow-Origin': '*', // Allow ANY origin for this debug route
+    'Access-Control-Allow-Methods': 'GET, OPTIONS'
+  });
+});
+// ========= END OF TEMPORARY DIAGNOSTIC ENDPOINT =========
+
 // --- ROBUST DYNAMIC CORS CONFIGURATION FOR VERCEL ---
 app.use('*', cors({
   origin: (origin) => {
