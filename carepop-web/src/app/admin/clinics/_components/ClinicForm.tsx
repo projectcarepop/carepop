@@ -19,7 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Clinic, Service } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
-import { getAdminServices, assignServicesToClinic } from '@/services/api';
+import { getAdminServices, assignServicesToClinic, getAdminClinicServices } from '@/services/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { MultiSelect, MultiSelectOption } from '@/components/ui/MultiSelect';
 import { toast } from '@/hooks/use-toast';
@@ -68,9 +68,38 @@ export function ClinicForm({
       latitude: initialData?.latitude || 0,
       longitude: initialData?.longitude || 0,
       isActive: initialData?.isActive ?? true,
-      serviceIds: initialData?.serviceIds || [],
+      serviceIds: [],
     },
   });
+
+  useEffect(() => {
+    async function fetchAssignedServices() {
+      if (initialData?.id && session) {
+        setIsServicesLoading(true);
+        try {
+          const assignedServiceIds = await getAdminClinicServices(initialData.id, session.access_token);
+          form.reset({
+            ...initialData,
+            phoneNumber: initialData.phoneNumber || '',
+            latitude: initialData.latitude || 0,
+            longitude: initialData.longitude || 0,
+            address: {
+              street: typeof initialData.address === 'object' && initialData.address !== null ? (initialData.address as any).street : '',
+              city: typeof initialData.address === 'object' && initialData.address !== null ? (initialData.address as any).city : '',
+              zip: typeof initialData.address === 'object' && initialData.address !== null ? (initialData.address as any).zip : '',
+            },
+            serviceIds: assignedServiceIds,
+          });
+        } catch (error) {
+          console.error("Failed to fetch assigned services", error);
+          toast({ title: "Error", description: "Could not fetch assigned services.", variant: "destructive" });
+        } finally {
+          setIsServicesLoading(false);
+        }
+      }
+    }
+    fetchAssignedServices();
+  }, [initialData, session, form]);
 
   useEffect(() => {
     async function fetchAllServices() {
@@ -90,18 +119,32 @@ export function ClinicForm({
   }, [session]);
 
   const handleFormSubmit = async (values: ClinicFormValues) => {
-    const clinicDataToSubmit: Omit<ClinicFormValues, 'serviceIds'> = { ...values };
+    const { serviceIds, ...clinicDataToSubmit } = values;
     
     const updatedClinic = await onSubmit(clinicDataToSubmit);
 
-    if (updatedClinic && values.serviceIds && session) {
+    if (updatedClinic && serviceIds && session) {
+      setIsServicesLoading(true);
       try {
-        await assignServicesToClinic(updatedClinic.id, values.serviceIds, session.access_token);
+        await assignServicesToClinic(updatedClinic.id, serviceIds, session.access_token);
         toast({ title: "Success", description: "Clinic services updated successfully." });
       } catch (error) {
           console.error("Failed to assign services", error);
           toast({ title: "Error", description: "Could not update the clinic's services.", variant: "destructive" });
+      } finally {
+          setIsServicesLoading(false);
       }
+    } else if (updatedClinic && !serviceIds && session) {
+        setIsServicesLoading(true);
+        try {
+            await assignServicesToClinic(updatedClinic.id, [], session.access_token);
+            toast({ title: "Success", description: "All services unassigned from clinic." });
+        } catch (error) {
+            console.error("Failed to unassign services", error);
+            toast({ title: "Error", description: "Could not update the clinic's services.", variant: "destructive" });
+        } finally {
+            setIsServicesLoading(false);
+        }
     }
   };
 

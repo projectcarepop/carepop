@@ -251,21 +251,6 @@ export const servicesRelations = relations(services, ({ one, many }) => ({
 	clinicServices: many(clinicServices),
 }));
 
-export const serviceCategoriesRelations = relations(serviceCategories, ({ many }) => ({
-	services: many(services),
-}));
-
-export const clinicServicesRelations = relations(clinicServices, ({ one }) => ({
-	clinic: one(clinics, {
-		fields: [clinicServices.clinicId],
-		references: [clinics.id],
-	}),
-	service: one(services, {
-		fields: [clinicServices.serviceId],
-		references: [services.id],
-	}),
-}));
-
 export const appointmentsRelations = relations(appointments, ({ one, many }) => ({
 	patient: one(profiles, {
 		fields: [appointments.patientId],
@@ -283,15 +268,39 @@ export const appointmentsRelations = relations(appointments, ({ one, many }) => 
 		fields: [appointments.clinicId],
 		references: [clinics.id]
 	}),
-	medicalRecords: many(medicalRecords),
-	review: one(reviews),
+	review: one(reviews, {
+		fields: [appointments.id],
+		references: [reviews.appointmentId]
+	}),
+    medicalRecords: many(medicalRecords),
 }));
 
 export const medicalRecordsRelations = relations(medicalRecords, ({ one }) => ({
-	appointment: one(appointments, {
-		fields: [medicalRecords.appointmentId],
-		references: [appointments.id]
-	}),
+  appointment: one(appointments, {
+    fields: [medicalRecords.appointmentId],
+    references: [appointments.id]
+  }),
+}));
+
+export const recordDoctorNotesRelations = relations(recordDoctorNotes, ({ one }) => ({
+    medicalRecord: one(medicalRecords, {
+        fields: [recordDoctorNotes.recordId],
+        references: [medicalRecords.id]
+    }),
+}));
+
+export const recordPrescriptionsRelations = relations(recordPrescriptions, ({ one }) => ({
+    medicalRecord: one(medicalRecords, {
+        fields: [recordPrescriptions.recordId],
+        references: [medicalRecords.id]
+    }),
+}));
+
+export const recordDocumentsRelations = relations(recordDocuments, ({ one }) => ({
+    medicalRecord: one(medicalRecords, {
+        fields: [recordDocuments.recordId],
+        references: [medicalRecords.id]
+    }),
 }));
 
 export const reviewsRelations = relations(reviews, ({ one }) => ({
@@ -309,16 +318,19 @@ export const reviewsRelations = relations(reviews, ({ one }) => ({
 	}),
 }));
 
+export const productCategoriesRelations = relations(productCategories, ({ many }) => ({
+	products: many(products),
+}));
+
 export const productsRelations = relations(products, ({ one }) => ({
 	productCategory: one(productCategories, {
 		fields: [products.categoryId],
 		references: [productCategories.id]
 	}),
-	inventory: one(inventory),
-}));
-
-export const productCategoriesRelations = relations(productCategories, ({ many }) => ({
-	products: many(products),
+	inventory: one(inventory, {
+        fields: [products.id],
+        references: [inventory.productId]
+    }),
 }));
 
 export const inventoryRelations = relations(inventory, ({ one }) => ({

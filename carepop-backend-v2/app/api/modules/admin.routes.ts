@@ -227,26 +227,37 @@ adminRoutes
   });
 
 // --- Clinic-Service Linking Endpoints ---
+
+/**
+ * GET /api/admin/clinics/:id/services
+ * Returns an array of service IDs assigned to a specific clinic.
+ */
 adminRoutes.get('/clinics/:id/services', async (c) => {
-    const { id } = c.req.param();
-    const assignedServices = await db.query.clinicServices.findMany({
-        where: eq(clinicServices.clinicId, id),
-        with: {
-            service: true,
-        }
-    });
+    const { id: clinicId } = c.req.param();
+    try {
+        const assignedServices = await db.select({
+            serviceId: clinicServices.serviceId
+        }).from(clinicServices).where(eq(clinicServices.clinicId, clinicId));
 
-    // We only want to return the service objects
-    const servicesOnly = assignedServices.map(cs => cs.service);
+        // Return a simple array of IDs as requested
+        const serviceIds = assignedServices.map(s => s.serviceId);
+        return c.json(serviceIds);
 
-    return c.json({ data: servicesOnly });
+    } catch (error: any) {
+        console.error(`Error fetching services for clinic ${clinicId}:`, error);
+        return c.json({ error: 'Failed to fetch assigned services', message: error.message }, 500);
+    }
 });
 
 const assignServicesSchema = z.object({
   serviceIds: z.array(z.string().uuid()),
 });
 
-adminRoutes.post('/clinics/:id/services', zValidator('json', assignServicesSchema), async (c) => {
+/**
+ * PUT /api/admin/clinics/:id/services
+ * Synchronizes the list of services for a specific clinic.
+ */
+adminRoutes.put('/clinics/:id/services', zValidator('json', assignServicesSchema), async (c) => {
     const { id: clinicId } = c.req.param();
     const { serviceIds } = c.req.valid('json');
 
@@ -255,8 +266,8 @@ adminRoutes.post('/clinics/:id/services', zValidator('json', assignServicesSchem
             // 1. Delete all existing service assignments for this clinic
             await tx.delete(clinicServices).where(eq(clinicServices.clinicId, clinicId));
 
-            // 2. If there are new service IDs, insert them
-            if (serviceIds.length > 0) {
+            // 2. If there are new service IDs to assign, insert them
+            if (serviceIds && serviceIds.length > 0) {
                 const newAssignments = serviceIds.map((serviceId: string) => ({
                     clinicId: clinicId,
                     serviceId: serviceId,
@@ -704,7 +715,7 @@ adminRoutes.post('/appointments/:id/documents',
         const appointmentId = c.req.param('id');
         const { documentName, file } = c.req.valid('form');
         
-        const env = c.env as AuthEnv['Variables'];
+        const env = c.env;
         
         // WORKAROUND: Create a new Supabase client to ensure correct storage types
         const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);

@@ -82,61 +82,53 @@ meRoutes.get('/appointments', async (c) => {
 
 /**
  * GET /me/records
- * Fetches all medical records for the authenticated user, enriched with
- * details from appointments, doctors, clinics, and services.
+ * Fetches all medical records for the authenticated user by querying through their appointments.
+ * This is the new, correct implementation for the dashboard.
  */
 meRoutes.get('/records', async (c) => {
-    const user = c.get('user');
-    try {
-        const baseRecords = await db.select({
-            recordId: medicalRecords.id,
-            recordType: medicalRecords.recordType,
-            createdAt: medicalRecords.createdAt,
-            appointment: {
-                id: appointments.id,
-                appointmentTime: appointments.appointmentTime,
-            },
+  const user = c.get('user');
+  const { appointments: schemaAppointments } = await import('../../../drizzle/schema');
+
+  try {
+    const userAppointmentsWithRecords = await db.query.appointments.findMany({
+        where: eq(schemaAppointments.patientId, user.id),
+        with: {
+            medicalRecords: true, // Fetch all related medical records
             doctor: {
-                fullName: doctors.fullName,
+                columns: { fullName: true }
             },
             clinic: {
-                name: clinics.name,
+                columns: { name: true }
             },
             service: {
-                name: services.name,
+                columns: { name: true }
             },
-        })
-        .from(medicalRecords)
-        .innerJoin(appointments, eq(medicalRecords.appointmentId, appointments.id))
-        .innerJoin(doctors, eq(appointments.doctorId, doctors.id))
-        .innerJoin(clinics, eq(appointments.clinicId, clinics.id))
-        .innerJoin(services, eq(appointments.serviceId, services.id))
-        .where(eq(appointments.patientId, user.id))
-        .orderBy(desc(appointments.appointmentTime));
+        },
+        orderBy: (appointments, { desc }) => [desc(appointments.appointmentTime)]
+    });
 
-        const enrichedRecords = await Promise.all(baseRecords.map(async (record) => {
-            let details = null;
-            switch (record.recordType) {
-                case 'DOCTOR_NOTE':
-                    details = await db.query.recordDoctorNotes.findFirst({ where: eq(recordDoctorNotes.recordId, record.recordId) });
-                    break;
-                case 'PRESCRIPTION':
-                    details = await db.query.recordPrescriptions.findFirst({ where: eq(recordPrescriptions.recordId, record.recordId) });
-                    break;
-                case 'CLINICAL_DOCUMENT':
-                    details = await db.query.recordDocuments.findFirst({ where: eq(recordDocuments.recordId, record.recordId) });
-                    break;
-                // Add cases for LAB_ORDER, LAB_RESULT if needed
+    // The frontend expects a flat list of records, not appointments.
+    // We will transform the data to match the required `{ records: [...] }` shape.
+    const records = userAppointmentsWithRecords.flatMap(appt => 
+        appt.medicalRecords.map(record => ({
+            ...record,
+            // Attach the appointment details to each record for context
+            appointment: {
+                id: appt.id,
+                appointmentTime: appt.appointmentTime,
+                doctor: appt.doctor,
+                clinic: appt.clinic,
+                service: appt.service,
             }
-            return { ...record, details };
-        }));
+        }))
+    );
 
-        return c.json(enrichedRecords);
+    return c.json({ records });
 
-    } catch (error) {
-        console.error("Error fetching enriched medical records:", error);
-        return c.json({ error: "Internal Server Error" }, 500);
-    }
+  } catch (error) {
+    console.error(`Error fetching medical records for user ${user.id}:`, error);
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
 });
 
 /**

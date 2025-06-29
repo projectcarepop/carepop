@@ -168,7 +168,7 @@ export async function getMyAppointments(accessToken: string, params?: { limit?: 
 
 export async function getMyMedicalRecords(accessToken: string, params?: { limit?: number }) {
   const headers = await getAuthHeaders(accessToken);
-  let url = `${API_BASE_URL}/api/me/medical-records`;
+  let url = `${API_BASE_URL}/api/me/records`;
 
   const queryParams = new URLSearchParams();
   if (params?.limit) {
@@ -200,7 +200,9 @@ export async function getMyEnrichedRecords(accessToken: string) {
         const error = await response.json().catch(() => ({ message: "Failed to fetch medical records." }));
         throw new Error(error.message);
     }
-    return response.json();
+    const result = await response.json();
+    // The backend returns { records: [...] }, so we extract the array.
+    return result.records || [];
 }
 
 export async function getSingleMedicalRecord(recordId: string, accessToken: string) {
