@@ -10,26 +10,19 @@ export const runtime = 'edge';
 
 const app = new Hono().basePath('/api');
 
-// --- DYNAMIC CORS CONFIGURATION FOR VERCEL ---
-const allowedOrigins = [
-  'http://localhost:3000',
-  'https://www.carepop.online',
-  'https://carepop.online',
-  'https://carepop.vercel.app'
-];
-
+// --- ROBUST DYNAMIC CORS CONFIGURATION FOR VERCEL ---
 app.use('*', cors({
-  origin: (origin, c) => {
-    // Allow requests from Vercel preview deployments
-    if (origin.endsWith('.vercel.app')) {
+  origin: (origin) => {
+    const vercelPreviewPattern = /^https:\/\/carepop-web-.*\.vercel\.app$/;
+    const allowed = [
+      'http://localhost:3000',
+      'https://www.carepop.online'
+    ];
+
+    if (allowed.includes(origin) || vercelPreviewPattern.test(origin)) {
       return origin;
     }
-    // Allow requests from the defined list
-    if (allowedOrigins.includes(origin)) {
-      return origin;
-    }
-    // Block all other origins by returning null
-    return null;
+    return null; // Block by default
   },
   allowHeaders: [
     'Authorization',
