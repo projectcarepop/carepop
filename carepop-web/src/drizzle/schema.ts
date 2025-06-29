@@ -1,10 +1,10 @@
-import { pgTable, index, pgPolicy, uuid, text, jsonb, boolean, timestamp, check, numeric, integer, date, unique, primaryKey, pgEnum, customType } from "drizzle-orm/pg-core"
+import { pgTable, index, uuid, text, jsonb, boolean, timestamp, check, numeric, integer, date, pgEnum, customType } from "drizzle-orm/pg-core"
 import { sql, relations } from "drizzle-orm"
 
 // Placeholder for auth.users table
 export const usersInAuth = pgTable("users", {
   id: uuid('id').primaryKey(),
-}, (table) => {
+}, () => {
     return {
         tableName: "users",
         schemaName: "auth"
@@ -68,7 +68,7 @@ export const services = pgTable("services", {
 	price: numeric("price", { precision: 10, scale:  2 }).notNull(),
 	durationMinutes: integer("duration_minutes").notNull(),
 	isActive: boolean("is_active").default(true).notNull(),
-}, (table) => ({
+}, () => ({
 	priceCheck: check("services_price_check", sql`price >= 0`),
     durationCheck: check("services_duration_minutes_check", sql`duration_minutes > 0`),
 }));
@@ -158,7 +158,7 @@ export const reviews = pgTable("reviews", {
 	rating: integer("rating").notNull(),
 	comment: text("comment"),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => ({
+}, () => ({
     ratingCheck: check("reviews_rating_check", sql`rating >= 1 AND rating <= 5`),
 }));
 
@@ -177,7 +177,7 @@ export const products = pgTable("products", {
 	price: numeric("price", { precision: 10, scale:  2 }).notNull(),
 	requiresPrescription: boolean("requires_prescription").default(false).notNull(),
 	isActive: boolean("is_active").default(true).notNull(),
-}, (table) => ({
+}, () => ({
     priceCheck: check("products_price_check", sql`price >= 0`),
 }));
 
@@ -185,7 +185,7 @@ export const inventory = pgTable("inventory", {
 	productId: uuid("product_id").primaryKey().notNull().references(() => products.id, { onDelete: 'cascade' }),
 	quantityOnHand: integer("quantity_on_hand").default(0).notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => ({
+}, () => ({
     quantityCheck: check("inventory_quantity_on_hand_check", sql`quantity_on_hand >= 0`),
 }));
 
@@ -247,11 +247,35 @@ export const appointmentsRelations = relations(appointments, ({ one, many }) => 
 	review: one(reviews),
 }));
 
-export const medicalRecordsRelations = relations(medicalRecords, ({ one }) => ({
+export const medicalRecordsRelations = relations(medicalRecords, ({ one, many }) => ({
 	appointment: one(appointments, {
 		fields: [medicalRecords.appointmentId],
 		references: [appointments.id]
 	}),
+    notes: one(recordDoctorNotes),
+    prescriptions: one(recordPrescriptions),
+    documents: many(recordDocuments),
+}));
+
+export const recordDoctorNotesRelations = relations(recordDoctorNotes, ({ one }) => ({
+    medicalRecord: one(medicalRecords, {
+        fields: [recordDoctorNotes.recordId],
+        references: [medicalRecords.id]
+    })
+}));
+
+export const recordPrescriptionsRelations = relations(recordPrescriptions, ({ one }) => ({
+    medicalRecord: one(medicalRecords, {
+        fields: [recordPrescriptions.recordId],
+        references: [medicalRecords.id]
+    })
+}));
+
+export const recordDocumentsRelations = relations(recordDocuments, ({ one }) => ({
+    medicalRecord: one(medicalRecords, {
+        fields: [recordDocuments.recordId],
+        references: [medicalRecords.id]
+    })
 }));
 
 export const reviewsRelations = relations(reviews, ({ one }) => ({
@@ -266,7 +290,7 @@ export const reviewsRelations = relations(reviews, ({ one }) => ({
 	doctor: one(doctors, {
 		fields: [reviews.doctorId],
 		references: [doctors.id]
-	}),
+	})
 }));
 
 export const productsRelations = relations(products, ({ one }) => ({
@@ -274,7 +298,7 @@ export const productsRelations = relations(products, ({ one }) => ({
 		fields: [products.categoryId],
 		references: [productCategories.id]
 	}),
-	inventory: one(inventory),
+	inventory: one(inventory)
 }));
 
 export const productCategoriesRelations = relations(productCategories, ({ many }) => ({
@@ -285,5 +309,5 @@ export const inventoryRelations = relations(inventory, ({ one }) => ({
 	product: one(products, {
 		fields: [inventory.productId],
 		references: [products.id]
-	}),
+	})
 }));
