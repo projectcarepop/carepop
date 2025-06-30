@@ -265,25 +265,24 @@ meRoutes.patch('/appointments/:id/cancel', async (c) => {
   }
 });
 
-// Zod schema for updating a user's profile
+// 1. Zod schema accepts camelCase and makes fields optional for updates
 const updateProfileSchema = z.object({
-  firstName: z.string().min(1, "First name is required").optional(),
-  lastName: z.string().min(1, "Last name is required").optional(),
-  middleInitial: z.string().max(1).optional().nullable(),
+  firstName: z.string().min(1).optional(),
+  lastName: z.string().min(1).optional(),
+  middleInitial: z.string().optional().nullable(),
   contactNo: z.string().optional().nullable(),
   birthday: z.string().optional().nullable(),
   genderIdentity: z.string().optional().nullable(),
   pronouns: z.string().optional().nullable(),
-  assignedSexAtBirth: z.string().optional().nullable(),
   civilStatus: z.string().optional().nullable(),
+  assignedSexAtBirth: z.string().optional().nullable(),
   religion: z.string().optional().nullable(),
   occupation: z.string().optional().nullable(),
   philhealthNo: z.string().optional().nullable(),
   street: z.string().optional().nullable(),
-  barangayCode: z.string().optional().nullable(),
-  cityMunicipalityCode: z.string().optional().nullable(),
   provinceCode: z.string().optional().nullable(),
-  avatarUrl: z.string().url("Invalid URL format").optional().nullable(),
+  cityMunicipalityCode: z.string().optional().nullable(),
+  barangayCode: z.string().optional().nullable(),
 });
 
 /**
@@ -294,36 +293,40 @@ meRoutes.put(
   '/profile',
   zValidator('json', updateProfileSchema),
   async (c) => {
-    try {
-      const user = c.get('user');
-      const validatedCamelCaseData = c.req.valid('json');
+    const user = c.get('user');
+    const validatedData = c.req.valid('json');
 
-      // --- LOG #1: What is the backend receiving? ---
-      console.log(`[BACKEND] PUT /profile request for user ID: ${user.id}`);
-      console.log("[BACKEND] Received validated camelCase data:", validatedCamelCaseData);
-      
+    try {
       // --- CRITICAL TRANSFORMATION STEP ---
       const payloadForDb = {
-        firstName: validatedCamelCaseData.firstName,
-        lastName: validatedCamelCaseData.lastName,
-        middleInitial: validatedCamelCaseData.middleInitial,
-        contactNo: validatedCamelCaseData.contactNo,
-        birthday: validatedCamelCaseData.birthday,
-        genderIdentity: validatedCamelCaseData.genderIdentity,
-        pronouns: validatedCamelCaseData.pronouns,
-        civilStatus: validatedCamelCaseData.civilStatus,
-        assignedSexAtBirth: validatedCamelCaseData.assignedSexAtBirth,
-        religion: validatedCamelCaseData.religion,
-        occupation: validatedCamelCaseData.occupation,
-        philhealthNo: validatedCamelCaseData.philhealthNo,
-        street: validatedCamelCaseData.street,
-        provinceCode: validatedCamelCaseData.provinceCode,
-        cityMunicipalityCode: validatedCamelCaseData.cityMunicipalityCode,
-        barangayCode: validatedCamelCaseData.barangayCode,
-        avatarUrl: validatedCamelCaseData.avatarUrl,
-        updatedAt: new Date(),
+        first_name: validatedData.firstName,
+        last_name: validatedData.lastName,
+        middle_initial: validatedData.middleInitial,
+        contact_no: validatedData.contactNo,
+        birthday: validatedData.birthday,
+        gender_identity: validatedData.genderIdentity,
+        pronouns: validatedData.pronouns,
+        civil_status: validatedData.civilStatus,
+        assigned_sex_at_birth: validatedData.assignedSexAtBirth,
+        religion: validatedData.religion,
+        occupation: validatedData.occupation,
+        philhealth_no: validatedData.philhealthNo,
+        street: validatedData.street,
+        province_code: validatedData.provinceCode,
+        city_municipality_code: validatedData.cityMunicipalityCode,
+        barangay_code: validatedData.barangayCode,
+        updated_at: new Date().toISOString(),
       };
       console.log("[BACKEND] Transformed to snake_case for DB:", payloadForDb);
+
+      // 4. Remove any keys that are undefined so Drizzle doesn't try to set them
+      Object.keys(payloadForDb).forEach(key =>
+        (payloadForDb as any)[key] === undefined && delete (payloadForDb as any)[key]
+      );
+
+      if (Object.keys(payloadForDb).length === 1 && 'updated_at' in payloadForDb) {
+        return c.json({ message: "No fields to update." }, 400);
+      }
 
       // --- LOG #2: The Drizzle Query ---
       console.log(`[BACKEND] Executing Drizzle update for profiles.id = ${user.id}`);
@@ -334,20 +337,14 @@ meRoutes.put(
         .where(eq(profiles.id, user.id))
         .returning();
 
-      // --- LOG #3: The Result ---
-      console.log("[BACKEND] Drizzle query completed. Result:", updatedProfile);
-
       if (!updatedProfile) {
-        // This is the likely failure point we are not seeing.
-        console.error(`[BACKEND] UPDATE FAILED: No profile found with ID ${user.id} to update.`);
         return c.json({ error: 'Profile not found to update' }, 404);
       }
-
-      console.log("[BACKEND] Successfully updated profile. Sending back data.");
+      
       return c.json(updatedProfile);
 
     } catch (error) {
-      console.error("[BACKEND] CRASH during profile update:", error);
+      console.error('Error updating profile:', error);
       return c.json({ error: 'Internal Server Error' }, 500);
     }
   }
