@@ -265,24 +265,24 @@ meRoutes.patch('/appointments/:id/cancel', async (c) => {
   }
 });
 
-// 1. Zod schema accepts camelCase and makes fields optional for updates
+// 1. Zod schema now expects snake_case, matching the database and clients.
 const updateProfileSchema = z.object({
-  firstName: z.string().min(1).optional(),
-  lastName: z.string().min(1).optional(),
-  middleInitial: z.string().optional().nullable(),
-  contactNo: z.string().optional().nullable(),
+  first_name: z.string().min(1).optional(),
+  last_name: z.string().min(1).optional(),
+  middle_initial: z.string().optional().nullable(),
+  contact_no: z.string().optional().nullable(),
   birthday: z.string().optional().nullable(),
-  genderIdentity: z.string().optional().nullable(),
+  gender_identity: z.string().optional().nullable(),
   pronouns: z.string().optional().nullable(),
-  civilStatus: z.string().optional().nullable(),
-  assignedSexAtBirth: z.string().optional().nullable(),
+  civil_status: z.string().optional().nullable(),
+  assigned_sex_at_birth: z.string().optional().nullable(),
   religion: z.string().optional().nullable(),
   occupation: z.string().optional().nullable(),
-  philhealthNo: z.string().optional().nullable(),
+  philhealth_no: z.string().optional().nullable(),
   street: z.string().optional().nullable(),
-  provinceCode: z.string().optional().nullable(),
-  cityMunicipalityCode: z.string().optional().nullable(),
-  barangayCode: z.string().optional().nullable(),
+  province_code: z.string().optional().nullable(),
+  city_municipality_code: z.string().optional().nullable(),
+  barangay_code: z.string().optional().nullable(),
 });
 
 /**
@@ -294,46 +294,19 @@ meRoutes.put(
   zValidator('json', updateProfileSchema),
   async (c) => {
     const user = c.get('user');
+    // This data is now already in the perfect snake_case format.
     const validatedData = c.req.valid('json');
 
     try {
-      // --- CRITICAL TRANSFORMATION STEP ---
+      // 2. The transformation block is removed. We prepare the final payload.
       const payloadForDb = {
-        first_name: validatedData.firstName,
-        last_name: validatedData.lastName,
-        middle_initial: validatedData.middleInitial,
-        contact_no: validatedData.contactNo,
-        birthday: validatedData.birthday,
-        gender_identity: validatedData.genderIdentity,
-        pronouns: validatedData.pronouns,
-        civil_status: validatedData.civilStatus,
-        assigned_sex_at_birth: validatedData.assignedSexAtBirth,
-        religion: validatedData.religion,
-        occupation: validatedData.occupation,
-        philhealth_no: validatedData.philhealthNo,
-        street: validatedData.street,
-        province_code: validatedData.provinceCode,
-        city_municipality_code: validatedData.cityMunicipalityCode,
-        barangay_code: validatedData.barangayCode,
-        updated_at: new Date().toISOString(),
+        ...validatedData,
+        updated_at: new Date().toISOString(), // Still good practice to set this
       };
-      console.log("[BACKEND] Transformed to snake_case for DB:", payloadForDb);
 
-      // 4. Remove any keys that are undefined so Drizzle doesn't try to set them
-      Object.keys(payloadForDb).forEach(key =>
-        (payloadForDb as any)[key] === undefined && delete (payloadForDb as any)[key]
-      );
-
-      if (Object.keys(payloadForDb).length === 1 && 'updated_at' in payloadForDb) {
-        return c.json({ message: "No fields to update." }, 400);
-      }
-
-      // --- LOG #2: The Drizzle Query ---
-      console.log(`[BACKEND] Executing Drizzle update for profiles.id = ${user.id}`);
-      
       const [updatedProfile] = await db
         .update(profiles)
-        .set(payloadForDb) // Use the transformed snake_case payload here
+        .set(payloadForDb) // 3. Use the payload directly.
         .where(eq(profiles.id, user.id))
         .returning();
 
@@ -342,7 +315,6 @@ meRoutes.put(
       }
       
       return c.json(updatedProfile);
-
     } catch (error) {
       console.error('Error updating profile:', error);
       return c.json({ error: 'Internal Server Error' }, 500);
