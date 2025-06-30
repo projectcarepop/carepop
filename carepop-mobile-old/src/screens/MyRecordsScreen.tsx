@@ -1,38 +1,62 @@
 import React, { useMemo } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, Alert, SafeAreaView, TouchableOpacity } from 'react-native';
+import { View, Text, SectionList, StyleSheet, ActivityIndicator, Alert, SafeAreaView, TouchableOpacity, RefreshControl } from 'react-native';
 import { format } from 'date-fns';
 import { theme, Button } from '../components';
 import * as Linking from 'expo-linking';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { DrawerScreenProps } from '@react-navigation/drawer';
-import type { DrawerParamList } from '../navigation/AppNavigator';
+import type { DrawerParamList } from '../navigation/AppDrawerNavigator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-
-// Import our new service function and types
 import { getMyMedicalRecords } from '../services/api';
-import type { MedicalRecord } from '../lib/types';
+import type { MedicalRecordWithRelations } from '../lib/types';
+import { supabase } from '../utils/supabase';
+import { FileText, AlertCircle } from 'lucide-react-native';
 
 type MyRecordsNavigationProp = DrawerScreenProps<DrawerParamList, 'Records'>['navigation'];
 
 export function MyRecordsScreen() {
   const navigation = useNavigation<MyRecordsNavigationProp>();
   const insets = useSafeAreaInsets();
-  const { session } = useAuth(); // Use session to control the query
+  const { authStatus } = useAuth();
 
   const { 
     data: medicalRecords, 
     isLoading, 
     isError, 
-    refetch 
-  } = useQuery<MedicalRecord[], Error>({
-    queryKey: ['myMedicalRecords'],
-    queryFn: getMyMedicalRecords, // Use the new service function directly
-    enabled: !!session, // Only run the query if the user is logged in
+    error,
+    refetch,
+    isRefetching
+  } = useQuery<MedicalRecordWithRelations[], Error>({
+    queryKey: ['myMedicalRecords', authStatus],
+    queryFn: () => getMyMedicalRecords(supabase),
+    enabled: authStatus === 'authenticated',
   });
+
+  const groupedRecords = useMemo(() => {
+    if (!medicalRecords) return [];
+
+    const groups: { [key: string]: MedicalRecordWithRelations[] } = medicalRecords.reduce((acc, record) => {
+      const appointment = record.appointments;
+      const title = appointment 
+        ? `${format(new Date(appointment.appointmentTime), 'MMMM dd, yyyy')} - ${appointment.service.name}`
+        : 'General Records';
+      
+      if (!acc[title]) {
+        acc[title] = [];
+      }
+      acc[title].push(record);
+      return acc;
+    }, {} as { [key: string]: MedicalRecordWithRelations[] });
+
+    return Object.keys(groups).map(title => ({
+      title,
+      data: groups[title].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    }));
+  }, [medicalRecords]);
 
   // Animation
   const opacity = useSharedValue(0);
@@ -65,59 +89,36 @@ export function MyRecordsScreen() {
     // }
   };
 
-  const renderRecordItem = ({ item }: { item: MedicalRecord }) => (
+  const renderRecordItem = ({ item }: { item: MedicalRecordWithRelations }) => (
     <View style={styles.recordItemContainer}>
       <View style={styles.recordInfo}>
-        <Text style={styles.recordType}>{item.recordType.replace(/_/g, ' ')}</Text>
-        <Text style={styles.recordDescription} numberOfLines={2}>
-          {typeof item.details === 'string' ? item.details : JSON.stringify(item.details)}
+        <Text style={styles.recordType} numberOfLines={1}>
+          {item.recordType ? item.recordType.replace(/_/g, ' ') : 'Record'}
         </Text>
-      </View>
-      <View style={styles.recordMeta}>
         <Text style={styles.recordDate}>
-          {format(new Date(item.createdAt), 'MMM d, yyyy')}
+          Created: {format(new Date(item.createdAt), 'p')}
         </Text>
-        <Button
-          title="View"
-          onPress={() => handleViewRecord(item.id)}
-          variant="outline"
-          size="sm"
-        />
       </View>
+      <Button
+        title="View"
+        onPress={() => handleViewRecord(item.id)}
+        variant="outline"
+        size="sm"
+      />
     </View>
   );
 
-  const ListContent = () => {
-    if (isLoading) {
-      return <ActivityIndicator size="large" color={theme.colors.primary} style={styles.centered} />;
-    }
+  const renderSectionHeader = ({ section: { title } }: { section: { title: string } }) => (
+    <Text style={styles.sectionHeader}>{title}</Text>
+  );
 
-    if (isError) {
-      return (
-        <View style={styles.centered}>
-          <Text style={styles.errorText}>Failed to fetch records.</Text>
-           <Button title="Retry" onPress={() => refetch()} style={{marginTop: 20}} />
-        </View>
-      );
-    }
-
-    if (!medicalRecords || medicalRecords.length === 0) {
-      return (
-        <View style={styles.centered}>
-          <Text style={styles.emptyText}>You have no medical records.</Text>
-        </View>
-      );
-    }
-
-    return (
-      <FlatList
-        data={medicalRecords}
-        renderItem={renderRecordItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContentContainer}
-      />
-    );
-  };
+  const ListEmptyComponent = () => (
+    <View style={styles.centered}>
+      <FileText size={48} color={theme.colors.mutedForeground} />
+      <Text style={styles.emptyText}>You have no medical records.</Text>
+      <Text style={styles.emptySubText}>Records from your appointments will appear here.</Text>
+    </View>
+  );
 
   const styles = useMemo(
     () =>
@@ -167,16 +168,41 @@ export function MyRecordsScreen() {
           ...theme.typography.h3,
           fontFamily: theme.typography.fontFamilySemiBold,
           textAlign: 'center',
+          color: theme.colors.foreground,
+        },
+        emptySubText: {
+          fontSize: 14,
+          fontFamily: theme.typography.fontFamily,
           color: theme.colors.mutedForeground,
+          textAlign: 'center',
+          marginTop: theme.spacing.sm,
+        },
+        errorSubText: {
+          fontSize: 14,
+          fontFamily: theme.typography.fontFamily,
+          color: theme.colors.mutedForeground,
+          textAlign: 'center',
+          marginTop: theme.spacing.sm,
         },
         listContentContainer: {
-          paddingBottom: 20,
+          paddingHorizontal: theme.spacing.md,
+          paddingBottom: theme.spacing.lg,
+          flexGrow: 1,
+        },
+        sectionHeader: {
+          fontSize: 16,
+          fontFamily: theme.typography.fontFamilyBold,
+          color: theme.colors.foreground,
+          paddingVertical: theme.spacing.md,
+          paddingHorizontal: theme.spacing.sm,
+          backgroundColor: theme.colors.background,
+          marginTop: theme.spacing.md,
         },
         recordItemContainer: {
           backgroundColor: theme.colors.card,
           borderRadius: theme.radius.lg,
-          padding: theme.spacing.lg,
-          marginBottom: theme.spacing.md,
+          padding: theme.spacing.md,
+          marginBottom: theme.spacing.sm,
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -188,25 +214,16 @@ export function MyRecordsScreen() {
           marginRight: theme.spacing.lg,
         },
         recordType: {
-          ...theme.typography.h4,
+          fontSize: 16,
           fontFamily: theme.typography.fontFamilySemiBold,
-          color: theme.colors.foreground,
-          marginBottom: theme.spacing.xs,
+          color: theme.colors.cardForeground,
+          textTransform: 'capitalize',
         },
         recordDate: {
-          ...theme.typography.small,
+          fontSize: 12,
           fontFamily: theme.typography.fontFamily,
           color: theme.colors.mutedForeground,
-          marginBottom: theme.spacing.md,
-          textAlign: 'right',
-        },
-        recordDescription: {
-          ...theme.typography.body,
-          fontFamily: theme.typography.fontFamily,
-          color: theme.colors.mutedForeground,
-        },
-        recordMeta: {
-          alignItems: 'flex-end',
+          marginTop: 4,
         },
       }),
     [insets]
@@ -219,7 +236,22 @@ export function MyRecordsScreen() {
       </TouchableOpacity>
       <Animated.View style={[styles.container, animatedStyle]}>
         <Text style={styles.title}>My Records</Text>
-        <ListContent />
+        <SectionList
+          sections={groupedRecords}
+          keyExtractor={(item) => item.id}
+          renderItem={renderRecordItem}
+          renderSectionHeader={renderSectionHeader}
+          ListEmptyComponent={ListEmptyComponent}
+          contentContainerStyle={styles.listContentContainer}
+          refreshControl={
+            <RefreshControl 
+              refreshing={isRefetching} 
+              onRefresh={refetch}
+              colors={[theme.colors.primary]}
+              tintColor={theme.colors.primary}
+            />
+          }
+        />
       </Animated.View>
     </View>
   );

@@ -33,6 +33,7 @@ export const Button: React.FC<ButtonProps> = ({
   icon,
   fullWidth = false,
   style,
+  onPress,
   ...rest
 }) => {
   const isDisabled = disabled || isLoading;
@@ -63,7 +64,7 @@ export const Button: React.FC<ButtonProps> = ({
   const iconColor = variantStyles[variant].text.color;
 
   return (
-    <Pressable style={containerStyle} disabled={isDisabled} {...rest}>
+    <Pressable style={containerStyle} disabled={isDisabled} onPress={onPress} {...rest}>
       {isLoading ? (
         <ActivityIndicator size="small" color={iconColor} />
       ) : (

@@ -11,16 +11,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MapPin, Search } from 'lucide-react-native';
 
 import { theme } from '../../components/theme';
-import { getPublicClinics } from '../../services/api';
+import { getPublicClinicsByService } from '../../services/api';
 import { Clinic } from '../../lib/types';
 import { BookingStackParamList } from '../../navigation/BookingNavigator';
 import { Card } from '../../components/card.native';
 
+type ClinicSelectionRouteProp = RouteProp<BookingStackParamList, 'ClinicSelection'>;
 type ClinicSelectionNavigationProp = NativeStackNavigationProp<
   BookingStackParamList,
   'ClinicSelection'
@@ -28,6 +29,8 @@ type ClinicSelectionNavigationProp = NativeStackNavigationProp<
 
 export default function ClinicSelectionScreen() {
   const navigation = useNavigation<ClinicSelectionNavigationProp>();
+  const route = useRoute<ClinicSelectionRouteProp>();
+  const { serviceId } = route.params;
   const [searchQuery, setSearchQuery] = useState('');
 
   const {
@@ -36,8 +39,9 @@ export default function ClinicSelectionScreen() {
     isError,
     error,
   } = useQuery<Clinic[], Error>({
-    queryKey: ['publicClinics'],
-    queryFn: getPublicClinics,
+    queryKey: ['publicClinicsByService', serviceId],
+    queryFn: () => getPublicClinicsByService(serviceId),
+    enabled: !!serviceId,
   });
 
   const filteredClinics = useMemo(() => {
@@ -48,7 +52,7 @@ export default function ClinicSelectionScreen() {
   }, [clinics, searchQuery]);
 
   const handleSelectClinic = (clinicId: string) => {
-    navigation.navigate('ServiceSelection', { clinicId });
+    navigation.navigate('DateTimeSelection', { serviceId, clinicId });
   };
 
   if (isLoading) {
@@ -73,7 +77,7 @@ export default function ClinicSelectionScreen() {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <Text style={styles.title}>Select a Clinic</Text>
-        <Text style={styles.subtitle}>Step 1 of 4</Text>
+        <Text style={styles.subtitle}>Step 2 of 4</Text>
       </View>
 
       <View style={styles.searchContainer}>
@@ -108,7 +112,7 @@ export default function ClinicSelectionScreen() {
         )}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No clinics found.</Text>
+            <Text style={styles.emptyText}>No clinics found offering this service.</Text>
           </View>
         }
       />

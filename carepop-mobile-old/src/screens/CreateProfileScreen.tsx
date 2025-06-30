@@ -2,17 +2,17 @@ import React from 'react';
 import { View, Text, SafeAreaView, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button } from '../src/components/button.native';
-import { theme } from '../src/components/theme';
-import { Input } from '../src/components/text-input.native'; // Assuming a reusable Input component
+import { Button } from '../components/button.native';
+import { theme } from '../components/theme';
+import { Input } from '../components/text-input.native'; // Assuming a reusable Input component
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { profileSchema, type ProfileFormValues } from '../src/lib/validation/profile';
-import { useAuth } from '../src/context/AuthContext';
-import { updateMyProfile } from '../src/services/api';
-import type { UpdateProfilePayload } from '../src/lib/types';
+import { profileSchema, type ProfileFormValues } from '../lib/validation/profile';
+import { useAuth } from '../context/AuthContext';
+import { updateMyProfile } from '../services/api';
+import type { UpdateProfilePayload } from '../lib/types';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../src/navigation/AppNavigator';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 
 // Import location data
 import provinceJson from '../src/data/psgc/provinces.json';

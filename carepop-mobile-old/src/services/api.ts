@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { supabase } from "../lib/supabase"; // Import the singleton client
+import { supabase } from "../lib/supabaseClient"; // FIX 1: Correct the import path
 import type {
   Clinic,
   DetailedAppointment,
@@ -7,11 +7,12 @@ import type {
   NewAppointment,
   Profile,
   Service,
-  UpdateProfilePayload,
+  UpdateProfileApiPayload,
   AvailabilitySlot,
   ServiceWithCategory,
 } from "../lib/types";
 import type { RegisterFormValues, LoginFormValues } from '../lib/validation/auth';
+import { keysToCamel, keysToSnake } from "../lib/utils/data-transformation";
 
 export type ServiceCategory = {
   id: string;
@@ -127,21 +128,57 @@ export const getMyAppointments = async (): Promise<DetailedAppointment[]> => {
 };
 
 /**
+ * A helper function to get authorization headers.
+ * @param supabase The Supabase client instance.
+ * @returns A promise that resolves to the headers object.
+ */
+async function getAuthHeaders(supabase: SupabaseClient) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+      throw new Error("User not authenticated");
+  }
+  return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
+  };
+}
+
+/**
  * Updates the profile for the currently authenticated user.
- * @param payload The partial profile data to update.
+ * @param supabase The Supabase client instance.
+ * @param profileData The partial profile data to update.
  * @returns A promise that resolves to the updated user profile.
  */
-export const updateMyProfile = async (payload: UpdateProfilePayload): Promise<void> => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("User not authenticated");
+export async function updateMyProfile(
+  supabase: SupabaseClient,
+  profileData: UpdateProfileApiPayload,
+): Promise<Profile> {
+  console.log("Service Layer: updateMyProfile called with data:", profileData); // For debugging
 
-  await supabaseCall(
-    supabase
-      .from('profiles')
-      .update(payload)
-      .eq('id', user.id)
-  );
-};
+  const headers = await getAuthHeaders(supabase);
+  const response = await fetch(`${API_URL}/api/me/profile`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(profileData), // The payload is already in the correct format
+  });
+
+  if (!response.ok) {
+    // Try to parse a JSON error from the backend, otherwise throw a generic error
+    try {
+        const errorBody = await response.json();
+        const message = errorBody.error || errorBody.message || `API Error: ${response.status}`;
+        throw new Error(message);
+    } catch (e) {
+        if (e instanceof Error) {
+            throw e; // Rethrow the more specific error
+        }
+        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    }
+  }
+
+  const data = await response.json();
+  return keysToCamel(data); // Ensure consistency with frontend
+}
 
 /**
  * Retrieves the medical records for the currently authenticated user.
@@ -307,22 +344,20 @@ export const getMyProfile = async (): Promise<Profile | null> => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("User not authenticated");
 
-  const { data, error } = await supabase
+  const { data: profile, error } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
     .single();
 
   if (error) {
-    // This function has custom error handling to allow for a non-existent profile,
-    // which is a valid state. Therefore, it does not use the `supabaseCall` helper.
-    if (error.code === 'PGRST116') { // PGRST116 is the code for "Not Found"
+    if (error.code === 'PGRST116') {
       return null;
     }
     throw new Error(error.message);
   }
 
-  return data;
+  return profile ? keysToCamel(profile) : null;
 };
 
 export const getAppointmentById = async (id: string): Promise<DetailedAppointment | null> => {

@@ -18,17 +18,18 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Eye, EyeOff, AlertCircle, Mail, Check, Circle } from 'lucide-react-native';
 import { AntDesign } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
 
-import { signUpWithEmail } from '../src/services/api';
-import { registerSchema, type RegisterFormValues } from '../src/lib/validation/auth';
+import { signUpWithEmail } from '../services/api';
+import { registerSchema, type RegisterFormValues } from '../lib/validation/auth';
 import {
   Button,
   Input,
   Checkbox,
   theme,
-} from '../src/components';
-import type { AuthStackParamList } from '../src/navigation/AppNavigator';
-import { useAuth } from '../src/context/AuthContext';
+} from '../components';
+import type { AuthStackParamList } from '../navigation/AuthNavigator';
+import { supabase } from '../utils/supabase';
 
 type RegisterScreenNavigationProp = NativeStackNavigationProp<
   AuthStackParamList,
@@ -83,7 +84,6 @@ const usePasswordStrength = (password: string) => {
 
 export const RegisterScreen: React.FC = () => {
   const navigation = useNavigation<RegisterScreenNavigationProp>();
-  const { signInWithGoogle } = useAuth();
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   
   const { control, handleSubmit, watch, formState: { errors } } = useForm<RegisterFormValues>({
@@ -108,9 +108,23 @@ export const RegisterScreen: React.FC = () => {
   const handleGoogleSignIn = async () => {
     setIsSigningInWithGoogle(true);
     try {
-      await signInWithGoogle();
-      // The auth listener in AuthContext will handle navigation.
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: 'exp://192.168.1.10:8081', 
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.url) {
+        const result = await WebBrowser.openAuthSessionAsync(data.url, null);
+        if (result.type === 'success') {
+          // The auth listener in AuthContext will handle navigation once the session is established.
+        }
+      }
     } catch (error) {
+      console.error('Google Sign-In Error:', error);
       Alert.alert('Google Sign-In Error', 'An unexpected error occurred. Please try again.');
     } finally {
       setIsSigningInWithGoogle(false);
@@ -132,7 +146,7 @@ export const RegisterScreen: React.FC = () => {
       >
         <View style={styles.header}>
         <Image
-          source={require('../assets/carepop-logo-pink.png')}
+          source={require('../../assets/carepop-logo-pink.png')}
           style={styles.logo}
         />
             <Text style={styles.title}>Create an Account</Text>

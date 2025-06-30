@@ -7,7 +7,7 @@ export default function PrivacyPolicyPage() {
         <h1 className="text-4xl font-bold text-center text-gray-900">Privacy Policy</h1>
       </header>
       <main className="prose prose-lg max-w-none prose-headings:text-gray-800 prose-p:text-gray-700 prose-li:text-gray-700 prose-strong:text-gray-800 prose-a:text-blue-600 hover:prose-a:text-blue-700">
-        <h3 className="text-xl font-semibold mt-4 mb-2 text-gray-700">Effective Date: [Date]</h3>
+        <h3 className="text-xl font-semibold mt-4 mb-2 text-gray-700">Effective Date: June 30, 2025</h3>
 
         <h2 className="text-2xl font-semibold mt-6 mb-3 text-gray-800">1. Our Commitment to Your Privacy</h2>
         <p className="mb-4 text-gray-700 leading-relaxed">The Family Planning Organization of the Philippines (FPOP) (&quot;We&quot;, &quot;Us&quot;, &quot;Our&quot;) is deeply committed to protecting the privacy, confidentiality, and security of your personal information and sensitive personal information. This Privacy Policy outlines how we collect, use, process, share, secure, and retain your data when you use the CarePoP/QueerCare Platform (the &quot;Platform&quot;), which includes our native mobile application (`carepop-nativeapp` for iOS and Android) and our web application (`carepop-web`) (collectively, the &quot;Services&quot;).</p>

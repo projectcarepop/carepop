@@ -17,14 +17,14 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Mail, ArrowLeft } from 'lucide-react-native';
 
-import { forgotPassword } from '../src/services/api';
-import { forgotPasswordSchema, type ForgotPasswordFormValues } from '../src/lib/validation/auth';
+import { forgotPassword } from '../services/api';
+import { forgotPasswordSchema, type ForgotPasswordFormValues } from '../lib/validation/auth';
 import {
   Button,
   Input,
   theme,
-} from '../src/components';
-import type { AuthStackParamList } from '../src/navigation/AppNavigator';
+} from '../components';
+import type { AuthStackParamList } from '../navigation/AuthNavigator';
 
 type ForgotPasswordScreenNavigationProp = NativeStackNavigationProp<
   AuthStackParamList,
@@ -73,7 +73,7 @@ export const ForgotPasswordScreen: React.FC = () => {
       >
         <View style={styles.header}>
             <Image
-              source={require('../assets/carepop-logo-pink.png')}
+              source={require('../../assets/carepop-logo-pink.png')}
               style={styles.logo}
             />
             <Text style={styles.title}>Reset Password</Text>

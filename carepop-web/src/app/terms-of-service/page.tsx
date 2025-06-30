@@ -7,7 +7,7 @@ export default function TermsOfServicePage() {
         <h1 className="text-4xl font-bold text-center text-gray-900">Terms of Service</h1>
       </header>
       <main className="prose prose-lg max-w-none prose-headings:text-gray-800 prose-p:text-gray-700 prose-li:text-gray-700 prose-strong:text-gray-800 prose-a:text-blue-600 hover:prose-a:text-blue-700">
-        <h3 className="text-xl font-semibold mt-4 mb-2 text-gray-700">Effective Date: [Date]</h3>
+        <h3 className="text-xl font-semibold mt-4 mb-2 text-gray-700">Effective Date: June 30, 2025</h3>
         
         <h2 className="text-2xl font-semibold mt-6 mb-3 text-gray-800">1. Introduction &amp; Acceptance of Terms</h2>
         <p className="mb-4 text-gray-700 leading-relaxed">Welcome to CarePoP/QueerCare (the &quot;Platform&quot;), operated in partnership with the Family Planning Organization of the Philippines (FPOP) (&quot;We&quot;, &quot;Us&quot;, &quot;Our&quot;). The Platform provides access to healthcare information, provider directories, appointment scheduling, personal health tracking tools, and related services (collectively, the &quot;Services&quot;) via our native mobile application (`carepop-nativeapp` for iOS and Android) and our web application (`carepop-web` accessible via web browsers).</p>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import {
   StyleSheet,
   Text,
@@ -16,10 +16,12 @@ import { format, parseISO } from 'date-fns';
 import { Calendar, Clock, MapPin, Stethoscope } from 'lucide-react-native';
 
 import { theme } from '../../components/theme';
-import { getPublicClinics, getPublicServices, createAppointment, NewAppointmentPayload } from '../../services/api';
+import { getPublicClinicById, getPublicServiceById, createAppointment, NewAppointmentPayload } from '../../services/api';
 import { BookingStackParamList } from '../../navigation/BookingNavigator';
 import { Card } from '../../components/card.native';
 import { Button } from '../../components/button.native';
+import { AuthContext } from '../../context/AuthContext';
+import { Clinic, ServiceWithCategory } from '../../lib/types';
 
 type ConfirmationRouteProp = RouteProp<BookingStackParamList, 'BookingConfirmation'>;
 type ConfirmationNavigationProp = NativeStackNavigationProp<BookingStackParamList, 'BookingConfirmation'>;
@@ -27,39 +29,32 @@ type ConfirmationNavigationProp = NativeStackNavigationProp<BookingStackParamLis
 export default function BookingConfirmationScreen() {
   const navigation = useNavigation<ConfirmationNavigationProp>();
   const route = useRoute<ConfirmationRouteProp>();
-  const { clinicId, serviceId, appointmentTime } = route.params;
+  const { clinicId, serviceId, dateTime } = route.params;
   const queryClient = useQueryClient();
+  const { user } = useContext(AuthContext);
 
-  // Fetch details for the summary view
-  const { data: clinic, isLoading: isLoadingClinic } = useQuery({
+  // Fetch details for the summary view using efficient queries
+  const { data: clinic, isLoading: isLoadingClinic } = useQuery<Clinic, Error>({
     queryKey: ['publicClinic', clinicId],
-    queryFn: async () => {
-      const clinics = await getPublicClinics();
-      return clinics.find(c => c.id === clinicId);
-    },
+    queryFn: () => getPublicClinicById(clinicId),
     enabled: !!clinicId,
   });
 
-  const { data: service, isLoading: isLoadingService } = useQuery({
+  const { data: service, isLoading: isLoadingService } = useQuery<ServiceWithCategory, Error>({
     queryKey: ['publicService', serviceId],
-    queryFn: async () => {
-      // We assume service details can be fetched individually or are already cached
-      const services = await getPublicServices(clinicId);
-      return services.find(s => s.id === serviceId);
-    },
-    enabled: !!clinicId && !!serviceId,
+    queryFn: () => getPublicServiceById(serviceId),
+    enabled: !!serviceId,
   });
 
   const { mutate: submitBooking, isPending } = useMutation({
     mutationFn: (payload: NewAppointmentPayload) => createAppointment(payload),
-    onSuccess: () => {
-      Alert.alert("Success!", "Your appointment has been booked.");
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['myAppointments'] }); // Invalidate for dashboard refetch
-      // Reset the navigation stack to the Dashboard
+      // Navigate to the success screen with appointment details
       navigation.dispatch(
         CommonActions.reset({
           index: 0,
-          routes: [{ name: 'Dashboard' }],
+          routes: [{ name: 'BookingSuccess', params: { appointmentDetails: data } }],
         })
       );
     },
@@ -69,7 +64,11 @@ export default function BookingConfirmationScreen() {
   });
 
   const handleConfirmBooking = () => {
-    const payload = { clinicId, serviceId, appointmentTime };
+    if (!user) {
+      Alert.alert("Authentication Error", "You must be logged in to book an appointment.");
+      return;
+    }
+    const payload = { clinicId, serviceId, appointmentTime: dateTime, patientId: user.id };
     submitBooking(payload);
   };
 
@@ -106,8 +105,8 @@ export default function BookingConfirmationScreen() {
           <View style={styles.separator} />
           <SummaryRow icon={Stethoscope} label="Service" value={service?.name} />
           <SummaryRow icon={MapPin} label="Clinic" value={clinic?.name} />
-          <SummaryRow icon={Calendar} label="Date" value={format(parseISO(appointmentTime), 'EEEE, MMMM d, yyyy')} />
-          <SummaryRow icon={Clock} label="Time" value={format(parseISO(appointmentTime), 'h:mm a')} />
+          <SummaryRow icon={Calendar} label="Date" value={format(parseISO(dateTime), 'EEEE, MMMM d, yyyy')} />
+          <SummaryRow icon={Clock} label="Time" value={format(parseISO(dateTime), 'h:mm a')} />
         </Card>
       </ScrollView>
 

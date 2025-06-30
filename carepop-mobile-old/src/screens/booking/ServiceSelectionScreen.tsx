@@ -13,7 +13,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Search, ChevronDown, Check } from 'lucide-react-native';
-import * as Popover from 'react-native-popover-view';
+import Popover from 'react-native-popover-view';
 
 import { theme } from '../../components/theme';
 import { getPublicServices, getPublicServiceCategories } from '../../services/api';
@@ -26,22 +26,23 @@ type ServiceSelectionNavigationProp = NativeStackNavigationProp<BookingStackPara
 
 export default function ServiceSelectionScreen() {
   const navigation = useNavigation<ServiceSelectionNavigationProp>();
-  const route = useRoute<ServiceSelectionRouteProp>();
-  const { clinicId } = route.params;
+  // REMOVED: No longer need route or clinicId at this step
+  // const route = useRoute<ServiceSelectionRouteProp>();
+  // const { clinicId } = route.params;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
 
-  // Fetch services for the selected clinic
+  // Fetch ALL public services, not filtered by clinic
   const {
     data: services,
     isLoading: isLoadingServices,
     isError: isErrorServices,
     error: errorServices,
   } = useQuery<ServiceWithCategory[], Error>({
-    queryKey: ['publicServices', clinicId],
-    queryFn: () => getPublicServices(clinicId),
-    enabled: !!clinicId,
+    queryKey: ['publicServices'], // Query key is no longer dependent on clinicId
+    queryFn: () => getPublicServices(), // Fetch all services
   });
 
   // Fetch all service categories for the filter dropdown
@@ -66,7 +67,8 @@ export default function ServiceSelectionScreen() {
   }, [services, searchQuery, selectedCategoryId]);
   
   const handleSelectService = (serviceId: string) => {
-    navigation.navigate('DateTimeSelection', { clinicId, serviceId });
+    // CORRECTED: Navigate to ClinicSelection, passing the chosen serviceId
+    navigation.navigate('ClinicSelection', { serviceId });
   };
 
   const renderLoading = () => (
@@ -95,7 +97,7 @@ export default function ServiceSelectionScreen() {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <Text style={styles.title}>Select a Service</Text>
-        <Text style={styles.subtitle}>Step 2 of 4</Text>
+        <Text style={styles.subtitle}>Step 1 of 4</Text>
       </View>
 
       <View style={styles.filtersContainer}>
@@ -112,29 +114,29 @@ export default function ServiceSelectionScreen() {
         </View>
 
         {/* Category Popover Select */}
-        <Popover.Root>
-          <Popover.Trigger>
-            <View style={[styles.inputContainer, { flex: 1.5 }]}>
+        <Popover
+          isVisible={showCategoryPicker}
+          onRequestClose={() => setShowCategoryPicker(false)}
+          from={(
+            <TouchableOpacity onPress={() => setShowCategoryPicker(true)} style={[styles.inputContainer, { flex: 1.5 }]}>
               <Text style={styles.popoverTriggerText} numberOfLines={1}>
                 {allCategories.find(c => c.id === selectedCategoryId)?.name}
               </Text>
               <ChevronDown color={theme.colors.mutedForeground} size={20} />
-            </View>
-          </Popover.Trigger>
-          <Popover.Content>
-            <Popover.Arrow style={{ backgroundColor: theme.colors.card }} />
-            <View style={styles.popoverContent}>
-              {allCategories.map(cat => (
-                <TouchableOpacity key={cat.id} onPress={() => { setSelectedCategoryId(cat.id); Popover.dismiss(); }}>
-                  <View style={styles.popoverItem}>
-                    <Text style={styles.popoverItemText}>{cat.name}</Text>
-                    {selectedCategoryId === cat.id && <Check color={theme.colors.primary} size={16} />}
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </Popover.Content>
-        </Popover.Root>
+            </TouchableOpacity>
+          )}
+        >
+          <View style={styles.popoverContent}>
+            {allCategories.map(cat => (
+              <TouchableOpacity key={cat.id} onPress={() => { setSelectedCategoryId(cat.id); setShowCategoryPicker(false); }}>
+                <View style={styles.popoverItem}>
+                  <Text style={styles.popoverItemText}>{cat.name}</Text>
+                  {selectedCategoryId === cat.id && <Check color={theme.colors.primary} size={16} />}
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Popover>
       </View>
 
       <FlatList
@@ -158,7 +160,7 @@ export default function ServiceSelectionScreen() {
         )}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No services found for this clinic.</Text>
+            <Text style={styles.emptyText}>No services found.</Text>
           </View>
         }
       />

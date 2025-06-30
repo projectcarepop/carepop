@@ -11,7 +11,6 @@
       "resizeMode": "contain",
       "backgroundColor": "#FFFFFF"
     },
-    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.carepop.mobile",
@@ -26,7 +25,7 @@
       },
       "package": "com.carepop.mobile",
       "edgeToEdgeEnabled": true,
-      "supabaseUrl": "https://lpaqfvfuzfqsrciawipu.supabase.co"
+      "supabaseUrl": "https://aylfhhekjdyiisqoevcq.supabase.co"
     },
     "web": {
       "favicon": "./assets/carepop-logo-blue.png"
@@ -38,7 +37,10 @@
     "extra": {
       "eas": {
         "projectId": "42305f69-4bf4-4559-b9d3-500ad85b7a11"
-      }
+      },
+      "EXPO_PUBLIC_SUPABASE_URL": "https://aylfhhekjdyiisqoevcq.supabase.co",
+      "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5bGZoaGVramR5aWlzcW9ldmNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2MTA0NTUsImV4cCI6MjA2NjE4NjQ1NX0.80vlX5kU_vEIFm3IpaI7IIMXWsNNZ3bWe8eZ-54a9rY",
+      "EXPO_PUBLIC_BACKEND_API_URL": "https://carepop-backend-api-92849154218.us-central1.run.app"
     },
     "plugins": [
       "expo-font",

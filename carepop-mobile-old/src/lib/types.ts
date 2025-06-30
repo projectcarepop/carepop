@@ -14,7 +14,7 @@ export type Profile = {
   middleInitial: string | null;
   email: string;
   role: UserRole;
-  birthday: string | null; // Changed from date_of_birth to match form
+  birthday: string | null;
   contactNo: string | null;
   street: string | null;
   provinceCode: string | null;
@@ -27,9 +27,36 @@ export type Profile = {
   genderIdentity: string | null;
   pronouns: string | null;
   assignedSexAtBirth: string | null;
+  avatarUrl: string | null;
   createdAt: string;
   updatedAt: string;
   // ... add other profile fields as needed
+};
+
+export type UpdateProfilePayload = Partial<Omit<Profile, 'id' | 'email' | 'role' | 'createdAt' | 'updatedAt'>>;
+
+/**
+ * The exact payload shape required by the backend API for updating a user profile.
+ * All keys are in snake_case.
+ */
+export type UpdateProfileApiPayload = {
+  first_name?: string | null;
+  last_name?: string | null;
+  middle_initial?: string | null;
+  birthday?: string | null;
+  contact_no?: string | null;
+  street?: string | null;
+  province_code?: string | null;
+  city_municipality_code?: string | null;
+  barangay_code?: string | null;
+  civil_status?: string | null;
+  religion?: string | null;
+  occupation?: string | null;
+  philhealth_no?: string | null;
+  gender_identity?: string | null;
+  pronouns?: string | null;
+  assigned_sex_at_birth?: string | null;
+  avatar_url?: string | null;
 };
 
 export type Clinic = {
@@ -89,7 +116,15 @@ export type NewAppointment = {
 
 
 // More specific types for API payloads and rich client-side objects
-export type UpdateProfilePayload = Partial<Omit<Profile, "id" | "email" | "role" | "createdAt" | "updatedAt">>;
+export type AppointmentWithRelations = Appointment & {
+  clinic: Pick<Clinic, 'id' | 'name' | 'address'>;
+  service: Pick<Service, 'id' | 'name' | 'price' | 'durationMinutes'>;
+};
+
+// This is the shape returned by the getMyMedicalRecords API call now
+export type MedicalRecordWithRelations = MedicalRecord & {
+  appointments: AppointmentWithRelations;
+};
 
 export type DetailedAppointment = Appointment & {
   doctor: Pick<Doctor, 'id' | 'fullName' | 'specialtyText'>;

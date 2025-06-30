@@ -296,18 +296,41 @@ meRoutes.put(
   async (c) => {
     try {
       const user = c.get('user');
-      const validatedProfileData = c.req.valid('json');
+      const validatedCamelCaseData = c.req.valid('json');
 
       // --- LOG #1: What is the backend receiving? ---
       console.log(`[BACKEND] PUT /profile request for user ID: ${user.id}`);
-      console.log("[BACKEND] Received validated data:", validatedProfileData);
+      console.log("[BACKEND] Received validated camelCase data:", validatedCamelCaseData);
       
+      // --- CRITICAL TRANSFORMATION STEP ---
+      const payloadForDb = {
+        firstName: validatedCamelCaseData.firstName,
+        lastName: validatedCamelCaseData.lastName,
+        middleInitial: validatedCamelCaseData.middleInitial,
+        contactNo: validatedCamelCaseData.contactNo,
+        birthday: validatedCamelCaseData.birthday,
+        genderIdentity: validatedCamelCaseData.genderIdentity,
+        pronouns: validatedCamelCaseData.pronouns,
+        civilStatus: validatedCamelCaseData.civilStatus,
+        assignedSexAtBirth: validatedCamelCaseData.assignedSexAtBirth,
+        religion: validatedCamelCaseData.religion,
+        occupation: validatedCamelCaseData.occupation,
+        philhealthNo: validatedCamelCaseData.philhealthNo,
+        street: validatedCamelCaseData.street,
+        provinceCode: validatedCamelCaseData.provinceCode,
+        cityMunicipalityCode: validatedCamelCaseData.cityMunicipalityCode,
+        barangayCode: validatedCamelCaseData.barangayCode,
+        avatarUrl: validatedCamelCaseData.avatarUrl,
+        updatedAt: new Date(),
+      };
+      console.log("[BACKEND] Transformed to snake_case for DB:", payloadForDb);
+
       // --- LOG #2: The Drizzle Query ---
       console.log(`[BACKEND] Executing Drizzle update for profiles.id = ${user.id}`);
       
       const [updatedProfile] = await db
         .update(profiles)
-        .set(validatedProfileData)
+        .set(payloadForDb) // Use the transformed snake_case payload here
         .where(eq(profiles.id, user.id))
         .returning();
 

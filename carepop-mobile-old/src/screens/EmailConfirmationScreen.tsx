@@ -1,11 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Button } from '../src/components/button.native';
-import { theme } from '../src/components/theme';
+import { Button } from '../components/button.native';
+import { theme } from '../components/theme';
 import { MailCheck } from 'lucide-react-native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { AuthStackParamList } from '../src/navigation/AppNavigator';
+import type { AuthStackParamList } from '../navigation/AuthNavigator';
 
 type EmailConfirmationNavigationProp = NativeStackNavigationProp<AuthStackParamList>;
 

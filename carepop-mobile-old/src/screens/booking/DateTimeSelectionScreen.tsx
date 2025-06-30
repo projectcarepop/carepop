@@ -15,8 +15,9 @@ import { Calendar, CalendarProps } from 'react-native-calendars';
 import { format, parseISO } from 'date-fns';
 
 import { theme } from '../../components/theme';
-import { getPublicAvailableDates, getPublicAvailability } from '../../services/api';
+import { getPublicSlots } from '../../services/api';
 import { BookingStackParamList } from '../../navigation/BookingNavigator';
+import { AvailabilitySlot } from '../../lib/types';
 
 type DateTimeSelectionRouteProp = RouteProp<BookingStackParamList, 'DateTimeSelection'>;
 type DateTimeSelectionNavigationProp = NativeStackNavigationProp<BookingStackParamList, 'DateTimeSelection'>;
@@ -29,22 +30,31 @@ export default function DateTimeSelectionScreen() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null); // YYYY-MM-DD
 
   const {
-    data: availableDates,
-    isLoading: isLoadingDates,
-  } = useQuery<string[], Error>({
-    queryKey: ['availableDates', clinicId, serviceId],
-    queryFn: () => getPublicAvailableDates({ clinicId, serviceId }),
+    data: availabilityByDoctor,
+    isLoading,
+    isError,
+    error,
+  } = useQuery<AvailabilitySlot[], Error>({
+    queryKey: ['publicSlots', clinicId, serviceId],
+    queryFn: () => getPublicSlots({ clinicId, serviceId }),
     enabled: !!clinicId && !!serviceId,
   });
 
-  const {
-    data: availableSlots,
-    isLoading: isLoadingSlots,
-  } = useQuery<string[], Error>({
-    queryKey: ['availability', clinicId, serviceId, selectedDate],
-    queryFn: () => getPublicAvailability({ clinicId, serviceId, date: selectedDate! }),
-    enabled: !!selectedDate,
-  });
+  const { availableDates, slotsForSelectedDate } = useMemo(() => {
+    if (!availabilityByDoctor) return { availableDates: [], slotsForSelectedDate: [] };
+
+    const allSlots = availabilityByDoctor.flatMap(doc => doc.slots);
+    
+    const uniqueDates = [...new Set(allSlots.map(slot => slot.split('T')[0]))];
+    
+    const slots = selectedDate
+      ? allSlots.filter(slot => slot.startsWith(selectedDate))
+      : [];
+
+    slots.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+
+    return { availableDates: uniqueDates, slotsForSelectedDate: slots };
+  }, [availabilityByDoctor, selectedDate]);
 
   const markedDates = useMemo(() => {
     const marks: CalendarProps['markedDates'] = {};
@@ -61,18 +71,18 @@ export default function DateTimeSelectionScreen() {
     return marks;
   }, [availableDates, selectedDate]);
 
-  const handleSelectTime = (time: string) => {
-    navigation.navigate('BookingConfirmation', { clinicId, serviceId, appointmentTime: time });
+  const handleSelectTime = (dateTime: string) => {
+    navigation.navigate('BookingConfirmation', { clinicId, serviceId, dateTime });
   };
 
   const renderTimeSlots = () => (
     <View style={styles.timeContainer}>
       <Text style={styles.timeTitle}>Select a Time</Text>
-      {isLoadingSlots ? (
+      {isLoading ? (
         <ActivityIndicator color={theme.colors.primary} />
       ) : (
         <View style={styles.slotsGrid}>
-          {availableSlots?.map(slot => (
+          {slotsForSelectedDate.map(slot => (
             <TouchableOpacity key={slot} style={styles.slotButton} onPress={() => handleSelectTime(slot)}>
               <Text style={styles.slotText}>{format(parseISO(slot), 'h:mm a')}</Text>
             </TouchableOpacity>
@@ -96,7 +106,7 @@ export default function DateTimeSelectionScreen() {
         {selectedDate ? (
           renderTimeSlots()
         ) : (
-          isLoadingDates ? (
+          isLoading ? (
             <ActivityIndicator size="large" color={theme.colors.primary} />
           ) : (
             <Calendar

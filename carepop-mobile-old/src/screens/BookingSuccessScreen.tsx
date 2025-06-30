@@ -1,68 +1,61 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity } from 'react-native';
-import { theme } from '../components';
-import { useNavigation, NavigationProp, CommonActions } from '@react-navigation/native';
-import { BookingStackParamList, DrawerParamList } from '../navigation/AppNavigator';
-import { Ionicons } from '@expo/vector-icons';
-import { DrawerActions } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, CommonActions } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { CheckCircle2 } from 'lucide-react-native';
 
-type BookingSuccessNavigationProp = NavigationProp<BookingStackParamList, 'BookingSuccess'>;
+import { theme } from '../components/theme';
+import { BookingStackParamList } from '../navigation/BookingNavigator';
+import { Button } from '../components/button.native';
+
+type BookingSuccessRouteProp = RouteProp<BookingStackParamList, 'BookingSuccess'>;
+type BookingSuccessNavigationProp = NativeStackNavigationProp<BookingStackParamList, 'BookingSuccess'>;
 
 export const BookingSuccessScreen = () => {
     const navigation = useNavigation<BookingSuccessNavigationProp>();
+    const route = useRoute<BookingSuccessRouteProp>();
+    
+    // Appointment details are available here if needed for display
+    const { appointmentDetails } = route.params;
 
     const handleViewAppointments = () => {
-        // This action first navigates to the root 'Dashboard' screen in the drawer, then opens the 'Appointments' screen.
-        navigation.dispatch(
-            CommonActions.navigate({
-                name: 'Dashboard', 
-                params: {
-                    screen: 'Appointments', // This is a screen within the Drawer
-                },
-            })
-        );
-        // Then, ensure the drawer is closed if it was open.
-        navigation.dispatch(DrawerActions.closeDrawer());
+        // Navigate to the main App navigator, then to the appointments screen.
+        navigation.getParent()?.navigate('App', { screen: 'Appointments' });
     };
 
     const handleBookAnother = () => {
-        // This resets the booking stack to the beginning for a fresh start.
+        // Reset the booking stack to the beginning (ServiceSelection).
         navigation.dispatch(
             CommonActions.reset({
                 index: 0,
-                routes: [{ name: 'ClinicSelection' }],
+                routes: [{ name: 'ServiceSelection' }],
             })
         );
     };
 
     const handleGoHome = () => {
-        // A simple action to go back to the main dashboard screen.
-        navigation.dispatch(
-             CommonActions.navigate({ name: 'Dashboard' })
-        );
-         navigation.dispatch(DrawerActions.closeDrawer());
+        // Navigate to the root of the parent navigator (the App Drawer).
+        navigation.getParent()?.navigate('App', { screen: 'Dashboard' });
     };
 
     return (
         <SafeAreaView style={styles.safeArea}>
             <View style={styles.container}>
                 <View style={styles.iconContainer}>
-                     <Ionicons name="checkmark-done-circle" size={120} color={theme.colors.success} />
+                     <CheckCircle2 size={100} color={theme.colors.success} strokeWidth={1.5} />
                 </View>
                 <Text style={styles.header}>Booking Confirmed!</Text>
                 <Text style={styles.subHeader}>
-                    You will receive a confirmation and reminder via email.
+                    You will receive a confirmation and reminder via email. Your appointment details are saved in your account.
                 </Text>
 
                 <View style={styles.buttonContainer}>
-                    <TouchableOpacity style={styles.primaryButton} onPress={handleViewAppointments}>
-                        <Ionicons name="calendar-outline" size={20} color={theme.colors.primaryForeground} style={styles.buttonIcon} />
-                        <Text style={styles.primaryButtonText}>View My Appointments</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.secondaryButton} onPress={handleBookAnother}>
-                         <Ionicons name="add-circle-outline" size={20} color={theme.colors.primary} style={styles.buttonIcon} />
-                        <Text style={styles.secondaryButtonText}>Book Another Service</Text>
-                    </TouchableOpacity>
+                    <Button onPress={handleViewAppointments}>
+                        View My Appointments
+                    </Button>
+                    <Button onPress={handleBookAnother} variant="outline" style={{ marginTop: theme.spacing.md }}>
+                        Book Another Service
+                    </Button>
                      <TouchableOpacity style={styles.tertiaryButton} onPress={handleGoHome}>
                         <Text style={styles.tertiaryButtonText}>Go to Dashboard</Text>
                     </TouchableOpacity>
@@ -82,13 +75,9 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         padding: theme.spacing.lg,
-        paddingBottom: theme.spacing.xl, // Extra space at bottom
     },
     iconContainer: {
         marginBottom: theme.spacing.lg,
-        backgroundColor: 'rgba(34, 197, 94, 0.1)',
-        borderRadius: theme.radius.full,
-        padding: theme.spacing.md,
     },
     header: {
         ...theme.typography.h1,
@@ -99,47 +88,16 @@ const styles = StyleSheet.create({
         ...theme.typography.body,
         color: theme.colors.mutedForeground,
         textAlign: 'center',
-        marginBottom: theme.spacing.xl * 2, // Large space before buttons
+        marginBottom: theme.spacing.xl * 2,
+        paddingHorizontal: theme.spacing.lg,
     },
     buttonContainer: {
         width: '100%',
-        alignItems: 'center',
-    },
-    primaryButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: theme.colors.primary,
-        paddingVertical: theme.spacing.md,
         paddingHorizontal: theme.spacing.lg,
-        borderRadius: theme.radius.md,
-        width: '100%',
-        marginBottom: theme.spacing.md,
-    },
-    primaryButtonText: {
-        color: theme.colors.primaryForeground,
-        ...theme.typography.h4,
-        fontFamily: theme.typography.fontFamilyBold,
-    },
-    secondaryButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'transparent',
-        paddingVertical: theme.spacing.md,
-        paddingHorizontal: theme.spacing.lg,
-        borderRadius: theme.radius.md,
-        borderWidth: 1,
-        borderColor: theme.colors.primary,
-        width: '100%',
-    },
-    secondaryButtonText: {
-        color: theme.colors.primary,
-        ...theme.typography.h4,
-        fontFamily: theme.typography.fontFamilyBold,
     },
     tertiaryButton: {
-        marginTop: theme.spacing.sm,
+        marginTop: theme.spacing.xl,
+        alignSelf: 'center',
     },
     tertiaryButtonText: {
         color: theme.colors.mutedForeground,
@@ -147,7 +105,4 @@ const styles = StyleSheet.create({
         fontFamily: theme.typography.fontFamilyMedium,
         textDecorationLine: 'underline',
     },
-    buttonIcon: {
-        marginRight: theme.spacing.sm,
-    }
 }); 

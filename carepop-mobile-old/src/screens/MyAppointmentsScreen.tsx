@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -10,55 +10,46 @@ import {
   RefreshControl,
 } from 'react-native';
 import {
-  Card,
   CardHeader,
   CardTitle,
   CardContent,
   Button,
   theme,
 } from '../components';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TabView, SceneMap, TabBar } from 'react-native-tab-view';
-import { useNavigation, CommonActions, DrawerActions } from '@react-navigation/native';
+import { useNavigation, NavigatorScreenParams } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Menu, Calendar, Clock, MapPin, AlertCircle } from 'lucide-react-native';
-import type { AppointmentsStackParamList } from '../navigation/AppNavigator';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
+import { Calendar, Clock, MapPin, AlertCircle } from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { getMyAppointments } from '../services/api';
 import type { DetailedAppointment } from '../lib/types';
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../utils/supabase';
+import type { BookingStackParamList } from '../navigation/BookingNavigator';
+
+// Widen the type to include the sibling navigator
+export type AppointmentsStackParamList = {
+  MyAppointments: undefined;
+  AppointmentDetail: { appointmentId: string };
+  Booking: NavigatorScreenParams<BookingStackParamList>;
+};
 
 type AppointmentsNavigationProp = NativeStackNavigationProp<AppointmentsStackParamList, 'MyAppointments'>;
 
 const StatusIndicator = ({ status }: { status: string }) => {
-  const statusConfig = {
-    confirmed: {
-      color: theme.colors.success,
-      text: 'Confirmed',
-    },
-    completed: {
-      color: theme.colors.primary,
-      text: 'Completed',
-    },
-    cancelled: {
-      color: theme.colors.destructive,
-      text: 'Cancelled',
-    },
-    'pending_payment': {
-        color: theme.colors.accent,
-        text: 'Pending Payment'
-    },
-    'no-show': {
-        color: theme.colors.mutedForeground,
-        text: 'No Show'
-    },
-    default: {
-      color: theme.colors.mutedForeground,
-      text: status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' '),
-    },
+  const statusConfig = useMemo(() => ({
+    CONFIRMED: { color: theme.colors.success, text: 'Confirmed' },
+    COMPLETED: { color: theme.colors.primary, text: 'Completed' },
+    CANCELLED: { color: theme.colors.destructive, text: 'Cancelled' },
+    PENDING: { color: theme.colors.accent, text: 'Pending' },
+    'NO-SHOW': { color: theme.colors.mutedForeground, text: 'No Show' },
+  }), []);
+
+  const config = statusConfig[status.toUpperCase() as keyof typeof statusConfig] || {
+    color: theme.colors.mutedForeground,
+    text: status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' '),
   };
-  const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.default;
 
   return (
     <View style={styles.statusContainer}>
@@ -67,8 +58,10 @@ const StatusIndicator = ({ status }: { status: string }) => {
     </View>
   );
 };
+StatusIndicator.displayName = 'StatusIndicator';
 
-const AppointmentCard: React.FC<{ item: DetailedAppointment; onPress: () => void }> = ({
+
+const AppointmentCard: React.FC<{ item: DetailedAppointment; onPress: () => void }> = React.memo(({
   item,
   onPress,
 }) => (
@@ -95,32 +88,33 @@ const AppointmentCard: React.FC<{ item: DetailedAppointment; onPress: () => void
       </CardContent>
     </View>
   </TouchableOpacity>
-);
+));
+
+AppointmentCard.displayName = 'AppointmentCard';
 
 const EmptyState = ({ onBook }: { onBook: () => void }) => (
   <View style={styles.emptyContainer}>
     <AlertCircle size={48} color={theme.colors.mutedForeground} />
-    <Text style={styles.emptyText}>No appointments here</Text>
+    <Text style={styles.emptyText}>No appointments found.</Text>
     <Text style={styles.emptySubText}>
-      Your upcoming appointments will be shown here.
+      When you book appointments, they will appear here.
     </Text>
-    <Button title="Book a Service" onPress={onBook} style={{ marginTop: theme.spacing.lg }} />
+    <Button title="Book New Appointment" onPress={onBook} style={{ marginTop: theme.spacing.lg }} />
   </View>
 );
-
-// --- Tab Views ---
+EmptyState.displayName = 'EmptyState';
 
 const AppointmentsList: React.FC<{
   appointments: DetailedAppointment[];
-  isLoading: boolean;
   onRefresh: () => void;
   refreshing: boolean;
-  navigation: AppointmentsNavigationProp;
-}> = ({ appointments, isLoading, onRefresh, refreshing, navigation }) => {
-  if (isLoading && !refreshing) {
-    return <ActivityIndicator style={{ marginTop: 40 }} size="large" color={theme.colors.primary} />;
-  }
+}> = ({ appointments, onRefresh, refreshing }) => {
+  const navigation = useNavigation<AppointmentsNavigationProp>();
 
+  const handleBookPress = () => {
+    navigation.navigate('Booking', { screen: 'ServiceSelection' });
+  };
+  
   return (
     <FlatList
       data={appointments}
@@ -132,30 +126,16 @@ const AppointmentsList: React.FC<{
       )}
       keyExtractor={(item) => item.id.toString()}
       contentContainerStyle={styles.listContainer}
-      ListEmptyComponent={
-        <EmptyState
-          onBook={() =>
-            navigation.dispatch(
-              CommonActions.navigate({
-                name: 'App',
-                params: {
-                  screen: 'Book a Service',
-                },
-              })
-            )
-          }
-        />
-      }
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      ListEmptyComponent={<EmptyState onBook={handleBookPress} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} tintColor={theme.colors.primary} />}
     />
   );
 };
-
-// --- Main Screen Component ---
+AppointmentsList.displayName = "AppointmentsList"
 
 export const MyAppointmentsScreen: React.FC = () => {
   const layout = useWindowDimensions();
-  const insets = useSafeAreaInsets();
+  const { authStatus } = useAuth(); // We only need the status to enable/disable the query
   const navigation = useNavigation<AppointmentsNavigationProp>();
 
   const [index, setIndex] = useState(0);
@@ -165,8 +145,14 @@ export const MyAppointmentsScreen: React.FC = () => {
   ]);
 
   const { data: allAppointments, isLoading, isError, error, refetch, isRefetching } = useQuery({
-      queryKey: ['myAppointments'],
-      queryFn: getMyAppointments
+      // The query is dependent on the user being authenticated.
+      queryKey: ['myAppointments', authStatus],
+      queryFn: () => {
+        // Pass the singleton client directly to the service function.
+        return getMyAppointments(supabase);
+      },
+      // Only run the query if the user is fully authenticated.
+      enabled: authStatus === 'authenticated',
   });
 
   const { upcomingAppointments, pastAppointments } = useMemo(() => {
@@ -176,30 +162,42 @@ export const MyAppointmentsScreen: React.FC = () => {
     const now = new Date();
     const upcoming = allAppointments.filter(appt => new Date(appt.appointmentTime) >= now);
     const past = allAppointments.filter(appt => new Date(appt.appointmentTime) < now);
-    return { upcomingAppointments: upcoming, pastAppointments: past };
+    return { 
+      upcomingAppointments: upcoming.sort((a, b) => new Date(a.appointmentTime).getTime() - new Date(b.appointmentTime).getTime()),
+      pastAppointments: past.sort((a, b) => new Date(b.appointmentTime).getTime() - new Date(a.appointmentTime).getTime()),
+    };
   }, [allAppointments]);
 
-  // Animation
-  const opacity = useSharedValue(0);
-  const translateY = useSharedValue(20);
+  const renderScene = useMemo(() => SceneMap({
+    upcoming: () => <AppointmentsList appointments={upcomingAppointments} onRefresh={refetch} refreshing={isRefetching} />,
+    past: () => <AppointmentsList appointments={pastAppointments} onRefresh={refetch} refreshing={isRefetching} />,
+  }), [upcomingAppointments, pastAppointments, refetch, isRefetching]);
 
-  useEffect(() => {
-    const a = setTimeout(() => {
-      opacity.value = withTiming(1, { duration: 500, easing: Easing.out(Easing.cubic) });
-      translateY.value = withTiming(0, { duration: 500, easing: Easing.out(Easing.cubic) });
-    }, 100); // Small delay to ensure layout is ready
-    return () => clearTimeout(a);
-  }, [opacity, translateY]);
+  const renderTabBar = (props: any) => (
+    <TabBar
+      {...props}
+      indicatorStyle={{ backgroundColor: theme.colors.primary, height: 2.5 }}
+      style={styles.tabBar}
+      labelStyle={styles.tabBarLabel}
+      activeColor={theme.colors.primary}
+      inactiveColor={theme.colors.mutedForeground}
+    />
+  );
 
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      opacity: opacity.value,
-      transform: [{ translateY: translateY.value }],
-      flex: 1,
-    };
-  });
+  React.useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Button 
+          title="Book New" 
+          onPress={() => navigation.navigate('Booking', { screen: 'ServiceSelection' })}
+          variant="ghost"
+          size="sm"
+        />
+      ),
+    });
+  }, [navigation]);
 
-  if (isLoading) {
+  if (isLoading && !isRefetching) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -209,122 +207,103 @@ export const MyAppointmentsScreen: React.FC = () => {
 
   if (isError) {
     return (
-      <View style={styles.container}>
-        <View style={styles.errorContainer}>
-          <AlertCircle size={48} color={theme.colors.destructive} />
-          <Text style={styles.errorText}>
-            Could not load appointments.
-          </Text>
-          <Text style={styles.errorSubText}>
-            {error?.message || 'An unexpected error occurred.'}
-          </Text>
-          <Button title="Retry" onPress={() => refetch()} style={{ marginTop: theme.spacing.lg }} />
-        </View>
+      <View style={styles.errorContainer}>
+        <AlertCircle size={48} color={theme.colors.destructive} />
+        <Text style={styles.errorText}>Could not load appointments.</Text>
+        <Text style={styles.errorSubText}>
+          {error instanceof Error ? error.message : 'An unexpected error occurred.'}
+        </Text>
+        <Button title="Retry" onPress={() => refetch()} style={{ marginTop: theme.spacing.lg }} />
       </View>
-    )
+    );
   }
-
-  const renderScene = SceneMap({
-    upcoming: () => <AppointmentsList appointments={upcomingAppointments} isLoading={isLoading} onRefresh={refetch} refreshing={isRefetching} navigation={navigation} />,
-    past: () => <AppointmentsList appointments={pastAppointments} isLoading={isLoading} onRefresh={refetch} refreshing={isRefetching} navigation={navigation} />,
-  });
-
-  const renderTabBar = (props: any) => (
-    <TabBar
-      {...props}
-      indicatorStyle={{ backgroundColor: theme.colors.primary, height: 2 }}
-      style={{
-        backgroundColor: 'transparent',
-        elevation: 0,
-        borderBottomWidth: 1,
-        borderColor: theme.colors.border,
-      }}
-      labelStyle={{
-        fontFamily: theme.typography.fontFamilySemiBold,
-        fontSize: 16,
-        textTransform: 'capitalize',
-      }}
-      activeColor={theme.colors.primary}
-      inactiveColor={theme.colors.mutedForeground}
-    />
-  );
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity
-        onPress={() => navigation.dispatch(DrawerActions.toggleDrawer())}
-        style={[
-          styles.menuButton,
-          { top: insets.top + theme.spacing.md, left: insets.left + theme.spacing.xl },
-        ]}
-      >
-        <Menu size={28} color={theme.colors.foreground} />
-      </TouchableOpacity>
-      <Animated.View style={animatedStyle}>
-        <View style={[styles.header, {paddingTop: insets.top + 60, paddingHorizontal: theme.spacing.xl}]}>
-            <Text style={styles.headerTitle}>My Bookings</Text>
-        </View>
-        <TabView
-          navigationState={{ index, routes }}
-          renderScene={renderScene}
-          onIndexChange={setIndex}
-          initialLayout={{ width: layout.width }}
-          renderTabBar={renderTabBar}
-        />
-      </Animated.View>
+      <TabView
+        navigationState={{ index, routes }}
+        renderScene={renderScene}
+        onIndexChange={setIndex}
+        initialLayout={{ width: layout.width }}
+        renderTabBar={renderTabBar}
+        style={styles.tabView}
+      />
     </View>
   );
 };
-
-// --- Styles ---
+MyAppointmentsScreen.displayName = "MyAppointmentsScreen"
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
   },
-  menuButton: {
-    position: 'absolute',
-    zIndex: 10,
-  },
-  header: {
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: theme.colors.background,
-    paddingBottom: theme.spacing.md,
   },
-  headerTitle: {
-    ...theme.typography.h1,
-    fontFamily: theme.typography.fontFamilyBold,
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing.lg,
+    backgroundColor: theme.colors.background,
+  },
+  errorText: {
+    fontSize: 18,
+    fontFamily: theme.typography.fontFamilySemiBold,
+    color: theme.colors.foreground,
+    marginTop: theme.spacing.md,
+    textAlign: 'center',
+  },
+  errorSubText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily,
+    color: theme.colors.mutedForeground,
+    marginTop: theme.spacing.sm,
+    textAlign: 'center',
+  },
+  tabView: {
+    flex: 1,
+  },
+  tabBar: {
+    backgroundColor: theme.colors.background,
+    elevation: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
+  },
+  tabBarLabel: {
+    fontFamily: theme.typography.fontFamilySemiBold,
+    fontSize: 16,
+    textTransform: 'capitalize',
   },
   listContainer: {
-    paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.lg,
-    paddingBottom: 100, // Ensure space for last card
+    flexGrow: 1,
+    padding: theme.spacing.md,
   },
   cardTouchable: {
-    marginBottom: theme.spacing.lg,
-    borderRadius: theme.radius.lg, // Softer corners
-    backgroundColor: theme.colors.card,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 3,
+    marginBottom: theme.spacing.md,
+    borderRadius: theme.radius.lg,
   },
   appointmentCard: {
+    backgroundColor: theme.colors.card,
     borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     overflow: 'hidden',
   },
   cardTitle: {
-    ...theme.typography.h4,
-    fontFamily: theme.typography.fontFamilyBold,
-    color: theme.colors.foreground,
-    paddingRight: 8, // Make space for status
-    flexShrink: 1,
+    fontSize: 16,
+    fontFamily: theme.typography.fontFamilySemiBold,
+    color: theme.colors.cardForeground,
+    flex: 1,
   },
   cardSeparator: {
     height: 1,
     backgroundColor: theme.colors.border,
-    marginHorizontal: theme.spacing.lg,
+    marginHorizontal: theme.spacing.md,
   },
   cardContent: {
     paddingTop: theme.spacing.md,
@@ -332,17 +311,22 @@ const styles = StyleSheet.create({
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
   },
   cardDetailText: {
-    ...theme.typography.body,
+    marginLeft: theme.spacing.sm,
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily,
     color: theme.colors.mutedForeground,
-    marginLeft: theme.spacing.md,
-    flexShrink: 1, // Prevent long text from pushing icons
+    flexShrink: 1,
   },
   statusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 4,
+    borderRadius: theme.radius.full,
+    backgroundColor: 'rgba(0,0,0,0.05)',
   },
   statusDot: {
     width: 8,
@@ -351,47 +335,25 @@ const styles = StyleSheet.create({
     marginRight: theme.spacing.sm,
   },
   statusText: {
-    ...theme.typography.small,
-    fontFamily: theme.typography.fontFamilySemiBold,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamilyMedium,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: theme.spacing.xl,
-    marginTop: 80, // Push it down a bit
+    minHeight: 400,
   },
   emptyText: {
-    ...theme.typography.h3,
-    marginTop: theme.spacing.lg,
+    fontSize: 18,
+    fontFamily: theme.typography.fontFamilySemiBold,
+    marginTop: theme.spacing.md,
     color: theme.colors.foreground,
-    fontFamily: theme.typography.fontFamilyBold,
   },
   emptySubText: {
-    ...theme.typography.body,
-    color: theme.colors.mutedForeground,
-    textAlign: 'center',
-    marginTop: theme.spacing.sm,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: theme.spacing.xl,
-  },
-  errorText: {
-    ...theme.typography.h3,
-    marginTop: theme.spacing.lg,
-    color: theme.colors.foreground,
-    fontFamily: theme.typography.fontFamilyBold,
-  },
-  errorSubText: {
-    ...theme.typography.body,
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily,
     color: theme.colors.mutedForeground,
     textAlign: 'center',
     marginTop: theme.spacing.sm,

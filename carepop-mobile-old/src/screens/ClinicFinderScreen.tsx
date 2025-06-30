@@ -2,10 +2,10 @@ import React from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
-import { getPublicClinics } from '../src/services/api';
-import { theme } from '../src/components/theme';
-import type { Clinic } from '../src/lib/types';
-import { Card, CardHeader, CardTitle, CardContent } from '../src/components/card.native';
+import { getPublicClinics } from '../services/api';
+import { theme } from '../components/theme';
+import type { Clinic } from '../lib/types';
+import { Card, CardHeader, CardTitle, CardContent } from '../components/card.native';
 
 const ClinicListItem: React.FC<{ item: Clinic }> = ({ item }) => (
   <Card style={styles.clinicCard}>

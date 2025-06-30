@@ -15,7 +15,7 @@ export default function ForbiddenPage() {
           We appreciate your interest! However, you do not have the required permissions to view this content. If you believe this is an error, please reach out to the technical team. Your feedback and security are important to us.
         </p>
         <Button asChild>
-          <Link href="/dashboard">Return to Your Dashboard</Link>
+          <Link href="/main-dashboard">Return to Your Dashboard</Link>
         </Button>
       </div>
     </div>
