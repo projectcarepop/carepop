@@ -12,7 +12,7 @@ import { Check, Search } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { updateMyProfile } from '../services/api';
 import { supabase } from '../lib/supabaseClient';
-import type { UpdateProfileApiPayload } from '../lib/types';
+import type { Profile, UpdateProfileApiPayload, UpdateProfilePayload } from '../lib/types';
 import { Button } from '../components/button.native';
 import { Input } from '../components/text-input.native';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/card.native';
@@ -83,35 +83,10 @@ export function EditProfileScreen() {
     });
 
     const { mutate: updateProfile, isPending } = useMutation({
-        mutationFn: (data: FormValues) => {
-          if (!profile) throw new Error("Profile not loaded");
-          
-          const payloadForApi: UpdateProfileApiPayload = {
-            first_name: data.firstName,
-            last_name: data.lastName,
-            middle_initial: data.middleInitial,
-            contact_no: data.contactNo,
-            birthday: data.birthday.toISOString().split('T')[0],
-            gender_identity: data.genderIdentity,
-            pronouns: data.pronouns,
-            civil_status: data.civilStatus,
-            assigned_sex_at_birth: data.assignedSexAtBirth,
-            religion: data.religion,
-            occupation: data.occupation,
-            philhealth_no: data.philhealthNo,
-            street: data.street,
-            province_code: data.provinceCode,
-            city_municipality_code: data.cityMunicipalityCode,
-            barangay_code: data.barangayCode,
-          };
-          
-          console.log("Transformed snake_case payload being sent to API:", payloadForApi);
-
-          return updateMyProfile(supabase, payloadForApi);
-        },
+        mutationFn: (data: UpdateProfilePayload) => updateMyProfile(supabase, data),
         onSuccess: (updatedProfile) => {
             updateProfileInContext(updatedProfile);
-            Toast.show({type: 'success', text1: 'Profile Updated'});
+            Toast.show({type: 'success', text1: 'Profile Updated', text2: 'Your information has been saved.'});
             navigation.goBack();
         },
         onError: (error) => {
@@ -120,8 +95,11 @@ export function EditProfileScreen() {
     });
 
     const onSubmit = (data: FormValues) => {
-        console.log("Form data submitted:", data);
-        updateProfile(data);
+        const payload: UpdateProfilePayload = {
+            ...data,
+            birthday: data.birthday.toISOString().split('T')[0],
+        };
+        updateProfile(payload);
     };
     
     const [activePicker, setActivePicker] = useState<ActivePicker>(null);
@@ -165,21 +143,21 @@ export function EditProfileScreen() {
                             <Controller name="firstName" control={control} render={({ field, fieldState }) => (
                                 <FormItem>
                                     <FormLabel required>First Name</FormLabel>
-                                    <Input placeholder="Enter your first name" {...field} onChangeText={field.onChange} editable={!isPending} />
+                                    <Input placeholder="Enter your first name" {...field} value={field.value ?? ''} onChangeText={field.onChange} editable={!isPending} />
                                     <FormMessage error={fieldState.error} />
                                 </FormItem>
                             )} />
                             <Controller name="middleInitial" control={control} render={({ field, fieldState }) => (
                                 <FormItem>
                                     <FormLabel>Middle Initial</FormLabel>
-                                    <Input placeholder="M.I." {...field} onChangeText={field.onChange} maxLength={5} editable={!isPending} />
+                                    <Input placeholder="M.I." {...field} value={field.value ?? ''} onChangeText={field.onChange} maxLength={5} editable={!isPending} />
                                     <FormMessage error={fieldState.error} />
                                 </FormItem>
                             )} />
                             <Controller name="lastName" control={control} render={({ field, fieldState }) => (
                                 <FormItem>
                                     <FormLabel required>Last Name</FormLabel>
-                                    <Input placeholder="Enter your last name" {...field} onChangeText={field.onChange} editable={!isPending} />
+                                    <Input placeholder="Enter your last name" {...field} value={field.value ?? ''} onChangeText={field.onChange} editable={!isPending} />
                                     <FormMessage error={fieldState.error} />
                                 </FormItem>
                             )} />
@@ -200,14 +178,14 @@ export function EditProfileScreen() {
                             <Controller name="contactNo" control={control} render={({ field, fieldState }) => (
                                 <FormItem>
                                     <FormLabel required>Contact Number</FormLabel>
-                                    <Input placeholder="e.g. 09171234567" {...field} onChangeText={field.onChange} keyboardType="phone-pad" editable={!isPending} />
+                                    <Input placeholder="e.g. 09171234567" {...field} value={field.value ?? ''} onChangeText={field.onChange} keyboardType="phone-pad" editable={!isPending} />
                                     <FormMessage error={fieldState.error} />
                                 </FormItem>
                             )} />
                             <Controller name="street" control={control} render={({ field, fieldState }) => (
                                 <FormItem>
                                     <FormLabel required>Street Address</FormLabel>
-                                    <Input placeholder="House No., Street, Subdivision" {...field} onChangeText={field.onChange} editable={!isPending} />
+                                    <Input placeholder="House No., Street, Subdivision" {...field} value={field.value ?? ''} onChangeText={field.onChange} editable={!isPending} />
                                     <FormMessage error={fieldState.error} />
                                 </FormItem>
                             )} />
@@ -215,7 +193,7 @@ export function EditProfileScreen() {
                                 <FormItem>
                                     <FormLabel required>Province</FormLabel>
                                      <TouchableOpacity onPress={() => setActivePicker('province')} style={styles.pickerButton} disabled={isPending}>
-                                        <Text style={styles.pickerText}>{getDisplayValue(field.value, provinceOptions, 'Select Province')}</Text>
+                                        <Text style={styles.pickerText}>{getDisplayValue(field.value ?? '', provinceOptions, 'Select Province')}</Text>
                                     </TouchableOpacity>
                                     <FormMessage error={fieldState.error} />
                                 </FormItem>
@@ -224,7 +202,7 @@ export function EditProfileScreen() {
                                 <FormItem>
                                     <FormLabel required>City/Municipality</FormLabel>
                                      <TouchableOpacity onPress={() => setActivePicker('city')} style={[styles.pickerButton, !watchedProvinceCode && styles.disabledButton]} disabled={isPending || !watchedProvinceCode}>
-                                        <Text style={styles.pickerText}>{getDisplayValue(field.value, cityOptions, 'Select City/Municipality')}</Text>
+                                        <Text style={styles.pickerText}>{getDisplayValue(field.value ?? '', cityOptions, 'Select City/Municipality')}</Text>
                                     </TouchableOpacity>
                                     <FormMessage error={fieldState.error} />
                                 </FormItem>
@@ -233,7 +211,7 @@ export function EditProfileScreen() {
                                 <FormItem>
                                     <FormLabel required>Barangay</FormLabel>
                                      <TouchableOpacity onPress={() => setActivePicker('barangay')} style={[styles.pickerButton, !watchedCityCode && styles.disabledButton]} disabled={isPending || !watchedCityCode}>
-                                        <Text style={styles.pickerText}>{getDisplayValue(field.value, barangayOptions, 'Select Barangay')}</Text>
+                                        <Text style={styles.pickerText}>{getDisplayValue(field.value ?? '', barangayOptions, 'Select Barangay')}</Text>
                                     </TouchableOpacity>
                                     <FormMessage error={fieldState.error} />
                                 </FormItem>
@@ -247,7 +225,7 @@ export function EditProfileScreen() {
                                 <FormItem>
                                     <FormLabel>Civil Status</FormLabel>
                                     <TouchableOpacity onPress={() => setActivePicker('civilStatus')} style={styles.pickerButton} disabled={isPending}>
-                                        <Text style={styles.pickerText}>{getDisplayValue(field.value, civilStatusOptions, 'Select Civil Status')}</Text>
+                                        <Text style={styles.pickerText}>{getDisplayValue(field.value ?? '', civilStatusOptions, 'Select Civil Status')}</Text>
                                     </TouchableOpacity>
                                     <FormMessage error={fieldState.error} />
                                 </FormItem>
@@ -256,7 +234,7 @@ export function EditProfileScreen() {
                                 <FormItem>
                                     <FormLabel>Gender Identity</FormLabel>
                                     <TouchableOpacity onPress={() => setActivePicker('genderIdentity')} style={styles.pickerButton} disabled={isPending}>
-                                        <Text style={styles.pickerText}>{getDisplayValue(field.value, genderIdentityOptions, 'Select Gender Identity')}</Text>
+                                        <Text style={styles.pickerText}>{getDisplayValue(field.value ?? '', genderIdentityOptions, 'Select Gender Identity')}</Text>
                                     </TouchableOpacity>
                                     <FormMessage error={fieldState.error} />
                                 </FormItem>
@@ -265,7 +243,7 @@ export function EditProfileScreen() {
                                 <FormItem>
                                     <FormLabel>Pronouns</FormLabel>
                                     <TouchableOpacity onPress={() => setActivePicker('pronouns')} style={styles.pickerButton} disabled={isPending}>
-                                        <Text style={styles.pickerText}>{getDisplayValue(field.value, pronounsOptions, 'Select Pronouns')}</Text>
+                                        <Text style={styles.pickerText}>{getDisplayValue(field.value ?? '', pronounsOptions, 'Select Pronouns')}</Text>
                                     </TouchableOpacity>
                                     <FormMessage error={fieldState.error} />
                                 </FormItem>
@@ -274,7 +252,7 @@ export function EditProfileScreen() {
                                 <FormItem>
                                     <FormLabel>Assigned Sex at Birth</FormLabel>
                                     <TouchableOpacity onPress={() => setActivePicker('assignedSex')} style={styles.pickerButton} disabled={isPending}>
-                                        <Text style={styles.pickerText}>{getDisplayValue(field.value, assignedSexOptions, 'Select Assigned Sex')}</Text>
+                                        <Text style={styles.pickerText}>{getDisplayValue(field.value ?? '', assignedSexOptions, 'Select Assigned Sex at Birth')}</Text>
                                     </TouchableOpacity>
                                     <FormMessage error={fieldState.error} />
                                 </FormItem>
@@ -282,21 +260,21 @@ export function EditProfileScreen() {
                             <Controller name="religion" control={control} render={({ field, fieldState }) => (
                                 <FormItem>
                                     <FormLabel>Religion</FormLabel>
-                                    <Input placeholder="e.g. Roman Catholic" {...field} onChangeText={field.onChange} editable={!isPending} />
+                                    <Input placeholder="e.g. Roman Catholic, Agnostic" {...field} value={field.value ?? ''} onChangeText={field.onChange} editable={!isPending} />
                                     <FormMessage error={fieldState.error} />
                                 </FormItem>
                             )} />
                             <Controller name="occupation" control={control} render={({ field, fieldState }) => (
                                 <FormItem>
                                     <FormLabel>Occupation</FormLabel>
-                                    <Input placeholder="e.g. Software Engineer" {...field} onChangeText={field.onChange} editable={!isPending} />
+                                    <Input placeholder="e.g. Software Engineer, Doctor" {...field} value={field.value ?? ''} onChangeText={field.onChange} editable={!isPending} />
                                     <FormMessage error={fieldState.error} />
                                 </FormItem>
                             )} />
                             <Controller name="philhealthNo" control={control} render={({ field, fieldState }) => (
                                 <FormItem>
-                                    <FormLabel>PhilHealth No.</FormLabel>
-                                    <Input placeholder="Enter your PhilHealth number" {...field} onChangeText={field.onChange} editable={!isPending} />
+                                    <FormLabel>PhilHealth Number</FormLabel>
+                                    <Input placeholder="Enter PhilHealth No. (optional)" {...field} value={field.value ?? ''} onChangeText={field.onChange} editable={!isPending} />
                                     <FormMessage error={fieldState.error} />
                                 </FormItem>
                             )} />
@@ -319,16 +297,16 @@ export function EditProfileScreen() {
             <CustomPickerModal visible={activePicker !== null} onClose={() => setActivePicker(null)} height={activePicker === 'date' ? '45%' : '80%'}>
                 {activePicker === 'date' ? (
                   <>
-                    <DateTimePicker 
-                        value={watch('birthday') || new Date()} 
-                        mode="date" 
-                        display="spinner" 
-                        onChange={(_, d) => {
-                            if (d) {
-                                setValue('birthday', d, { shouldDirty: true });
+                    <DateTimePicker
+                        value={watch('birthday') || new Date()}
+                        mode="date"
+                        display="spinner"
+                        onChange={(event, date) => {
+                            setActivePicker(null);
+                            if (date) {
+                                setValue('birthday', date, { shouldValidate: true });
                             }
                         }}
-                        textColor={theme.colors.foreground} 
                     />
                     <Button title="Done" onPress={() => setActivePicker(null)} style={{ marginTop: 16 }}/>
                   </>

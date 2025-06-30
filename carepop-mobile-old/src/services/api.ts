@@ -12,7 +12,7 @@ import type {
   ServiceWithCategory,
 } from "../lib/types";
 import type { RegisterFormValues, LoginFormValues } from '../lib/validation/auth';
-import { keysToCamel, keysToSnake } from "../lib/utils/data-transformation";
+import { keysToCamel } from "../lib/utils/data-transformation";
 
 export type ServiceCategory = {
   id: string;

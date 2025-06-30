@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -19,22 +19,52 @@ import { Menu, LogOut } from 'lucide-react-native';
 import type { ProfileStackParamList } from '../navigation/ProfileNavigator';
 import { supabase } from '../lib/supabaseClient';
 
+// --- Import Location Data ---
+import provinces from '../data/psgc/provinces.json';
+import cities from '../data/psgc/cities-municipalities.json';
+import barangays from '../data/psgc/barangays.json';
+
 const ProfileInfoRow = ({
   label,
   value,
+  isLoading,
 }: {
   label: string;
   value: string | null | undefined;
+  isLoading?: boolean;
 }) => (
   <View style={styles.infoRow}>
     <Text style={styles.label}>{label}</Text>
-    <Text style={styles.value}>{value || 'Not set'}</Text>
+    {isLoading ? <ActivityIndicator size="small" /> : <Text style={styles.value}>{value || 'Not set'}</Text>}
   </View>
 );
 
 export function MyProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const { user, profile, authStatus } = useAuth();
+
+  const [address, setAddress] = useState({
+    province: '',
+    city: '',
+    barangay: '',
+  });
+  const [isAddressLoading, setIsAddressLoading] = useState(true);
+
+  useEffect(() => {
+    if (profile) {
+      setIsAddressLoading(true);
+      const provinceName = provinces.find(p => p.province_code === profile.provinceCode)?.province_name || profile.provinceCode;
+      const cityName = cities.find(c => c.city_code === profile.cityMunicipalityCode)?.city_name || profile.cityMunicipalityCode;
+      const barangayName = barangays.find(b => b.brgy_code === profile.barangayCode)?.brgy_name || profile.barangayCode;
+      
+      setAddress({
+        province: provinceName || '',
+        city: cityName || '',
+        barangay: barangayName || '',
+      });
+      setIsAddressLoading(false);
+    }
+  }, [profile]);
 
   const formattedDob = useMemo(() => {
     const dob = profile?.birthday;
@@ -105,10 +135,9 @@ export function MyProfileScreen() {
             <ProfileInfoRow label="Email" value={user?.email} />
             <ProfileInfoRow label="Phone Number" value={profile.contactNo} />
             <ProfileInfoRow label="Street Address" value={profile.street} />
-            {/* Address lookups removed for simplicity, as they were not part of the core task */}
-            <ProfileInfoRow label="Province" value={profile.provinceCode} />
-            <ProfileInfoRow label="City/Municipality" value={profile.cityMunicipalityCode} />
-            <ProfileInfoRow label="Barangay" value={profile.barangayCode} />
+            <ProfileInfoRow label="Province" value={address.province} isLoading={isAddressLoading} />
+            <ProfileInfoRow label="City/Municipality" value={address.city} isLoading={isAddressLoading} />
+            <ProfileInfoRow label="Barangay" value={address.barangay} isLoading={isAddressLoading} />
           </CardContent>
         </Card>
 

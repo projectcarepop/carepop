@@ -265,61 +265,53 @@ meRoutes.patch('/appointments/:id/cancel', async (c) => {
   }
 });
 
-// 1. Zod schema now expects snake_case, matching the database and clients.
 const updateProfileSchema = z.object({
-  first_name: z.string().min(1).optional(),
-  last_name: z.string().min(1).optional(),
-  middle_initial: z.string().optional().nullable(),
-  contact_no: z.string().optional().nullable(),
-  birthday: z.string().optional().nullable(),
-  gender_identity: z.string().optional().nullable(),
-  pronouns: z.string().optional().nullable(),
-  civil_status: z.string().optional().nullable(),
-  assigned_sex_at_birth: z.string().optional().nullable(),
-  religion: z.string().optional().nullable(),
-  occupation: z.string().optional().nullable(),
-  philhealth_no: z.string().optional().nullable(),
-  street: z.string().optional().nullable(),
-  province_code: z.string().optional().nullable(),
-  city_municipality_code: z.string().optional().nullable(),
-  barangay_code: z.string().optional().nullable(),
+    firstName: z.string().min(1, "First name is required"),
+    lastName: z.string().min(1, "Last name is required"),
+    middleInitial: z.string().max(5).optional(),
+    birthday: z.string().optional(),
+    contactNo: z.string().optional(),
+    street: z.string().optional(),
+    provinceCode: z.string().optional(),
+    cityMunicipalityCode: z.string().optional(),
+    barangayCode: z.string().optional(),
+    civilStatus: z.string().optional(),
+    religion: z.string().optional(),
+    occupation: z.string().optional(),
+    philhealthNo: z.string().optional(),
+    genderIdentity: z.string().optional(),
+    pronouns: z.string().optional(),
+    assignedSexAtBirth: z.string().optional(),
 });
 
 /**
  * PUT /me/profile
  * Updates the profile for the authenticated user.
  */
-meRoutes.put(
-  '/profile',
-  zValidator('json', updateProfileSchema),
-  async (c) => {
-    const user = c.get('user');
-    // This data is now already in the perfect snake_case format.
-    const validatedData = c.req.valid('json');
+meRoutes.put('/profile', zValidator('json', updateProfileSchema), async (c) => {
+  const user = c.get('user');
+  const validatedData = c.req.valid('json');
 
-    try {
-      // 2. The transformation block is removed. We prepare the final payload.
-      const payloadForDb = {
+  try {
+    // Drizzle's .set() method expects camelCase keys and maps them to snake_case columns automatically.
+    // The linter confirms this behavior.
+    const [updatedProfile] = await db.update(profiles)
+      .set({
         ...validatedData,
-        updated_at: new Date().toISOString(), // Still good practice to set this
-      };
-
-      const [updatedProfile] = await db
-        .update(profiles)
-        .set(payloadForDb) // 3. Use the payload directly.
-        .where(eq(profiles.id, user.id))
-        .returning();
-
-      if (!updatedProfile) {
-        return c.json({ error: 'Profile not found to update' }, 404);
-      }
-      
-      return c.json(updatedProfile);
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      return c.json({ error: 'Internal Server Error' }, 500);
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(profiles.id, user.id))
+      .returning();
+    
+    if (!updatedProfile) {
+      return c.json({ error: 'Profile not found for update' }, 404);
     }
+    
+    return c.json(updatedProfile);
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    return c.json({ error: 'Internal Server Error' }, 500);
   }
-);
+});
 
 export default meRoutes;
