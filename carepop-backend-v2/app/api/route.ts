@@ -37,7 +37,8 @@ app.use('*', cors({
     // Define your static list of allowed production and development origins
     const allowed = [
       'http://localhost:3000',
-      'https://www.carepop.online'
+      'https://www.carepop.online',
+      'https://carepop-backend-api-92849154218.us-central1.run.app' // Add your new backend URL here
     ];
 
     // Define a regular expression to match your Vercel preview deployments

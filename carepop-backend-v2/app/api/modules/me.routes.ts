@@ -290,40 +290,44 @@ const updateProfileSchema = z.object({
  * PUT /me/profile
  * Updates the profile for the authenticated user.
  */
-meRoutes.put('/profile', zValidator('json', updateProfileSchema), async (c) => {
-  const user = c.get('user');
-  const validatedProfileData = c.req.valid('json');
+meRoutes.put(
+  '/profile',
+  zValidator('json', updateProfileSchema),
+  async (c) => {
+    try {
+      const user = c.get('user');
+      const validatedProfileData = c.req.valid('json');
 
-  if (!user.email) {
-    return c.json({ error: 'User email not found in authentication token.' }, 400);
-  }
+      // --- LOG #1: What is the backend receiving? ---
+      console.log(`[BACKEND] PUT /profile request for user ID: ${user.id}`);
+      console.log("[BACKEND] Received validated data:", validatedProfileData);
+      
+      // --- LOG #2: The Drizzle Query ---
+      console.log(`[BACKEND] Executing Drizzle update for profiles.id = ${user.id}`);
+      
+      const [updatedProfile] = await db
+        .update(profiles)
+        .set(validatedProfileData)
+        .where(eq(profiles.id, user.id))
+        .returning();
 
-  try {
-    const [result] = await db.insert(profiles).values({
-      id: user.id,
-      email: user.email,
-      role: 'patient', // Set default role on initial creation
-      ...validatedProfileData,
-    }).onConflictDoUpdate({
-      target: profiles.id,
-      set: {
-        ...validatedProfileData,
-        updatedAt: new Date().toISOString()
-        // The role should not be updated here, it's set once on creation
-        // or managed by an admin.
+      // --- LOG #3: The Result ---
+      console.log("[BACKEND] Drizzle query completed. Result:", updatedProfile);
+
+      if (!updatedProfile) {
+        // This is the likely failure point we are not seeing.
+        console.error(`[BACKEND] UPDATE FAILED: No profile found with ID ${user.id} to update.`);
+        return c.json({ error: 'Profile not found to update' }, 404);
       }
-    }).returning();
-    
-    return c.json(result);
-    
-  } catch (error: any) {
-    // Check for a specific database error code for unique constraint violation
-    if (error.code === '23505') { 
-      return c.json({ message: 'A profile with this email already exists.' }, 409); // 409 Conflict
+
+      console.log("[BACKEND] Successfully updated profile. Sending back data.");
+      return c.json(updatedProfile);
+
+    } catch (error) {
+      console.error("[BACKEND] CRASH during profile update:", error);
+      return c.json({ error: 'Internal Server Error' }, 500);
     }
-    console.error('Error upserting profile:', error);
-    return c.json({ message: 'An internal server error occurred.' }, 500);
   }
-});
+);
 
 export default meRoutes;
