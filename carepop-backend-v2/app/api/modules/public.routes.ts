@@ -213,6 +213,8 @@ publicRoutes.get('/doctors', async (c) => {
      */
     publicRoutes.get('/services', zValidator('query', servicesQuerySchema), async (c) => {
         const { clinicId } = c.req.valid('query');
+        console.log(`--- Backend /api/public/services ---`);
+        console.log(`Received request with clinicId: ${clinicId}`);
 
         try {
             if (clinicId) {
@@ -239,6 +241,9 @@ publicRoutes.get('/doctors', async (c) => {
                 ))
                 .orderBy(asc(services.name));
 
+                console.log(`Found ${servicesInClinic.length} services for clinicId ${clinicId}.`);
+                console.log(`Returning services:`, JSON.stringify(servicesInClinic, null, 2));
+                console.log(`------------------------------------`);
                 return c.json({ data: servicesInClinic });
 
             } else {

@@ -216,12 +216,37 @@ export const inventory = pgTable("inventory", {
     quantityCheck: check("inventory_quantity_on_hand_check", sql`quantity_on_hand >= 0`),
 }));
 
+export const healthLogs = pgTable("health_logs", {
+    id: uuid('id').default(sql`gen_random_uuid()`).primaryKey().notNull(),
+    userId: uuid("user_id").notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+    mood: text("mood"),
+    symptoms: text("symptoms").array(),
+    notes: text("notes"),
+    logDate: date("log_date").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => ({
+    userIdx: index("idx_health_logs_user_id").on(table.userId),
+}));
+
+export const menstrualLogs = pgTable("menstrual_logs", {
+    id: uuid('id').default(sql`gen_random_uuid()`).primaryKey().notNull(),
+    userId: uuid("user_id").notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+    startDate: date("start_date").notNull(),
+    endDate: date("end_date").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => ({
+    userIdx: index("idx_menstrual_logs_user_id").on(table.userId),
+    periodCheck: check("menstrual_logs_period_check", sql`end_date >= start_date`),
+}));
+
 
 // --- RELATIONS ---
 
 export const profilesRelations = relations(profiles, ({ many, one }) => ({
 	appointments: many(appointments),
 	reviews: many(reviews),
+    healthLogs: many(healthLogs),
+    menstrualLogs: many(menstrualLogs),
     user: one(usersInAuth, {
         fields: [profiles.id],
         references: [usersInAuth.id],
@@ -338,4 +363,18 @@ export const inventoryRelations = relations(inventory, ({ one }) => ({
 		fields: [inventory.productId],
 		references: [products.id]
 	}),
+}));
+
+export const healthLogsRelations = relations(healthLogs, ({ one }) => ({
+    user: one(profiles, {
+        fields: [healthLogs.userId],
+        references: [profiles.id]
+    }),
+}));
+
+export const menstrualLogsRelations = relations(menstrualLogs, ({ one }) => ({
+    user: one(profiles, {
+        fields: [menstrualLogs.userId],
+        references: [profiles.id]
+    }),
 }));
