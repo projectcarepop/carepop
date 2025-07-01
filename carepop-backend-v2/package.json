@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch dev.ts",
-    "start": "tsx server.ts",
+    "start": "tsx dev.ts",
     "test": "vitest"
   },
   "keywords": [],

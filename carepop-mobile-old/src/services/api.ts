@@ -4,9 +4,7 @@ import type {
   Clinic,
   DetailedAppointment,
   MedicalRecord,
-  NewAppointment,
   Profile,
-  Service,
   UpdateProfileApiPayload,
   AvailabilitySlot,
   ServiceWithCategory,
@@ -63,21 +61,28 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
 
   if (!response.ok) {
     try {
-      const errorBody = await response.json();
-      let message = `API request failed with status ${response.status}`;
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.indexOf('application/json') !== -1) {
+        const errorBody = await response.json();
+        let message = `API request failed with status ${response.status}`;
 
-      if (errorBody.error) {
-        if (typeof errorBody.error === 'string') {
-          message = errorBody.error;
-        } else if (typeof errorBody.error === 'object' && errorBody.error.issues) {
-          message = errorBody.error.issues.map((issue: any) => `${issue.path.join('.')} - ${issue.message}`).join('\\n');
-        } else {
-          message = JSON.stringify(errorBody.error);
+        if (errorBody.error) {
+          if (typeof errorBody.error === 'string') {
+            message = errorBody.error;
+          } else if (typeof errorBody.error === 'object' && errorBody.error.issues) {
+            message = errorBody.error.issues.map((issue: any) => `${issue.path.join('.')} - ${issue.message}`).join('\\n');
+          } else {
+            message = JSON.stringify(errorBody.error);
+          }
         }
+        
+        const error = new Error(message);
+        throw error;
+      } else {
+        // Handle non-JSON error responses
+        const textError = await response.text();
+        throw new Error(`API Error: ${response.status} - ${textError}`);
       }
-      
-      const error = new Error(message);
-      throw error;
     } catch (e) {
       if (e instanceof Error) {
         throw e;
