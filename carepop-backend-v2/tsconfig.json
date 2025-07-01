@@ -18,6 +18,6 @@
       "@/drizzle/*": ["./drizzle/*"]
     }
   },
-  "include": ["app/**/*.ts", "drizzle/**/*.ts"],
+  "include": ["app/**/*.ts", "drizzle/**/*.ts", "src/**/*.ts"],
   "exclude": ["node_modules"]
 } 

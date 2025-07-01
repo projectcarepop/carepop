@@ -31,6 +31,16 @@ const assignedSexOptions = ["Male", "Female", "Prefer not to say"].map(o => ({ l
 
 type ActivePicker = 'date' | 'province' | 'city' | 'barangay' | 'civilStatus' | 'genderIdentity' | 'pronouns' | 'assignedSex' | null;
 
+const pickerKeyToFormField: { [key in Exclude<ActivePicker, 'date' | null>]: keyof FormValues } = {
+    province: 'provinceCode',
+    city: 'cityMunicipalityCode',
+    barangay: 'barangayCode',
+    civilStatus: 'civilStatus',
+    genderIdentity: 'genderIdentity',
+    pronouns: 'pronouns',
+    assignedSex: 'assignedSexAtBirth',
+};
+
 // --- Helper Components ---
 const FormItem = ({ children }: { children: React.ReactNode }) => <View style={{ marginBottom: 16 }}>{children}</View>;
 const FormLabel = ({ children, required }: { children: React.ReactNode, required?: boolean }) => (
@@ -42,23 +52,86 @@ const FormMessage = ({ error }: { error?: { message?: string } }) => (
 
 const PickerRow = ({ label, isSelected, onPress }: {label: string, isSelected: boolean, onPress: () => void}) => (
     <TouchableOpacity onPress={onPress} style={[styles.pickerItem, isSelected && styles.pickerItemSelected]}>
-        <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>{isSelected && <Check color={theme.colors.primaryForeground} size={14} />}</View>
         <Text style={[styles.pickerItemText, isSelected && styles.pickerItemTextSelected]}>{label}</Text>
+        {isSelected && <Check color={theme.colors.primary} size={20} />}
     </TouchableOpacity>
 );
 
-const CustomPickerModal = ({ visible, onClose, children, height = '80%' }: { visible: boolean; onClose: () => void; children: React.ReactNode; height?: DimensionValue; }) => (
-    <AnimatePresence>
-      {visible && (
-        <Pressable onPress={onClose} style={styles.modalBackdrop}>
-          <MotiView from={{ translateY: 800 }} animate={{ translateY: 0 }} exit={{ translateY: 800 }} transition={{ type: 'timing', duration: 400 }} style={[styles.bottomSheetContainer, { height }]} onStartShouldSetResponder={() => true}>
-            <View style={styles.grabber} />
-            {children}
-          </MotiView>
-        </Pressable>
-      )}
-    </AnimatePresence>
-);
+const CustomPickerModal = ({
+  visible,
+  onClose,
+  options,
+  onConfirm,
+  title,
+  selectedValue,
+  showSearch,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  options: { label: string; value: any }[];
+  onConfirm: (value: any) => void;
+  title: string;
+  selectedValue: any;
+  showSearch: boolean;
+}) => {
+    const [tempValue, setTempValue] = useState(selectedValue);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const filteredOptions = options.filter(item => item.label.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    const handleConfirm = () => {
+        onConfirm(tempValue);
+        onClose();
+    };
+
+    // Reset temp value when modal is opened
+    React.useEffect(() => {
+        if (visible) {
+            setTempValue(selectedValue);
+            setSearchTerm(''); // also reset search term
+        }
+    }, [visible, selectedValue]);
+
+    return (
+      <AnimatePresence>
+        {visible && (
+          <Pressable onPress={onClose} style={styles.modalBackdrop}>
+            <MotiView from={{ translateY: 800 }} animate={{ translateY: 0 }} exit={{ translateY: 800 }} transition={{ type: 'timing', duration: 400 }} style={styles.bottomSheetContainer} onStartShouldSetResponder={() => true}>
+              <View style={styles.bottomSheetHeader}>
+                  <Text style={styles.bottomSheetTitle}>{title}</Text>
+              </View>
+              
+              {showSearch && (
+                  <View style={styles.searchContainer}>
+                      <Search size={20} color={theme.colors.mutedForeground} />
+                      <RNTextInput
+                          style={styles.searchInput}
+                          placeholder="Search..."
+                          placeholderTextColor={theme.colors.mutedForeground}
+                          value={searchTerm}
+                          onChangeText={setSearchTerm}
+                      />
+                  </View>
+              )}
+              
+              <FlatList
+                  data={filteredOptions}
+                  keyExtractor={(item) => item.value}
+                  renderItem={({ item }) => (
+                      <PickerRow label={item.label} isSelected={tempValue === item.value} onPress={() => setTempValue(item.value)} />
+                  )}
+                  style={styles.pickerList}
+              />
+
+              <View style={styles.bottomSheetFooter}>
+                  <Button title="Done" onPress={handleConfirm} style={styles.bottomSheetButton} textStyle={styles.bottomSheetButtonText} />
+              </View>
+            </MotiView>
+          </Pressable>
+        )}
+      </AnimatePresence>
+    );
+};
 
 type FormValues = {
   firstName: string; lastName: string; middleInitial: string; contactNo: string;
@@ -137,8 +210,12 @@ export function EditProfileScreen() {
             <KeyboardAwareScrollView>
                 <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
                     <Text style={styles.screenTitle}>Edit Profile</Text>
+                    <Text style={styles.screenSubTitle}>
+                        Keep your personal and medical information up to date.
+                    </Text>
                     
-                    <Card style={styles.card}><CardHeader><CardTitle>Personal Information</CardTitle></CardHeader>
+                    <Card style={styles.card}>
+                        <CardHeader><CardTitle style={styles.cardTitle}>Personal Information</CardTitle></CardHeader>
                         <CardContent>
                             <Controller name="firstName" control={control} render={({ field, fieldState }) => (
                                 <FormItem>
@@ -173,7 +250,8 @@ export function EditProfileScreen() {
                         </CardContent>
                     </Card>
                     
-                    <Card style={styles.card}><CardHeader><CardTitle>Contact & Address</CardTitle></CardHeader>
+                    <Card style={styles.card}>
+                        <CardHeader><CardTitle style={styles.cardTitle}>Contact & Address</CardTitle></CardHeader>
                         <CardContent>
                             <Controller name="contactNo" control={control} render={({ field, fieldState }) => (
                                 <FormItem>
@@ -219,7 +297,8 @@ export function EditProfileScreen() {
                         </CardContent>
                     </Card>
                     
-                     <Card style={styles.card}><CardHeader><CardTitle>Identity & Other Info</CardTitle></CardHeader>
+                     <Card style={styles.card}>
+                        <CardHeader><CardTitle style={styles.cardTitle}>Identity & Other Info</CardTitle></CardHeader>
                         <CardContent>
                             <Controller name="civilStatus" control={control} render={({ field, fieldState }) => (
                                 <FormItem>
@@ -281,76 +360,58 @@ export function EditProfileScreen() {
                         </CardContent>
                     </Card>
 
-                    <Button 
-                        title="Save Changes"
-                        variant="default"
-                        size="xl"
-                        icon={<Check size={18} color="white" />}
-                        onPress={handleSubmit(onSubmit)}
-                        disabled={isPending}
-                        isLoading={isPending}
-                        style={styles.submitButton}
-                    />
-                </ScrollView>
-            </KeyboardAwareScrollView>
-            
-            <CustomPickerModal visible={activePicker !== null} onClose={() => setActivePicker(null)} height={activePicker === 'date' ? '45%' : '80%'}>
-                {activePicker === 'date' ? (
-                  <>
-                    <DateTimePicker
-                        value={watch('birthday') || new Date()}
-                        mode="date"
-                        display="spinner"
-                        onChange={(event, date) => {
-                            setActivePicker(null);
-                            if (date) {
-                                setValue('birthday', date, { shouldValidate: true });
-                            }
-                        }}
-                    />
-                    <Button title="Done" onPress={() => setActivePicker(null)} style={{ marginTop: 16 }}/>
-                  </>
-                ) : (
-                    <View style={{ flex: 1 }}>
-                        <Text style={styles.modalTitle}>{modalTitle}</Text>
-                        <View style={styles.searchContainer}>
-                            <Search size={20} color={theme.colors.mutedForeground} style={{position: 'absolute', left: 12, top: 12}} />
-                            <RNTextInput
-                                placeholder="Search..."
-                                value={searchTerm}
-                                onChangeText={setSearchTerm}
-                                style={styles.searchInput}
-                                placeholderTextColor={theme.colors.mutedForeground}
-                            />
-                        </View>
-                        <FlatList
-                            data={filteredOptions}
-                            keyExtractor={item => item.value}
-                            renderItem={({ item }) => {
-                                const fieldName = Object.entries({
-                                    province: 'provinceCode', city: 'cityMunicipalityCode', barangay: 'barangayCode',
-                                    civilStatus: 'civilStatus', genderIdentity: 'genderIdentity', pronouns: 'pronouns', assignedSex: 'assignedSexAtBirth'
-                                }).find(([key]) => key === activePicker)?.[1] as keyof FormValues | undefined;
-
-                                if (!fieldName) return null;
-                                
-                                return (
-                                    <PickerRow 
-                                        label={item.label} 
-                                        isSelected={watch(fieldName) === item.value} 
-                                        onPress={() => {
-                                            setValue(fieldName, item.value, { shouldValidate: true, shouldDirty: true });
-                                            if (fieldName === 'provinceCode') { setValue('cityMunicipalityCode', '', { shouldDirty: true }); setValue('barangayCode', '', { shouldDirty: true }); }
-                                            if (fieldName === 'cityMunicipalityCode') setValue('barangayCode', '', { shouldDirty: true });
-                                            setActivePicker(null);
-                                        }} 
-                                    />
-                                );
-                            }}
+                    <View style={styles.footer}>
+                        <Button
+                            title={isPending ? "Saving..." : "Save Changes"}
+                            onPress={handleSubmit(onSubmit)}
+                            isLoading={isPending}
+                            fullWidth
+                            style={styles.bottomSheetButton}
+                            textStyle={styles.bottomSheetButtonText}
+                            icon={<Check size={18} color={theme.colors.primaryForeground} />}
                         />
                     </View>
-                )}
-            </CustomPickerModal>
+                </ScrollView>
+            </KeyboardAwareScrollView>
+
+             {/* Unified Modal for all pickers */}
+            <CustomPickerModal
+                visible={!!activePicker && activePicker !== 'date'}
+                onClose={() => setActivePicker(null)}
+                title={modalTitle}
+                options={modalOptions}
+                selectedValue={activePicker && activePicker !== 'date' ? watch(pickerKeyToFormField[activePicker]) : null}
+                showSearch={['province', 'city', 'barangay'].includes(activePicker || '')}
+                onConfirm={(value) => {
+                    if (activePicker && activePicker !== 'date') {
+                        const fieldName = pickerKeyToFormField[activePicker];
+                        setValue(fieldName, value, { shouldValidate: true, shouldDirty: true });
+                        
+                        // Reset dependent fields
+                        if (fieldName === 'provinceCode') {
+                            setValue('cityMunicipalityCode', '', { shouldDirty: true });
+                            setValue('barangayCode', '', { shouldDirty: true });
+                        }
+                        if (fieldName === 'cityMunicipalityCode') {
+                            setValue('barangayCode', '', { shouldDirty: true });
+                        }
+                    }
+                }}
+            />
+
+            {activePicker === 'date' && (
+                <DateTimePicker
+                    value={watch('birthday') || new Date()}
+                    mode="date"
+                    display="spinner"
+                    onChange={(event, date) => {
+                        setActivePicker(null);
+                        if (date) {
+                            setValue('birthday', date, { shouldValidate: true });
+                        }
+                    }}
+                />
+            )}
         </SafeAreaView>
     );
 }
@@ -358,54 +419,125 @@ export function EditProfileScreen() {
 const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: theme.colors.background },
     container: { padding: 16, paddingBottom: 100 },
-    screenTitle: { fontSize: 28, fontWeight: 'bold', color: theme.colors.foreground, marginBottom: 20 },
-    card: { marginBottom: 20 },
-    pickerLabel: { fontSize: 14, fontWeight: '500', color: theme.colors.foreground, marginBottom: 8 },
+    screenTitle: { ...theme.typography.h2, textAlign: 'center', marginBottom: theme.spacing.sm, marginTop: theme.spacing.lg, color: theme.colors.secondary },
+    screenSubTitle: {
+        ...theme.typography.body,
+        textAlign: 'center',
+        color: theme.colors.mutedForeground,
+        marginBottom: theme.spacing.xl,
+    },
+    card: { marginBottom: theme.spacing.lg },
+    cardTitle: {
+        color: theme.colors.secondary,
+    },
+    footer: { padding: theme.spacing.lg },
     pickerButton: {
+        backgroundColor: theme.colors.input,
+        paddingHorizontal: theme.spacing.md,
+        paddingVertical: theme.spacing.md,
+        borderRadius: theme.radius.md,
         borderWidth: 1,
         borderColor: theme.colors.border,
-        borderRadius: 8,
-        padding: 12,
-        backgroundColor: theme.colors.input,
         justifyContent: 'center',
     },
-    disabledButton: { backgroundColor: '#e0e0e0' },
-    pickerText: { color: theme.colors.foreground, fontSize: 16 },
-    submitButton: { marginTop: 20 },
+    pickerText: { ...theme.typography.body, color: theme.colors.foreground },
+    disabledButton: { opacity: 0.5, backgroundColor: theme.colors.muted },
     modalBackdrop: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.6)',
         justifyContent: 'flex-end',
+        zIndex: 10,
     },
     bottomSheetContainer: {
         backgroundColor: theme.colors.card,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        padding: 16,
+        borderTopLeftRadius: theme.radius.lg,
+        borderTopRightRadius: theme.radius.lg,
+        padding: theme.spacing.lg * 2,
+        height: '60%',
     },
-    grabber: {
-        width: 40,
-        height: 5,
-        borderRadius: 2.5,
-        backgroundColor: theme.colors.border,
-        alignSelf: 'center',
-        marginBottom: 16,
+    bottomSheetHeader: {
+        alignItems: 'center',
+        paddingBottom: theme.spacing.md,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.colors.border,
+        marginBottom: theme.spacing.sm,
     },
-    modalTitle: { fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 16, color: theme.colors.foreground },
-    searchContainer: { marginBottom: 16, position: 'relative' },
-    searchInput: {
-        height: 44,
-        paddingLeft: 40,
-        backgroundColor: theme.colors.background,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
+    bottomSheetTitle: {
+        ...theme.typography.h3,
         color: theme.colors.foreground,
     },
-    pickerItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-    pickerItemSelected: { /* No specific style needed here now */ },
-    pickerItemText: { fontSize: 16, color: theme.colors.foreground, marginLeft: 12 },
-    pickerItemTextSelected: { fontWeight: 'bold', color: theme.colors.primary },
-    radioCircle: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: theme.colors.primary, justifyContent: 'center', alignItems: 'center' },
-    radioCircleSelected: { backgroundColor: theme.colors.primary }
+    pickerList: {
+        marginVertical: theme.spacing.md,
+    },
+    pickerItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: theme.spacing.lg,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.colors.border,
+    },
+    pickerItemText: {
+        ...theme.typography.body,
+        color: theme.colors.foreground,
+    },
+    pickerItemTextSelected: {
+        ...theme.typography.h4,
+        color: theme.colors.primary,
+    },
+    pickerItemSelected: {}, // Keep for structure, can add background color if needed
+    radioCircle: {
+        width: 20, height: 20, borderRadius: 10,
+        borderWidth: 2, borderColor: theme.colors.primary,
+        alignItems: 'center', justifyContent: 'center', marginRight: theme.spacing.md,
+    },
+    radioCircleSelected: {
+        backgroundColor: theme.colors.primary,
+    },
+    bottomSheetFooter: {
+        paddingTop: theme.spacing.md,
+        borderTopWidth: 1,
+        borderTopColor: theme.colors.border,
+    },
+    bottomSheetButton: {
+        height: 52,
+        borderRadius: theme.radius.md,
+    },
+    bottomSheetButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: theme.colors.input,
+        borderRadius: theme.radius.md,
+        paddingHorizontal: theme.spacing.md,
+        marginVertical: theme.spacing.md,
+    },
+    searchInput: {
+        flex: 1,
+        ...theme.typography.body,
+        paddingVertical: theme.spacing.md,
+        paddingLeft: theme.spacing.sm,
+        color: theme.colors.foreground,
+    },
+    pickerLabel: { 
+        ...theme.typography.small, 
+        fontWeight: '500',
+        color: theme.colors.foreground,
+        marginBottom: theme.spacing.sm,
+    },
+    grabber: {
+        width: 60,
+        height: 5,
+        backgroundColor: theme.colors.border,
+        borderRadius: theme.radius.full,
+        alignSelf: 'center',
+        marginBottom: theme.spacing.md,
+    }
 });

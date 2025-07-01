@@ -91,62 +91,7 @@ export function RootAppNavigator() {
   );
 }
 
-// --- Custom Drawer Content ---
-function CustomDrawerContent(props: any) {
-  const drawerStyles = createDrawerStyles();
-  const { user, signOut } = useAuth();
-
-  return (
-    <DrawerContentScrollView {...props} contentContainerStyle={drawerStyles.container}>
-      <View style={drawerStyles.header}>
-        <UserCircle color={theme.colors.primary} size={48} />
-        <Text style={drawerStyles.headerEmail} numberOfLines={1}>
-          {user?.email || 'User'}
-        </Text>
-      </View>
-      <View style={drawerStyles.menuGroup}>
-        <DrawerItemList {...props} />
-      </View>
-      <View style={drawerStyles.footer}>
-        <DrawerItem
-          label="Sign Out"
-          icon={({ color }) => <LogOut size={20} color={color} />}
-          onPress={signOut}
-          inactiveTintColor={theme.colors.destructive}
-          labelStyle={{ ...theme.typography.body, fontFamily: theme.typography.fontFamilyMedium }}
-        />
-      </View>
-    </DrawerContentScrollView>
-  );
-}
-
 // --- Main App Styles ---
 const styles = StyleSheet.create({
   // The tabContainer style is no longer needed here as styles are applied directly to tabBarStyle
-});
-
-const createDrawerStyles = () => StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.colors.background, },
-    header: {
-      paddingHorizontal: theme.spacing.xl,
-      paddingVertical: theme.spacing.lg,
-      marginBottom: theme.spacing.md,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    headerEmail: {
-      ...theme.typography.body,
-      fontFamily: theme.typography.fontFamilySemiBold,
-      color: theme.colors.secondary,
-      marginLeft: theme.spacing.md,
-      flex: 1,
-    },
-    menuGroup: { flex: 1, paddingTop: theme.spacing.sm, },
-    footer: {
-      borderTopWidth: 1,
-      borderTopColor: theme.colors.border,
-      padding: theme.spacing.sm,
-    }
 });

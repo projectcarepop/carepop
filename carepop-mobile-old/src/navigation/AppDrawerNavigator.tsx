@@ -4,19 +4,21 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, Text, StyleSheet } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { theme } from '../components/theme';
-import { LayoutDashboard, CalendarPlus, CalendarCheck, Map, FileText, HeartPulse, Info, User, LogOut, UserCircle } from 'lucide-react-native';
+import { LayoutDashboard, CalendarPlus, Map, FileText, HeartPulse, Info, User, LogOut, UserCircle, CalendarDays } from 'lucide-react-native';
+import { supabase } from '../lib/supabaseClient';
 
 // Screen Imports
 import { DashboardScreen } from '../screens/DashboardScreen';
-import { MyAppointmentsScreen } from '../screens/MyAppointmentsScreen';
+import MyAppointmentsScreen from '../screens/MyAppointmentsScreen';
 import { AppointmentDetailScreen } from '../screens/AppointmentDetailScreen';
-import { BookingNavigator } from './BookingNavigator';
+import BookingScreen from '../screens/BookingScreen';
 import { ClinicFinderScreen } from '../screens/ClinicFinderScreen';
-import HealthBuddyScreen from '../screens/HealthBuddyScreen';
-import { MyRecordsScreen } from '../screens/MyRecordsScreen';
+import HealthBuddyDashboardScreen from '../screens/health-buddy/HealthBuddyDashboardScreen';
+import LogSymptomsScreen from '../screens/health-buddy/LogSymptomsScreen';
+import LogPeriodScreen from '../screens/health-buddy/LogPeriodScreen';
+import MyMedicalRecordsScreen from '../screens/MyMedicalRecordsScreen';
 import { RecordDetailScreen } from '../screens/RecordDetailScreen';
 import { AboutUsScreen } from '../screens/AboutUsScreen';
-import { MyProfileScreen } from '../screens/MyProfileScreen';
 import { ProfileNavigator } from './ProfileNavigator';
 
 // --- Param Lists ---
@@ -30,12 +32,18 @@ export type RecordsStackParamList = {
   RecordDetail: { recordId: string };
 };
 
+export type HealthBuddyStackParamList = {
+  HealthBuddyDashboard: undefined;
+  LogSymptoms: undefined;
+  LogPeriod: undefined;
+};
+
 export type DrawerParamList = {
   Dashboard: undefined;
   Appointments: undefined;
   Records: undefined;
   'Health Buddy': undefined;
-  'Book a Service': undefined;
+  Booking: { clinicId?: string } | undefined;
   'Clinic Finder': undefined;
   AboutUs: undefined;
   Profile: undefined;
@@ -44,6 +52,7 @@ export type DrawerParamList = {
 // --- Navigators ---
 const AppointmentsStackNav = createNativeStackNavigator<AppointmentsStackParamList>();
 const RecordsStackNav = createNativeStackNavigator<RecordsStackParamList>();
+const HealthBuddyStackNav = createNativeStackNavigator<HealthBuddyStackParamList>();
 const Drawer = createDrawerNavigator<DrawerParamList>();
 
 // --- Nested Stack Navigator ---
@@ -59,16 +68,26 @@ function AppointmentsNavigator() {
 function RecordsNavigator() {
   return (
     <RecordsStackNav.Navigator screenOptions={{ headerShown: false }}>
-      <RecordsStackNav.Screen name="MyRecords" component={MyRecordsScreen} />
+      <RecordsStackNav.Screen name="MyRecords" component={MyMedicalRecordsScreen} />
       <RecordsStackNav.Screen name="RecordDetail" component={RecordDetailScreen} />
     </RecordsStackNav.Navigator>
+  );
+}
+
+function HealthBuddyNavigator() {
+  return (
+    <HealthBuddyStackNav.Navigator screenOptions={{ headerShown: false }}>
+      <HealthBuddyStackNav.Screen name="HealthBuddyDashboard" component={HealthBuddyDashboardScreen} />
+      <HealthBuddyStackNav.Screen name="LogSymptoms" component={LogSymptomsScreen} />
+      <HealthBuddyStackNav.Screen name="LogPeriod" component={LogPeriodScreen} />
+    </HealthBuddyStackNav.Navigator>
   );
 }
 
 // --- Custom Drawer Content ---
 function CustomDrawerContent(props: any) {
   const drawerStyles = createDrawerStyles();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
 
   return (
     <DrawerContentScrollView {...props} contentContainerStyle={drawerStyles.container}>
@@ -85,7 +104,7 @@ function CustomDrawerContent(props: any) {
         <DrawerItem
           label="Sign Out"
           icon={({ color }) => <LogOut size={20} color={color} />}
-          onPress={() => signOut()}
+          onPress={() => supabase.auth.signOut()}
           inactiveTintColor={theme.colors.destructive}
           labelStyle={{ ...theme.typography.body, fontFamily: theme.typography.fontFamilyMedium }}
         />
@@ -110,11 +129,31 @@ export function AppDrawerNavigator() {
       }}
     >
       <Drawer.Screen name="Dashboard" component={DashboardScreen} options={{ drawerIcon: ({ color }: { color: string }) => <LayoutDashboard size={20} color={color} /> }} />
-      <Drawer.Screen name="Appointments" component={AppointmentsNavigator} options={{ drawerIcon: ({ color }: { color: string }) => <CalendarCheck size={20} color={color} /> }} />
-      <Drawer.Screen name="Book a Service" component={BookingNavigator} options={{ drawerIcon: ({ color }: { color: string }) => <CalendarPlus size={20} color={color} /> }} />
+      <Drawer.Screen
+        name="Appointments"
+        component={AppointmentsNavigator}
+        options={{
+          drawerIcon: ({ color, size }) => <CalendarDays color={color} size={size} />,
+          drawerLabel: 'My Appointments',
+        }}
+      />
+      <Drawer.Screen name="Booking" component={BookingScreen} options={{ title: 'Book a Service', drawerIcon: ({ color }: { color: string }) => <CalendarPlus size={20} color={color} /> }} />
       <Drawer.Screen name="Clinic Finder" component={ClinicFinderScreen} options={{ drawerIcon: ({ color }: { color: string }) => <Map size={20} color={color} /> }} />
-      <Drawer.Screen name="Health Buddy" component={HealthBuddyScreen} options={{ drawerIcon: ({ color }: { color: string }) => <HeartPulse size={20} color={color} /> }} />
-      <Drawer.Screen name="Records" component={RecordsNavigator} options={{ drawerIcon: ({ color }: { color:string }) => <FileText size={20} color={color} /> }} />
+      <Drawer.Screen 
+        name="Health Buddy" 
+        component={HealthBuddyNavigator} 
+        options={{ 
+          drawerIcon: ({ color }: { color: string }) => <HeartPulse size={20} color={color} /> 
+        }} 
+      />
+      <Drawer.Screen
+        name="Records"
+        component={RecordsNavigator}
+        options={{
+          drawerIcon: ({ color, size }) => <FileText color={color} size={size} />,
+          drawerLabel: 'My Records',
+        }}
+      />
       <Drawer.Screen name="AboutUs" component={AboutUsScreen} options={{ title: 'About Us', drawerIcon: ({ color }: { color: string }) => <Info size={20} color={color} /> }} />
       <Drawer.Screen name="Profile" component={ProfileNavigator} options={{ drawerIcon: ({ color }: { color: string }) => <User size={20} color={color} /> }} />
     </Drawer.Navigator>

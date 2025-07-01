@@ -4,10 +4,10 @@ import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Button } from '../../src/components/button.native';
 import { theme } from '../../src/components/theme';
-import { RootStackParamList } from '../../src/navigation/AppNavigator';
+import { AuthStackParamList } from '../../src/navigation/AuthNavigator';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-type OnboardingNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Onboarding'>;
+type OnboardingNavigationProp = NativeStackNavigationProp<AuthStackParamList>;
 
 // This screen will likely be part of a larger stack that, upon completion,
 // navigates the user to the main app (e.g., Auth or Dashboard).
@@ -21,7 +21,8 @@ export const OnboardingScreenThree = () => {
     } catch (e) {
       console.error('Failed to save onboarding status', e);
     }
-    navigation.navigate('Auth');
+    // Navigate to the Register screen within the Auth stack
+    navigation.navigate('Register');
   };
 
   return (

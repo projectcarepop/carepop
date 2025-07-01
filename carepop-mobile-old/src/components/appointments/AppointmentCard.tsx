@@ -1,107 +1,114 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Card, Text, useTheme } from 'react-native-paper';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet } from 'react-native';
 import { format } from 'date-fns';
-
-// Import the canonical Appointment type
-import { Appointment } from '../../utils/api';
+import { Calendar, Clock, Building } from 'lucide-react-native';
+import { theme } from '../theme';
+import { Card } from '../card.native';
+import { Badge, getStatusStyles } from '../Badge';
+import type { DetailedAppointment } from '../../lib/types';
+import { Button } from '../button.native';
 
 interface AppointmentCardProps {
-  appointment: Appointment;
-  onPress: () => void;
+  appointment: Omit<DetailedAppointment, 'appointmentTime'>;
+  appointmentDate: Date;
+  onCancel: () => void;
+  isCancelling?: boolean;
 }
 
-const statusDetails = {
-  confirmed: { icon: 'checkmark-circle', color: '#4CAF50', text: 'Confirmed' },
-  pending_confirmation: { icon: 'time-outline', color: '#FFC107', text: 'Pending' },
-  cancelled: { icon: 'close-circle', color: '#F44336', text: 'Cancelled' },
-  completed: { icon: 'flag-outline', color: '#2196F3', text: 'Completed' },
-  no_show: { icon: 'alert-circle', color: '#9E9E9E', text: 'No Show' },
-};
+const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, appointmentDate, onCancel, isCancelling }) => {
+  const { status, service, clinic } = appointment;
+  const displayStatus = status || 'unknown';
+  const { bgColor, textColor, Icon } = getStatusStyles(displayStatus as any);
 
-export const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, onPress }) => {
-  const theme = useTheme();
-  const detail = statusDetails[appointment.status] || statusDetails.no_show;
+  const formattedDate = format(appointmentDate, 'eeee, MMMM dd');
+  const formattedTime = format(appointmentDate, 'h:mm a');
+  const statusText = displayStatus.replace(/_/g, ' ').replace('canceled by', 'cancelled by');
 
   return (
-    <Card style={styles.card} onPress={onPress}>
-      <Card.Content>
+    <Card style={styles.card}>
+      <View style={styles.mainContent}>
         <View style={styles.header}>
-          <Text variant="titleMedium" style={styles.serviceName}>{appointment.services.name}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: detail.color }]}>
-            <Ionicons name={detail.icon as any} size={14} color="#fff" />
-            <Text style={styles.statusText}>{detail.text}</Text>
+          <Text style={styles.serviceName} numberOfLines={2}>
+            {service?.name || 'Service not specified'}
+          </Text>
+          <Badge
+            text={statusText}
+            backgroundColor={bgColor}
+            textColor={textColor}
+            icon={<Icon size={12} color={textColor} />}
+          />
+        </View>
+
+        <View style={styles.detailsContainer}>
+          <View style={styles.detailRow}>
+            <Building size={16} color={theme.colors.secondary} />
+            <Text style={styles.detailText}>{clinic?.name || 'Clinic not specified'}</Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Calendar size={16} color={theme.colors.secondary} />
+            <Text style={styles.detailText}>{formattedDate}</Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Clock size={16} color={theme.colors.secondary} />
+            <Text style={styles.detailText}>{formattedTime}</Text>
           </View>
         </View>
-        <View style={styles.infoRow}>
-          <Ionicons name="calendar-outline" size={16} color={theme.colors.onSurfaceVariant} />
-          <Text variant="bodyMedium" style={styles.infoText}>
-            {format(new Date(appointment.appointment_datetime), 'EEE, MMM d, yyyy')}
-          </Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Ionicons name="time-outline" size={16} color={theme.colors.onSurfaceVariant} />
-          <Text variant="bodyMedium" style={styles.infoText}>
-            {format(new Date(appointment.appointment_datetime), 'h:mm a')}
-          </Text>
-        </View>
-        <View style={styles.separator} />
-        <View style={styles.infoRow}>
-          <Ionicons name="location-outline" size={16} color={theme.colors.onSurfaceVariant} />
-          <Text variant="bodyMedium" style={styles.infoText}>{appointment.clinics.name}</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Ionicons name="person-outline" size={16} color={theme.colors.onSurfaceVariant} />
-          <Text variant="bodyMedium" style={styles.infoText}>
-            {`Dr. ${appointment.providers.first_name} ${appointment.providers.last_name}`}
-          </Text>
-        </View>
-      </Card.Content>
+        
+        {status === 'scheduled' && (
+          <View style={styles.actionsContainer}>
+            <Button
+              variant="destructive"
+              size="sm"
+              onPress={onCancel}
+              disabled={isCancelling}
+            >
+              {isCancelling ? 'Cancelling...' : 'Cancel Appointment'}
+            </Button>
+          </View>
+        )}
+      </View>
     </Card>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    marginVertical: 8,
-    marginHorizontal: 16,
-    elevation: 2,
+    borderRadius: theme.radius.md,
+    padding: 0,
+    overflow: 'hidden',
+    flexDirection: 'column',
+  },
+  mainContent: {
+    flex: 1,
+    padding: theme.spacing.lg,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    marginBottom: theme.spacing.lg,
   },
   serviceName: {
-    flex: 1,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontFamily: theme.typography.fontFamilyBold,
+    color: theme.colors.foreground,
+    marginBottom: theme.spacing.md,
   },
-  statusBadge: {
+  detailsContainer: {},
+  detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 12,
+    marginBottom: theme.spacing.sm,
   },
-  statusText: {
-    color: '#fff',
-    marginLeft: 4,
-    fontSize: 12,
-    fontWeight: 'bold',
+  detailText: {
+    marginLeft: theme.spacing.md,
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamilyMedium,
+    color: theme.colors.secondary,
   },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
+  actionsContainer: {
+    marginTop: theme.spacing.md,
+    alignItems: 'flex-start',
   },
-  infoText: {
-    marginLeft: 8,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: '#e0e0e0',
-    marginVertical: 12,
-  },
-}); 
+});
+
+export default AppointmentCard; 

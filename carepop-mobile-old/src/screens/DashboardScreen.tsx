@@ -1,400 +1,472 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet,
   Text,
   View,
   ScrollView,
-  ActivityIndicator,
   TouchableOpacity,
-  FlatList,
+  ActivityIndicator,
 } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  Easing,
-} from 'react-native-reanimated';
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardFooter,
-  CardDescription,
-} from '../components/card.native';
-import { Button } from '../components/button.native';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
+import type { DrawerNavigationProp } from '@react-navigation/drawer';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useQuery, useMutation } from '@tanstack/react-query';
+
 import { theme } from '../components/theme';
 import { useAuth } from '../context/AuthContext';
-import { useQuery } from '@tanstack/react-query';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, DrawerActions, CommonActions } from '@react-navigation/native';
-import { DrawerNavigationProp } from '@react-navigation/drawer';
-import { DrawerParamList } from '../navigation/AppNavigator';
-import { Menu, HeartPulse, Stethoscope, Syringe, PersonStanding, Pill, FileText, User, Droplets, Bell, BookHeart, Calendar, Map, CheckCircle, XCircle, Smile, Meh, Frown, PlusCircle, AlertCircle } from 'lucide-react-native';
-import { getMyAppointments } from '../services/api';
-import type { DetailedAppointment } from '../lib/types';
+import type { DrawerParamList } from '../navigation/AppDrawerNavigator';
+import { getMyAppointments, getMyProfile, getAiInsight, getPublicClinics } from '../services/api';
+import type { AIInsight, Clinic } from '../lib/types';
+import AiInsightModal from '../components/health-buddy/AiInsightModal';
+import { Button } from '../components/button.native';
+import { parseISOString } from '../lib/utils/date';
+
+import {
+  ChevronRight,
+  Calendar,
+  ClipboardList,
+  HeartPulse,
+  Map,
+  Menu,
+  Stethoscope,
+  User,
+  Sparkles,
+  MapPin,
+} from 'lucide-react-native';
 
 type DashboardNavigationProp = DrawerNavigationProp<DrawerParamList>;
-type DashboardProps = {};
 
-interface QuickAction {
-  id: string;
-  name: string;
+const ActionCard = ({
+  icon: Icon,
+  title,
+  onPress,
+}: {
   icon: React.ElementType;
-  screen: keyof DrawerParamList;
-  iconColor: string;
-}
+  title: string;
+  onPress: () => void;
+}) => (
+  <TouchableOpacity style={styles.actionCard} onPress={onPress}>
+    <View style={styles.actionCardContent}>
+      <Icon size={24} color={theme.colors.primary} />
+      <Text style={styles.actionCardTitle}>{title}</Text>
+    </View>
+    <ChevronRight size={24} color={theme.colors.mutedForeground} />
+  </TouchableOpacity>
+);
 
-interface HealthService {
-  id: string;
-  name: string;
-  icon: React.ElementType;
-  screen: keyof DrawerParamList;
-}
+const RecordCard = ({
+    icon: Icon,
+    title,
+    description,
+    onPress,
+}: {
+    icon: React.ElementType;
+    title: string;
+    description: string;
+    onPress: () => void;
+}) => (
+    <TouchableOpacity style={styles.recordCard} onPress={onPress}>
+        <Icon size={24} color={theme.colors.primary} />
+        <View style={styles.recordCardTextContainer}>
+            <Text style={styles.recordCardTitle}>{title}</Text>
+            <Text style={styles.recordCardDescription}>{description}</Text>
+        </View>
+    </TouchableOpacity>
+);
 
-interface HealthBuddyTool {
-  id: string;
-  name: string;
-  description: string;
-  icon: React.ElementType;
-  screen: keyof DrawerParamList;
-}
+const ClinicCard = ({ clinic, onPress }: { clinic: Clinic, onPress: () => void }) => (
+    <TouchableOpacity style={styles.clinicCard} onPress={onPress}>
+        <Map size={24} color={theme.colors.secondary} />
+        <View style={styles.clinicCardTextContainer}>
+            <Text style={styles.clinicCardTitle} numberOfLines={1}>{clinic.name}</Text>
+            <Text style={styles.clinicCardAddress} numberOfLines={1}>{clinic.address?.street}, {clinic.address?.city}</Text>
+        </View>
+    </TouchableOpacity>
+);
 
-interface HealthStatusData {
-    pillLogged: boolean;
-    moodLogged: boolean;
-    cycleLogged: boolean;
-}
+export const DashboardScreen = () => {
+  const navigation = useNavigation<DashboardNavigationProp>();
+  const [isInsightModalVisible, setIsInsightModalVisible] = useState(false);
 
-const getIconForService = (serviceName: string): React.ElementType => {
-  const name = serviceName.toLowerCase();
-  if (name.includes('planning')) return HeartPulse;
-  if (name.includes('contraceptive')) return Pill;
-  if (name.includes('iud')) return Syringe;
-  if (name.includes('prenatal')) return PersonStanding;
-  if (name.includes('pap smear')) return Stethoscope;
-  if (name.includes('hiv')) return HeartPulse;
-  if (name.includes('gender-affirming')) return PersonStanding;
-  return Stethoscope;
+  const { data: profile } = useQuery({
+    queryKey: ['myProfile'],
+    queryFn: getMyProfile,
+  });
+
+  const {
+    data: appointments,
+    isLoading: isLoadingAppointments,
+  } = useQuery({
+    queryKey: ['myAppointments'],
+    queryFn: () => getMyAppointments(),
+  });
+
+  const { data: clinics, isLoading: isLoadingClinics } = useQuery<Clinic[]>({
+      queryKey: ['publicClinics'],
+      queryFn: () => getPublicClinics(),
+  });
+
+  const {
+    mutate: fetchAiInsight,
+    data: aiInsight,
+    isPending: isFetchingInsight,
+  } = useMutation<AIInsight>({
+    mutationFn: getAiInsight,
+    onSuccess: () => setIsInsightModalVisible(true),
+    onError: () => {
+      // For demo purposes, show mock insight on error
+      setIsInsightModalVisible(true);
+    },
+  });
+
+  const nextAppointment = appointments?.[0];
+
+  const renderAppointmentCard = () => {
+    if (isLoadingAppointments) {
+      return (
+        <View style={styles.mainCard}>
+          <ActivityIndicator color={theme.colors.primary} />
+        </View>
+      );
+    }
+
+    if (!nextAppointment) {
+      return (
+        <View style={styles.mainCard}>
+          <Text style={styles.mainCardTitle}>No Upcoming Appointments</Text>
+          <Text style={styles.mainCardSubtitle}>You&apos;re all clear! Book a new one anytime.</Text>
+          <Button 
+            title="Book a new appointment" 
+            onPress={() => navigation.navigate('Booking')}
+            style={{marginTop: theme.spacing.lg}}
+          />
+        </View>
+      );
+    }
+
+    const appointmentDate = parseISOString(nextAppointment.appointmentTime);
+
+    if (!appointmentDate) {
+        return (
+            <View style={styles.mainCard}>
+                <Text style={styles.mainCardTitle}>Next Appointment</Text>
+                <Text style={styles.mainCardSubtitle}>Could not display appointment time.</Text>
+            </View>
+        );
+    }
+
+    return (
+      <View style={styles.mainCard}>
+        <Text style={styles.mainCardTitle}>{nextAppointment.service.name}</Text>
+        <Text style={styles.mainCardSubtitle}>
+          {appointmentDate.toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'long',
+            day: 'numeric',
+          })} at {appointmentDate.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+        </Text>
+        <View style={styles.mainCardLocationContainer}>
+            <MapPin size={14} color={theme.colors.secondary} />
+            <Text style={styles.mainCardLocation}>
+                {nextAppointment.clinic.name}
+            </Text>
+        </View>
+        <Button 
+            title="View Details" 
+            onPress={() => navigation.navigate('Appointments')}
+            variant='default'
+            style={{marginTop: theme.spacing.lg, borderRadius: theme.radius.md}}
+        />
+      </View>
+    );
+  };
+
+  const renderClinics = () => (
+      <View style={styles.clinicsSection}>
+          <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Featured Clinics</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Clinic Finder')}>
+                  <Text style={styles.viewAllText}>View All</Text>
+              </TouchableOpacity>
+          </View>
+          {isLoadingClinics ? (
+              <ActivityIndicator color={theme.colors.primary} />
+          ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {clinics?.slice(0, 4).map(clinic => (
+                      <ClinicCard 
+                        key={clinic.id} 
+                        clinic={clinic} 
+                        onPress={() => navigation.navigate('Booking', { clinicId: clinic.id })}
+                      />
+                  ))}
+              </ScrollView>
+          )}
+      </View>
+  );
+
+  const mockAiInsight: AIInsight = {
+    insight: "We've noticed a pattern of headaches and fatigue. Consider discussing this with your provider. Remember to stay hydrated and get plenty of rest!"
+  }
+  
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.greetingText}>Welcome back,</Text>
+            <Text style={styles.displayNameText}>
+              {profile?.firstName || 'there'}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
+            style={styles.menuButton}>
+            <Menu size={28} color={theme.colors.foreground} />
+          </TouchableOpacity>
+        </View>
+        
+        <View>
+            <Text style={styles.sectionTitle}>Your Upcoming Appointment</Text>
+            {renderAppointmentCard()}
+        </View>
+
+        {renderClinics()}
+
+        <View style={{marginTop: theme.spacing.md}}>
+            <Text style={styles.sectionTitle}>Access our Health Buddy</Text>
+            <TouchableOpacity style={styles.insightCard} onPress={() => fetchAiInsight()}>
+              <View style={styles.actionCardContent}>
+                <Sparkles size={24} color={theme.colors.accentForeground} />
+                <View>
+                    <Text style={styles.insightCardTitle}>
+                    {isFetchingInsight ? 'Generating...' : 'Weekly Health Insight'}
+                    </Text>
+                    <Text style={styles.insightCardSubtitle}>Let AI summarize your week</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+        </View>
+
+        <View style={styles.actionsSection}>
+          <Text style={styles.sectionTitle}>Access your records</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <RecordCard
+                icon={ClipboardList}
+                title="My Medical Records"
+                description="View your health history."
+                onPress={() => navigation.navigate('Records')}
+            />
+            <RecordCard
+                icon={Calendar}
+                title="My Appointments"
+                description="Check your upcoming visits."
+                onPress={() => navigation.navigate('Appointments')}
+            />
+            <RecordCard
+                icon={User}
+                title="My Profile"
+                description="Update your information."
+                onPress={() => navigation.navigate('Profile')}
+            />
+          </ScrollView>
+        </View>
+      </ScrollView>
+
+      {isInsightModalVisible && (
+        <AiInsightModal
+          visible={isInsightModalVisible}
+          insight={aiInsight?.insight || mockAiInsight.insight}
+          onClose={() => setIsInsightModalVisible(false)}
+        />
+      )}
+    </SafeAreaView>
+  );
 };
-
-// Simplified data structure
-const quickActions: QuickAction[] = [
-  { id: '1', name: 'Book Appointment', icon: Calendar, screen: 'Book a Service', iconColor: theme.colors.primary },
-  { id: '2', name: 'Clinic Finder', icon: Map, screen: 'Clinic Finder', iconColor: theme.colors.secondary },
-  { id: '3', name: 'Health Buddy', icon: BookHeart, screen: 'Health Buddy', iconColor: theme.colors.primary },
-  { id: '4', name: 'My Records', icon: FileText, screen: 'Records', iconColor: theme.colors.secondary },
-];
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: theme.colors.background },
   container: {
     flex: 1,
     paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.lg,
+    paddingTop: theme.spacing.lg,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  menuButton: {
-    height: 48,
-    width: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTexts: {
-    flex: 1,
-    alignItems: 'flex-start',
-    paddingLeft: theme.spacing.md,
+    paddingVertical: theme.spacing.xl,
   },
   greetingText: {
-    ...theme.typography.body,
-    paddingTop: theme.spacing.md,
-    color: theme.colors.mutedForeground,
-    fontSize: 24,
+    ...theme.typography.h3,
+    fontSize: 28,
+    color: theme.colors.secondary,
   },
   displayNameText: {
-    ...theme.typography.h2,
+    ...theme.typography.h1,
+    fontSize: 36,
     color: theme.colors.primary,
-    paddingTop: theme.spacing.md,
-    fontFamily: theme.typography.interFontFamilyBold,
-    fontSize: 40,
+    fontFamily: theme.typography.fontFamilyBold,
   },
-  content: {
-    flex: 1,
-    justifyContent: 'flex-start',
-    paddingVertical: theme.spacing.lg,
-  },
-  cardShadow: {
-    shadowColor: theme.colors.foreground,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  appointmentCard: {
-    padding: theme.spacing.lg*1.2,
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.radius.md,
-    marginBottom: theme.spacing.lg,
-  },
-  appointmentTitle: {
-    ...theme.typography.h4,
-    fontFamily: theme.typography.fontFamilySemiBold,
+  menuButton: {
+    padding: theme.spacing.sm,
     color: theme.colors.secondary,
   },
-  appointmentDetails: {
+  mainCard: {
+    backgroundColor: theme.colors.card,
+    borderWidth: 0.5,
+    borderColor: theme.colors.muted,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.lg,
+    marginTop: theme.spacing.xs,
+  },
+  mainCardTitle: {
+    ...theme.typography.h4,
+    color: theme.colors.secondary,
+    fontFamily: theme.typography.fontFamilySemiBold,
+  },
+  mainCardSubtitle: {
     ...theme.typography.body,
     color: theme.colors.mutedForeground,
-    marginTop: theme.spacing.sm,
+    opacity: 0.8,
+    marginTop: theme.spacing.xs,
+  },
+  mainCardLocationContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.xs,
+      marginTop: theme.spacing.md,
+  },
+  mainCardLocation: {
+      ...theme.typography.small,
+      color: theme.colors.secondary,
+      opacity: 0.8,
+      fontFamily: theme.typography.fontFamilyMedium
   },
   insightCard: {
-    padding: theme.spacing.lg,
-    backgroundColor: theme.colors.card,
+    backgroundColor: theme.colors.secondary,
     borderRadius: theme.radius.md,
-  },
-  insightTitle: {
-    ...theme.typography.h4,
-    fontFamily: theme.typography.fontFamilySemiBold,
-    color: theme.colors.secondary,
-    marginBottom: theme.spacing.sm,
-  },
-  insightText: {
-    ...theme.typography.body,
-    color: theme.colors.mutedForeground,
-  },
-  healthBuddyCard: {
     padding: theme.spacing.lg,
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.radius.md,
-    marginBottom: theme.spacing.lg,
-  },
-  healthBuddyTitle: {
-    ...theme.typography.h4,
-    fontFamily: theme.typography.fontFamilySemiBold,
-    color: theme.colors.secondary,
-    marginBottom: theme.spacing.lg,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: theme.colors.border,
-    marginVertical: theme.spacing.lg,
-  },
-  healthStatusContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  statusItem: {
     alignItems: 'center',
-  },
-  statusText: {
-    ...theme.typography.small,
-    color: theme.colors.mutedForeground,
+    justifyContent: 'space-between',
     marginTop: theme.spacing.sm,
   },
-  quickActionsContainer: {
-  },
-  quickActionsTitle: {
-    ...theme.typography.h4,
+  insightCardTitle: {
+    ...theme.typography.h3,
+    color: theme.colors.accentForeground,
     fontFamily: theme.typography.fontFamilySemiBold,
-    color: theme.colors.foreground,
+  },
+  insightCardSubtitle: {
+      ...theme.typography.body,
+      color: theme.colors.accentForeground,
+      opacity: 0.9,
+  },
+  actionsSection: {
+    marginTop: theme.spacing.lg,
+  },
+  sectionHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: theme.spacing.md,
+  },
+  sectionTitle: {
+      ...theme.typography.h4,
+      color: theme.colors.secondary,
+      marginBottom: theme.spacing.md,
+      fontFamily: theme.typography.fontFamilySemiBold,
+  },
+  sectionSubtitle: {
+    ...theme.typography.body,
+    color: theme.colors.mutedForeground,
     marginBottom: theme.spacing.lg,
   },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+  viewAllText: {
+      ...theme.typography.body,
+      color: theme.colors.primary,
+      fontFamily: theme.typography.fontFamilySemiBold,
   },
-  quickActionTouchable: {
-    width: '48%',
-    marginBottom: theme.spacing.md,
+  clinicsSection: {
+      marginTop: theme.spacing.xl,
   },
-  quickActionItem: {
+  clinicCard: {
+      backgroundColor: theme.colors.card,
+      borderRadius: theme.radius.md,
+      padding: theme.spacing.lg,
+      width: 250,
+      marginRight: theme.spacing.md,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.lg,
+  },
+  clinicCardTextContainer: {
+      flex: 1,
+  },
+  clinicCardTitle: {
+      ...theme.typography.h4,
+      fontFamily: theme.typography.fontFamilySemiBold,
+      color: theme.colors.foreground,
+  },
+  clinicCardAddress: {
+      ...theme.typography.small,
+      color: theme.colors.mutedForeground,
+      marginTop: theme.spacing.xs,
+  },
+  actionCard: {
     backgroundColor: theme.colors.card,
     borderRadius: theme.radius.md,
-    padding: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    height: 120,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing.md,
   },
-  quickActionText: {
+  actionCardContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.lg,
+  },
+  actionCardTitle: {
     ...theme.typography.body,
+    fontFamily: theme.typography.fontFamilySemiBold,
     color: theme.colors.foreground,
-    textAlign: 'center',
-    marginTop: theme.spacing.md,
-    fontFamily: theme.typography.fontFamilyMedium,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.colors.background,
+  recordCardsContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: theme.spacing.sm,
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: theme.spacing.lg,
+  recordCard: {
+      backgroundColor: theme.colors.card,
+      borderRadius: theme.radius.md,
+      padding: theme.spacing.sm,
+      width: 200,
+      marginRight: theme.spacing.md,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.lg,
   },
-  errorText: {
-    ...theme.typography.body,
-    color: theme.colors.destructive,
-    textAlign: 'center',
+  recordCardTextContainer: {
+      flex: 1,
+  },
+  recordCardTitle: {
+      ...theme.typography.h4,
+      fontFamily: theme.typography.fontFamilySemiBold,
+      color: theme.colors.foreground,
+  },
+  recordCardDescription: {
+      ...theme.typography.small,
+      color: theme.colors.mutedForeground,
+      marginTop: theme.spacing.xs,
   },
 });
-
-export const DashboardScreen: React.FC<DashboardProps> = () => {
-  const { user } = useAuth();
-  const navigation = useNavigation<DashboardNavigationProp>();
-  const insets = useSafeAreaInsets();
-  const opacity = useSharedValue(0);
-
-  const { data: appointments, isLoading, isError, error } = useQuery<DetailedAppointment[], Error>({
-    queryKey: ['myAppointments'],
-    queryFn: () => getMyAppointments(),
-  });
-
-  const upcomingAppointment = appointments?.[0];
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-  }));
-
-  useEffect(() => {
-    opacity.value = withTiming(1, {
-      duration: 800,
-      easing: Easing.out(Easing.ease),
-    });
-  }, []);
-
-  const WelcomeHeader = () => (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <Animated.View style={[styles.container, animatedStyle]}>
-        <View style={styles.header}>
-          <View style={styles.headerTexts}>
-            <Text style={styles.greetingText}>Welcome back,</Text>
-            <Text style={styles.displayNameText} numberOfLines={1}>
-              {user?.firstName || 'User'}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={styles.menuButton}
-            onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Menu size={32} color={theme.colors.foreground} />
-          </TouchableOpacity>
-        </View>
-      </Animated.View>
-    </SafeAreaView>
-  );
-
-  const UpcomingAppointment = () => {
-    if (isLoading) {
-      return (
-        <View style={styles.appointmentCard}>
-          <ActivityIndicator color={theme.colors.primary} />
-        </View>
-      );
-    }
-
-    if (isError) {
-      return (
-        <View style={[styles.appointmentCard, { backgroundColor: theme.colors.destructiveMuted }]}>
-          <Text style={styles.appointmentTitle}>Error</Text>
-          <Text style={styles.appointmentDetails}>
-            Could not load appointments. Please try again later.
-          </Text>
-        </View>
-        
-      );
-    }
-
-    if (!upcomingAppointment) {
-      return (
-        <View style={styles.appointmentCard}>
-          <Text style={styles.appointmentTitle}>No Upcoming Appointments</Text>
-          <Text style={styles.appointmentDetails}>You&apos;re all clear! Book a new appointment anytime.</Text>
-          <Button
-            title="Set an appointment"
-            variant="secondary"
-            size="xl"
-            onPress={() => navigation.navigate('Book a Service')}
-            style={{ marginTop: theme.spacing.lg }}
-          />
-        </View>
-      );
-    }
-    
-    return (
-      <View style={styles.appointmentCard}>
-        <Text style={styles.appointmentTitle}>Next Appointment</Text>
-        <Text style={styles.appointmentDetails}>
-          {new Date(upcomingAppointment.appointmentTime).toLocaleDateString('en-US', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
-        </Text>
-         <Text style={styles.appointmentDetails}>
-           With {upcomingAppointment.doctor.fullName} at {upcomingAppointment.clinic.name}
-        </Text>
-      </View>
-    );
-  };
-
-  const QuickActions = () => (
-    <View style={styles.quickActionsContainer}>
-      <Text style={styles.quickActionsTitle}>Quick Actions</Text>
-      <View style={styles.quickActionsGrid}>
-        {quickActions.map((action) => (
-          <TouchableOpacity 
-            key={action.id}
-            style={styles.quickActionTouchable}
-            onPress={() => navigation.navigate(action.screen)}
-          >
-            <View style={styles.quickActionItem}>
-              <action.icon size={32} color={action.iconColor} />
-              <Text style={styles.quickActionText}>{action.name}</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-
-  if (isLoading) {
-    return <View style={styles.loadingContainer}><ActivityIndicator size="large" /></View>;
-  }
-
-  if (isError) {
-    return <View style={styles.errorContainer}><Text style={styles.errorText}>Error: {(error as Error).message}</Text></View>;
-  }
-
-  return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <WelcomeHeader />
-        <Animated.View style={[styles.content, animatedStyle]}>
-          <UpcomingAppointment />
-          <QuickActions />
-        </Animated.View>
-      </ScrollView>
-    </SafeAreaView>
-  );
-};
 

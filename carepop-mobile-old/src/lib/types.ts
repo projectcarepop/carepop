@@ -2,7 +2,7 @@
 // Ideally, these types would be in a shared package.
 
 export type AppointmentStatus = 'scheduled' | 'completed' | 'canceled_by_patient' | 'canceled_by_admin' | 'no_show';
-export type MedicalRecordType = 'PRESCRIPTION' | 'LAB_ORDER' | 'DOCTOR_NOTE';
+export type MedicalRecordType = 'PRESCRIPTION' | 'CLINICAL_DOCUMENT' | 'DOCTOR_NOTE';
 export type OrderStatus = 'pending_payment' | 'processing' | 'shipped' | 'delivered' | 'canceled';
 export type UserRole = 'patient' | 'admin';
 export type DayOfWeek = "SUNDAY" | "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY";
@@ -121,9 +121,49 @@ export type AppointmentWithRelations = Appointment & {
   service: Pick<Service, 'id' | 'name' | 'price' | 'durationMinutes'>;
 };
 
-// This is the shape returned by the getMyMedicalRecords API call now
-export type MedicalRecordWithRelations = MedicalRecord & {
-  appointments: AppointmentWithRelations;
+// This is the shape returned by the GET /api/me/records endpoint
+export type MedicalRecordWithRelations = {
+  id: string;
+  recordType: MedicalRecordType;
+  createdAt: string;
+  appointment: {
+    id: string;
+    appointmentTime: string;
+    doctor: Pick<Doctor, 'fullName'> | null;
+    clinic: Pick<Clinic, 'name'> | null;
+    service: Pick<Service, 'name'> | null;
+  };
+};
+
+export type DetailedMedicalRecord = {
+  recordId: string;
+  recordType: MedicalRecordType;
+  createdAt: string;
+  appointment: {
+    id: string;
+    appointmentTime: string;
+  };
+  doctor: {
+    fullName:string;
+  };
+  clinic: {
+    name: string;
+  };
+  service: {
+    name: string;
+  };
+  details: {
+    // DOCTOR_NOTE
+    note?: string;
+    // PRESCRIPTION
+    medicationName?: string;
+    dosage?: string;
+    frequency?: string;
+    instructions?: string;
+    // DOCUMENT
+    documentUrl?: string;
+    documentName?: string;
+  } | null;
 };
 
 export type DetailedAppointment = Appointment & {
@@ -143,4 +183,44 @@ export type AvailabilitySlot = {
 // New type for the combined service and category data
 export type ServiceWithCategory = Service & {
   serviceCategory: ServiceCategory | null;
+};
+
+export type AvailabilityResponse = {
+  availableSlots: string[];
+  doctorsForSlot: Record<string, string[]>;
+};
+
+// --- Health Buddy Types ---
+
+export type HealthLog = {
+  id: string;
+  userId: string;
+  mood: string | null;
+  symptoms: string[] | null;
+  notes: string | null;
+  logDate: string; // "YYYY-MM-DD"
+  createdAt: string;
+};
+
+export type CreateHealthLogPayload = Omit<HealthLog, 'id' | 'userId' | 'createdAt'>;
+
+export type AIInsight = {
+  insight: string;
+};
+
+// --- New Health Buddy Types ---
+
+export type MenstrualLog = {
+  id: string;
+  userId: string;
+  startDate: string; // "YYYY-MM-DD"
+  endDate: string; // "YYYY-MM-DD"
+  createdAt: string;
+};
+
+export type CreateMenstrualLogPayload = Omit<MenstrualLog, 'id' | 'userId' | 'createdAt'>;
+
+export type HealthLogSummary = {
+  frequentSymptoms: { symptom: string; count: number }[];
+  // other summary data can be added here in the future
 };

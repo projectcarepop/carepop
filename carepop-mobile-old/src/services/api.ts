@@ -10,6 +10,12 @@ import type {
   UpdateProfileApiPayload,
   AvailabilitySlot,
   ServiceWithCategory,
+  HealthLog,
+  CreateHealthLogPayload,
+  AIInsight,
+  MenstrualLog,
+  CreateMenstrualLogPayload,
+  HealthLogSummary,
 } from "../lib/types";
 import type { RegisterFormValues, LoginFormValues } from '../lib/validation/auth';
 import { keysToCamel } from "../lib/utils/data-transformation";
@@ -33,7 +39,7 @@ if (!API_URL) {
  * @param options Standard fetch options, including the Authorization header.
  * @returns The JSON response from the API.
  */
-async function apiFetch(path: string, options: RequestInit = {}) {
+async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -43,7 +49,6 @@ async function apiFetch(path: string, options: RequestInit = {}) {
   };
 
   if (options.headers) {
-    // Merge existing headers
     Object.assign(headers, options.headers);
   }
 
@@ -59,24 +64,30 @@ async function apiFetch(path: string, options: RequestInit = {}) {
   if (!response.ok) {
     try {
       const errorBody = await response.json();
-      // Create a more informative error
-      const message = errorBody.error || `API request failed with status ${response.status}`;
+      let message = `API request failed with status ${response.status}`;
+
+      if (errorBody.error) {
+        if (typeof errorBody.error === 'string') {
+          message = errorBody.error;
+        } else if (typeof errorBody.error === 'object' && errorBody.error.issues) {
+          message = errorBody.error.issues.map((issue: any) => `${issue.path.join('.')} - ${issue.message}`).join('\\n');
+        } else {
+          message = JSON.stringify(errorBody.error);
+        }
+      }
+      
       const error = new Error(message);
-      // You can attach more context to the error if needed
-      // (error as any).status = response.status;
       throw error;
     } catch (e) {
-      // If parsing the error body fails, throw a generic error
       if (e instanceof Error) {
-        throw e; // re-throw the informative error from the try block
+        throw e;
       }
       throw new Error(`API request failed with status ${response.status}`);
     }
   }
 
-  // Handle responses with no content (e.g., 204 for DELETE)
   if (response.status === 204) {
-    return null;
+    return null as any;
   }
 
   return response.json();
@@ -114,7 +125,7 @@ async function supabaseAuthCall<T>(responsePromise: Promise<{ data: T; error: im
 }
 
 // ============================================================================
-// AUTHENTICATED ROUTES (require a Supabase client instance)
+// AUTHENTICATED ROUTES
 // ============================================================================
 
 /**
@@ -122,9 +133,10 @@ async function supabaseAuthCall<T>(responsePromise: Promise<{ data: T; error: im
  * @returns A promise that resolves to an array of detailed appointments.
  */
 export const getMyAppointments = async (): Promise<DetailedAppointment[]> => {
-  return apiFetch("/api/me/appointments", {
+  const result = await apiFetch<{ appointments: DetailedAppointment[] }>("/api/me/appointments", {
     method: "GET",
   });
+  return result?.appointments || [];
 };
 
 /**
@@ -181,29 +193,67 @@ export async function updateMyProfile(
 }
 
 /**
- * Retrieves the medical records for the currently authenticated user.
+ * Retrieves the medical records for the currently authenticated user by calling the backend endpoint.
  * @returns A promise that resolves to an array of medical records.
  */
 export const getMyMedicalRecords = async (): Promise<MedicalRecord[]> => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("User not authenticated");
+  const response = await apiFetch<{ records: MedicalRecord[] }>('/api/me/records');
+  return response?.records ?? [];
+};
 
-  const records = await supabaseCall(
-    supabase
-      .from("medical_records")
-      .select("*")
-      .eq("user_id", user.id)
-  );
-  return records ?? [];
+// ============================================================================
+// HEALTH BUDDY API
+// ============================================================================
+
+/**
+ * Creates a new health log for the authenticated user.
+ */
+export const createHealthLog = async (payload: CreateHealthLogPayload): Promise<HealthLog> => {
+  return apiFetch<HealthLog>('/api/me/health-logs', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+};
+
+/**
+ * Creates a new menstrual cycle log for the authenticated user.
+ */
+export const createMenstrualLog = async (payload: CreateMenstrualLogPayload): Promise<MenstrualLog> => {
+  // Assuming a backend endpoint like '/api/me/menstrual-logs'
+  // This will need to be created in the backend.
+  return apiFetch<MenstrualLog>('/api/me/menstrual-logs', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+};
+
+/**
+ * Fetches all health logs for the authenticated user.
+ */
+export const getHealthLogs = async (): Promise<HealthLog[]> => {
+  const result = await apiFetch<{ health_logs: HealthLog[] }>('/api/me/health-logs', {
+    method: 'GET',
+  });
+  return result?.health_logs || [];
+};
+
+/**
+ * Fetches a summary of health logs, like most frequent symptoms for the last 7 days.
+ */
+export const getHealthLogSummary = async (): Promise<HealthLogSummary> => {
+  // Assuming a backend endpoint like '/api/me/health-logs/summary'
+  // This will need to be created in the backend.
+  const summary = await apiFetch<HealthLogSummary>('/api/me/health-logs/summary');
+  return summary ?? { frequentSymptoms: [] };
 };
 
 /**
  * Fetches an AI insight based on the user's health logs.
  * @returns A promise that resolves to an object containing the AI insight.
  */
-export const getAiInsight = async (): Promise<{ insight: string }> => {
-  return apiFetch("/api/me/ai/insight", {
-    method: "POST", // Assuming this is a POST as it may involve sending data
+export const getAiInsight = async (): Promise<AIInsight> => {
+  return apiFetch<AIInsight>("/api/me/ai/insight", {
+    method: "POST", // This is a POST as it triggers a generation process
   });
 };
 
@@ -226,7 +276,7 @@ export type NewAppointmentPayload = {
 export const createAppointment = async (
   appointmentData: NewAppointmentPayload,
 ): Promise<DetailedAppointment> => {
-  return apiFetch("/api/me/appointments", {
+  return apiFetch<DetailedAppointment>("/api/me/appointments", {
     method: "POST",
     body: JSON.stringify(appointmentData),
   });
@@ -238,34 +288,23 @@ export const createAppointment = async (
 
 /**
  * Fetches all publicly available clinics.
- * @param serviceId Optional service ID to filter clinics by.
  * @returns A promise that resolves to an array of clinics.
  */
 export const getPublicClinics = async (): Promise<Clinic[]> => {
-  const clinics = await supabaseCall(supabase.from('clinics').select('*'));
-  return clinics ?? [];
+  const response = await apiFetch<{ data: Clinic[] }>("/api/public/clinics");
+  return response?.data ?? [];
 };
 
 /**
  * Fetches publicly available services. If a clinic ID is provided, it fetches
- * services specific to that clinic from our backend API. Otherwise, it returns all services.
- * @param clinicId Optional clinic ID to filter services by.
+ * services available at that specific clinic.
+ * @param clinicId Optional clinic ID.
  * @returns A promise that resolves to an array of services with their categories.
  */
 export const getPublicServices = async (clinicId?: string): Promise<ServiceWithCategory[]> => {
-  if (clinicId) {
-    // This endpoint should be updated in the backend to return the nested category.
-    // For now, we assume it does, matching the web client's expectation.
-    return apiFetch(`/api/public/clinics/${clinicId}/services`);
-  }
-  // Fetch all services with their category joined.
-  const services = await supabaseCall(
-    supabase.from('services').select(`
-      *,
-      serviceCategory:service_categories(*)
-    `)
-  );
-  return services ?? [];
+  const endpoint = clinicId ? `/api/public/services?clinicId=${clinicId}` : '/api/public/services';
+  const response = await apiFetch<{ data: ServiceWithCategory[] }>(endpoint);
+  return response?.data ?? [];
 };
 
 type GetAvailabilityParams = {
@@ -274,16 +313,23 @@ type GetAvailabilityParams = {
   date: string; // YYYY-MM-DD
 };
 
+export type AvailabilityResponse = {
+  availableSlots: string[];
+  doctorsForSlot: Record<string, string[]>;
+};
+
 /**
  * Fetches doctor availability for a given service, clinic, and date.
  * @param params The service, clinic, and date to filter by.
- * @returns A promise that resolves to an array of availability slots.
+ * @returns A promise that resolves to an object containing available slots and doctor mapping.
  */
 export const getPublicAvailability = async (
   params: GetAvailabilityParams,
-): Promise<AvailabilitySlot[]> => {
+): Promise<AvailabilityResponse> => {
   const query = new URLSearchParams(params).toString();
-  return apiFetch(`/api/public/availability?${query}`);
+  const response = await apiFetch<AvailabilityResponse>(`/api/public/availability?${query}`);
+  // The backend already returns the correct shape, but if it's null/undefined, return a default empty state
+  return response ?? { availableSlots: [], doctorsForSlot: {} };
 };
 
 /**
@@ -300,7 +346,8 @@ export const getPublicAvailableDates = async ({
 }): Promise<string[]> => {
   const query = new URLSearchParams({ clinicId, serviceId }).toString();
   // This endpoint needs to be created in the backend. We assume it exists for now.
-  return apiFetch(`/api/public/available-dates?${query}`);
+  const response = await apiFetch<{ data: string[] }>(`/api/public/available-dates?${query}`);
+  return response?.data ?? [];
 };
 
 /**
@@ -316,7 +363,7 @@ export const getPublicSlots = async ({
   clinicId: string;
   serviceId:string;
 }): Promise<AvailabilitySlot[]> => {
-  return apiFetch(`/api/public/clinics/${clinicId}/slots?serviceId=${serviceId}`);
+  return apiFetch<AvailabilitySlot[]>(`/api/public/clinics/${clinicId}/slots?serviceId=${serviceId}`);
 };
 
 /**
@@ -324,8 +371,7 @@ export const getPublicSlots = async ({
  * @returns A promise that resolves to an array of service categories.
  */
 export const getPublicServiceCategories = async (): Promise<ServiceCategory[]> => {
-  // Assuming v1 endpoint based on backend routing file
-  return apiFetch("/api/v1/service-categories");
+  return apiFetch<ServiceCategory[]>("/api/public/service-categories");
 };
 
 export const forgotPassword = async (email: string): Promise<void> => {
@@ -377,22 +423,6 @@ export const cancelAppointment = async (id: string): Promise<void> => {
       .update({ status: 'canceled_by_patient' })
       .eq('id', id)
   );
-};
-
-export type HealthLogPayload = {
-  mood: string;
-  symptoms: string[];
-  notes?: string;
-};
-
-export const logHealthData = async (payload: HealthLogPayload): Promise<void> => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("User not authenticated");
-
-  await supabaseCall(supabase.from('health_logs').insert({
-    user_id: user.id,
-    ...payload,
-  }));
 };
 
 export const signUpWithEmail = async (payload: RegisterFormValues) => {

@@ -22,6 +22,8 @@ interface ButtonProps extends PressableProps {
   disabled?: boolean;
   icon?: React.ReactNode;
   fullWidth?: boolean;
+  textStyle?: TextStyle;
+  children?: React.ReactNode;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -33,7 +35,9 @@ export const Button: React.FC<ButtonProps> = ({
   icon,
   fullWidth = false,
   style,
+  textStyle: customTextStyle,
   onPress,
+  children,
   ...rest
 }) => {
   const isDisabled = disabled || isLoading;
@@ -61,6 +65,10 @@ export const Button: React.FC<ButtonProps> = ({
     sizeStyles[size].text,
   ];
 
+  if (customTextStyle) {
+    textStyle.push(customTextStyle);
+  }
+
   const iconColor = variantStyles[variant].text.color;
 
   return (
@@ -70,7 +78,15 @@ export const Button: React.FC<ButtonProps> = ({
       ) : (
         <View style={styles.contentContainer}>
           {icon}
-          {title && <Text style={textStyle}>{title}</Text>}
+          {children ? (
+            typeof children === 'string' ? (
+              <Text style={textStyle}>{children}</Text>
+            ) : (
+              children
+            )
+          ) : title ? (
+            <Text style={textStyle}>{title}</Text>
+          ) : null}
         </View>
       )}
     </Pressable>
