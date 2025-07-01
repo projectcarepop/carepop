@@ -62,7 +62,10 @@ export type UpdateProfileApiPayload = {
 export type Clinic = {
   id: string;
   name: string;
-  address: any | null; // JSONB
+  address: any | null; // JSONB, consider creating a specific type for this later
+  latitude: number;
+  longitude: number;
+  distance?: number; // Optional, only present when searching with location
   // ... add other clinic fields as needed
 };
 

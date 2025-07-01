@@ -301,6 +301,44 @@ export const getPublicClinics = async (): Promise<Clinic[]> => {
 };
 
 /**
+ * Searches for public clinics with optional filters for name, service, and location.
+ * @param filters An object containing optional search criteria.
+ * @param filters.name A search term to filter clinics by name.
+ * @param filters.serviceId The ID of a service to filter clinics by.
+ * @param filters.lat The latitude of the user's location for proximity sorting.
+ * @param filters.lon The longitude of the user's location for proximity sorting.
+ * @returns A promise that resolves to an array of clinics, potentially including distance.
+ */
+export const searchPublicClinics = async (filters: {
+  name?: string;
+  serviceId?: string;
+  lat?: number;
+  lon?: number;
+  radius?: number; // Radius in kilometers
+}): Promise<Clinic[]> => {
+  const params = new URLSearchParams();
+  if (filters.name) {
+    params.append('name', filters.name);
+  }
+  if (filters.serviceId) {
+    params.append('serviceId', filters.serviceId);
+  }
+  if (filters.lat && filters.lon) {
+    params.append('lat', filters.lat.toString());
+    params.append('lon', filters.lon.toString());
+  }
+  if (filters.radius) {
+    params.append('radius', filters.radius.toString());
+  }
+
+  const queryString = params.toString();
+  const path = `/api/public/search/clinics${queryString ? `?${queryString}` : ''}`;
+  
+  const data = await apiFetch<{ clinics: Clinic[] }>(path);
+  return data?.clinics ?? [];
+};
+
+/**
  * Fetches publicly available services. If a clinic ID is provided, it fetches
  * services available at that specific clinic.
  * @param clinicId Optional clinic ID.

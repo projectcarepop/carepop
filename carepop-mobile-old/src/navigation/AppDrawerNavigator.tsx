@@ -12,7 +12,7 @@ import { DashboardScreen } from '../screens/DashboardScreen';
 import MyAppointmentsScreen from '../screens/MyAppointmentsScreen';
 import { AppointmentDetailScreen } from '../screens/AppointmentDetailScreen';
 import BookingScreen from '../screens/BookingScreen';
-import { ClinicFinderScreen } from '../screens/ClinicFinderScreen';
+import { ClinicFinderScreen } from '../screens/finder/ClinicFinderScreen';
 import HealthBuddyDashboardScreen from '../screens/health-buddy/HealthBuddyDashboardScreen';
 import LogSymptomsScreen from '../screens/health-buddy/LogSymptomsScreen';
 import LogPeriodScreen from '../screens/health-buddy/LogPeriodScreen';
