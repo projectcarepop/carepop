@@ -23,3 +23,7 @@ memory-bank/
 .cursor\rules
 context/
 final-blueprint/
+
+# Environment variables
+*.env
+/carepop-backend-v2/.env
