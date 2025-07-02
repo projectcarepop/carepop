@@ -90,18 +90,33 @@ const BookingWizard = () => {
   const {
     data: availableSlots,
     isLoading: isLoadingAvailability,
+    isError: isErrorAvailability,
+    error: availabilityError,
+    isFetching: isFetchingAvailability,
   } = useQuery<string[], Error>({
     queryKey: ['availabilitySlots', selectedClinicId, selectedServiceId, selectedDate],
     queryFn: () => {
-      // @ts-expect-error - Assuming getAvailableSlots will be created in api.ts
-      return getAvailableSlots({
+      const params = {
         clinicId: selectedClinicId!,
         serviceId: selectedServiceId!,
         date: format(selectedDate!, 'yyyy-MM-dd'),
-      });
+      };
+      // LOG #1: What are we sending?
+      console.log("%c[QUERY FN] Fetching availability with params:", "color: blue; font-weight: bold;", params);
+      return getAvailableSlots(params);
     },
     enabled: !!(selectedClinicId && selectedServiceId && selectedDate),
   });
+
+  // LOG #2: What is the query's real-time state?
+  console.groupCollapsed(`[QUERY STATE] Availability Query Status`);
+  console.log(`enabled: ${!!(selectedClinicId && selectedServiceId && selectedDate)}`);
+  console.log(`isFetching: ${isFetchingAvailability}`);
+  console.log(`isLoading: ${isLoadingAvailability}`);
+  console.log(`isError: ${isErrorAvailability}`);
+  if (isErrorAvailability) console.error("Error Object:", availabilityError);
+  console.log("Data:", availableSlots);
+  console.groupEnd();
 
   // --- CLIENT-SIDE FILTERING LOGIC ---
 

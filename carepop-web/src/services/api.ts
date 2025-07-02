@@ -518,6 +518,18 @@ export async function getPublicClinicDetails(clinicId: string) {
   return response.json();
 }
 
+export async function getAvailableSlots(params: { serviceId: string; clinicId: string; date: string; }): Promise<string[]> {
+  const { serviceId, clinicId, date } = params;
+  const url = `${API_BASE_URL}/api/public/availability/slots?serviceId=${serviceId}&clinicId=${clinicId}&date=${date}`;
+  const response = await fetch(url, { cache: 'no-store' });
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.status}`}));
+    throw new Error(error.message || "Failed to fetch available slots.");
+  }
+  return response.json();
+}
+
 export async function getClinicDetails(clinicId: string) {
   const url = `${API_BASE_URL}/api/public/clinics/${clinicId}`;
   const response = await fetch(url, { cache: 'no-store' });
@@ -528,24 +540,6 @@ export async function getClinicDetails(clinicId: string) {
   return response.json();
 }
 
-export async function getPublicAvailability(params: { serviceId: string; clinicId: string; date: string; }) {
-  const { serviceId, clinicId, date } = params;
-  const url = `${API_BASE_URL}/api/public/availability?serviceId=${serviceId}&clinicId=${clinicId}&date=${date}`;
-  const response = await fetch(url);
-  const responseText = await response.text(); // Get response as text first
-  console.log(`[API Service] Raw response for availability:`, responseText); // LOG IT
-  if (!response.ok) throw new Error("Failed to fetch availability.");
-  return JSON.parse(responseText); // Now parse it
-}
-
-export async function getPublicAvailableDates(params: { clinicId: string; serviceId: string; }) {
-    const url = `${API_BASE_URL}/api/public/availability/dates?clinicId=${params.clinicId}&serviceId=${params.serviceId}`;
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error('Failed to fetch available dates.');
-    }
-    return response.json();
-}
 
 export async function getProvidersForService(serviceId: string) {
     const url = `${API_BASE_URL}/api/public/services/${serviceId}/providers`;
