@@ -95,9 +95,7 @@ export const inventoryRelations = relations(inventory, ({one}) => ({
 		fields: [inventory.productId],
 		references: [products.id]
 	}),
-}));
-
-export const patientOrdersRelations = relations(patientOrders, ({one, many}) => ({
+}));export const patientOrdersRelations = relations(patientOrders, ({one, many}) => ({
 	profile: one(profiles, {
 		fields: [patientOrders.patientId],
 		references: [profiles.id]
@@ -151,3 +149,4 @@ export const patientOrderItemsRelations = relations(patientOrderItems, ({one}) =
 		references: [products.id]
 	}),
 }));
+

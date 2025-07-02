@@ -7,7 +7,6 @@ import { eq, sql, count, asc, and, gte, lt, getTableColumns, desc, inArray } fro
 import { authMiddleware, adminMiddleware, AuthEnv } from '../middleware/auth';
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
-import { type File } from 'hono/utils/body';
 
 const adminRoutes = new Hono<AuthEnv>();
 
@@ -667,21 +666,23 @@ adminRoutes.post('/appointments/:id/records', zValidator('json', newMedicalRecor
     const payload = c.req.valid('json');
 
     try {
-        const newRecord = await db.transaction(async (tx) => {
+        const newRecordWithDetails = await db.transaction(async (tx) => {
             const [record] = await tx.insert(medicalRecords).values({
                 appointmentId: appointmentId,
                 recordType: payload.recordType,
             }).returning();
 
+            let details: any = null;
+
             switch (payload.recordType) {
                 case 'DOCTOR_NOTE':
-                    await tx.insert(recordDoctorNotes).values({
+                    [details] = await tx.insert(recordDoctorNotes).values({
                         recordId: record.id,
                         note: payload.details.note,
-                    });
+                    }).returning();
                     break;
                 case 'PRESCRIPTION':
-                    await tx.insert(recordPrescriptions).values({
+                    [details] = await tx.insert(recordPrescriptions).values({
                         recordId: record.id,
                         medication: payload.details.medication,
                         dosage: payload.details.dosage,
@@ -689,23 +690,13 @@ adminRoutes.post('/appointments/:id/records', zValidator('json', newMedicalRecor
                         startDate: payload.details.startDate,
                         endDate: payload.details.endDate,
                         notes: payload.details.notes,
-                    });
+                    }).returning();
                     break;
             }
-            return record;
+            return { ...record, details };
         });
 
-        // Refetch the created record with its details to return to the client
-        const finalRecord = await db.query.medicalRecords.findFirst({
-            where: eq(medicalRecords.id, newRecord.id),
-            with: {
-                doctorNote: true,
-                prescription: true,
-                document: true,
-            }
-        });
-
-        return c.json({ data: finalRecord }, 201);
+        return c.json({ data: newRecordWithDetails }, 201);
 
     } catch (error: any) {
         console.error(`Failed to create medical record for appointment ${appointmentId}:`, error);
@@ -732,7 +723,7 @@ adminRoutes.post('/appointments/:appointmentId/documents', async (c) => {
 
     // 1. Upload to Supabase
     const { error: uploadError } = await supabase.storage
-        .from('medical_documents')
+        .from('medical-documents')
         .upload(filePath, documentFile);
 
     if (uploadError) {
@@ -763,7 +754,7 @@ adminRoutes.post('/appointments/:appointmentId/documents', async (c) => {
     } catch (dbError: any) {
         console.error('Database error after upload:', dbError);
         // Attempt to delete the orphaned file from storage
-        await supabase.storage.from('medical_documents').remove([filePath]);
+        await supabase.storage.from('medical-documents').remove([filePath]);
         return c.json({ error: 'Failed to save document record.', message: dbError.message }, 500);
     }
 });
