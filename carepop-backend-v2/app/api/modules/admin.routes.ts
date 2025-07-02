@@ -138,10 +138,10 @@ const newMedicalRecordSchema = z.discriminatedUnion("recordType", [
     prescriptionSchema,
 ]);
 
-// Schema for document uploads (multipart/form-data)
-const documentUploadSchema = z.object({
-    documentName: z.string().min(1, 'Document name is required.'),
-    document: z.instanceof(File, { message: 'A file is required for upload.' }),
+// Zod schema for multipart/form-data
+const uploadDocumentSchema = z.object({
+  documentName: z.string().min(1),
+  file: z.instanceof(File),
 });
 
 // --- Clinic Management Endpoints ---
@@ -704,60 +704,69 @@ adminRoutes.post('/appointments/:id/records', zValidator('json', newMedicalRecor
     }
 });
 
-adminRoutes.post('/appointments/:appointmentId/documents', async (c) => {
-    const appointmentId = c.req.param('appointmentId');
-    const body = await c.req.parseBody();
-    const documentFile = body['document'] as File;
-    const documentName = body['documentName'] as string;
-
-    // Basic validation
-    if (!documentFile || !(documentFile instanceof File)) {
-        return c.json({ error: 'Document file is required.' }, 400);
-    }
-    if (!documentName || typeof documentName !== 'string') {
-        return c.json({ error: 'Document name is required.' }, 400);
-    }
-
-    const supabase = createClient(c.env.SUPABASE_URL!, c.env.SUPABASE_SERVICE_ROLE_KEY!);
-    const filePath = `public/${appointmentId}_${uuidv4()}-${documentFile.name}`;
-
-    // 1. Upload to Supabase
-    const { error: uploadError } = await supabase.storage
-        .from('medical-documents')
-        .upload(filePath, documentFile);
-
-    if (uploadError) {
-        console.error('Supabase upload error:', uploadError);
-        return c.json({ error: 'Failed to upload document.', message: uploadError.message }, 500);
-    }
-
-    // 2. Create DB entries in a transaction
+adminRoutes.post(
+  '/appointments/:id/documents',
+  zValidator('form', uploadDocumentSchema), // Use 'form' for multipart/form-data
+  async (c) => {
+    console.log("[UPLOAD_DOC] Endpoint hit.");
     try {
-        const newRecord = await db.transaction(async (tx) => {
-            const [record] = await tx.insert(medicalRecords).values({
-                appointmentId,
-                recordType: 'CLINICAL_DOCUMENT',
-            }).returning();
+      const { id: appointmentId } = c.req.param();
+      const { documentName, file } = c.req.valid('form');
+      
+      console.log(`[UPLOAD_DOC] Received data: appointmentId=${appointmentId}, documentName='${documentName}', fileName='${file.name}', fileSize=${file.size}`);
+      
+      const supabaseAdmin = createClient(c.env.SUPABASE_URL!, c.env.SUPABASE_SERVICE_ROLE_KEY!);
 
-            const [document] = await tx.insert(recordDocuments).values({
-                recordId: record.id,
-                documentName,
-                filePath,
-                fileType: documentFile.type,
-            }).returning();
-            
-            return { ...record, details: document };
-        });
+      // Step 1: Upload to Supabase Storage
+      const storagePath = `${appointmentId}/${Date.now()}-${file.name}`;
+      console.log(`[UPLOAD_DOC] Attempting to upload to Supabase Storage at path: ${storagePath}`);
+      
+      const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+        .from('medical-documents')
+        .upload(storagePath, file);
 
-        return c.json({ data: newRecord }, 201);
+      if (uploadError) {
+        console.error("[UPLOAD_DOC] Supabase Storage upload failed:", uploadError);
+        throw new Error(`Storage Error: ${uploadError.message}`);
+      }
+      
+      console.log("[UPLOAD_DOC] Supabase Storage upload successful. Path:", uploadData.path);
 
-    } catch (dbError: any) {
-        console.error('Database error after upload:', dbError);
-        // Attempt to delete the orphaned file from storage
-        await supabase.storage.from('medical-documents').remove([filePath]);
-        return c.json({ error: 'Failed to save document record.', message: dbError.message }, 500);
+      // Step 2: Save records to the database in a transaction
+      const savedRecord = await db.transaction(async (tx) => {
+        console.log("[UPLOAD_DOC] Starting database transaction.");
+        const [newMedicalRecord] = await tx
+          .insert(medicalRecords)
+          .values({
+            appointmentId: appointmentId,
+            recordType: 'CLINICAL_DOCUMENT',
+          })
+          .returning();
+        
+        console.log(`[UPLOAD_DOC] Created medical_records entry with ID: ${newMedicalRecord.id}`);
+
+        const [newDocumentRecord] = await tx
+          .insert(recordDocuments)
+          .values({
+            recordId: newMedicalRecord.id,
+            documentName: documentName,
+            filePath: uploadData.path, // Using filePath to match schema
+            fileType: file.type,
+          })
+          .returning();
+        
+        console.log("[UPLOAD_DOC] Created record_documents entry. Transaction complete.");
+        return { ...newMedicalRecord, details: newDocumentRecord };
+      });
+      
+      return c.json({ data: savedRecord }, 201);
+
+    } catch (error: any) {
+      console.error("[UPLOAD_DOC] CRASH:", error);
+      return c.json({ error: 'Internal Server Error', message: error.message }, 500);
     }
-});
+  }
+);
 
 adminRoutes
     .get('/users', async (c) => {
