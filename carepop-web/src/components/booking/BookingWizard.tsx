@@ -292,6 +292,9 @@ const BookingWizard = () => {
                 )}
               </div>
             </CardContent>
+            <CardFooter>
+                <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
+            </CardFooter>
           </Card>
         );
       case 3:
@@ -344,6 +347,9 @@ const BookingWizard = () => {
                 )}
               </div>
             </CardContent>
+            <CardFooter>
+                <Button variant="outline" onClick={() => setStep(2)}>Back</Button>
+            </CardFooter>
           </Card>
         );
       case 4:
@@ -374,7 +380,8 @@ const BookingWizard = () => {
                       <p>Loading details...</p>
                   )}
               </CardContent>
-              <CardFooter className="flex justify-end">
+              <CardFooter className="flex justify-between">
+                <Button variant="outline" onClick={() => setStep(3)}>Back</Button>
                 <Button onClick={handleConfirmBooking} disabled={isBooking}>
                   {isBooking ? 'Booking...' : 'Confirm Appointment'}
                 </Button>
@@ -423,9 +430,6 @@ const BookingWizard = () => {
                         <p className="text-muted-foreground">{selectedTime ? format(new Date(selectedTime), 'p') : 'Not selected'}</p>
                     </div>
                 </CardContent>
-                <CardFooter className="flex-col items-stretch gap-2">
-                    {step > 1 && <Button variant="outline" onClick={() => setStep(s => s - 1)}>Back</Button>}
-                </CardFooter>
             </Card>
         </div>
       </div>
