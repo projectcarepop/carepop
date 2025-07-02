@@ -14,16 +14,27 @@ import {
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
-import { Calendar } from 'react-native-calendars';
+import { Calendar, DateData } from 'react-native-calendars';
 import { ChevronsRight, X, Calendar as CalendarIcon, Clock, Building, Stethoscope, MapPin, CheckCircle } from 'lucide-react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import {
+    startOfMonth,
+    endOfMonth,
+    format,
+    isSameDay,
+    parseISO,
+    setHours,
+    setMinutes,
+    setSeconds,
+    addMinutes,
+    isBefore,
+} from 'date-fns';
 
 import {
   getPublicClinics,
   getPublicServices,
   getPublicServiceCategories,
-  getPublicAvailableDates,
-  getPublicAvailability,
+  getClinicBookedAppointments,
   createAppointment,
   NewAppointmentPayload,
   ServiceCategory,
@@ -31,7 +42,6 @@ import {
 import type {
   Clinic,
   ServiceWithCategory,
-  AvailabilityResponse,
 } from '../lib/types';
 import { useDebounce } from '../hooks/useDebounce';
 import { theme } from '../components/theme';
@@ -59,12 +69,13 @@ const BookingScreen = () => {
   const [currentStep, setCurrentStep] = useState<Step>('clinic');
   const [selectedClinicId, setSelectedClinicId] = useState<string | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
-    const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>('all');
   const [isCategoryPickerVisible, setCategoryPickerVisible] = useState(false);
   const [isSuccessModalVisible, setSuccessModalVisible] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
@@ -86,13 +97,29 @@ const BookingScreen = () => {
     enabled: !!selectedClinicId,
     select: (data: any) => data.data || data,
   });
-  const { data: availableDates, isLoading: isLoadingDates, error: datesError } = useQuery<string[], Error>({ queryKey: ['availableDates', selectedClinicId, selectedServiceId], queryFn: () => getPublicAvailableDates({ clinicId: selectedClinicId!, serviceId: selectedServiceId! }), enabled: !!selectedClinicId && !!selectedServiceId });
-  const { data: availability, isLoading: isLoadingAvailability } = useQuery<AvailabilityResponse, Error>({ queryKey: ['availability', selectedClinicId, selectedServiceId, selectedDate], queryFn: () => getPublicAvailability({ clinicId: selectedClinicId!, serviceId: selectedServiceId!, date: selectedDate! }), enabled: !!selectedClinicId && !!selectedServiceId && !!selectedDate });
+  
+  // --- NEW: Core Data Fetching Logic ---
+  const { data: bookedAppointments, isLoading: isLoadingBookedAppointments } = useQuery({
+    queryKey: ['bookedAppointments', selectedClinicId, format(currentMonth, 'yyyy-MM')],
+    queryFn: () => {
+      if (!selectedClinicId) return { data: [] };
+      const startDate = startOfMonth(currentMonth).toISOString();
+      const endDate = endOfMonth(currentMonth).toISOString();
+      return getClinicBookedAppointments({ clinicId: selectedClinicId, startDate, endDate });
+    },
+    enabled: !!selectedClinicId,
+    select: (res) => (res?.data ?? []).map(appt => ({
+        ...appt,
+        appointmentTime: parseISO(appt.appointmentTime) // Ensure dates are Date objects
+    })),
+  });
+
 
   const { mutate: bookAppointment, isPending: isBooking } = useMutation({
     mutationFn: (appointmentData: NewAppointmentPayload) => createAppointment(appointmentData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['myAppointments'] });
+      queryClient.invalidateQueries({ queryKey: ['bookedAppointments'] }); // NEW
       setSuccessModalVisible(true);
     },
     onError: (error: Error) => {
@@ -122,6 +149,37 @@ const BookingScreen = () => {
 
     return filtered;
   }, [services, selectedCategoryId, debouncedSearchQuery]);
+
+  // --- NEW: Core Availability Calculation ---
+  const availableTimeSlots = useMemo(() => {
+    if (!selectedDate || !selectedService || !bookedAppointments) {
+      return [];
+    }
+    
+    const serviceDuration = selectedService.durationMinutes ?? 30;
+    const dayAsDateObj = parseISO(selectedDate);
+    const workDayStart = setHours(setMinutes(setSeconds(dayAsDateObj, 0), 0), 9); // 9:00 AM
+    const workDayEnd = setHours(setMinutes(setSeconds(dayAsDateObj, 0), 0), 17); // 5:00 PM (17:00)
+
+    const potentialSlots: Date[] = [];
+    let currentSlot = workDayStart;
+    while (isBefore(currentSlot, workDayEnd)) {
+        potentialSlots.push(currentSlot);
+        currentSlot = addMinutes(currentSlot, serviceDuration);
+    }
+
+    const bookedSlotsSet = new Set(
+        bookedAppointments
+            .filter(appt => isSameDay(appt.appointmentTime, dayAsDateObj))
+            .map(appt => appt.appointmentTime.toISOString())
+    );
+
+    const availableSlots = potentialSlots.filter(
+        slot => !bookedSlotsSet.has(slot.toISOString())
+    );
+
+    return availableSlots;
+  }, [selectedDate, selectedService, bookedAppointments]);
 
   const formatAddress = (address: any): string => {
     if (!address) {
@@ -164,16 +222,15 @@ const BookingScreen = () => {
   };
 
     const handleConfirmBooking = () => {
-    if (!selectedClinicId || !selectedServiceId || !selectedDate || !selectedTime) {
+    if (!selectedClinicId || !selectedServiceId || !selectedTime) {
       Alert.alert("Error", "Missing information. Please complete all steps.");
       return;
     }
-    const appointmentTime = new Date(`${selectedDate}T${selectedTime}`).toISOString();
     
     const payload = {
       clinicId: selectedClinicId,
       serviceId: selectedServiceId,
-      appointmentTime,
+      appointmentTime: selectedTime,
       doctorId: '02ab0a6b-b366-4c10-9b75-623a5be46f1d',
     };
     
@@ -189,6 +246,7 @@ const BookingScreen = () => {
     setSearchQuery('');
     setSelectedCategoryId('all');
     setSuccessModalVisible(false);
+    setCurrentMonth(new Date());
   };
 
   // --- UI Components ---
@@ -311,9 +369,13 @@ const BookingScreen = () => {
   const renderDateTimeStep = () => (
     <View style={{ flex: 1, paddingVertical: theme.spacing.lg, paddingHorizontal: theme.spacing.lg }}>
                                    <Calendar
-            onDayPress={day => setSelectedDate(day.dateString)}
+            onDayPress={(day: DateData) => {
+              setSelectedDate(day.dateString);
+              setSelectedTime(null);
+            }}
             markedDates={{ [selectedDate || '']: { selected: true, selectedColor: theme.colors.primary } }}
             minDate={new Date().toISOString().split('T')[0]}
+            onMonthChange={(month) => setCurrentMonth(new Date(month.dateString))}
             theme={{
                 arrowColor: theme.colors.primary,
                 todayTextColor: theme.colors.foreground,
@@ -333,12 +395,11 @@ const BookingScreen = () => {
             }}
         />
 
-        {isLoadingDates && <ActivityIndicator style={{marginTop: theme.spacing.xl}}/>}
-        {datesError && <Text style={styles.errorText}>{datesError.message}</Text>}
+        {(isLoadingBookedAppointments) && <ActivityIndicator style={{marginTop: theme.spacing.xl}}/>}
 
                             {selectedDate && (
             <View style={{ flex: 1 }}>
-                {isLoadingAvailability ? <ActivityIndicator style={{marginTop: theme.spacing.xl}}/> : (
+                {isLoadingBookedAppointments ? <ActivityIndicator style={{marginTop: theme.spacing.xl}}/> : (
                     <>
                         <View style={styles.timeSlotsHeaderContainer}>
                             <Clock size={18} color={theme.colors.secondary} />
@@ -348,14 +409,18 @@ const BookingScreen = () => {
                         </View>
                         <ScrollView>
                             <View style={styles.gridContainer}>
-                                {availability?.availableSlots.length === 0 ? (
+                                {availableTimeSlots.length === 0 ? (
                                     <Text>No time slots available for this date.</Text>
                                 ) : (
-                                    availability?.availableSlots.map(time => (
-                                        <Button key={time} variant={selectedTime === time ? 'default' : 'outline'} onPress={() => setSelectedTime(time)} style={styles.gridButton}>
-                                            {formatTo12Hour(time)}
-                                        </Button>
-                                    ))
+                                    availableTimeSlots.map(time => {
+                                        const timeAsString = time.toISOString();
+                                        const timeFormatted = format(time, 'p');
+                                        return (
+                                            <Button key={timeAsString} variant={selectedTime === timeAsString ? 'default' : 'outline'} onPress={() => setSelectedTime(timeAsString)} style={styles.gridButton}>
+                                                {timeFormatted}
+                                            </Button>
+                                        )
+                                    })
                                 )}
                             </View>
                         </ScrollView>
@@ -385,7 +450,7 @@ const BookingScreen = () => {
                   </View>
                   <View style={styles.summaryRow}>
                       <Text style={styles.summaryLabel}>Time</Text>
-                      <Text style={styles.summaryValue}>{formatTo12Hour(selectedTime)}</Text>
+                      <Text style={styles.summaryValue}>{selectedTime ? format(parseISO(selectedTime), 'p') : ''}</Text>
                   </View>
               </View>
           </Card>

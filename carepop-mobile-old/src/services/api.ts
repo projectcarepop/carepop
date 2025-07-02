@@ -392,63 +392,28 @@ export const getPublicServices = async (clinicId?: string): Promise<ServiceWithC
   return response?.data ?? [];
 };
 
-type GetAvailabilityParams = {
-  serviceId: string;
-  clinicId: string;
-  date: string; // YYYY-MM-DD
-};
-
-export type AvailabilityResponse = {
-  availableSlots: string[];
-  doctorsForSlot: Record<string, string[]>;
-};
-
 /**
- * Fetches doctor availability for a given service, clinic, and date.
- * @param params The service, clinic, and date to filter by.
- * @returns A promise that resolves to an object containing available slots and doctor mapping.
+ * Fetches the raw list of booked appointments for a specific clinic within a given date range.
+ * This is the new, simplified data source for frontend availability logic.
+ * @param clinicId The UUID of the clinic.
+ * @param startDate The start of the date range (ISO string).
+ * @param endDate The end of the date range (ISO string).
+ * @returns A promise that resolves to an array of appointment objects.
  */
-export const getPublicAvailability = async (
-  params: GetAvailabilityParams,
-): Promise<AvailabilityResponse> => {
-  const query = new URLSearchParams(params).toString();
-  const response = await apiFetch<AvailabilityResponse>(`/api/public/availability?${query}`);
-  // The backend already returns the correct shape, but if it's null/undefined, return a default empty state
-  return response ?? { availableSlots: [], doctorsForSlot: {} };
-};
-
-/**
- * Fetches which dates are available for a given service and clinic.
- * @param params The clinic and service to filter by.
- * @returns A promise that resolves to an array of date strings (e.g., "2024-12-25").
- */
-export const getPublicAvailableDates = async ({
-  clinicId,
-  serviceId,
+export const getClinicBookedAppointments = async ({
+    clinicId,
+    startDate,
+    endDate,
 }: {
-  clinicId: string;
-  serviceId: string;
-}): Promise<string[]> => {
-  const query = new URLSearchParams({ clinicId, serviceId }).toString();
-  // This endpoint needs to be created in the backend. We assume it exists for now.
-  const response = await apiFetch<{ data: string[] }>(`/api/public/available-dates?${query}`);
-  return response?.data ?? [];
-};
-
-/**
- * Fetches available appointment slots for a given service at a specific clinic.
- * This uses the new backend slot-generation logic.
- * @param params The clinic and service to filter by.
- * @returns A promise that resolves to an array of availability slots.
- */
-export const getPublicSlots = async ({
-  clinicId,
-  serviceId,
-}: {
-  clinicId: string;
-  serviceId:string;
-}): Promise<AvailabilitySlot[]> => {
-  return apiFetch<AvailabilitySlot[]>(`/api/public/clinics/${clinicId}/slots?serviceId=${serviceId}`);
+    clinicId: string;
+    startDate: string;
+    endDate: string;
+}): Promise<{ data: { appointmentTime: string; serviceId: string }[] }> => {
+    const query = new URLSearchParams({ startDate, endDate });
+    return apiFetch<{ data: { appointmentTime: string; serviceId: string }[] }>(
+        `/api/public/clinics/${clinicId}/appointments?${query.toString()}`,
+        { method: 'GET' }
+    );
 };
 
 /**
