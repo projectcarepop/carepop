@@ -30,7 +30,7 @@ export default function DownloadAppPage() {
                     </Link>
                 </div>
             </div>
-            <div className="absolute right-0">
+            <div className="flex justify-center">
                 <Image
                     src="/carepop-app-mockup.png"
                     height={600}
