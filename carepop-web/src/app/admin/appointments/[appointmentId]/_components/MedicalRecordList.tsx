@@ -54,7 +54,7 @@ const DocumentCard = ({ details }: { details: ClinicalDocument }) => {
     const { supabase } = useAuth();
     const handleDownload = async () => {
         if (!supabase) return;
-        const { data, error } = await supabase.storage.from('medical_documents').createSignedUrl(details.filePath, 60);
+        const { data, error } = await supabase.storage.from('medical-documents').createSignedUrl(details.filePath, 60);
         if (error || !data?.signedUrl) {
             console.error("Error creating signed URL:", error);
             alert('Could not get download link.');

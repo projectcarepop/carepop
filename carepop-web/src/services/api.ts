@@ -796,25 +796,30 @@ export async function addMedicalRecord(appointmentId: string, payload: MedicalRe
 }
 
 export async function uploadDocument(appointmentId: string, documentName: string, file: File, token: string) {
-    const formData = new FormData();
-    formData.append('document', file);
-    formData.append('documentName', documentName);
+  const formData = new FormData();
+  formData.append('documentName', documentName);
+  formData.append('document', file); // The key 'document' must match the backend's c.req.parseBody() expectation
 
-    const response = await fetch(`${API_BASE_URL}/api/admin/appointments/${appointmentId}/documents`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            // 'Content-Type': 'multipart/form-data' is set automatically by the browser with FormData
-        },
-        body: formData,
-    });
+  const headers = {
+    'Authorization': `Bearer ${token}`,
+    // DO NOT set 'Content-Type': 'multipart/form-data'. 
+    // The browser will do it automatically with the correct boundary.
+  };
 
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.status}`}));
-        throw new Error(error.message || 'Failed to upload document.');
-    }
+  const url = `${API_BASE_URL}/api/admin/appointments/${appointmentId}/documents`;
 
-    return response.json();
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Failed to upload document.' }));
+    throw new Error(error.message);
+  }
+
+  return response.json();
 }
 
 export async function getAdminClinicServices(clinicId: string, accessToken: string) {
