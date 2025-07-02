@@ -140,8 +140,8 @@ const newMedicalRecordSchema = z.discriminatedUnion("recordType", [
 
 // Zod schema for multipart/form-data
 const uploadDocumentSchema = z.object({
-  documentName: z.string().min(1),
-  file: z.instanceof(File),
+  documentName: z.string().min(1, { message: 'Document name is required.' }),
+  document: z.instanceof(File, { message: 'A file is required.' }),
 });
 
 // --- Clinic Management Endpoints ---
@@ -711,7 +711,7 @@ adminRoutes.post(
     console.log("[UPLOAD_DOC] Endpoint hit.");
     try {
       const { id: appointmentId } = c.req.param();
-      const { documentName, file } = c.req.valid('form');
+      const { documentName, document: file } = c.req.valid('form');
       
       console.log(`[UPLOAD_DOC] Received data: appointmentId=${appointmentId}, documentName='${documentName}', fileName='${file.name}', fileSize=${file.size}`);
       
