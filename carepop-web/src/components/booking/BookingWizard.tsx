@@ -396,12 +396,12 @@ const BookingWizard = () => {
         <Progress value={progressValue} className="w-full" />
       </div>
 
-      <div className="flex flex-col md:flex-row gap-8">
-        <div className="w-full md:w-2/3">
+      <div className="flex flex-col gap-8">
+        <div className="w-full">
           {renderStep()}
         </div>
-        <div className="w-full md:w-1/3">
-            <Card className="sticky top-24">
+        <div className="w-full">
+            <Card>
                 <CardHeader>
                     <CardTitle>Your Selections</CardTitle>
                 </CardHeader>
