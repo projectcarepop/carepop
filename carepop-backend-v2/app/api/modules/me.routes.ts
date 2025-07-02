@@ -317,33 +317,50 @@ meRoutes.put('/profile', zValidator('json', updateProfileSchema), async (c) => {
 // HEALTH BUDDY ROUTES
 // ============================================================================
 
-const healthLogSchema = z.object({
-    logDate: z.string().date(), // Expects "YYYY-MM-DD"
-    mood: z.string().max(50).nullable(),
-    symptoms: z.array(z.string().max(100)).nullable(),
-    notes: z.string().max(1000).nullable(),
+// Zod schema for health logs
+const createHealthLogSchema = z.object({
+  logDate: z.string().datetime(),
+  symptoms: z.array(z.string()),
+  mood: z.enum(['happy', 'sad', 'neutral', 'anxious', 'irritable']),
+  notes: z.string().optional(),
+});
+
+// Zod schema for menstrual logs
+const createMenstrualLogSchema = z.object({
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime(),
+  notes: z.string().optional(),
 });
 
 /**
  * POST /me/health-logs
- * Creates a new health log entry for the authenticated user.
+ * Creates a new daily health log for the authenticated user.
  */
-meRoutes.post('/health-logs', zValidator('json', healthLogSchema), async (c) => {
+meRoutes.post(
+  '/health-logs',
+  zValidator('json', createHealthLogSchema),
+  async (c) => {
     const user = c.get('user');
     const logData = c.req.valid('json');
-
     try {
-        const [newLog] = await db.insert(healthLogs).values({
-            userId: user.id,
-            ...logData,
-        }).returning();
-
-        return c.json(newLog, 201);
+      console.log(`Attempting to insert health log for user ${user.id}`, logData);
+      const [newLog] = await db
+        .insert(healthLogs)
+        .values({
+          patientId: user.id,
+          logDate: logData.logDate,
+          mood: logData.mood,
+          symptoms: logData.symptoms,
+          notes: logData.notes,
+        })
+        .returning();
+      return c.json(newLog, 201);
     } catch (error) {
-        console.error(`Error creating health log for user ${user.id}:`, error);
-        return c.json({ error: 'Internal Server Error' }, 500);
+      console.error("CRASH in /health-logs:", error);
+      return c.json({ error: 'Failed to save health log' }, 500);
     }
-});
+  }
+);
 
 /**
  * GET /me/health-logs
@@ -353,7 +370,7 @@ meRoutes.get('/health-logs', async (c) => {
     const user = c.get('user');
     try {
         const logs = await db.query.healthLogs.findMany({
-            where: eq(healthLogs.userId, user.id),
+            where: eq(healthLogs.patientId, user.id),
             orderBy: (healthLogs, { desc }) => [desc(healthLogs.logDate)],
             limit: 30, // Get the last 30 logs
         });
@@ -403,51 +420,6 @@ meRoutes.get('/ai/insight', async (c) => {
     return c.json({ error: 'Failed to generate insight from Vertex AI' }, 500);
   }
 });
-
-// Zod schema for health logs
-const createHealthLogSchema = z.object({
-  logDate: z.string().datetime(),
-  symptoms: z.array(z.string()),
-  mood: z.enum(['happy', 'sad', 'neutral', 'anxious', 'irritable']),
-  notes: z.string().optional(),
-});
-
-// Zod schema for menstrual logs
-const createMenstrualLogSchema = z.object({
-  startDate: z.string().datetime(),
-  endDate: z.string().datetime(),
-  notes: z.string().optional(),
-});
-
-/**
- * POST /me/health-logs
- * Creates a new daily health log for the authenticated user.
- */
-meRoutes.post(
-  '/health-logs',
-  zValidator('json', createHealthLogSchema),
-  async (c) => {
-    const user = c.get('user');
-    const logData = c.req.valid('json');
-    try {
-      console.log(`Attempting to insert health log for user ${user.id}`, logData);
-      const [newLog] = await db
-        .insert(healthLogs)
-        .values({
-          patientId: user.id,
-          logDate: logData.logDate,
-          mood: logData.mood,
-          symptoms: logData.symptoms,
-          notes: logData.notes,
-        })
-        .returning();
-      return c.json(newLog, 201);
-    } catch (error) {
-      console.error("CRASH in /health-logs:", error);
-      return c.json({ error: 'Failed to save health log' }, 500);
-    }
-  }
-);
 
 /**
  * POST /me/menstrual-logs

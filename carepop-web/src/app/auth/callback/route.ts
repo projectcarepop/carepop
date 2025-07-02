@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   const next = searchParams.get('next') ?? '/main-dashboard'
 
   if (code) {
-    const cookieStore = await cookies()
+     const cookieStore = await cookies()
     const supabase = createClient(cookieStore)
     // This exchanges the code for a session and automatically sets the cookie
     const { error } = await supabase.auth.exchangeCodeForSession(code)

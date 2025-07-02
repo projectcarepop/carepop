@@ -852,3 +852,58 @@ export async function assignServicesToClinic(clinicId: string, serviceIds: strin
     }
     return response.json();
 }
+
+// --- SERVER-SIDE SERVICE FUNCTIONS ---
+// These accept the token directly, as they are called from Server Components or Route Handlers
+
+const API_URL_SERVER = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+async function getServerAuthHeaders(accessToken: string) {
+    return {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    };
+}
+
+export async function getMyProfileOnServer(accessToken: string): Promise<Profile> {
+  const headers = await getServerAuthHeaders(accessToken);
+  try {
+    const response = await fetch(`${API_URL_SERVER}/api/me/profile`, { headers, cache: 'no-store' });
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({ message: `HTTP Error: ${response.status} ${response.statusText}` }));
+      console.error("API Error in getMyProfileOnServer:", errorBody);
+      throw new Error(errorBody.message);
+    }
+    return response.json();
+  } catch (error) {
+    console.error("Network or parsing error in getMyProfileOnServer:", error);
+    throw new Error("A server-side network error occurred.");
+  }
+}
+
+export async function getMyAppointmentsOnServer(accessToken: string) {
+  const headers = await getServerAuthHeaders(accessToken);
+  try {
+    const response = await fetch(`${API_URL_SERVER}/api/me/appointments`, { headers, cache: 'no-store' });
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({ message: 'Failed to fetch appointments.' }));
+      throw new Error(errorBody.message);
+    }
+    const result = await response.json();
+    return result.appointments || [];
+  } catch (error) {
+    console.error("Network or parsing error in getMyAppointmentsOnServer:", error);
+    throw new Error("A server-side network error occurred while fetching appointments.");
+  }
+}
+
+export async function getMyMedicalRecordsOnServer(accessToken: string) {
+    const headers = await getServerAuthHeaders(accessToken);
+    const response = await fetch(`${API_URL_SERVER}/api/me/records`, { headers, cache: 'no-store' });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: "Failed to fetch medical records." }));
+        throw new Error(error.message);
+    }
+    const result = await response.json();
+    return result.records || [];
+}
