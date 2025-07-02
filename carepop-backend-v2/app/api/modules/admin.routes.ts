@@ -719,7 +719,7 @@ adminRoutes.post('/appointments/:appointmentId/documents', async (c) => {
     }
 
     const supabase = createClient(c.env.SUPABASE_URL!, c.env.SUPABASE_SERVICE_ROLE_KEY!);
-    const filePath = `public/${appointmentId}/${uuidv4()}-${documentFile.name}`;
+    const filePath = `public/${appointmentId}/${uuidv4()}-${documentFile.name}`; //added public to the path
 
     // 1. Upload to Supabase
     const { error: uploadError } = await supabase.storage
