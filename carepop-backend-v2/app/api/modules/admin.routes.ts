@@ -420,9 +420,20 @@ adminRoutes
 // --- Doctor Management Endpoints ---
 
 adminRoutes.get('/doctors', async (c) => {
-    // TODO: This query needs to be fleshed out with joins for services, clinics etc.
-    // For now, fetching the basic doctor profiles.
-    const allDoctors = await db.select().from(doctors);
+    // This query now joins doctors with profiles to get the full name and other details.
+    const allDoctors = await db.select({
+        id: doctors.id,
+        userId: doctors.userId,
+        fullName: sql<string>`TRIM(CONCAT(${profiles.firstName}, ' ', ${profiles.lastName}))`,
+        email: profiles.email,
+        avatarUrl: profiles.avatarUrl,
+        specialtyText: doctors.specialtyText,
+        bio: doctors.bio,
+        isActive: doctors.isActive,
+    })
+    .from(doctors)
+    .leftJoin(profiles, eq(doctors.userId, profiles.id));
+    
     return c.json({ data: allDoctors });
 });
 
