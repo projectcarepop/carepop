@@ -1,46 +1,35 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import { useActionState } from 'react';
+import { useFormState, useFormStatus } from 'react-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Mail, MapPin, Phone } from "lucide-react";
+import { Mail, MapPin, Phone, Loader2, CheckCircle, AlertTriangle } from "lucide-react";
 import { sendContactEmail, type ContactFormState } from './actions';
-import { useToast } from '@/components/ui/use-toast';
-
 
 function SubmitButton() {
-    // const { pending } = useFormStatus(); // This hook is not available in React 19 canary yet.
-    // We'll manage loading state manually for now.
+    const { pending } = useFormStatus();
     return (
-        <Button type="submit" className="w-full font-inter">
-            {/* {pending ? <Loader2 className="h-4 w-4 mr-2 animate-spin"/> : null} */}
+        <Button type="submit" className="w-full font-inter" disabled={pending}>
+            {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Send Message
         </Button>
-    )
+    );
 }
 
 export default function ContactFormPage() {
-    const initialState: ContactFormState = { message: '' };
-    const [state, formAction] = useActionState(sendContactEmail, initialState);
-    const { toast } = useToast();
+    const initialState: ContactFormState = { message: '', success: false };
+    const [state, formAction] = useFormState(sendContactEmail, initialState);
     const formRef = useRef<HTMLFormElement>(null);
 
     useEffect(() => {
-        if(state.message) {
-            toast({
-                title: state.isSuccess ? "Success!" : "Oops!",
-                description: state.message,
-                variant: state.isSuccess ? "default" : "destructive",
-            });
-        }
-        if (state.isSuccess) {
+        if (state.success) {
             formRef.current?.reset();
         }
-    }, [state, toast]);
+    }, [state.success]);
 
   return (
     <>
@@ -109,24 +98,30 @@ export default function ContactFormPage() {
                             <div className="space-y-2">
                                 <Label htmlFor="name" className="font-inter">Full Name</Label>
                                 <Input id="name" name="name" placeholder="Your Name" required className="font-inter"/>
-                                {state.errors?.name && <p className="text-sm text-red-500">{state.errors.name[0]}</p>}
+                                {state.errors?.name && <p className="text-sm font-medium text-destructive">{state.errors.name[0]}</p>}
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="email" className="font-inter">Email</Label>
                                 <Input id="email" name="email" type="email" placeholder="you@example.com" required className="font-inter"/>
-                                {state.errors?.email && <p className="text-sm text-red-500">{state.errors.email[0]}</p>}
+                                {state.errors?.email && <p className="text-sm font-medium text-destructive">{state.errors.email[0]}</p>}
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="subject" className="font-inter">Subject</Label>
                                 <Input id="subject" name="subject" placeholder="Question about..." required className="font-inter"/>
-                                {state.errors?.subject && <p className="text-sm text-red-500">{state.errors.subject[0]}</p>}
+                                {state.errors?.subject && <p className="text-sm font-medium text-destructive">{state.errors.subject[0]}</p>}
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="message" className="font-inter">Message</Label>
                                 <Textarea id="message" name="message" placeholder="Your message..." rows={5} required className="font-inter"/>
-                                {state.errors?.message && <p className="text-sm text-red-500">{state.errors.message[0]}</p>}
+                                {state.errors?.message && <p className="text-sm font-medium text-destructive">{state.errors.message[0]}</p>}
                             </div>
                             <SubmitButton />
+                            {state.message && (
+                                <div className={`flex items-center space-x-2 mt-4 p-3 rounded-md ${state.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                    {state.success ? <CheckCircle className="h-5 w-5"/> : <AlertTriangle className="h-5 w-5"/>}
+                                    <p className="text-sm font-medium">{state.message}</p>
+                                </div>
+                            )}
                         </form>
                     </CardContent>
                 </Card>
