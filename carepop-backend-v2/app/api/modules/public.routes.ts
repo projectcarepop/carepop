@@ -533,6 +533,77 @@ publicRoutes.get('/availability', zValidator('query', availabilityQuerySchema), 
 });
 
 /**
+ * GET /public/availability/slots
+ * The definitive, correct endpoint for fetching available appointment slots.
+ */
+publicRoutes.get('/availability/slots', zValidator('query', availabilityQuerySchema), async (c) => {
+  const { serviceId, clinicId, date } = c.req.valid('query');
+  const targetDate = startOfDay(parseISO(date));
+
+  try {
+    // Step 1: Fetch service duration
+    const service = await db.query.services.findFirst({
+        where: eq(services.id, serviceId),
+        columns: { durationMinutes: true }
+    });
+
+    if (!service || !service.durationMinutes) {
+        return c.json({ error: "Service not found or has invalid duration" }, 404);
+    }
+    const duration = service.durationMinutes;
+
+    // Step 2: Find all providers for the service at the clinic
+    const providersForService = await db.select({ id: doctors.id })
+      .from(doctors)
+      .innerJoin(doctorClinics, eq(doctors.id, doctorClinics.doctorId))
+      .innerJoin(doctorServices, eq(doctors.id, doctorServices.doctorId))
+      .where(and(
+        eq(doctorClinics.clinicId, clinicId),
+        eq(doctorServices.serviceId, serviceId),
+        eq(doctors.isActive, true)
+      ));
+    
+    if (providersForService.length === 0) {
+        return c.json([]); // Return empty array as per spec
+    }
+    const providerIds = providersForService.map(p => p.id);
+
+    // Step 3: Get all non-canceled appointments for these providers on the target date
+    const bookedAppointments = await db.select({ appointmentTime: appointments.appointmentTime })
+      .from(appointments)
+      .where(and(
+        inArray(appointments.doctorId, providerIds),
+        sql`DATE(appointment_time) = ${format(targetDate, 'yyyy-MM-dd')}`,
+        ne(appointments.status, 'canceled_by_patient'),
+        ne(appointments.status, 'canceled_by_admin')
+      ));
+
+    const bookedSlots = new Set(
+      bookedAppointments.map(a => a.appointmentTime) // Store the full ISO string
+    );
+
+    // Step 4: Generate all potential slots for the day
+    const potentialSlots: string[] = [];
+    let currentTime = setHours(targetDate, 9); // 9:00 AM
+    const endTime = setHours(targetDate, 17); // 5:00 PM
+
+    while (isBefore(currentTime, endTime)) {
+      potentialSlots.push(currentTime.toISOString());
+      currentTime = addMinutes(currentTime, duration);
+    }
+
+    // Step 5: Filter potential slots to find available ones
+    const availableSlots = potentialSlots.filter(slot => !bookedSlots.has(slot));
+    
+    return c.json(availableSlots);
+
+  } catch (error) {
+    console.error("Error fetching availability slots:", error);
+    return c.json({ error: "Internal Server Error" }, 500);
+  }
+});
+
+/**
  * GET /public/psgc/provinces
  * Returns a list of all provinces from the PSGC data.
  */
