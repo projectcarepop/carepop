@@ -1,20 +1,46 @@
 'use client';
 
+import React, { useEffect, useRef } from 'react';
+import { useActionState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Mail, MapPin, Phone } from "lucide-react";
+import { sendContactEmail, type ContactFormState } from './actions';
+import { useToast } from '@/components/ui/use-toast';
 
+
+function SubmitButton() {
+    // const { pending } = useFormStatus(); // This hook is not available in React 19 canary yet.
+    // We'll manage loading state manually for now.
+    return (
+        <Button type="submit" className="w-full font-inter">
+            {/* {pending ? <Loader2 className="h-4 w-4 mr-2 animate-spin"/> : null} */}
+            Send Message
+        </Button>
+    )
+}
 
 export default function ContactFormPage() {
-    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        // In a real app, you would handle submission to an API endpoint here.
-        // For this example, we'll just show an alert.
-        alert('Form submitted (placeholder)!');
-    };
+    const initialState: ContactFormState = { message: '' };
+    const [state, formAction] = useActionState(sendContactEmail, initialState);
+    const { toast } = useToast();
+    const formRef = useRef<HTMLFormElement>(null);
+
+    useEffect(() => {
+        if(state.message) {
+            toast({
+                title: state.isSuccess ? "Success!" : "Oops!",
+                description: state.message,
+                variant: state.isSuccess ? "default" : "destructive",
+            });
+        }
+        if (state.isSuccess) {
+            formRef.current?.reset();
+        }
+    }, [state, toast]);
 
   return (
     <>
@@ -79,24 +105,28 @@ export default function ContactFormPage() {
                         <CardTitle className="font-space-grotesk text-2xl">Send us a Message</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <form onSubmit={handleSubmit} className="space-y-4">
+                        <form ref={formRef} action={formAction} className="space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="name" className="font-inter">Full Name</Label>
-                                <Input id="name" placeholder="Your Name" required className="font-inter"/>
+                                <Input id="name" name="name" placeholder="Your Name" required className="font-inter"/>
+                                {state.errors?.name && <p className="text-sm text-red-500">{state.errors.name[0]}</p>}
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="email" className="font-inter">Email</Label>
-                                <Input id="email" type="email" placeholder="you@example.com" required className="font-inter"/>
+                                <Input id="email" name="email" type="email" placeholder="you@example.com" required className="font-inter"/>
+                                {state.errors?.email && <p className="text-sm text-red-500">{state.errors.email[0]}</p>}
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="subject" className="font-inter">Subject</Label>
-                                <Input id="subject" placeholder="Question about..." required className="font-inter"/>
+                                <Input id="subject" name="subject" placeholder="Question about..." required className="font-inter"/>
+                                {state.errors?.subject && <p className="text-sm text-red-500">{state.errors.subject[0]}</p>}
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="message" className="font-inter">Message</Label>
-                                <Textarea id="message" placeholder="Your message..." rows={5} required className="font-inter"/>
+                                <Textarea id="message" name="message" placeholder="Your message..." rows={5} required className="font-inter"/>
+                                {state.errors?.message && <p className="text-sm text-red-500">{state.errors.message[0]}</p>}
                             </div>
-                            <Button type="submit" className="w-full font-inter">Send Message</Button>
+                            <SubmitButton />
                         </form>
                     </CardContent>
                 </Card>

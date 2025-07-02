@@ -197,7 +197,7 @@ const AboutPage = () => {
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-4 mt-4">
-                  <Link href="/register">
+                  <Link href="/sign-in">
                   <Button size="lg">Create an Account</Button>
                   </Link>
                   <Link href="/download-app">
