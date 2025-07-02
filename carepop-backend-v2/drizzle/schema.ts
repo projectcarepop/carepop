@@ -4,7 +4,7 @@ import { sql, relations } from "drizzle-orm"
 // Placeholder for auth.users table
 export const usersInAuth = pgTable("users", {
   id: uuid('id').primaryKey(),
-}, (table) => ({
+}, () => ({
     tableName: "users",
     schemaName: "auth"
 }));
@@ -44,7 +44,6 @@ export const clinics = pgTable("clinics", {
 
 export const doctors = pgTable("doctors", {
 	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
-    userId: uuid("user_id").unique().references(() => profiles.id, { onDelete: 'cascade' }),
 	fullName: text("full_name").notNull(),
 	specialtyText: text("specialty_text"),
 	bio: text("bio"),
@@ -55,7 +54,7 @@ export const doctors = pgTable("doctors", {
 
 export const serviceCategories = pgTable("service_categories", {
 	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
-	name: text("name").notNull().unique(),
+	name: text("name").notNull(),
 	description: text("description"),
 });
 
@@ -67,9 +66,16 @@ export const services = pgTable("services", {
 	price: numeric("price", { precision: 10, scale:  2 }).notNull(),
 	durationMinutes: integer("duration_minutes").notNull(),
 	isActive: boolean("is_active").default(true).notNull(),
-}, (table) => ({
+}, () => ({
 	priceCheck: check("services_price_check", sql`price >= 0`),
     durationCheck: check("services_duration_minutes_check", sql`duration_minutes > 0`),
+}));
+
+export const clinicServices = pgTable("clinic_services", {
+	clinicId: uuid("clinic_id").notNull().references(() => clinics.id, { onDelete: 'cascade' }),
+	serviceId: uuid("service_id").notNull().references(() => services.id, { onDelete: 'cascade' }),
+}, (table) => ({
+	compoundKey: primaryKey({ columns: [table.clinicId, table.serviceId] }),
 }));
 
 export const doctorClinics = pgTable("doctor_clinics", {
@@ -143,12 +149,11 @@ export const medicalRecords = pgTable("medical_records", {
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 });
 
-// --- NEW/REVERTED Specialised Medical Record Tables ---
-
 export const recordDoctorNotes = pgTable("record_doctor_notes", {
     id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
     recordId: uuid("record_id").notNull().references(() => medicalRecords.id, { onDelete: 'cascade' }),
-    note: text("note").notNull(),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 });
 
 export const recordPrescriptions = pgTable("record_prescriptions", {
@@ -156,14 +161,20 @@ export const recordPrescriptions = pgTable("record_prescriptions", {
     recordId: uuid("record_id").notNull().references(() => medicalRecords.id, { onDelete: 'cascade' }),
     medication: text("medication").notNull(),
     dosage: text("dosage"),
-    instructions: text("instructions"),
+    frequency: text("frequency"),
+    startDate: date("start_date"),
+    endDate: date("end_date"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 });
 
 export const recordDocuments = pgTable("record_documents", {
     id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
     recordId: uuid("record_id").notNull().references(() => medicalRecords.id, { onDelete: 'cascade' }),
     documentName: text("document_name").notNull(),
-    documentUrl: text("document_url").notNull(),
+    filePath: text("file_path").notNull(),
+    fileType: text("file_type"),
+    uploadedAt: timestamp("uploaded_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 });
 
 export const reviews = pgTable("reviews", {
@@ -174,7 +185,7 @@ export const reviews = pgTable("reviews", {
 	rating: integer("rating").notNull(),
 	comment: text("comment"),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => ({
+}, () => ({
     ratingCheck: check("reviews_rating_check", sql`rating >= 1 AND rating <= 5`),
 }));
 
@@ -193,7 +204,7 @@ export const products = pgTable("products", {
 	price: numeric("price", { precision: 10, scale:  2 }).notNull(),
 	requiresPrescription: boolean("requires_prescription").default(false).notNull(),
 	isActive: boolean("is_active").default(true).notNull(),
-}, (table) => ({
+}, () => ({
     priceCheck: check("products_price_check", sql`price >= 0`),
 }));
 
@@ -201,31 +212,8 @@ export const inventory = pgTable("inventory", {
 	productId: uuid("product_id").primaryKey().notNull().references(() => products.id, { onDelete: 'cascade' }),
 	quantityOnHand: integer("quantity_on_hand").default(0).notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => ({
+}, () => ({
     quantityCheck: check("inventory_quantity_on_hand_check", sql`quantity_on_hand >= 0`),
-}));
-
-export const healthLogs = pgTable("health_logs", {
-    id: uuid('id').default(sql`gen_random_uuid()`).primaryKey().notNull(),
-    userId: uuid("user_id").notNull().references(() => profiles.id, { onDelete: 'cascade' }),
-    mood: text("mood"),
-    symptoms: text("symptoms").array(),
-    notes: text("notes"),
-    logDate: date("log_date").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => ({
-    userIdx: index("idx_health_logs_user_id").on(table.userId),
-}));
-
-export const menstrualLogs = pgTable("menstrual_logs", {
-    id: uuid('id').default(sql`gen_random_uuid()`).primaryKey().notNull(),
-    userId: uuid("user_id").notNull().references(() => profiles.id, { onDelete: 'cascade' }),
-    startDate: date("start_date").notNull(),
-    endDate: date("end_date").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => ({
-    userIdx: index("idx_menstrual_logs_user_id").on(table.userId),
-    periodCheck: check("menstrual_logs_period_check", sql`end_date >= start_date`),
 }));
 
 
@@ -234,167 +222,120 @@ export const menstrualLogs = pgTable("menstrual_logs", {
 export const profilesRelations = relations(profiles, ({ many, one }) => ({
 	appointments: many(appointments),
 	reviews: many(reviews),
-    healthLogs: many(healthLogs),
-    menstrualLogs: many(menstrualLogs),
-    doctor: one(doctors, {
-        fields: [profiles.id],
-        references: [doctors.userId],
-    }),
     user: one(usersInAuth, {
         fields: [profiles.id],
         references: [usersInAuth.id],
     })
 }));
 
-export const doctorsRelations = relations(doctors, ({ one, many }) => ({
-    profile: one(profiles, {
-        fields: [doctors.userId],
-        references: [profiles.id],
-    }),
-    doctorClinics: many(doctorClinics),
-    doctorServices: many(doctorServices),
-    appointments: many(appointments),
-    reviews: many(reviews),
-    availabilities: many(providerAvailability),
+export const usersInAuthRelations = relations(usersInAuth, ({ one }) => ({
+    profile: one(profiles),
 }));
 
 export const clinicsRelations = relations(clinics, ({ many }) => ({
-    doctorClinics: many(doctorClinics),
-    appointments: many(appointments),
+	appointments: many(appointments),
+	clinicServices: many(clinicServices),
 }));
 
-export const serviceCategoriesRelations = relations(serviceCategories, ({ many }) => ({
-    services: many(services),
+export const doctorsRelations = relations(doctors, ({ many }) => ({
+	appointments: many(appointments),
+	reviews: many(reviews),
 }));
 
 export const servicesRelations = relations(services, ({ one, many }) => ({
-    serviceCategory: one(serviceCategories, {
-        fields: [services.categoryId],
-        references: [serviceCategories.id],
-    }),
-    doctorServices: many(doctorServices),
-    appointments: many(appointments),
-}));
-
-export const doctorClinicsRelations = relations(doctorClinics, ({ one }) => ({
-    doctor: one(doctors, {
-        fields: [doctorClinics.doctorId],
-        references: [doctors.id],
-    }),
-    clinic: one(clinics, {
-        fields: [doctorClinics.clinicId],
-        references: [clinics.id],
-    }),
-}));
-
-export const doctorServicesRelations = relations(doctorServices, ({ one }) => ({
-    doctor: one(doctors, {
-        fields: [doctorServices.doctorId],
-        references: [doctors.id],
-    }),
-    service: one(services, {
-        fields: [doctorServices.serviceId],
-        references: [services.id],
-    }),
-}));
-
-export const providerAvailabilityRelations = relations(providerAvailability, ({ one }) => ({
-    doctor: one(doctors, {
-        fields: [providerAvailability.doctorId],
-        references: [doctors.id],
-    }),
+	serviceCategory: one(serviceCategories, {
+		fields: [services.categoryId],
+		references: [serviceCategories.id]
+	}),
+	appointments: many(appointments),
+	clinicServices: many(clinicServices),
 }));
 
 export const appointmentsRelations = relations(appointments, ({ one, many }) => ({
-    patient: one(profiles, {
-        fields: [appointments.patientId],
-        references: [profiles.id],
-    }),
-    doctor: one(doctors, {
-        fields: [appointments.doctorId],
-        references: [doctors.id],
-    }),
-    service: one(services, {
-        fields: [appointments.serviceId],
-        references: [services.id],
-    }),
-    clinic: one(clinics, {
-        fields: [appointments.clinicId],
-        references: [clinics.id],
-    }),
+	patient: one(profiles, {
+		fields: [appointments.patientId],
+		references: [profiles.id]
+	}),
+	doctor: one(doctors, {
+		fields: [appointments.doctorId],
+		references: [doctors.id]
+	}),
+	service: one(services, {
+		fields: [appointments.serviceId],
+		references: [services.id]
+	}),
+	clinic: one(clinics, {
+		fields: [appointments.clinicId],
+		references: [clinics.id]
+	}),
+	review: one(reviews, {
+		fields: [appointments.id],
+		references: [reviews.appointmentId]
+	}),
     medicalRecords: many(medicalRecords),
-    review: one(reviews, {
-        fields: [appointments.id],
-        references: [reviews.appointmentId],
+}));
+
+export const medicalRecordsRelations = relations(medicalRecords, ({ one }) => ({
+  appointment: one(appointments, {
+    fields: [medicalRecords.appointmentId],
+    references: [appointments.id]
+  }),
+}));
+
+export const recordDoctorNotesRelations = relations(recordDoctorNotes, ({ one }) => ({
+    medicalRecord: one(medicalRecords, {
+        fields: [recordDoctorNotes.recordId],
+        references: [medicalRecords.id]
     }),
 }));
 
-export const medicalRecordsRelations = relations(medicalRecords, ({ one, many }) => ({
-    appointment: one(appointments, {
-        fields: [medicalRecords.appointmentId],
-        references: [appointments.id],
+export const recordPrescriptionsRelations = relations(recordPrescriptions, ({ one }) => ({
+    medicalRecord: one(medicalRecords, {
+        fields: [recordPrescriptions.recordId],
+        references: [medicalRecords.id]
     }),
-    doctorNote: one(recordDoctorNotes, {
-        fields: [medicalRecords.id],
-        references: [recordDoctorNotes.recordId],
-    }),
-    prescription: one(recordPrescriptions, {
-        fields: [medicalRecords.id],
-        references: [recordPrescriptions.recordId],
-    }),
-    document: one(recordDocuments, {
-        fields: [medicalRecords.id],
-        references: [recordDocuments.recordId],
+}));
+
+export const recordDocumentsRelations = relations(recordDocuments, ({ one }) => ({
+    medicalRecord: one(medicalRecords, {
+        fields: [recordDocuments.recordId],
+        references: [medicalRecords.id]
     }),
 }));
 
 export const reviewsRelations = relations(reviews, ({ one }) => ({
-    appointment: one(appointments, {
-        fields: [reviews.appointmentId],
-        references: [appointments.id],
-    }),
-    patient: one(profiles, {
-        fields: [reviews.patientId],
-        references: [profiles.id],
-    }),
-    doctor: one(doctors, {
-        fields: [reviews.doctorId],
-        references: [doctors.id],
-    }),
+	appointment: one(appointments, {
+		fields: [reviews.appointmentId],
+		references: [appointments.id]
+	}),
+	patient: one(profiles, {
+		fields: [reviews.patientId],
+		references: [profiles.id]
+	}),
+	doctor: one(doctors, {
+		fields: [reviews.doctorId],
+		references: [doctors.id]
+	}),
 }));
 
 export const productCategoriesRelations = relations(productCategories, ({ many }) => ({
-    products: many(products),
+	products: many(products),
 }));
 
-export const productsRelations = relations(products, ({ one, many }) => ({
-    category: one(productCategories, {
-        fields: [products.categoryId],
-        references: [productCategories.id]
-    }),
-    inventory: one(inventory, {
+export const productsRelations = relations(products, ({ one }) => ({
+	productCategory: one(productCategories, {
+		fields: [products.categoryId],
+		references: [productCategories.id]
+	}),
+	inventory: one(inventory, {
         fields: [products.id],
         references: [inventory.productId]
     }),
 }));
 
 export const inventoryRelations = relations(inventory, ({ one }) => ({
-    product: one(products, {
-        fields: [inventory.productId],
-        references: [products.id]
-    }),
-}));
-
-export const healthLogsRelations = relations(healthLogs, ({ one }) => ({
-    user: one(profiles, {
-        fields: [healthLogs.userId],
-        references: [profiles.id],
-    }),
-}));
-
-export const menstrualLogsRelations = relations(menstrualLogs, ({ one }) => ({
-    user: one(profiles, {
-        fields: [menstrualLogs.userId],
-        references: [profiles.id],
-    }),
+	product: one(products, {
+		fields: [inventory.productId],
+		references: [products.id]
+	}),
 }));

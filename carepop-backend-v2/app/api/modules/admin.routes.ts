@@ -420,8 +420,8 @@ adminRoutes
 // --- Doctor Management Endpoints ---
 
 adminRoutes.get('/doctors', async (c) => {
-    // This query selects all available data directly from the doctors table.
-    // NOTE: A JOIN to the profiles table is not possible as there is no 'user_id' FK in the deployed DB.
+    // TODO: This query needs to be fleshed out with joins for services, clinics etc.
+    // For now, fetching the basic doctor profiles.
     const allDoctors = await db.select().from(doctors);
     return c.json({ data: allDoctors });
 });
