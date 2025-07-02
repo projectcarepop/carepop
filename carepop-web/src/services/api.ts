@@ -202,7 +202,7 @@ export async function getMyEnrichedRecords(accessToken: string) {
     }
     const result = await response.json();
     // The backend returns { records: [...] }, so we return the full object.
-    return result;
+    return result.records || [];
 }
 
 export async function getSingleMedicalRecord(recordId: string, accessToken: string) {
