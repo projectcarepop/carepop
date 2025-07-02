@@ -3,12 +3,13 @@
 import * as React from "react";
 import Link from "next/link";
 import { useSearchParams } from 'next/navigation';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Icons } from "@/components/icons";
 import { GoogleIcon } from "@/components/icons/GoogleIcon";
-import { signIn, googleSignIn } from "@/app/sign-in/actions";
+import { signIn } from "@/app/sign-in/actions";
 
 // Note: We are no longer using react-hook-form as Server Actions simplify form handling.
 
@@ -16,6 +17,18 @@ export default function Page() {
   const [showPassword, setShowPassword] = React.useState(false);
   const searchParams = useSearchParams();
   const errorMessage = searchParams.get('message');
+  const supabase = createClientComponentClient();
+
+  const handleGoogleSignIn = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        // This tells Supabase to redirect back to our Next.js app's
+        // auth callback route after the user authenticates with Google.
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+  };
 
   return (
     <div className="flex justify-center items-center h-screen bg-gray-50">
@@ -77,12 +90,10 @@ export default function Page() {
             </div>
         </div>
 
-        {/* Google Sign-in Form */}
-        <form action={googleSignIn}>
-            <Button variant="outline" type="submit" className="w-full">
-                <GoogleIcon className="mr-2 h-4 w-4" /> Google
-            </Button>
-        </form>
+        {/* Google Sign-in Button */}
+        <Button variant="outline" type="button" className="w-full" onClick={handleGoogleSignIn}>
+            <GoogleIcon className="mr-2 h-4 w-4" /> Google
+        </Button>
 
         <p className="px-8 text-center text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}
