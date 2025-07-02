@@ -32,8 +32,7 @@ export default function DownloadAppPage() {
             </div>
             <div className="flex justify-center">
                 <Image
-                    src="/app-mockup.png" // Placeholder image
-                    width={300}
+                    src="/carepop-app-mockup.png"
                     height={600}
                     alt="CarePoP mobile app running on a smartphone"
                     className="rounded-2xl shadow-2xl"
