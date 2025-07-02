@@ -296,47 +296,80 @@ export const createAppointment = async (
  * @returns A promise that resolves to an array of clinics.
  */
 export const getPublicClinics = async (): Promise<Clinic[]> => {
-  const response = await apiFetch<{ data: Clinic[] }>("/api/public/clinics");
-  return response?.data ?? [];
+  const url = `${API_URL}/api/public/clinics`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to fetch public clinics: ${response.status} - ${errorText}`);
+    }
+    const result = await response.json();
+    // The public clinics endpoint returns a { data: [...] } envelope
+    return result.data || [];
+  } catch (error) {
+    console.error("Error in getPublicClinics:", error);
+    throw error;
+  }
 };
 
 /**
- * Searches for public clinics with optional filters for name, service, and location.
- * @param filters An object containing optional search criteria.
- * @param filters.name A search term to filter clinics by name.
- * @param filters.serviceId The ID of a service to filter clinics by.
- * @param filters.lat The latitude of the user's location for proximity sorting.
- * @param filters.lon The longitude of the user's location for proximity sorting.
- * @returns A promise that resolves to an array of clinics, potentially including distance.
+ * (NEW) Searches for clinics based on multiple filter criteria for the Clinic Finder.
+ * This function calls the dedicated, powerful search endpoint.
  */
-export const searchPublicClinics = async (filters: {
-  name?: string;
-  serviceId?: string;
+type ClinicSearchFilters = {
+  q?: string;
   lat?: number;
   lon?: number;
-  radius?: number; // Radius in kilometers
-}): Promise<Clinic[]> => {
+  radius?: number; // in meters
+};
+
+export async function searchClinicsForFinder(filters: ClinicSearchFilters): Promise<Clinic[]> {
   const params = new URLSearchParams();
-  if (filters.name) {
-    params.append('name', filters.name);
-  }
-  if (filters.serviceId) {
-    params.append('serviceId', filters.serviceId);
-  }
-  if (filters.lat && filters.lon) {
-    params.append('lat', filters.lat.toString());
-    params.append('lon', filters.lon.toString());
-  }
-  if (filters.radius) {
-    params.append('radius', filters.radius.toString());
-  }
+  
+  if (filters.q) params.append('q', filters.q);
+  if (filters.lat) params.append('lat', String(filters.lat));
+  if (filters.lon) params.append('lon', String(filters.lon));
+  if (filters.radius) params.append('radius', String(filters.radius));
 
   const queryString = params.toString();
-  const path = `/api/public/search/clinics${queryString ? `?${queryString}` : ''}`;
+  // Ensure we are hitting the correct, powerful search endpoint
+  const url = `${API_URL}/api/public/clinics/nearby?${queryString}`;
   
-  const data = await apiFetch<{ clinics: Clinic[] }>(path);
-  return data?.clinics ?? [];
-};
+  console.log(`[Service Layer] Calling Clinic Finder API: ${url}`);
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to search clinics: ${response.status} - ${errorText}`);
+    }
+    const result = await response.json();
+    
+    // The /nearby endpoint returns a `location` string, e.g., "POINT(121.123 14.456)"
+    // We must parse this into latitude and longitude for the map components.
+    if (Array.isArray(result)) {
+        return result.map((clinic: any) => {
+            if (clinic.location && typeof clinic.location === 'string') {
+                const match = clinic.location.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
+                if (match) {
+                    return {
+                        ...clinic,
+                        longitude: parseFloat(match[1]),
+                        latitude: parseFloat(match[2]),
+                    };
+                }
+            }
+            return clinic;
+        });
+    }
+
+    return [];
+    
+  } catch (error) {
+    console.error("Error in searchClinicsForFinder:", error);
+    throw error; // Re-throw the error for TanStack Query to handle
+  }
+}
 
 /**
  * Fetches publicly available services. If a clinic ID is provided, it fetches
