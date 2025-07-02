@@ -49,8 +49,16 @@ type DashboardMetrics = {
   };
 };
 
-// Colors for the pie chart
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+// Colors for the pie chart, using HSL values from globals.css
+const BRAND_COLORS = {
+    primary: 'hsl(349 100% 65%)',
+    secondary: 'hsl(230 71% 27%)',
+    accent: 'hsl(349 90% 90%)',
+    muted: 'hsl(208 7% 46%)',
+    success: 'hsl(152 69% 31%)'
+};
+
+const PIE_CHART_COLORS = [BRAND_COLORS.primary, BRAND_COLORS.secondary, BRAND_COLORS.success, BRAND_COLORS.accent];
 
 export default function AdminDashboardPage() {
     const router = useRouter();
@@ -160,11 +168,11 @@ export default function AdminDashboardPage() {
                 <ResponsiveContainer width="100%" height={350}>
                     <BarChart data={metrics.timeSeries.appointmentsOverTime}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                        <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} />
+                        <XAxis dataKey="date" stroke={BRAND_COLORS.muted} fontSize={12} tickLine={false} axisLine={false} />
+                        <YAxis stroke={BRAND_COLORS.muted} fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} />
                         <Tooltip />
                         <Legend />
-                        <Bar dataKey="count" fill="#adfa1d" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="count" fill={BRAND_COLORS.primary} radius={[4, 4, 0, 0]} />
                     </BarChart>
                 </ResponsiveContainer>
             </CardContent>
@@ -176,9 +184,9 @@ export default function AdminDashboardPage() {
             <CardContent>
                 <ResponsiveContainer width="100%" height={350}>
                     <PieChart>
-                        <Pie data={formattedAppointmentsByStatus} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={120} fill="#8884d8" label>
+                        <Pie data={formattedAppointmentsByStatus} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={120} fill={BRAND_COLORS.primary} label>
                             {formattedAppointmentsByStatus.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                <Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} />
                             ))}
                         </Pie>
                         <Tooltip />
