@@ -102,9 +102,9 @@ export default async function MedicalRecordDetailPage({ params }: MedicalRecordD
     <div className="container mx-auto max-w-4xl py-10">
       <div className="mb-6">
         <Button variant="outline" asChild>
-          <Link href="/records">
+          <Link href="/main-dashboard">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to All Records
+            Back to Dashboard
           </Link>
         </Button>
       </div>

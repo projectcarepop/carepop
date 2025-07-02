@@ -21,7 +21,6 @@ memory-bank-backend/
 memory-bank/
 .cursor/
 .cursor\rules
-context/
 final-blueprint/
 
 # Environment variables
