@@ -40,14 +40,14 @@ export function MainDashboardClient({
   // The queries are now enabled only when the auth context is initialized AND there's a session.
   const { data: appointments, isLoading: isLoadingAppointments } = useQuery({
     queryKey: ['myAppointments', session?.user?.id],
-    queryFn: () => getMyAppointments(),
+    queryFn: () => getMyAppointments(session!.access_token, { limit: 3 }),
     initialData: initialAppointments,
     enabled: isInitialized && !!session,
   });
 
   const { data: medicalRecords, isLoading: isLoadingRecords } = useQuery({
     queryKey: ['myMedicalRecords', session?.user?.id],
-    queryFn: () => getMyMedicalRecords(),
+    queryFn: () => getMyMedicalRecords(session!.access_token, { limit: 3 }),
     initialData: initialMedicalRecords,
     enabled: isInitialized && !!session,
   });
@@ -214,7 +214,7 @@ export function MainDashboardClient({
                             </div>
                         </div>
                         <Button variant="outline" size="sm" asChild>
-                             <Link href={`/records/${record.id}`}>View Details</Link>
+                             <Link href={`/records/${record.id}?from=dashboard`}>View Details</Link>
                         </Button>
                     </div>
                 ))

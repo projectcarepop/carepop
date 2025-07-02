@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getMyEnrichedRecords } from '@/services/api';
 import RecordListClient from '@/components/records/RecordListClient';
-import { type MedicalRecordWithRelations } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
@@ -20,7 +19,7 @@ export default async function MedicalRecordsPage() {
     redirect('/sign-in');
   }
 
-  const records: MedicalRecordWithRelations[] = await getMyEnrichedRecords(session.access_token);
+  const { records } = await getMyEnrichedRecords(session.access_token);
 
   return (
     <div className="container mx-auto py-8">

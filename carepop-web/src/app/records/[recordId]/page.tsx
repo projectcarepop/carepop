@@ -14,6 +14,7 @@ interface MedicalRecordDetailPageProps {
   params: {
     recordId: string;
   };
+  searchParams: { [key: string]: string | string[] | undefined };
 }
 
 const formatRecordType = (type: MedicalRecordWithRelations['recordType']) => {
@@ -62,7 +63,7 @@ const RecordDetailsContent = ({ record }: { record: MedicalRecordWithRelations }
     }
 };
 
-export default async function MedicalRecordDetailPage({ params }: MedicalRecordDetailPageProps) {
+export default async function MedicalRecordDetailPage({ params, searchParams }: MedicalRecordDetailPageProps) {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
@@ -96,15 +97,19 @@ export default async function MedicalRecordDetailPage({ params }: MedicalRecordD
     notFound();
   }
   
+  const from = searchParams.from;
+  const backHref = from === 'dashboard' ? '/main-dashboard' : '/records';
+  const backText = from === 'dashboard' ? 'Back to Dashboard' : 'Back to All Records';
+
   const { text: recordTypeText, icon: recordTypeIcon } = formatRecordType(record.recordType);
 
   return (
     <div className="container mx-auto max-w-4xl py-10">
       <div className="mb-6">
         <Button variant="outline" asChild>
-          <Link href="/main-dashboard">
+          <Link href={backHref}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Dashboard
+            {backText}
           </Link>
         </Button>
       </div>

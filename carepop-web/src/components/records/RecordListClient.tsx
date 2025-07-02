@@ -8,6 +8,7 @@ import RecordCard from './RecordCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { FileText } from 'lucide-react';
+import Link from 'next/link';
 
 interface RecordListClientProps {
   initialRecords: MedicalRecordWithRelations[];
@@ -61,7 +62,9 @@ export default function RecordListClient({ initialRecords }: RecordListClientPro
   return (
     <div className="space-y-6">
       {records.map((record) => (
-        <RecordCard key={record.recordId} record={record} />
+        <Link key={record.recordId} href={`/records/${record.recordId}?from=records`} className="block">
+          <RecordCard record={record} />
+        </Link>
       ))}
     </div>
   );
