@@ -817,6 +817,95 @@ adminRoutes.get('/stats', async (c) => {
     }
 });
 
+// --- NEW DASHBOARD METRICS ENDPOINT ---
+adminRoutes.get('/dashboard-metrics', async (c) => {
+    try {
+        // 1. Core Counts
+        const [userCount] = await db.select({ count: count() }).from(profiles);
+        const [doctorCount] = await db.select({ count: count() }).from(doctors);
+        const [clinicCount] = await db.select({ count: count() }).from(clinics);
+        const [totalAppointments] = await db.select({ count: count() }).from(appointments);
+
+        // 2. Time-Series Data (Last 30 days)
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const appointmentsOverTime = await db
+            .select({
+                date: sql<string>`DATE(appointment_time)`,
+                count: sql<number>`count(id)::int`,
+            })
+            .from(appointments)
+            .where(gte(appointments.appointmentTime, thirtyDaysAgo.toISOString()))
+            .groupBy(sql`DATE(appointment_time)`)
+            .orderBy(sql`DATE(appointment_time)`);
+
+        const usersOverTime = await db
+            .select({
+                date: sql<string>`DATE(created_at)`,
+                count: sql<number>`count(id)::int`,
+            })
+            .from(profiles)
+            .where(gte(profiles.createdAt, thirtyDaysAgo.toISOString()))
+            .groupBy(sql`DATE(created_at)`)
+            .orderBy(sql`DATE(created_at)`);
+
+        // 3. Aggregate Metrics
+        const appointmentsByStatus = await db
+            .select({
+                status: appointments.status,
+                count: sql<number>`count(id)::int`,
+            })
+            .from(appointments)
+            .groupBy(appointments.status);
+        
+        const topServices = await db
+            .select({
+                serviceName: services.name,
+                count: sql<number>`count(appointments.id)::int`,
+            })
+            .from(appointments)
+            .leftJoin(services, eq(appointments.serviceId, services.id))
+            .groupBy(services.name)
+            .orderBy(desc(sql<number>`count(appointments.id)::int`))
+            .limit(5);
+
+        const topClinics = await db
+            .select({
+                clinicName: clinics.name,
+                count: sql<number>`count(appointments.id)::int`,
+            })
+            .from(appointments)
+            .leftJoin(clinics, eq(appointments.clinicId, clinics.id))
+            .groupBy(clinics.name)
+            .orderBy(desc(sql<number>`count(appointments.id)::int`))
+            .limit(5);
+
+        return c.json({
+            data: {
+                coreCounts: {
+                    users: userCount.count,
+                    doctors: doctorCount.count,
+                    clinics: clinicCount.count,
+                    appointments: totalAppointments.count,
+                },
+                timeSeries: {
+                    appointmentsOverTime,
+                    usersOverTime,
+                },
+                aggregates: {
+                    appointmentsByStatus,
+                    topServices,
+                    topClinics
+                }
+            }
+        });
+    } catch (error: any) {
+        console.error('Error fetching admin dashboard metrics:', error);
+        return c.json({ error: 'Failed to fetch dashboard metrics', details: error.message }, 500);
+    }
+});
+
 adminRoutes.delete('/appointments/:id', async (c) => {
     const { id } = c.req.param();
     const user = c.get('user');
