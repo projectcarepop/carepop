@@ -321,8 +321,11 @@ meRoutes.put('/profile', zValidator('json', updateProfileSchema), async (c) => {
 const createHealthLogSchema = z.object({
   logDate: z.string().datetime(),
   symptoms: z.array(z.string()),
-  mood: z.enum(['happy', 'sad', 'neutral', 'anxious', 'irritable']),
-  notes: z.string().optional(),
+  mood: z.preprocess(
+    (val) => (typeof val === 'string' ? val.toLowerCase() : val),
+    z.enum(['happy', 'sad', 'neutral', 'anxious', 'stressed']).optional()
+  ),
+  notes: z.string().nullable().optional().transform(val => val ?? undefined),
 });
 
 // Zod schema for menstrual logs

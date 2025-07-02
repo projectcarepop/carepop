@@ -92,7 +92,7 @@ const HealthBuddyDashboardScreen = () => {
 
   const handleSymptomSubmit = (data: LogSymptomsFormData) => {
     const payload: CreateHealthLogPayload = {
-        logDate: new Date().toISOString().split('T')[0],
+        logDate: new Date().toISOString(),
         mood: data.mood ?? selectedMood ?? null,
         symptoms: data.symptoms ?? [],
         notes: data.notes ?? null,

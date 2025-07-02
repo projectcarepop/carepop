@@ -216,7 +216,7 @@ export const inventory = pgTable("inventory", {
     quantityCheck: check("inventory_quantity_on_hand_check", sql`quantity_on_hand >= 0`),
 }));
 
-export const moodEnum = pgEnum("mood", ['happy', 'sad', 'neutral', 'anxious', 'irritable']);
+export const moodEnum = pgEnum("mood", ['happy', 'sad', 'neutral', 'anxious', 'stressed']);
 
 export const healthLogs = pgTable("health_logs", {
 	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
