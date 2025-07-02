@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { sql, desc } from 'drizzle-orm';
 import { db } from '../lib/db';
 import { appointments, doctors, clinics, services, medicalRecords, recordDoctorNotes, recordPrescriptions, recordDocuments, profiles, healthLogs, menstrualLogs } from '../../../drizzle/schema';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, gte } from 'drizzle-orm';
 import { authMiddleware, AuthEnv } from '../middleware/auth';
 import { generativeModel } from '../../../src/services/vertex-ai';
 
@@ -388,31 +388,62 @@ meRoutes.get('/health-logs', async (c) => {
 meRoutes.get('/ai/insight', async (c) => {
   const user = c.get('user');
 
-  // For the purpose of this task, we will mock the health data fetching.
-  // In a real scenario, you would fetch this from the healthLogs and menstrualLogs tables.
-  const healthData = {
-      symptoms: ["headache", "fatigue"],
-      period: "light",
-      notes: "Feeling more tired than usual this week."
-  };
-
-  const prompt = `
-      Analyze the following health data for a user and provide a short, supportive, and actionable insight.
-      The user is part of the LGBTQ+ community, so use inclusive and gender-neutral language.
-      Do not provide medical advice. Focus on wellness and self-care.
-      
-      Data:
-      - Symptoms logged: ${healthData.symptoms.join(', ')}
-      - Period flow: ${healthData.period}
-      - Notes: ${healthData.notes}
-
-      Generate a one-paragraph insight.
-  `;
-
   try {
+    // Step 1: Fetch the user's recent health data
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const recentHealthLogs = await db.query.healthLogs.findMany({
+      where: and(
+        eq(healthLogs.patientId, user.id),
+        gte(healthLogs.logDate, thirtyDaysAgo.toISOString())
+      ),
+      orderBy: (logs, { desc }) => [desc(logs.logDate)],
+    });
+
+    const recentMenstrualLogs = await db.query.menstrualLogs.findMany({
+        where: eq(menstrualLogs.patientId, user.id),
+        orderBy: (logs, { desc }) => [desc(logs.startDate)],
+        limit: 1,
+    });
+    
+    // Step 2: Process and summarize the data for the prompt
+    if (recentHealthLogs.length === 0 && recentMenstrualLogs.length === 0) {
+        return c.json({ insight: "We don't have enough data to generate an insight yet. Try logging your symptoms or period for a few days!" });
+    }
+
+    const symptomsSummary = recentHealthLogs.flatMap(log => log.symptoms || []);
+    const moodSummary = recentHealthLogs.map(log => log.mood).filter(Boolean);
+    const notesSummary = recentHealthLogs.map(log => log.notes).filter(Boolean).join('\\n- ');
+
+    const healthData = {
+       symptoms: [...new Set(symptomsSummary)], // Unique symptoms
+       moods: [...new Set(moodSummary)], // Unique moods
+       notes: notesSummary,
+       lastPeriod: recentMenstrualLogs[0] ? `from ${new Date(recentMenstrualLogs[0].startDate).toLocaleDateString()} to ${new Date(recentMenstrualLogs[0].endDate).toLocaleDateString()}` : "not logged in the last month",
+    };
+
+    // Step 3: Build a dynamic, detailed prompt
+    const prompt = `
+        Analyze the following health data for a user over the last 30 days and provide a short, supportive, and actionable insight.
+        The user is part of the LGBTQ+ community, so use inclusive and gender-neutral language (e.g., "your body" instead of gendered terms).
+        Do not provide medical advice. Focus on wellness, self-care, and potential patterns.
+        If a data point is empty or not available, do not mention it.
+        
+        Data:
+        - Symptoms logged: ${healthData.symptoms.length > 0 ? healthData.symptoms.join(', ') : 'None'}
+        - Moods logged: ${healthData.moods.length > 0 ? healthData.moods.join(', ') : 'None'}
+        - Last menstrual cycle logged: ${healthData.lastPeriod}
+        - User's notes include:
+        - ${healthData.notes.length > 0 ? healthData.notes : 'None'}
+
+        Generate a one-paragraph insight based on this data.
+    `;
+
+    // Step 4: Generate content
     const result = await generativeModel.generateContent(prompt);
     const response = result.response;
-    const insightText = response.candidates?.[0]?.content?.parts?.[0]?.text || "Could not generate an insight at this time.";
+    const insightText = response.candidates?.[0]?.content?.parts?.[0]?.text || "Could not generate an insight at this time. Please try again later.";
     
     return c.json({ insight: insightText });
   } catch (error) {
