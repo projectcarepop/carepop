@@ -14,7 +14,7 @@ import {
     doctorClinics, 
     providerAvailability 
 } from '../../../drizzle/schema';
-import { and, eq, sql, inArray, SQL, asc, getTableColumns, type AnyColumn } from 'drizzle-orm';
+import { and, eq, sql, inArray, SQL, asc, getTableColumns, type AnyColumn, ne } from 'drizzle-orm';
 import { getDay, parseISO, format, startOfDay, endOfDay, setHours, setMinutes, setSeconds, isBefore, addMinutes, isEqual } from 'date-fns';
 import fs from 'fs/promises';
 import path from 'path';
@@ -469,102 +469,68 @@ publicRoutes.get('/availability/dates', zValidator('query', availableDatesQueryS
 
 /**
  * GET /public/availability
- * New, simplified endpoint to get availability slots for a given service, clinic, and date.
+ * Calculates available appointment slots for a given service and clinic on a specific date.
+ * This endpoint implements the "Golden Pattern" to prevent double-bookings.
  */
 publicRoutes.get('/availability', zValidator('query', availabilityQuerySchema), async (c) => {
   const { serviceId, clinicId, date } = c.req.valid('query');
   const targetDate = startOfDay(parseISO(date));
 
-  console.log(`[AVAILABILITY] Request for clinic: ${clinicId}, service: ${serviceId}, date: ${date}`);
-
   try {
-    const service = await db.query.services.findFirst({
-        where: eq(services.id, serviceId),
-        columns: { durationMinutes: true }
-    });
-
-    if (!service || !service.durationMinutes) {
-        console.error(`[AVAILABILITY] Service with ID ${serviceId} not found or has no duration.`);
-        return c.json({ error: "Service not found or has no duration." }, 404);
-    }
-    const serviceDuration = service.durationMinutes;
-    console.log(`[AVAILABILITY] Service duration: ${serviceDuration} minutes.`);
-
-    const providersForServiceInClinic = await db.select({
-        id: doctors.id
-    }).from(doctors)
-        .innerJoin(doctorClinics, eq(doctors.id, doctorClinics.doctorId))
-        .innerJoin(doctorServices, eq(doctors.id, doctorServices.doctorId))
-        .where(and(
-            eq(doctorClinics.clinicId, clinicId),
-            eq(doctorServices.serviceId, serviceId),
-            eq(doctors.isActive, true)
-        ));
-
-    console.log(`[AVAILABILITY] Found ${providersForServiceInClinic.length} provider(s) for this service and clinic.`);
-
-    if (providersForServiceInClinic.length === 0) {
+    // Step 1: Find all doctors for the service at the clinic
+    const providersForService = await db.select({ id: doctors.id })
+      .from(doctors)
+      .innerJoin(doctorClinics, eq(doctors.id, doctorClinics.doctorId))
+      .innerJoin(doctorServices, eq(doctors.id, doctorServices.doctorId))
+      .where(and(
+        eq(doctorClinics.clinicId, clinicId),
+        eq(doctorServices.serviceId, serviceId),
+        eq(doctors.isActive, true)
+      ));
+    
+    if (providersForService.length === 0) {
         return c.json({ availableSlots: [], doctorsForSlot: {} });
     }
-    const providerIds = providersForServiceInClinic.map(p => p.id);
+    const providerIds = providersForService.map(p => p.id);
 
-    const bookedAppointments = await db.select({
-        appointmentTime: appointments.appointmentTime,
-        doctorId: appointments.doctorId,
-    }).from(appointments)
-    .where(and(
+    // Step 2: Get all NON-CANCELED appointments for these providers on the target date
+    const bookedAppointments = await db.select({ appointmentTime: appointments.appointmentTime })
+      .from(appointments)
+      .where(and(
         inArray(appointments.doctorId, providerIds),
         eq(appointments.clinicId, clinicId),
-        sql`${appointments.appointmentTime} >= ${format(startOfDay(targetDate), 'yyyy-MM-dd HH:mm:ss')}`,
-        sql`${appointments.appointmentTime} < ${format(endOfDay(targetDate), 'yyyy-MM-dd HH:mm:ss')}`,
-        sql`status != 'canceled_by_patient'`,
-        sql`status != 'canceled_by_admin'`    ));
+        sql`DATE(appointment_time) = ${format(targetDate, 'yyyy-MM-dd')}`,
+        ne(appointments.status, 'canceled_by_patient'),
+        ne(appointments.status, 'canceled_by_admin')
+      ));
 
-    console.log(`[AVAILABILITY] Found ${bookedAppointments.length} booked appointments for the given providers on this day.`);
+    const bookedSlots = new Set(
+      bookedAppointments.map(a => format(parseISO(a.appointmentTime), 'HH:mm'))
+    );
 
-    const bookedDoctorSlots = new Set(bookedAppointments.map(a => `${format(parseISO(a.appointmentTime), 'HH:mm')}-${a.doctorId}`));
-    
-    console.log('[AVAILABILITY] Set of booked slots:', bookedDoctorSlots);
-
+    // Step 3: Generate all possible slots and filter out the booked ones
+    const service = await db.query.services.findFirst({ where: eq(services.id, serviceId), columns: { durationMinutes: true }});
+    const duration = service?.durationMinutes || 30;
     const availableSlots: string[] = [];
-    const doctorsPerSlot: Record<string, string[]> = {};
-
-    let currentTime = setMinutes(setHours(targetDate, 9), 0);
-    const endTime = setMinutes(setHours(targetDate, 17), 0);
+    let currentTime = setHours(targetDate, 9); // 9:00 AM
+    const endTime = setHours(targetDate, 17); // 5:00 PM
 
     while (isBefore(currentTime, endTime)) {
-        const timeSlotStr = format(currentTime, 'HH:mm');
-        const availableDoctorsForSlot = [];
-
-        for (const providerId of providerIds) {
-            if (!bookedDoctorSlots.has(`${timeSlotStr}-${providerId}`)) {
-                availableDoctorsForSlot.push(providerId);
-            }
-        }
-        
-        if (availableDoctorsForSlot.length > 0) {
-            if (!doctorsPerSlot[timeSlotStr]) {
-                 availableSlots.push(timeSlotStr);
-                 doctorsPerSlot[timeSlotStr] = [];
-            }
-            doctorsPerSlot[timeSlotStr].push(...availableDoctorsForSlot);
-        }
-        currentTime = addMinutes(currentTime, serviceDuration);
+      const timeSlotStr = format(currentTime, 'HH:mm');
+      if (!bookedSlots.has(timeSlotStr)) {
+        availableSlots.push(currentTime.toISOString()); // Return full ISO string
+      }
+      currentTime = addMinutes(currentTime, duration);
     }
     
-    console.log(`[AVAILABILITY] Final computed available slots: ${availableSlots.length}`, availableSlots);
-
-    return c.json({
-        availableSlots: availableSlots.sort(),
-        doctorsForSlot: doctorsPerSlot
-    });
+    // The original response shape included doctorsForSlot, returning an empty object for compatibility.
+    return c.json({ availableSlots, doctorsForSlot: {} });
 
   } catch (error) {
-    console.error(`Error fetching availability for service ${serviceId} at clinic ${clinicId} on ${date}:`, error);
-    return c.json({ error: "Internal Server Error" }, 500);
+    console.error("Error fetching availability:", error);
+    return c.json({ error: "Internal Server Error", message: "Failed to fetch availability." }, 500);
   }
 });
-
 
 /**
  * GET /public/psgc/provinces

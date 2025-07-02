@@ -452,7 +452,7 @@ const BookingScreen = () => {
                     {renderStepContent()}
       </View>
       <View style={styles.footer}>
-        {currentStep !== 'clinic' && <Button variant="outline" onPress={goToPreviousStep} style={styles.footerButton} textStyle={styles.footerButtonText}>Back</Button>}
+        {currentStep !== 'clinic' && <Button variant="outline" onPress={goToPreviousStep} style={styles.footerButton} textStyle={styles.footerBackButtonText}>Back</Button>}
         <View style={{flex:1, marginLeft: currentStep !== 'clinic' ? theme.spacing.md : 0}}>
             {currentStep === 'confirm' ? (
                 <Button onPress={handleConfirmBooking} disabled={isBooking} style={styles.footerButton}>
@@ -502,10 +502,15 @@ const styles = StyleSheet.create({
   footerButton: {
     height: 48,
     borderRadius: theme.radius.md,
+    
   },
   footerButtonText: {
     fontSize: 16,
     fontFamily: theme.typography.fontFamilySemiBold,
+    color: theme.colors.accentForeground,
+  },
+  footerBackButtonText: {
+    color: theme.colors.primary,
   },
   selectableCard: { marginBottom: theme.spacing.md, padding: theme.spacing.lg, borderRadius: theme.radius.md },
   selectedCard: { borderWidth: 2, borderColor: theme.colors.primary },
