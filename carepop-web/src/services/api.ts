@@ -104,6 +104,7 @@ interface ClinicSearchFilters {
   userLocation?: {
     lat: number;
     lon: number;
+    radius?: number;
   } | null;
 }
 
@@ -112,21 +113,40 @@ export async function searchClinics(filters: ClinicSearchFilters) {
   if (filters.serviceId) {
     params.append('serviceId', filters.serviceId);
   }
+
+  // Determine the correct endpoint based on whether location is provided.
+  const endpoint = filters.userLocation
+    ? '/api/public/clinics/nearby'
+    : '/api/public/clinics';
+
   if (filters.userLocation) {
     params.append('lat', String(filters.userLocation.lat));
     params.append('lon', String(filters.userLocation.lon));
+    if (filters.userLocation.radius) {
+        params.append('radius', String(filters.userLocation.radius));
+    }
   }
 
-  const url = `${API_BASE_URL}/api/public/search/clinics?${params.toString()}`;
+  const url = `${API_BASE_URL}${endpoint}?${params.toString()}`;
   
   try {
     const response = await fetch(url, { cache: 'no-store' });
     if (!response.ok) {
         const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.status}`}));
-        throw new Error(error.message || `Failed to search clinics.`);
+        throw new Error(error.message || `Failed to search for clinics.`);
     }
     const result = await response.json();
-    return result.data || [];
+    
+    // Adapt to inconsistent API response shapes, just like the mobile app.
+    const clinics = result.data || result;
+
+    // Standardize the location object, as the 'nearby' endpoint returns a different format.
+    return clinics.map((clinic: any) => ({
+        ...clinic,
+        latitude: clinic.latitude ?? parseFloat(clinic.location?.split(' ')[1].slice(1)),
+        longitude: clinic.longitude ?? parseFloat(clinic.location?.split(' ')[0].slice(6)),
+    }));
+
   } catch(error) {
     console.error("Network or parsing error in searchClinics:", error);
     throw new Error("A network error occurred while searching for clinics.");
