@@ -201,8 +201,8 @@ export async function getMyEnrichedRecords(accessToken: string) {
         throw new Error(error.message);
     }
     const result = await response.json();
-    // The backend returns { records: [...] }, so we extract the array.
-    return result.records || [];
+    // The backend returns { records: [...] }, so we return the full object.
+    return result;
 }
 
 export async function getSingleMedicalRecord(recordId: string, accessToken: string) {
