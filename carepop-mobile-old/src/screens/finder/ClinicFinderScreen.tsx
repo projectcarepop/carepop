@@ -29,6 +29,8 @@ import Animated, {
   withSpring,
   runOnJS,
 } from 'react-native-reanimated';
+import { useNavigation } from '@react-navigation/native';
+import { type NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import {
   searchClinicsForFinder,
@@ -38,6 +40,7 @@ import { useDebounce } from '../../hooks/useDebounce';
 import { theme } from '../../components/theme';
 import { Clinic } from '../../lib/types';
 import { Button } from '../../components/button.native';
+import { type ClinicFinderStackParamList } from '../../navigation/AppDrawerNavigator';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -105,6 +108,7 @@ const EmptyState = () => (
 // --- Main Screen ---
 
 export function ClinicFinderScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<ClinicFinderStackParamList>>();
   const [filters, setFilters] = useState<Filters>({});
   const [searchText, setSearchText] = useState('');
   const debouncedSearchText = useDebounce(searchText, 500);
@@ -412,7 +416,7 @@ export function ClinicFinderScreen() {
               Find Near Me
             </Button>
             {isFilterActive && (
-                 <Button onPress={clearFilters} variant="secondary" icon={<X size={16} color={theme.colors.foreground} />}>
+                 <Button onPress={clearFilters} variant="secondary" icon={<X size={16} color={theme.colors.accentForeground} />}>
                     Clear
                 </Button>
             )}
@@ -456,7 +460,20 @@ export function ClinicFinderScreen() {
               </View>
           )}
 
-          <Button onPress={handleGetDirections} style={{ margin: theme.spacing.lg }}>Get Directions</Button>
+          <View style={styles.buttonRow}>
+            <Button onPress={handleGetDirections} style={styles.buttonFlex}>Get Directions</Button>
+            <Button 
+                variant="secondary" 
+                style={styles.buttonFlex}
+                onPress={() => {
+                    if (selectedClinic) {
+                        navigation.navigate('ClinicDetail', { clinicId: selectedClinic.id });
+                    }
+                }}
+            >
+                View Details
+            </Button>
+          </View>
       </View>
   );
 
@@ -829,6 +846,16 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.border,
     marginTop: theme.spacing.md,
     marginBottom: theme.spacing.sm,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    paddingBottom: theme.spacing.lg,
+  },
+  buttonFlex: {
+    flex: 1,
   },
 });
 

@@ -66,6 +66,7 @@ export type Clinic = {
   latitude: number;
   longitude: number;
   distance?: number; // Optional, only present when searching with location
+  services?: ServiceWithCategory[]; // Optional, only present in detailed view
   // ... add other clinic fields as needed
 };
 

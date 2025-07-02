@@ -20,6 +20,7 @@ import MyMedicalRecordsScreen from '../screens/MyMedicalRecordsScreen';
 import { RecordDetailScreen } from '../screens/RecordDetailScreen';
 import { AboutUsScreen } from '../screens/AboutUsScreen';
 import { ProfileNavigator } from './ProfileNavigator';
+import { ClinicDetailScreen } from '../screens/finder/ClinicDetailScreen';
 
 // --- Param Lists ---
 export type AppointmentsStackParamList = {
@@ -30,6 +31,11 @@ export type AppointmentsStackParamList = {
 export type RecordsStackParamList = {
   MyRecords: undefined;
   RecordDetail: { recordId: string };
+};
+
+export type ClinicFinderStackParamList = {
+  ClinicFinder: undefined;
+  ClinicDetail: { clinicId: string };
 };
 
 export type HealthBuddyStackParamList = {
@@ -44,7 +50,7 @@ export type DrawerParamList = {
   Records: undefined;
   'Health Buddy': undefined;
   Booking: { clinicId?: string } | undefined;
-  'Clinic Finder': undefined;
+  'Clinic Finder': { screen?: keyof ClinicFinderStackParamList; params?: any };
   AboutUs: undefined;
   Profile: undefined;
 };
@@ -52,6 +58,7 @@ export type DrawerParamList = {
 // --- Navigators ---
 const AppointmentsStackNav = createNativeStackNavigator<AppointmentsStackParamList>();
 const RecordsStackNav = createNativeStackNavigator<RecordsStackParamList>();
+const ClinicFinderStackNav = createNativeStackNavigator<ClinicFinderStackParamList>();
 const HealthBuddyStackNav = createNativeStackNavigator<HealthBuddyStackParamList>();
 const Drawer = createDrawerNavigator<DrawerParamList>();
 
@@ -71,6 +78,15 @@ function RecordsNavigator() {
       <RecordsStackNav.Screen name="MyRecords" component={MyMedicalRecordsScreen} />
       <RecordsStackNav.Screen name="RecordDetail" component={RecordDetailScreen} />
     </RecordsStackNav.Navigator>
+  );
+}
+
+function ClinicFinderNavigator() {
+  return (
+    <ClinicFinderStackNav.Navigator screenOptions={{ headerShown: false }}>
+      <ClinicFinderStackNav.Screen name="ClinicFinder" component={ClinicFinderScreen} />
+      <ClinicFinderStackNav.Screen name="ClinicDetail" component={ClinicDetailScreen} />
+    </ClinicFinderStackNav.Navigator>
   );
 }
 
@@ -138,7 +154,13 @@ export function AppDrawerNavigator() {
         }}
       />
       <Drawer.Screen name="Booking" component={BookingScreen} options={{ title: 'Book a Service', drawerIcon: ({ color }: { color: string }) => <CalendarPlus size={20} color={color} /> }} />
-      <Drawer.Screen name="Clinic Finder" component={ClinicFinderScreen} options={{ drawerIcon: ({ color }: { color: string }) => <Map size={20} color={color} /> }} />
+      <Drawer.Screen 
+        name="Clinic Finder" 
+        component={ClinicFinderNavigator} 
+        options={{ 
+          drawerIcon: ({ color }: { color: string }) => <Map size={20} color={color} /> 
+        }} 
+      />
       <Drawer.Screen 
         name="Health Buddy" 
         component={HealthBuddyNavigator} 

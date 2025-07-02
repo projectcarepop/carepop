@@ -313,6 +313,15 @@ export const getPublicClinics = async (): Promise<Clinic[]> => {
 };
 
 /**
+ * Fetches the details for a single public clinic by its ID.
+ * @param clinicId The ID of the clinic to fetch.
+ * @returns A promise that resolves to the detailed clinic object.
+ */
+export const getPublicClinicDetails = async (clinicId: string): Promise<Clinic> => {
+    return apiFetch<Clinic>(`/api/public/clinics/${clinicId}`);
+}
+
+/**
  * (NEW) Searches for clinics based on multiple filter criteria for the Clinic Finder.
  * This function calls the dedicated, powerful search endpoint.
  */
