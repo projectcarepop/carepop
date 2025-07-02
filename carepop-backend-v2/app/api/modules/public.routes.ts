@@ -535,105 +535,82 @@ publicRoutes.get('/availability', zValidator('query', availabilityQuerySchema), 
 /**
  * GET /public/availability/slots
  * The definitive, correct endpoint for fetching available appointment slots.
+ * Implements the "Golden Pattern" which assumes a 9-5, Mon-Fri work schedule
+ * and does not depend on any provider_availability table.
  */
 publicRoutes.get('/availability/slots', zValidator('query', availabilityQuerySchema), async (c) => {
-  const { serviceId, clinicId, date } = c.req.valid('query');
-  
-  // All time operations will be standardized to UTC to avoid timezone ambiguity.
-  // The client is responsible for displaying these UTC times in the user's local timezone.
-  const timeZone = 'Asia/Manila'; // The operating timezone of the clinics.
-  const targetDate = zonedTimeToUtc(date, timeZone);
-
-  console.log(`[AVAILABILITY] Request for service: ${serviceId}, clinic: ${clinicId}, date: ${date}`);
-  console.log(`[AVAILABILITY] Target date converted to UTC: ${targetDate.toISOString()}`);
+  const { clinicId, serviceId, date } = c.req.valid('query');
+  // The date is parsed as UTC midnight for the given date string.
+  const targetDate = startOfDay(parseISO(date));
 
   try {
-    // Step 1: Fetch the service duration and all providers for that service at the clinic in a single query.
-    // This query is now possible and efficient because of the corrected schema relations.
-    const serviceAndProviders = await db.query.services.findFirst({
+    // THIS IS THE FIX: Check for weekends first.
+    const dayOfWeek = getDay(targetDate); // Sunday = 0, Saturday = 6
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      console.log(`[AVAILABILITY] Request for a weekend date (${date}). Returning empty.`);
+      return c.json([]); // No slots on weekends.
+    }
+
+    // 1. Fetch service duration and find all providers for the service at the clinic.
+    const service = await db.query.services.findFirst({
         where: eq(services.id, serviceId),
-        columns: { durationMinutes: true },
-        with: {
-            doctorServices: {
-                with: {
-                    doctor: {
-                        with: {
-                            doctorClinics: {
-                                where: eq(doctorClinics.clinicId, clinicId),
-                                columns: {
-                                    clinicId: true, // We only need to know this link exists.
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        columns: { durationMinutes: true }
     });
 
-    if (!serviceAndProviders || !serviceAndProviders.durationMinutes) {
-        console.warn(`[AVAILABILITY] Service with ID ${serviceId} not found or has no duration.`);
-        return c.json([]);
+    // Find all active doctors at the clinic who provide the service.
+    const providers = await db.select({ id: doctors.id })
+        .from(doctors)
+        .innerJoin(doctorClinics, eq(doctors.id, doctorClinics.doctorId))
+        .innerJoin(doctorServices, eq(doctors.id, doctorServices.doctorId))
+        .where(and(
+            eq(doctorClinics.clinicId, clinicId),
+            eq(doctorServices.serviceId, serviceId),
+            eq(doctors.isActive, true)
+        ));
+    
+    const providerIds = providers.map(p => p.id);
+
+    // If no service, duration, or providers are found, no slots are available.
+    if (!service || !service.durationMinutes || providerIds.length === 0) {
+      console.warn(`[AVAILABILITY] No service, duration, or active providers found for service ${serviceId} at clinic ${clinicId}.`);
+      return c.json([]);
     }
 
-    // Filter down to only providers who are linked to the requested clinic.
-    const providerIds = serviceAndProviders.doctorServices
-        .map(ds => ds.doctor)
-        .filter(doc => doc && doc.doctorClinics.length > 0)
-        .map(doc => doc.id);
-
-    if (providerIds.length === 0) {
-        console.warn(`[AVAILABILITY] No active providers found for service ${serviceId} at clinic ${clinicId}.`);
-        return c.json([]);
-    }
-    console.log(`[AVAILABILITY] Found ${providerIds.length} provider(s): ${providerIds.join(', ')}`);
-
-    // Step 2: Fetch all non-canceled appointments for these providers on the target day.
-    // The date range must be in UTC.
-    const dayStart = startOfDay(targetDate);
-    const dayEnd = endOfDay(targetDate);
+    // 2. Fetch all non-canceled appointments for these providers on the given date.
+    const startOfTargetDate = startOfDay(parseISO(date));
+    const endOfTargetDate = endOfDay(parseISO(date));
 
     const bookedAppointments = await db.select({ appointmentTime: appointments.appointmentTime })
       .from(appointments)
       .where(and(
         inArray(appointments.doctorId, providerIds),
         eq(appointments.clinicId, clinicId),
-        gte(appointments.appointmentTime, dayStart.toISOString()),
-        lt(appointments.appointmentTime, dayEnd.toISOString()),
+        gte(appointments.appointmentTime, startOfTargetDate.toISOString()),
+        lt(appointments.appointmentTime, endOfTargetDate.toISOString()),
         ne(appointments.status, 'canceled_by_patient'),
         ne(appointments.status, 'canceled_by_admin')
       ));
 
-    // Store booked slots in a Set for efficient O(1) lookups. All are stored as full ISO strings.
+    // Create a Set of booked slot start times (as ISO strings) for efficient filtering.
     const bookedSlotsUTC = new Set(bookedAppointments.map(a => new Date(a.appointmentTime).toISOString()));
-    console.log(`[AVAILABILITY] Found ${bookedSlotsUTC.size} booked slots for the target date.`);
-    if (bookedSlotsUTC.size > 0) console.log("[AVAILABILITY] Booked Slots (UTC):", bookedSlotsUTC);
 
-    // Step 3: Generate all potential appointment slots for the day from 9 AM to 5 PM Manila Time, converted to UTC.
+    // 3. Generate all potential slots for a 9 AM - 5 PM workday.
     const potentialSlots = [];
-    const operatingHoursStart = zonedTimeToUtc(`${date}T09:00:00`, timeZone);
-    const operatingHoursEnd = zonedTimeToUtc(`${date}T17:00:00`, timeZone);
-    
-    let currentTime = operatingHoursStart;
+    let currentTime = setHours(targetDate, 9); // 9:00 AM on the target date (UTC)
+    const endTime = setHours(targetDate, 17);   // 5:00 PM on the target date (UTC)
 
-    console.log(`[AVAILABILITY] Generating potential slots from ${operatingHoursStart.toISOString()} to ${operatingHoursEnd.toISOString()}`);
-    
-    while (isBefore(currentTime, operatingHoursEnd)) {
+    while (isBefore(currentTime, endTime)) {
       potentialSlots.push(currentTime.toISOString());
-      currentTime = addMinutes(currentTime, serviceAndProviders.durationMinutes);
+      currentTime = addMinutes(currentTime, service.durationMinutes);
     }
-    console.log(`[AVAILABILITY] Generated ${potentialSlots.length} potential slots.`);
 
-    // Step 4: Filter out the booked slots to get the final list of available slots.
+    // 4. Filter out any potential slots that are already booked.
     const availableSlots = potentialSlots.filter(slot => !bookedSlotsUTC.has(slot));
-    console.log(`[AVAILABILITY] Final available slots count: ${availableSlots.length}.`);
-    console.log(`[AVAILABILITY] Sending to client:`, availableSlots);
     
     return c.json(availableSlots);
 
   } catch (error) {
     console.error("[AVAILABILITY] CRASH during availability calculation:", error);
-    // Log the actual error for debugging
     return c.json({ 
         error: "Internal Server Error", 
         message: error instanceof Error ? error.message : "An unknown error occurred" 
