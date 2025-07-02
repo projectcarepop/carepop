@@ -150,10 +150,33 @@ export function MedicalRecordList({ initialRecords, appointmentId }: MedicalReco
 
     const { mutate: uploadDocMutate, isPending: isUploadingDoc } = useMutation({
         mutationFn: (data: DocumentUploadPayload) => api.uploadDocument(appointmentId, data.documentName, data.file, session!.access_token),
-        onSuccess: () => { onMutationSuccess(); documentForm.reset(); setSelectedFile(null); },
+        onSuccess: (newlyCreatedRecord) => {
+            // Optimistically update the UI without a full refetch
+            queryClient.setQueryData(
+                ['appointmentDetails', appointmentId, 'records'],
+                (oldRecords: MedicalRecordWithDetails[] | undefined) => {
+                    // The API returns the full record object inside a 'data' property
+                    const newRecord = newlyCreatedRecord.data;
+                    if (oldRecords) {
+                        return [...oldRecords, newRecord];
+                    }
+                    return [newRecord];
+                }
+            );
+            
+            // Still invalidate in the background to ensure data consistency with the server
+            queryClient.invalidateQueries({ queryKey: ['appointmentDetails', appointmentId] });
+
+            // Reset form and close dialog
+            documentForm.reset(); 
+            setSelectedFile(null);
+            setDialogOpen(null);
+        },
         onError: onMutationError,
     });
     
+    const handleNoteSubmit = (data: NoteFormData) => addNoteMutate(data);
+    const handlePrescriptionSubmit = (data: PrescriptionFormData) => addPrescriptionMutate(data);
     const handleDocumentSubmit = (data: DocumentFormData) => {
         if (!selectedFile) { alert("Please select a file to upload."); return; }
         uploadDocMutate({ ...data, file: selectedFile });
@@ -169,7 +192,7 @@ export function MedicalRecordList({ initialRecords, appointmentId }: MedicalReco
                         <DialogTrigger asChild><Button variant="outline" size="sm"><Stethoscope className="h-4 w-4 mr-2" />Add Note</Button></DialogTrigger>
                         <DialogContent>
                             <DialogHeader><DialogTitle>Add Doctor&apos;s Note</DialogTitle><DialogDescription className="sr-only">Enter clinical notes.</DialogDescription></DialogHeader>
-                            <Form {...noteForm}><form onSubmit={noteForm.handleSubmit(addNoteMutate)} className="space-y-4">
+                            <Form {...noteForm}><form onSubmit={noteForm.handleSubmit(handleNoteSubmit)} className="space-y-4">
                                 <FormField control={noteForm.control} name="note" render={({ field }) => (<FormItem><FormLabel>Note</FormLabel><FormControl><Textarea {...field} rows={5}/></FormControl><FormMessage /></FormItem>)}/>
                                 <DialogFooter><Button type="submit" disabled={isAddingNote}>{isAddingNote ? 'Saving...' : 'Save'}</Button></DialogFooter>
                             </form></Form>
@@ -180,7 +203,7 @@ export function MedicalRecordList({ initialRecords, appointmentId }: MedicalReco
                         <DialogTrigger asChild><Button variant="outline" size="sm"><Pill className="h-4 w-4 mr-2"/>Add Prescription</Button></DialogTrigger>
                         <DialogContent>
                             <DialogHeader><DialogTitle>Add Prescription</DialogTitle><DialogDescription className="sr-only">Enter prescription details.</DialogDescription></DialogHeader>
-                            <Form {...prescriptionForm}><form onSubmit={prescriptionForm.handleSubmit(addPrescriptionMutate)} className="space-y-4">
+                            <Form {...prescriptionForm}><form onSubmit={prescriptionForm.handleSubmit(handlePrescriptionSubmit)} className="space-y-4">
                                 <FormField control={prescriptionForm.control} name="medication" render={({ field }) => (<FormItem><FormLabel>Medication</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)}/>
                                 <FormField control={prescriptionForm.control} name="dosage" render={({ field }) => (<FormItem><FormLabel>Dosage</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)}/>
                                 <FormField control={prescriptionForm.control} name="frequency" render={({ field }) => (<FormItem><FormLabel>Frequency</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)}/>

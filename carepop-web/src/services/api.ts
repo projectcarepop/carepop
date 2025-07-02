@@ -770,7 +770,11 @@ export async function deleteProductCategory(categoryId: string, accessToken: str
     return response.json();
 }
 
-export async function addMedicalRecord(appointmentId: string, payload: { recordType: string; details: { note: string } }, accessToken: string) {
+type NotePayload = { recordType: 'DOCTOR_NOTE'; details: { note: string } };
+type PrescriptionPayload = { recordType: 'PRESCRIPTION'; details: { medication: string; dosage?: string; frequency?: string } };
+type MedicalRecordPayload = NotePayload | PrescriptionPayload;
+
+export async function addMedicalRecord(appointmentId: string, payload: MedicalRecordPayload, accessToken: string) {
   const headers = {
     'Authorization': `Bearer ${accessToken}`,
     'Content-Type': 'application/json'
@@ -796,7 +800,7 @@ export async function uploadDocument(appointmentId: string, documentName: string
     formData.append('document', file);
     formData.append('documentName', documentName);
 
-    const response = await fetch(`${API_BASE_URL}/api/me/appointments/${appointmentId}/documents`, {
+    const response = await fetch(`${API_BASE_URL}/api/admin/appointments/${appointmentId}/documents`, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${token}`,
