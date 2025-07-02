@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { format, startOfDay, setSeconds, setMinutes, setHours } from "date-fns";
+import { format } from "date-fns";
 
 import { useAuth } from '@/lib/contexts/auth-context';
 import {
@@ -11,7 +11,6 @@ import {
   getPublicServices,
   getPublicAvailability,
   createAppointment,
-  getPublicAvailableDates,
   getPublicServiceCategories,
 } from "@/services/api";
 import { type ServiceWithCategory, type Clinic, type AppointmentBookingPayload, type ServiceCategory } from "@/lib/types";
@@ -32,7 +31,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
@@ -56,7 +54,7 @@ const BookingWizard = () => {
   const [step, setStep] = useState(1);
   const [selectedClinicId, setSelectedClinicId] = useState<string | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [selectedDate, ] = useState<Date | undefined>(new Date());
   const [selectedTime, setSelectedTime] = useState<string | null>(null); // This will now be the full datetime string from the API
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [clinicSearch, setClinicSearch] = useState('');
@@ -89,20 +87,9 @@ const BookingWizard = () => {
   });
 
   const {
-    data: availableDates,
-    isLoading: isLoadingDates,
-  } = useQuery({
-    queryKey: ['availableDates', selectedClinicId, selectedServiceId],
-    queryFn: () => getPublicAvailableDates({ clinicId: selectedClinicId!, serviceId: selectedServiceId! }),
-    enabled: !!(selectedClinicId && selectedServiceId),
-    select: (response: any) => response.data || [],
-  });
-
-  // --- LOG #2: The Query Hook ---
-  const {
-    data: availableSlots,
+    data: availabilityData,
     isLoading: isLoadingAvailability,
-  } = useQuery<{ availableSlots: string[] }>({
+  } = useQuery({
     queryKey: ['availability', selectedClinicId, selectedServiceId, selectedDate],
     queryFn: () => {
       return getPublicAvailability({
@@ -113,6 +100,8 @@ const BookingWizard = () => {
     },
     enabled: !!(selectedClinicId && selectedServiceId && selectedDate),
   });
+
+  const availableSlots = useMemo(() => availabilityData?.availableSlots || [], [availabilityData]);
 
   // --- CLIENT-SIDE FILTERING LOGIC ---
 
@@ -139,8 +128,6 @@ const BookingWizard = () => {
       service.name.toLowerCase().includes(serviceSearch.toLowerCase())
     );
   }, [filteredServicesByCategory, serviceSearch]);
-
-  const availableDateSet = useMemo(() => new Set(availableDates || []), [availableDates]);
 
   // --- MUTATION ---
 
@@ -184,14 +171,11 @@ const BookingWizard = () => {
       return;
     }
 
-    const [hours, minutes] = selectedTime.split(':').map(Number);
-    const appointmentDateTime = setSeconds(setMinutes(setHours(startOfDay(selectedDate), hours), minutes), 0);
-
     const backendPayload = {
       patientId: user.id,
       clinicId: selectedClinicId,
       serviceId: selectedServiceId,
-      appointmentTime: appointmentDateTime.toISOString(),
+      appointmentTime: selectedTime, // selectedTime is now the full ISO string
       doctorId: '02ab0a6b-b366-4c10-9b75-623a5be46f1d', 
     };
 
@@ -316,50 +300,36 @@ const BookingWizard = () => {
         return (
           <Card>
             <CardHeader>
-              <CardTitle className="text-xl font-semibold">Step 3: Choose a Date & Time</CardTitle>
-              <CardDescription>Select a date to see available time slots for your chosen service.</CardDescription>
+              <CardTitle>Step 3: Select a Time</CardTitle>
+              <CardDescription>
+                Available slots for {selectedService?.name} at {selectedClinic?.name} on {selectedDate ? format(selectedDate, 'PPP') : ''}
+              </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col md:flex-row gap-8">
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold mb-2 text-center">Select a Date</h3>
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={setSelectedDate}
-                  disabled={(date) => {
-                    if (date < startOfDay(new Date())) return true;
-                    if (isLoadingDates) return true;
-                    return !availableDateSet.has(format(date, 'yyyy-MM-dd'));
-                  }}
-                  initialFocus
-                />
-              </div>
-              <div className="flex-1">
-                <div className="flex-1 border-l border-border pl-4 ml-4">
-                  <h4 className="font-semibold mb-2 text-center">Select a Time</h4>
-                  <div className="grid grid-cols-3 gap-2">
-                    {isLoadingAvailability ? (
-                      <p>Loading times...</p>
-                    ) : availableSlots && availableSlots.availableSlots && availableSlots.availableSlots.length > 0 ? (
-                      availableSlots.availableSlots.map((time) => (
-                        <Button
-                          key={time}
-                          variant={selectedTime === time ? "default" : "outline"}
-                          onClick={() => handleSelectTime(time)}
-                        >
-                          {time}
-                        </Button>
-                      ))
-                    ) : (
-                      <p>No available slots for this day.</p>
-                    )}
-                  </div>
+            <CardContent>
+              {isLoadingAvailability ? (
+                <p>Loading availability...</p>
+              ) : availableSlots.length > 0 ? (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  {availableSlots.map((time: string) => (
+                    <Button
+                      key={time}
+                      variant={selectedTime === time ? "default" : "outline"}
+                      onClick={() => handleSelectTime(time)}
+                    >
+                      {format(new Date(time), 'p')}
+                    </Button>
+                  ))}
                 </div>
-              </div>
+              ) : (
+                <Alert>
+                  <AlertTitle>No Slots Available</AlertTitle>
+                  <AlertDescription>There are no available appointments for this day. Please select another date.</AlertDescription>
+                </Alert>
+              )}
             </CardContent>
             <CardFooter className="flex justify-between">
-                <Button variant="outline" onClick={() => setStep(2)}>Back</Button>
-                <Button onClick={() => setStep(4)} disabled={!selectedTime}>Next</Button>
+              <Button variant="ghost" onClick={() => setStep(2)}>Back</Button>
+              <Button onClick={() => setStep(4)} disabled={!selectedTime}>Next</Button>
             </CardFooter>
           </Card>
         );
