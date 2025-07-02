@@ -643,20 +643,27 @@ export async function getAdminUsersByRole(role: 'doctor' | 'patient', accessToke
     return response.json();
 }
 
+/**
+ * Cancels an appointment. Throws an error on failure to properly integrate with tanstack-query.
+ * This function is intended to be called with a valid access token.
+ */
 export async function cancelAppointment(appointmentId: string, accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
     const url = `${API_BASE_URL}/api/me/appointments/${appointmentId}/cancel`;
+    
     const response = await fetch(url, {
         method: 'PATCH',
         headers,
     });
 
     if (!response.ok) {
+        // This is the key change. By throwing an error, we allow useMutation's onError to catch it.
         const error = await response.json().catch(() => ({ message: "An unknown error occurred." }));
-        return { success: false, message: error.message || "Failed to cancel appointment." };
+        throw new Error(error.message || "Failed to cancel appointment.");
     }
 
-    return { success: true, data: await response.json() };
+    // On success, we just return the JSON data.
+    return response.json();
 }
 
 export async function deleteClinic(clinicId: string, accessToken: string) {

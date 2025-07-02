@@ -76,14 +76,10 @@ export function AppointmentsTable({ appointments }: AppointmentsTableProps) {
       }
       return cancelAppointment(appointmentId, session.access_token);
     },
-    onSuccess: (result) => {
-      if (result.success) {
-        toast({ title: "Success", description: "Your appointment has been canceled." });
-        queryClient.invalidateQueries({ queryKey: ['myAppointments'] }); 
-        queryClient.invalidateQueries({ queryKey: ['appointments'] });
-      } else {
-        toast({ title: "Cancellation Failed", description: result.message, variant: "destructive" });
-      }
+    onSuccess: () => {
+      toast({ title: "Success", description: "Your appointment has been canceled." });
+      queryClient.invalidateQueries({ queryKey: ['myAppointments'] }); 
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
     },
     onError: (error) => {
       toast({ title: "Cancellation Failed", description: error.message, variant: "destructive" });
