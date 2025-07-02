@@ -9,7 +9,6 @@ import {
     appointments, 
     dayOfWeekEnum, 
     serviceCategories, 
-    clinicServices, 
     doctorServices, 
     doctorClinics, 
     providerAvailability 
@@ -540,33 +539,57 @@ publicRoutes.get('/availability', zValidator('query', availabilityQuerySchema), 
 publicRoutes.get('/availability/slots', zValidator('query', availabilityQuerySchema), async (c) => {
   const { serviceId, clinicId, date } = c.req.valid('query');
   
-  const timeZone = 'Asia/Manila';
+  // All time operations will be standardized to UTC to avoid timezone ambiguity.
+  // The client is responsible for displaying these UTC times in the user's local timezone.
+  const timeZone = 'Asia/Manila'; // The operating timezone of the clinics.
   const targetDate = zonedTimeToUtc(date, timeZone);
 
+  console.log(`[AVAILABILITY] Request for service: ${serviceId}, clinic: ${clinicId}, date: ${date}`);
+  console.log(`[AVAILABILITY] Target date converted to UTC: ${targetDate.toISOString()}`);
+
   try {
-    // 1. Fetch service and providers
-    const service = await db.query.services.findFirst({
+    // Step 1: Fetch the service duration and all providers for that service at the clinic in a single query.
+    // This query is now possible and efficient because of the corrected schema relations.
+    const serviceAndProviders = await db.query.services.findFirst({
         where: eq(services.id, serviceId),
-        columns: { durationMinutes: true }
+        columns: { durationMinutes: true },
+        with: {
+            doctorServices: {
+                with: {
+                    doctor: {
+                        with: {
+                            doctorClinics: {
+                                where: eq(doctorClinics.clinicId, clinicId),
+                                columns: {
+                                    clinicId: true, // We only need to know this link exists.
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     });
 
-    const providersForService = await db.select({ id: doctors.id })
-      .from(doctors)
-      .innerJoin(doctorClinics, eq(doctors.id, doctorClinics.doctorId))
-      .innerJoin(doctorServices, eq(doctors.id, doctorServices.doctorId))
-      .where(and(
-        eq(doctorClinics.clinicId, clinicId),
-        eq(doctorServices.serviceId, serviceId),
-        eq(doctors.isActive, true)
-      ));
-
-    if (!service || !service.durationMinutes || providersForService.length === 0) {
-      return c.json([]);
+    if (!serviceAndProviders || !serviceAndProviders.durationMinutes) {
+        console.warn(`[AVAILABILITY] Service with ID ${serviceId} not found or has no duration.`);
+        return c.json([]);
     }
-    const providerIds = providersForService.map(p => p.id);
-    console.log(`[BACKEND] Found ${providerIds.length} providers for this service/clinic.`);
 
-    // 2. Fetch ALL booked appointment times for the target day IN UTC
+    // Filter down to only providers who are linked to the requested clinic.
+    const providerIds = serviceAndProviders.doctorServices
+        .map(ds => ds.doctor)
+        .filter(doc => doc && doc.doctorClinics.length > 0)
+        .map(doc => doc.id);
+
+    if (providerIds.length === 0) {
+        console.warn(`[AVAILABILITY] No active providers found for service ${serviceId} at clinic ${clinicId}.`);
+        return c.json([]);
+    }
+    console.log(`[AVAILABILITY] Found ${providerIds.length} provider(s): ${providerIds.join(', ')}`);
+
+    // Step 2: Fetch all non-canceled appointments for these providers on the target day.
+    // The date range must be in UTC.
     const dayStart = startOfDay(targetDate);
     const dayEnd = endOfDay(targetDate);
 
@@ -581,32 +604,40 @@ publicRoutes.get('/availability/slots', zValidator('query', availabilityQuerySch
         ne(appointments.status, 'canceled_by_admin')
       ));
 
+    // Store booked slots in a Set for efficient O(1) lookups. All are stored as full ISO strings.
     const bookedSlotsUTC = new Set(bookedAppointments.map(a => new Date(a.appointmentTime).toISOString()));
-    console.log(`[BACKEND] Found ${bookedAppointments.length} booked appointments for this date.`);
-    console.log("[BACKEND] Booked Slots (UTC):", bookedSlotsUTC);
+    console.log(`[AVAILABILITY] Found ${bookedSlotsUTC.size} booked slots for the target date.`);
+    if (bookedSlotsUTC.size > 0) console.log("[AVAILABILITY] Booked Slots (UTC):", bookedSlotsUTC);
 
-    // 3. Generate all potential slots for the day IN UTC
+    // Step 3: Generate all potential appointment slots for the day from 9 AM to 5 PM Manila Time, converted to UTC.
     const potentialSlots = [];
-    let currentTime = setHours(startOfDay(targetDate), 9);
-    const endTime = setHours(targetDate, 17);
+    const operatingHoursStart = zonedTimeToUtc(`${date}T09:00:00`, timeZone);
+    const operatingHoursEnd = zonedTimeToUtc(`${date}T17:00:00`, timeZone);
     
-    console.log(`Generating slots from ${currentTime.toISOString()} to ${endTime.toISOString()}`);
+    let currentTime = operatingHoursStart;
 
-    while (isBefore(currentTime, endTime)) {
+    console.log(`[AVAILABILITY] Generating potential slots from ${operatingHoursStart.toISOString()} to ${operatingHoursEnd.toISOString()}`);
+    
+    while (isBefore(currentTime, operatingHoursEnd)) {
       potentialSlots.push(currentTime.toISOString());
-      currentTime = addMinutes(currentTime, service.durationMinutes!);
+      currentTime = addMinutes(currentTime, serviceAndProviders.durationMinutes);
     }
-    console.log(`[BACKEND] Generated ${potentialSlots.length} potential slots for the day.`);
+    console.log(`[AVAILABILITY] Generated ${potentialSlots.length} potential slots.`);
 
-    // 4. Filter out the booked slots
+    // Step 4: Filter out the booked slots to get the final list of available slots.
     const availableSlots = potentialSlots.filter(slot => !bookedSlotsUTC.has(slot));
-    console.log(`Final Available Slots (${availableSlots.length}):`, availableSlots);
+    console.log(`[AVAILABILITY] Final available slots count: ${availableSlots.length}.`);
+    console.log(`[AVAILABILITY] Sending to client:`, availableSlots);
     
     return c.json(availableSlots);
 
   } catch (error) {
-    console.error("[BACKEND] CRASH during availability calculation:", error);
-    return c.json({ error: "Internal Server Error" }, 500);
+    console.error("[AVAILABILITY] CRASH during availability calculation:", error);
+    // Log the actual error for debugging
+    return c.json({ 
+        error: "Internal Server Error", 
+        message: error instanceof Error ? error.message : "An unknown error occurred" 
+    }, 500);
   }
 });
 
