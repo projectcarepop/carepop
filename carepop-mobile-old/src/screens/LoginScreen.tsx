@@ -69,18 +69,14 @@ export const LoginScreen: React.FC = () => {
     setAuthError(null);
     setIsSigningInWithGoogle(true);
     try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: 'exp://192.168.1.10:8081',
+          clientId: Platform.OS === 'ios'
+            ? process.env.EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID_IOS
+            : process.env.EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID_ANDROID,
         },
       });
-
-      if (error) throw error;
-
-      if (data.url) {
-        await WebBrowser.openAuthSessionAsync(data.url, null);
-      }
     } catch (error) {
       Alert.alert('Google Sign-In Error', 'An unexpected error occurred. Please try again.');
     } finally {

@@ -309,7 +309,7 @@ meRoutes.put('/profile', zValidator('json', updateProfileSchema), async (c) => {
     return c.json(updatedProfile);
   } catch (error) {
     console.error('Error updating profile:', error);
-    return c.json({ error: 'Internal Server Error' }, 500);
+    return c.json({ error: 'Internal Server Error', message: 'Failed to update profile' }, 500);
   }
 });
 
@@ -401,6 +401,76 @@ meRoutes.get('/ai/insight', async (c) => {
   } catch (error) {
     console.error('Error generating AI insight:', error);
     return c.json({ error: 'Failed to generate insight from Vertex AI' }, 500);
+  }
+});
+
+// Zod schema for health logs
+const createHealthLogSchema = z.object({
+  logDate: z.string().datetime(),
+  symptoms: z.array(z.string()),
+  mood: z.enum(['happy', 'sad', 'neutral', 'anxious', 'irritable']),
+  notes: z.string().optional(),
+});
+
+// Zod schema for menstrual logs
+const createMenstrualLogSchema = z.object({
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime(),
+  notes: z.string().optional(),
+});
+
+/**
+ * POST /me/health-logs
+ * Creates a new daily health log for the authenticated user.
+ */
+meRoutes.post(
+  '/health-logs',
+  zValidator('json', createHealthLogSchema),
+  async (c) => {
+    const user = c.get('user');
+    const logData = c.req.valid('json');
+    try {
+      console.log(`Attempting to insert health log for user ${user.id}`, logData);
+      const [newLog] = await db
+        .insert(healthLogs)
+        .values({
+          patientId: user.id,
+          logDate: logData.logDate,
+          mood: logData.mood,
+          symptoms: logData.symptoms,
+          notes: logData.notes,
+        })
+        .returning();
+      return c.json(newLog, 201);
+    } catch (error) {
+      console.error("CRASH in /health-logs:", error);
+      return c.json({ error: 'Failed to save health log' }, 500);
+    }
+  }
+);
+
+/**
+ * POST /me/menstrual-logs
+ * Creates a new menstrual cycle log for the authenticated user.
+ */
+meRoutes.post('/menstrual-logs', zValidator('json', createMenstrualLogSchema), async (c) => {
+  const user = c.get('user');
+  const logData = c.req.valid('json');
+
+  try {
+    const [newLog] = await db
+      .insert(menstrualLogs)
+      .values({
+        patientId: user.id,
+        startDate: logData.startDate,
+        endDate: logData.endDate,
+        notes: logData.notes,
+      })
+      .returning();
+    return c.json(newLog, 201);
+  } catch (error) {
+    console.error("CRASH in /menstrual-logs:", error);
+    return c.json({ error: 'Failed to save menstrual log' }, 500);
   }
 });
 

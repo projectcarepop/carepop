@@ -216,12 +216,35 @@ export const inventory = pgTable("inventory", {
     quantityCheck: check("inventory_quantity_on_hand_check", sql`quantity_on_hand >= 0`),
 }));
 
+export const moodEnum = pgEnum("mood", ['happy', 'sad', 'neutral', 'anxious', 'irritable']);
+
+export const healthLogs = pgTable("health_logs", {
+	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+	patientId: uuid("patient_id").notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+	logDate: timestamp("log_date", { withTimezone: true, mode: 'string' }).notNull(),
+	mood: moodEnum("mood"),
+	symptoms: jsonb("symptoms"),
+	notes: text("notes"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+});
+
+export const menstrualLogs = pgTable("menstrual_logs", {
+	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+	patientId: uuid("patient_id").notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+	startDate: timestamp("start_date", { withTimezone: true, mode: 'string' }).notNull(),
+	endDate: timestamp("end_date", { withTimezone: true, mode: 'string' }).notNull(),
+	notes: text("notes"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+});
+
 
 // --- RELATIONS ---
 
 export const profilesRelations = relations(profiles, ({ many, one }) => ({
 	appointments: many(appointments),
 	reviews: many(reviews),
+    healthLogs: many(healthLogs),
+    menstrualLogs: many(menstrualLogs),
     user: one(usersInAuth, {
         fields: [profiles.id],
         references: [usersInAuth.id],
@@ -337,5 +360,19 @@ export const inventoryRelations = relations(inventory, ({ one }) => ({
 	product: one(products, {
 		fields: [inventory.productId],
 		references: [products.id]
+	}),
+}));
+
+export const healthLogsRelations = relations(healthLogs, ({ one }) => ({
+	patient: one(profiles, {
+		fields: [healthLogs.patientId],
+		references: [profiles.id]
+	}),
+}));
+
+export const menstrualLogsRelations = relations(menstrualLogs, ({ one }) => ({
+	patient: one(profiles, {
+		fields: [menstrualLogs.patientId],
+		references: [profiles.id]
 	}),
 }));
