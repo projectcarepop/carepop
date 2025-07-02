@@ -19,7 +19,7 @@ export default async function MedicalRecordsPage() {
     redirect('/sign-in');
   }
 
-  const { records } = await getMyEnrichedRecords(session.access_token);
+  const records = await getMyEnrichedRecords(session.access_token);
 
   return (
     <div className="container mx-auto py-8">
