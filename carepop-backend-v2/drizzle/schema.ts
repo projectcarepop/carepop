@@ -140,8 +140,30 @@ export const medicalRecords = pgTable("medical_records", {
 	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
 	appointmentId: uuid("appointment_id").notNull().references(() => appointments.id, { onDelete: 'cascade' }),
 	recordType: medicalRecordType("record_type").notNull(),
-	details: jsonb("details"),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+});
+
+// --- NEW/REVERTED Specialised Medical Record Tables ---
+
+export const recordDoctorNotes = pgTable("record_doctor_notes", {
+    id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+    recordId: uuid("record_id").notNull().references(() => medicalRecords.id, { onDelete: 'cascade' }),
+    note: text("note").notNull(),
+});
+
+export const recordPrescriptions = pgTable("record_prescriptions", {
+    id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+    recordId: uuid("record_id").notNull().references(() => medicalRecords.id, { onDelete: 'cascade' }),
+    medication: text("medication").notNull(),
+    dosage: text("dosage"),
+    instructions: text("instructions"),
+});
+
+export const recordDocuments = pgTable("record_documents", {
+    id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+    recordId: uuid("record_id").notNull().references(() => medicalRecords.id, { onDelete: 'cascade' }),
+    documentName: text("document_name").notNull(),
+    documentUrl: text("document_url").notNull(),
 });
 
 export const reviews = pgTable("reviews", {
@@ -300,20 +322,29 @@ export const appointmentsRelations = relations(appointments, ({ one, many }) => 
         fields: [appointments.clinicId],
         references: [clinics.id],
     }),
-    medicalRecord: one(medicalRecords, {
-        fields: [appointments.id],
-        references: [medicalRecords.appointmentId],
-    }),
+    medicalRecords: many(medicalRecords),
     review: one(reviews, {
         fields: [appointments.id],
         references: [reviews.appointmentId],
     }),
 }));
 
-export const medicalRecordsRelations = relations(medicalRecords, ({ one }) => ({
+export const medicalRecordsRelations = relations(medicalRecords, ({ one, many }) => ({
     appointment: one(appointments, {
         fields: [medicalRecords.appointmentId],
         references: [appointments.id],
+    }),
+    doctorNote: one(recordDoctorNotes, {
+        fields: [medicalRecords.id],
+        references: [recordDoctorNotes.recordId],
+    }),
+    prescription: one(recordPrescriptions, {
+        fields: [medicalRecords.id],
+        references: [recordPrescriptions.recordId],
+    }),
+    document: one(recordDocuments, {
+        fields: [medicalRecords.id],
+        references: [recordDocuments.recordId],
     }),
 }));
 

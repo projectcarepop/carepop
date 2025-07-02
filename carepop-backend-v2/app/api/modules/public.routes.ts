@@ -38,19 +38,6 @@ const servicesQuerySchema = z.object({
   clinicId: z.string().uuid().optional(),
 });
 
-// Validation schema for available dates
-const availableDatesQuerySchema = z.object({
-    clinicId: z.string().uuid({ message: "Invalid Clinic ID" }),
-    serviceId: z.string().uuid({ message: "Invalid Service ID" }),
-});
-
-// Validation schema for the availability endpoint query
-const availabilityQuerySchema = z.object({
-  serviceId: z.string().uuid({ message: "Invalid Service ID" }),
-  clinicId: z.string().uuid({ message: "Invalid Clinic ID" }),
-  date: z.string().refine((date) => !isNaN(Date.parse(date)), { message: "Invalid date format. Use YYYY-MM-DD" }),
-});
-
 // --- NEW --- Schema for the universal clinic search
 const searchClinicsSchema = z.object({
   q: z.string().optional(),
@@ -198,6 +185,54 @@ publicRoutes.get('/clinics/:id', zValidator('param', z.object({ id: z.string().u
 });
 
 /**
+ * NEW: GET /public/clinics/:id/appointments
+ * Fetches all scheduled appointments for a specific clinic, with an optional date range.
+ * This is the simplified endpoint to provide raw booking data to the frontend.
+ */
+publicRoutes.get('/clinics/:id/appointments', 
+    zValidator('param', z.object({ id: z.string().uuid() })),
+    zValidator('query', z.object({ 
+        // startDate and endDate should be ISO 8601 strings (e.g., "2024-08-01T00:00:00.000Z")
+        startDate: z.string().datetime().optional(),
+        endDate: z.string().datetime().optional()
+    })),
+    async (c) => {
+        const { id: clinicId } = c.req.valid('param');
+        const { startDate, endDate } = c.req.valid('query');
+
+        try {
+            const queryConditions: (SQL | undefined)[] = [
+                eq(appointments.clinicId, clinicId),
+                eq(appointments.status, 'scheduled')
+            ];
+
+            if (startDate) {
+                queryConditions.push(gte(appointments.appointmentTime, startDate));
+            }
+            if (endDate) {
+                queryConditions.push(lt(appointments.appointmentTime, endDate));
+            }
+
+            const clinicAppointments = await db.select({
+                id: appointments.id,
+                appointmentTime: appointments.appointmentTime,
+                serviceId: appointments.serviceId,
+                doctorId: appointments.doctorId,
+            })
+            .from(appointments)
+            .where(and(...queryConditions))
+            .orderBy(asc(appointments.appointmentTime));
+
+            return c.json({ data: clinicAppointments });
+
+        } catch (error) {
+            console.error(`Failed to fetch appointments for clinic ${clinicId}:`, error);
+            return c.json({ error: "Internal Server Error", message: "Could not fetch appointments." }, 500);
+        }
+    }
+);
+
+/**
  * GET /public/doctors
  * Returns a list of all active doctors.
  */
@@ -287,334 +322,6 @@ publicRoutes.get('/service-categories', async (c) => {
   } catch (error) {
     console.error("Backend Error: Failed to fetch service categories.", error);
     return c.json({ error: "Internal Server Error" }, 500);
-  }
-});
-
-/**
- * GET /public/available-dates
- * Returns an array of dates within the next 90 days where at least one provider is available
- * for a specific service at a specific clinic.
- */
-publicRoutes.get('/available-dates', zValidator('query', availableDatesQuerySchema), async (c) => {
-    const { clinicId, serviceId } = c.req.valid('query');
-    try {
-        // --- FINAL IMPLEMENTATION ---
-        // This logic correctly calculates availability based on a fixed 9 AM-5 PM
-        // clinic schedule, as per user instruction.
-
-        // Step 1: Get service duration to calculate total slots.
-        const service = await db.query.services.findFirst({
-            where: eq(services.id, serviceId),
-            columns: { durationMinutes: true }
-        });
-
-        if (!service || !service.durationMinutes || service.durationMinutes <= 0) {
-             // If service is not found or has an invalid duration, no dates can be available.
-             return c.json({ data: [] });
-        }
-        const serviceDuration = service.durationMinutes;
-
-        // Step 2: Calculate total possible slots in a 9 AM to 5 PM workday.
-        const totalOperatingMinutes = (17 - 9) * 60; // 8 hours * 60 minutes/hour
-        const totalSlotsPerDay = Math.floor(totalOperatingMinutes / serviceDuration);
-
-        // Step 3: Find all doctors at the clinic who provide the service.
-        const providers = await db.select({
-            id: doctors.id
-        }).from(doctors)
-            .innerJoin(doctorClinics, eq(doctors.id, doctorClinics.doctorId))
-            .innerJoin(doctorServices, eq(doctors.id, doctorServices.doctorId))
-            .where(and(
-                eq(doctorClinics.clinicId, clinicId),
-                eq(doctorServices.serviceId, serviceId),
-                eq(doctors.isActive, true)
-            ));
-        
-        const providerIds = providers.map(p => p.id);
-        if (providerIds.length === 0) {
-            return c.json({ data: [] });
-        }
-        const totalCapacityPerDay = totalSlotsPerDay * providerIds.length;
-
-        // Step 4: Get booked appointments count for each day for the next 90 days.
-        const today = startOfDay(new Date());
-        const futureDate = endOfDay(addMinutes(today, 90 * 24 * 60)); // 90 days from now
-
-        const dailyBookings = await db.select({
-            date: sql<string>`DATE(${appointments.appointmentTime})`,
-            count: sql<number>`count(${appointments.id})`.mapWith(Number),
-        }).from(appointments)
-        .where(and(
-            inArray(appointments.doctorId, providerIds),
-            eq(appointments.clinicId, clinicId),
-            sql`${appointments.appointmentTime} >= ${format(today, 'yyyy-MM-dd HH:mm:ss')}`,
-            sql`${appointments.appointmentTime} < ${format(futureDate, 'yyyy-MM-dd HH:mm:ss')}`,
-            sql`status != 'canceled_by_patient'`,
-            sql`status != 'canceled_by_admin'`
-        ))
-        .groupBy(sql`DATE(${appointments.appointmentTime})`);
-
-        // Step 5: Determine available dates.
-        const availableDates:string[] = [];
-        const bookingsMap = new Map(dailyBookings.map(b => [format(parseISO(b.date), 'yyyy-MM-dd'), b.count]));
-
-        for (let i = 0; i < 90; i++) {
-            const currentDate = addMinutes(today, i * 24 * 60);
-            const dayOfWeek = getDay(currentDate); // 0 = Sunday, 6 = Saturday
-            if (dayOfWeek === 0 || dayOfWeek === 6) {
-                continue; // Skip weekends
-            }
-
-            const dateStr = format(currentDate, 'yyyy-MM-dd');
-            const bookedCount = bookingsMap.get(dateStr) || 0;
-
-            if (bookedCount < totalCapacityPerDay) {
-                availableDates.push(dateStr);
-            }
-        }
-        return c.json({ data: availableDates });
-    } catch (error) {
-        console.error("Error fetching available dates:", error);
-        return c.json({ error: "Internal Server Error" }, 500);
-    }
-});
-
-/**
- * GET /public/availability/dates
- * ALIAS for /public/available-dates. The frontend was pointing to this path, so we're adding it
- * to avoid a 404 without requiring a frontend change.
- * Returns an array of dates within the next 90 days where at least one provider is available
- * for a specific service at a specific clinic.
- */
-publicRoutes.get('/availability/dates', zValidator('query', availableDatesQuerySchema), async (c) => {
-    const { clinicId, serviceId } = c.req.valid('query');
-    try {
-        // This logic is identical to the /available-dates endpoint.
-
-        // Step 1: Get service duration to calculate total slots.
-        const service = await db.query.services.findFirst({
-            where: eq(services.id, serviceId),
-            columns: { durationMinutes: true }
-        });
-
-        if (!service || !service.durationMinutes || service.durationMinutes <= 0) {
-             return c.json({ data: [] });
-        }
-        const serviceDuration = service.durationMinutes;
-
-        // Step 2: Calculate total possible slots in a 9 AM to 5 PM workday.
-        const totalOperatingMinutes = (17 - 9) * 60; // 8 hours * 60 minutes/hour
-        const totalSlotsPerDay = Math.floor(totalOperatingMinutes / serviceDuration);
-
-        // Step 3: Find all doctors at the clinic who provide the service.
-        const providers = await db.select({
-            id: doctors.id
-        }).from(doctors)
-            .innerJoin(doctorClinics, eq(doctors.id, doctorClinics.doctorId))
-            .innerJoin(doctorServices, eq(doctors.id, doctorServices.doctorId))
-            .where(and(
-                eq(doctorClinics.clinicId, clinicId),
-                eq(doctorServices.serviceId, serviceId),
-                eq(doctors.isActive, true)
-            ));
-        
-        const providerIds = providers.map(p => p.id);
-        if (providerIds.length === 0) {
-            return c.json({ data: [] });
-        }
-        const totalCapacityPerDay = totalSlotsPerDay * providerIds.length;
-
-        // Step 4: Get booked appointments count for each day for the next 90 days.
-        const today = startOfDay(new Date());
-        const futureDate = endOfDay(addMinutes(today, 90 * 24 * 60));
-
-        const dailyBookings = await db.select({
-            date: sql<string>`DATE(${appointments.appointmentTime})`,
-            count: sql<number>`count(${appointments.id})`.mapWith(Number),
-        }).from(appointments)
-        .where(and(
-            inArray(appointments.doctorId, providerIds),
-            eq(appointments.clinicId, clinicId),
-            sql`${appointments.appointmentTime} >= ${format(today, 'yyyy-MM-dd HH:mm:ss')}`,
-            sql`${appointments.appointmentTime} < ${format(futureDate, 'yyyy-MM-dd HH:mm:ss')}`,
-            sql`status != 'canceled_by_patient'`,
-            sql`status != 'canceled_by_admin'`
-        ))
-        .groupBy(sql`DATE(${appointments.appointmentTime})`);
-
-        // Step 5: Determine available dates.
-        const availableDates:string[] = [];
-        const bookingsMap = new Map(dailyBookings.map(b => [format(parseISO(b.date), 'yyyy-MM-dd'), b.count]));
-
-        for (let i = 0; i < 90; i++) {
-            const currentDate = addMinutes(today, i * 24 * 60);
-            const dayOfWeek = getDay(currentDate);
-            if (dayOfWeek === 0 || dayOfWeek === 6) { // Skip weekends
-                continue;
-            }
-
-            const dateStr = format(currentDate, 'yyyy-MM-dd');
-            const bookedCount = bookingsMap.get(dateStr) || 0;
-
-            if (bookedCount < totalCapacityPerDay) {
-                availableDates.push(dateStr);
-            }
-        }
-        return c.json({ data: availableDates });
-    } catch (error) {
-        console.error("Error fetching available dates:", error);
-        return c.json({ error: "Internal Server Error" }, 500);
-    }
-});
-
-/**
- * GET /public/availability
- * Calculates available appointment slots for a given service and clinic on a specific date.
- * This endpoint implements the "Golden Pattern" to prevent double-bookings.
- */
-publicRoutes.get('/availability', zValidator('query', availabilityQuerySchema), async (c) => {
-  const { serviceId, clinicId, date } = c.req.valid('query');
-  const targetDate = startOfDay(parseISO(date));
-
-  try {
-    // Step 1: Find all doctors for the service at the clinic
-    const providersForService = await db.select({ id: doctors.id })
-      .from(doctors)
-      .innerJoin(doctorClinics, eq(doctors.id, doctorClinics.doctorId))
-      .innerJoin(doctorServices, eq(doctors.id, doctorServices.doctorId))
-      .where(and(
-        eq(doctorClinics.clinicId, clinicId),
-        eq(doctorServices.serviceId, serviceId),
-        eq(doctors.isActive, true)
-      ));
-    
-    if (providersForService.length === 0) {
-        return c.json({ availableSlots: [], doctorsForSlot: {} });
-    }
-    const providerIds = providersForService.map(p => p.id);
-
-    // Step 2: Get all NON-CANCELED appointments for these providers on the target date
-    const bookedAppointments = await db.select({ appointmentTime: appointments.appointmentTime })
-      .from(appointments)
-      .where(and(
-        inArray(appointments.doctorId, providerIds),
-        eq(appointments.clinicId, clinicId),
-        sql`DATE(appointment_time) = ${format(targetDate, 'yyyy-MM-dd')}`,
-        ne(appointments.status, 'canceled_by_patient'),
-        ne(appointments.status, 'canceled_by_admin')
-      ));
-
-    const bookedSlots = new Set(
-      bookedAppointments.map(a => format(parseISO(a.appointmentTime), 'HH:mm'))
-    );
-
-    // Step 3: Generate all possible slots and filter out the booked ones
-    const service = await db.query.services.findFirst({ where: eq(services.id, serviceId), columns: { durationMinutes: true }});
-    const duration = service?.durationMinutes || 30;
-    const availableSlots: string[] = [];
-    let currentTime = setHours(targetDate, 9); // 9:00 AM
-    const endTime = setHours(targetDate, 17); // 5:00 PM
-
-    while (isBefore(currentTime, endTime)) {
-      const timeSlotStr = format(currentTime, 'HH:mm');
-      if (!bookedSlots.has(timeSlotStr)) {
-        availableSlots.push(currentTime.toISOString()); // Return full ISO string
-      }
-      currentTime = addMinutes(currentTime, duration);
-    }
-    
-    // The original response shape included doctorsForSlot, returning an empty object for compatibility.
-    return c.json({ availableSlots, doctorsForSlot: {} });
-
-  } catch (error) {
-    console.error("Error fetching availability:", error);
-    return c.json({ error: "Internal Server Error", message: "Failed to fetch availability." }, 500);
-  }
-});
-
-/**
- * GET /public/availability/slots
- * The definitive, correct endpoint for fetching available appointment slots.
- * Implements the "Golden Pattern" which assumes a 9-5, Mon-Fri work schedule
- * and does not depend on any provider_availability table.
- */
-publicRoutes.get('/availability/slots', zValidator('query', availabilityQuerySchema), async (c) => {
-  const { clinicId, serviceId, date } = c.req.valid('query');
-  // The date is parsed as UTC midnight for the given date string.
-  const targetDate = startOfDay(parseISO(date));
-
-  try {
-    // THIS IS THE FIX: Check for weekends first.
-    const dayOfWeek = getDay(targetDate); // Sunday = 0, Saturday = 6
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-      console.log(`[AVAILABILITY] Request for a weekend date (${date}). Returning empty.`);
-      return c.json([]); // No slots on weekends.
-    }
-
-    // 1. Fetch service duration and find all providers for the service at the clinic.
-    const service = await db.query.services.findFirst({
-        where: eq(services.id, serviceId),
-        columns: { durationMinutes: true }
-    });
-
-    // Find all active doctors at the clinic who provide the service.
-    const providers = await db.select({ id: doctors.id })
-        .from(doctors)
-        .innerJoin(doctorClinics, eq(doctors.id, doctorClinics.doctorId))
-        .innerJoin(doctorServices, eq(doctors.id, doctorServices.doctorId))
-        .where(and(
-            eq(doctorClinics.clinicId, clinicId),
-            eq(doctorServices.serviceId, serviceId),
-            eq(doctors.isActive, true)
-        ));
-    
-    const providerIds = providers.map(p => p.id);
-
-    // If no service, duration, or providers are found, no slots are available.
-    if (!service || !service.durationMinutes || providerIds.length === 0) {
-      console.warn(`[AVAILABILITY] No service, duration, or active providers found for service ${serviceId} at clinic ${clinicId}.`);
-      return c.json([]);
-    }
-
-    // 2. Fetch all non-canceled appointments for these providers on the given date.
-    const startOfTargetDate = startOfDay(parseISO(date));
-    const endOfTargetDate = endOfDay(parseISO(date));
-
-    const bookedAppointments = await db.select({ appointmentTime: appointments.appointmentTime })
-      .from(appointments)
-      .where(and(
-        inArray(appointments.doctorId, providerIds),
-        eq(appointments.clinicId, clinicId),
-        gte(appointments.appointmentTime, startOfTargetDate.toISOString()),
-        lt(appointments.appointmentTime, endOfTargetDate.toISOString()),
-        ne(appointments.status, 'canceled_by_patient'),
-        ne(appointments.status, 'canceled_by_admin')
-      ));
-
-    // Create a Set of booked slot start times (as ISO strings) for efficient filtering.
-    const bookedSlotsUTC = new Set(bookedAppointments.map(a => new Date(a.appointmentTime).toISOString()));
-
-    // 3. Generate all potential slots for a 9 AM - 5 PM workday.
-    const potentialSlots = [];
-    let currentTime = setHours(targetDate, 9); // 9:00 AM on the target date (UTC)
-    const endTime = setHours(targetDate, 17);   // 5:00 PM on the target date (UTC)
-
-    while (isBefore(currentTime, endTime)) {
-      potentialSlots.push(currentTime.toISOString());
-      currentTime = addMinutes(currentTime, service.durationMinutes);
-    }
-
-    // 4. Filter out any potential slots that are already booked.
-    const availableSlots = potentialSlots.filter(slot => !bookedSlotsUTC.has(slot));
-    
-    return c.json(availableSlots);
-
-  } catch (error) {
-    console.error("[AVAILABILITY] CRASH during availability calculation:", error);
-    return c.json({ 
-        error: "Internal Server Error", 
-        message: error instanceof Error ? error.message : "An unknown error occurred" 
-    }, 500);
   }
 });
 
@@ -736,6 +443,14 @@ publicRoutes.get('/search/clinics', zValidator('query', universalSearchSchema), 
         return c.json({ error: "Internal Server Error" }, 500);
     }
 });
+
+// Helper function to convert "HH:MM:SS" to a Date object for a specific date
+function timeToDate(timeStr: string, date: Date): Date {
+    const [hours, minutes, seconds] = timeStr.split(':').map(Number);
+    const newDate = new Date(date);
+    newDate.setHours(hours, minutes, seconds, 0);
+    return newDate;
+}
 
 export default publicRoutes;
 

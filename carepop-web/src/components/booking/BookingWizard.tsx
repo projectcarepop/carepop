@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { format, startOfToday } from "date-fns";
+import { format, startOfDay, endOfDay, addDays, addMinutes, setHours, isBefore } from "date-fns";
 
 import { useAuth } from '@/lib/contexts/auth-context';
 import {
@@ -11,7 +11,8 @@ import {
   getPublicServices,
   createAppointment,
   getPublicServiceCategories,
-  getAvailableSlots,
+  getClinicAppointments,
+  type BookedAppointment,
 } from "@/services/api";
 import { type ServiceWithCategory, type Clinic, type AppointmentBookingPayload, type ServiceCategory } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
@@ -36,7 +37,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 
-// This interface needs to match the actual address object from the backend/DB
 interface Address {
   street: string;
   barangay: string;
@@ -51,17 +51,16 @@ const BookingWizard = () => {
   const queryClient = useQueryClient();
   const { user, session } = useAuth();
 
-  // State reflects the new "Clinic-first" flow
   const [step, setStep] = useState(1);
   const [selectedClinicId, setSelectedClinicId] = useState<string | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  const [selectedTime, setSelectedTime] = useState<string | null>(null); // This will now be the full datetime string from the API
+  const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [clinicSearch, setClinicSearch] = useState('');
   const [serviceSearch, setServiceSearch] = useState('');
 
-  // --- DATA FETCHING (NEW FLOW) ---
+  // --- DATA FETCHING (REFACTORED) ---
 
   const {
     data: clinics,
@@ -79,7 +78,7 @@ const BookingWizard = () => {
     queryFn: () => getPublicServices(selectedClinicId!),
     enabled: !!selectedClinicId,
   });
-
+  
   const {
     data: categories,
   } = useQuery<ServiceCategory[], Error>({
@@ -88,38 +87,52 @@ const BookingWizard = () => {
   });
 
   const {
-    data: availableSlots,
-    isLoading: isLoadingAvailability,
-    isError: isErrorAvailability,
-    error: availabilityError,
-    isFetching: isFetchingAvailability,
-  } = useQuery<string[], Error>({
-    queryKey: ['availabilitySlots', selectedClinicId, selectedServiceId, selectedDate],
+    data: bookedAppointments,
+    isLoading: isLoadingAppointments,
+    isError: isErrorAppointments,
+  } = useQuery<BookedAppointment[], Error>({
+    queryKey: ['clinicAppointments', selectedClinicId],
     queryFn: () => {
-      const params = {
+      const today = startOfDay(new Date());
+      const futureDate = endOfDay(addDays(today, 90));
+      return getClinicAppointments({
         clinicId: selectedClinicId!,
-        serviceId: selectedServiceId!,
-        date: format(selectedDate!, 'yyyy-MM-dd'),
-      };
-      // LOG #1: What are we sending?
-      console.log("%c[QUERY FN] Fetching availability with params:", "color: blue; font-weight: bold;", params);
-      return getAvailableSlots(params);
+        startDate: today.toISOString(),
+        endDate: futureDate.toISOString(),
+      });
     },
-    enabled: !!(selectedClinicId && selectedServiceId && selectedDate),
+    enabled: !!selectedClinicId,
   });
 
-  // LOG #2: What is the query's real-time state?
-  console.groupCollapsed(`[QUERY STATE] Availability Query Status`);
-  console.log(`enabled: ${!!(selectedClinicId && selectedServiceId && selectedDate)}`);
-  console.log(`isFetching: ${isFetchingAvailability}`);
-  console.log(`isLoading: ${isLoadingAvailability}`);
-  console.log(`isError: ${isErrorAvailability}`);
-  if (isErrorAvailability) console.error("Error Object:", availabilityError);
-  console.log("Data:", availableSlots);
-  console.groupEnd();
+  const selectedService = useMemo(() => services?.find(s => s.id === selectedServiceId), [services, selectedServiceId]);
+
+  const availableSlots = useMemo(() => {
+    if (!selectedDate || !selectedService || !bookedAppointments) {
+      return [];
+    }
+    const dayStart = startOfDay(selectedDate);
+    const dayEnd = endOfDay(selectedDate);
+    const bookedSlotsForDay = new Set(
+      bookedAppointments
+        .map(appt => new Date(appt.appointmentTime))
+        .filter(apptTime => apptTime >= dayStart && apptTime < dayEnd)
+        .map(apptTime => apptTime.toISOString())
+    );
+
+    const potentialSlots = [];
+    const serviceDuration = selectedService.durationMinutes;
+    let currentTime = setHours(dayStart, 9);
+    const endTime = setHours(dayStart, 17);
+
+    while (isBefore(currentTime, endTime)) {
+      potentialSlots.push(currentTime.toISOString());
+      currentTime = addMinutes(currentTime, serviceDuration);
+    }
+    return potentialSlots.filter(slot => !bookedSlotsForDay.has(slot));
+  }, [selectedDate, selectedService, bookedAppointments]);
+
 
   // --- CLIENT-SIDE FILTERING LOGIC ---
-
   const filteredClinics = useMemo(() => {
     if (!clinics) return [];
     return clinics.filter(clinic =>
@@ -128,12 +141,8 @@ const BookingWizard = () => {
   }, [clinics, clinicSearch]);
 
   const filteredServicesByCategory = useMemo(() => {
-    if (!services) {
-      return [];
-    }
-    if (selectedCategoryId === 'all') {
-      return services;
-    }
+    if (!services) return [];
+    if (selectedCategoryId === 'all') return services;
     return services.filter(service => service.serviceCategory?.id === selectedCategoryId);
   }, [services, selectedCategoryId]);
 
@@ -145,12 +154,9 @@ const BookingWizard = () => {
   }, [filteredServicesByCategory, serviceSearch]);
 
   // --- MUTATION ---
-
   const { mutate: submitAppointment, isPending: isBooking } = useMutation({
-    mutationFn: async (payload: AppointmentBookingPayload) => {
-      if (!session?.access_token) {
-        throw new Error("Authentication error: You are not signed in.");
-      }
+    mutationFn: (payload: AppointmentBookingPayload) => {
+      if (!session?.access_token) throw new Error("Authentication error: You are not signed in.");
       return createAppointment(payload, session.access_token);
     },
     onSuccess: () => {
@@ -164,7 +170,6 @@ const BookingWizard = () => {
   });
 
   // --- HANDLERS ---
-  
   const handleSelectClinic = (clinicId: string) => {
     setSelectedClinicId(clinicId);
     setStep(2);
@@ -172,6 +177,8 @@ const BookingWizard = () => {
   
   const handleSelectService = (serviceId: string) => {
     setSelectedServiceId(serviceId);
+    setSelectedDate(undefined);
+    setSelectedTime(null);
     setStep(3);
   };
 
@@ -185,27 +192,20 @@ const BookingWizard = () => {
       toast({ title: "Missing Information", description: "Please complete all previous steps.", variant: "destructive" });
       return;
     }
-
     const backendPayload = {
       patientId: user.id,
       clinicId: selectedClinicId,
       serviceId: selectedServiceId,
-      appointmentTime: selectedTime, // selectedTime is now the full ISO string
+      appointmentTime: selectedTime,
       doctorId: '02ab0a6b-b366-4c10-9b75-623a5be46f1d', 
     };
-
     submitAppointment(backendPayload);
   };
   
-  const progressValue = useMemo(() => {
-    return (step - 1) * (100 / 4);
-  }, [step]);
-
+  const progressValue = useMemo(() => (step - 1) * (100 / 4), [step]);
   const selectedClinic = useMemo(() => clinics?.find(c => c.id === selectedClinicId), [clinics, selectedClinicId]);
-  const selectedService = useMemo(() => services?.find(s => s.id === selectedServiceId), [services, selectedServiceId]);
 
   // --- RENDER LOGIC ---
-
   const renderStep = () => {
     switch (step) {
       case 1:
@@ -245,9 +245,6 @@ const BookingWizard = () => {
                 )}
               </div>
             </CardContent>
-            <CardFooter className="flex justify-end">
-                <Button onClick={() => setStep(2)} disabled={!selectedClinicId}>Next</Button>
-            </CardFooter>
           </Card>
         );
       case 2:
@@ -255,37 +252,27 @@ const BookingWizard = () => {
           <Card>
             <CardHeader>
               <CardTitle className="text-xl font-semibold">Step 2: Select a Service</CardTitle>
-              <CardDescription>What type of service do you need today at {selectedClinic?.name}?</CardDescription>
+              <CardDescription>What service are you looking for at {selectedClinic?.name}?</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="md:w-1/3">
-                  <Input
-                    placeholder="Search for a service..."
-                    value={serviceSearch}
-                    onChange={(e) => setServiceSearch(e.target.value)}
-                  />
-                </div>
-                <div className="md:w-1/3">
-                  <Select
-                    value={selectedCategoryId}
-                    onValueChange={(value) => setSelectedCategoryId(value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Filter by category..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Categories</SelectItem>
-                      {categories?.map((cat: ServiceCategory) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="flex gap-4 mb-4">
+                <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
+                  <SelectTrigger className="w-1/3">
+                    <SelectValue placeholder="Filter by category..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {categories?.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Input
+                  className="w-2/3"
+                  placeholder="Search for a service by name..."
+                  value={serviceSearch}
+                  onChange={(e) => setServiceSearch(e.target.value)}
+                />
               </div>
-              <div className="mt-4 space-y-2 max-h-72 overflow-y-auto pr-2">
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-2">
                 {isLoadingServices ? (
                   <p>Loading services...</p>
                 ) : (
@@ -298,127 +285,150 @@ const BookingWizard = () => {
                     >
                       <div className="text-left">
                         <p className="font-semibold">{service.name}</p>
-                        <p className="text-sm text-muted-foreground">{service.description}</p>
+                        <p className="text-sm text-muted-foreground">{service.serviceCategory?.name}</p>
                       </div>
                     </Button>
                   ))
                 )}
               </div>
             </CardContent>
-            <CardFooter className="flex justify-between">
-                <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
-                <Button onClick={() => setStep(3)} disabled={!selectedServiceId}>Next</Button>
-            </CardFooter>
           </Card>
         );
       case 3:
         return (
           <Card>
             <CardHeader>
-              <CardTitle>Step 3: Select a Date & Time</CardTitle>
-              <CardDescription>
-                Available slots for {selectedService?.name} at {selectedClinic?.name}.
-              </CardDescription>
+              <CardTitle className="text-xl font-semibold">Step 3: Select Date & Time</CardTitle>
+              <CardDescription>Choose a date and time for your appointment.</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col md:flex-row gap-8">
-              <div className="md:w-1/2 flex justify-center">
+            <CardContent className="flex flex-col md:flex-row gap-4">
+              <div className="flex-shrink-0">
                 <Calendar
                   mode="single"
                   selected={selectedDate}
-                  onSelect={setSelectedDate}
-                  disabled={(date) => date < startOfToday()}
-                  className="rounded-md border"
+                  onSelect={(date) => {
+                    setSelectedDate(date as Date);
+                    setSelectedTime(null);
+                  }}
+                  disabled={(date) => date < startOfDay(new Date())}
+                  initialFocus
                 />
               </div>
-              <div className="md:w-1/2">
-                <h4 className="font-semibold mb-2 text-center md:text-left">
-                  {selectedDate ? `Available Times for ${format(selectedDate, 'PPP')}` : 'Please select a date'}
+              <div className="flex-grow border-l pl-4">
+                <h4 className="font-semibold mb-2">
+                  {selectedDate ? `Available Slots for ${format(selectedDate, 'PPP')}` : 'Please select a date'}
                 </h4>
-                {isLoadingAvailability ? (
+                {isLoadingAppointments ? (
                   <p>Loading availability...</p>
-                ) : selectedDate && availableSlots ? (
-                  availableSlots.length > 0 ? (
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                      {availableSlots.map((time: string) => (
-                        <Button
-                          key={time}
-                          variant={selectedTime === time ? "default" : "outline"}
-                          onClick={() => handleSelectTime(time)}
-                        >
-                          {format(new Date(time), 'p')}
-                        </Button>
-                      ))}
-                    </div>
-                  ) : (
-                    <Alert>
-                      <AlertTitle>No Slots Available</AlertTitle>
-                      <AlertDescription>There are no available appointments for this day. Please select another date.</AlertDescription>
-                    </Alert>
-                  )
+                ) : isErrorAppointments ? (
+                  <Alert variant="destructive">
+                    <AlertTitle>Error</AlertTitle>
+                    <AlertDescription>Could not load appointment data. Please try again later.</AlertDescription>
+                  </Alert>
+                ) : !selectedDate ? (
+                   <p className="text-sm text-muted-foreground">Select a date to see available times.</p>
+                ) : availableSlots.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    {availableSlots.map((time) => (
+                      <Button
+                        key={time}
+                        variant={selectedTime === time ? 'default' : 'outline'}
+                        onClick={() => handleSelectTime(time)}
+                      >
+                        {format(new Date(time), 'p')}
+                      </Button>
+                    ))}
+                  </div>
                 ) : (
-                  selectedDate && <p>Select a date to see available times.</p>
+                  <p className="text-sm text-muted-foreground">No available slots for this day.</p>
                 )}
               </div>
             </CardContent>
-            <CardFooter className="flex justify-between">
-              <Button variant="ghost" onClick={() => setStep(2)}>Back</Button>
-              <Button onClick={() => setStep(4)} disabled={!selectedTime}>Next</Button>
-            </CardFooter>
           </Card>
         );
       case 4:
         return (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl font-semibold">Step 4: Confirm Your Appointment</CardTitle>
-              <CardDescription>Please review the details below before confirming.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-semibold">Clinic:</h3>
-                  <p className="text-muted-foreground">{selectedClinic?.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {(selectedClinic?.address as Address)?.street}, {(selectedClinic?.address as Address)?.city}
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-semibold">Service</h4>
-                  <p className="text-muted-foreground">{selectedService?.name}</p>
-                </div>
-                <div>
-                  <h4 className="font-semibold">Date & Time</h4>
-                  <p className="text-muted-foreground">
-                    {selectedTime ? 
-                      format(new Date(selectedTime), 'EEEE, MMMM d, yyyy \'at\' p')
-                      : 'Not selected'}
-                  </p>
-                </div>
-              </div>
-              <Alert className="mt-6">
-                <AlertTitle>Thank you for your booking request!</AlertTitle>
-                <AlertDescription>
-                  {`Your request for a '${selectedService?.name}' at ${selectedClinic?.name} has been sent. The clinic will confirm your appointment shortly.`}
-                </AlertDescription>
-              </Alert>
-            </CardContent>
-            <CardFooter className="flex justify-between">
-                <Button variant="outline" onClick={() => setStep(3)}>Go Back</Button>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-xl font-semibold">Step 4: Confirm Your Booking</CardTitle>
+                <CardDescription>Please review your appointment details below.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                  {selectedClinic && selectedService && selectedDate && selectedTime ? (
+                      <div className="space-y-4">
+                          <div>
+                              <p className="font-semibold">Clinic:</p>
+                              <p>{selectedClinic.name}</p>
+                              <p className="text-sm text-muted-foreground">{(selectedClinic.address as Address)?.street}, {(selectedClinic.address as Address)?.city}</p>
+                          </div>
+                          <div>
+                              <p className="font-semibold">Service:</p>
+                              <p>{selectedService.name}</p>
+                          </div>
+                          <div>
+                              <p className="font-semibold">Date & Time:</p>
+                              <p>{format(new Date(selectedTime), 'PPPP p')}</p>
+                          </div>
+                      </div>
+                  ) : (
+                      <p>Loading details...</p>
+                  )}
+              </CardContent>
+              <CardFooter className="flex justify-end">
                 <Button onClick={handleConfirmBooking} disabled={isBooking}>
                   {isBooking ? 'Booking...' : 'Confirm Appointment'}
                 </Button>
-            </CardFooter>
-          </Card>
+              </CardFooter>
+            </Card>
         );
       default:
-        return null;
+        return <p>Something went wrong. Please refresh the page.</p>;
     }
   };
 
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-8">
-      <Progress value={progressValue} className="mb-8" />
-      {renderStep()}
+      <div className="mb-8">
+        <div className="flex justify-between mb-1">
+            <h2 className="text-2xl font-bold">Book an Appointment</h2>
+            <span className="text-sm font-medium">Step {step} of 4</span>
+        </div>
+        <Progress value={progressValue} className="w-full" />
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-8">
+        <div className="w-full md:w-2/3">
+          {renderStep()}
+        </div>
+        <div className="w-full md:w-1/3">
+            <Card className="sticky top-24">
+                <CardHeader>
+                    <CardTitle>Your Selections</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 text-sm">
+                    <div>
+                        <p className="font-semibold">Clinic:</p>
+                        <p className="text-muted-foreground">{selectedClinic?.name || 'Not selected'}</p>
+                    </div>
+                    <div>
+                        <p className="font-semibold">Service:</p>
+                        <p className="text-muted-foreground">{selectedService?.name || 'Not selected'}</p>
+                    </div>
+                    <div>
+                        <p className="font-semibold">Date:</p>
+                        <p className="text-muted-foreground">{selectedDate ? format(selectedDate, 'PPP') : 'Not selected'}</p>
+                    </div>
+                    <div>
+                        <p className="font-semibold">Time:</p>
+                        <p className="text-muted-foreground">{selectedTime ? format(new Date(selectedTime), 'p') : 'Not selected'}</p>
+                    </div>
+                </CardContent>
+                <CardFooter className="flex-col items-stretch gap-2">
+                    {step > 1 && <Button variant="outline" onClick={() => setStep(s => s - 1)}>Back</Button>}
+                </CardFooter>
+            </Card>
+        </div>
+      </div>
     </div>
   );
 };

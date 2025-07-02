@@ -474,76 +474,99 @@ export async function updateStock(productId: string, quantity: number, accessTok
 // --- Public Booking Services ---
 
 export async function getPublicServiceCategories() {
-  const res = await fetch(`${API_BASE_URL}/api/public/service-categories`);
-  if (!res.ok) throw new Error('Failed to fetch service categories');
-  return res.json();
+    const url = `${API_BASE_URL}/api/public/service-categories`;
+    const response = await fetch(url, { cache: 'no-store' }); // Use no-store for dynamic data
+    if (!response.ok) {
+        throw new Error('Failed to fetch service categories');
+    }
+    return response.json();
 }
 
 export async function getPublicServices(clinicId?: string) {
-  let url = `${API_BASE_URL}/api/public/services`;
-  if (clinicId) {
-    url += `?clinicId=${clinicId}`;
-  }
-  const response = await fetch(url);
-  if (!response.ok) throw new Error("Failed to fetch services.");
-  const result = await response.json();
-  // This endpoint returns data in a 'data' property.
-  return result.data || [];
+    let url = `${API_BASE_URL}/api/public/services`;
+    if (clinicId) {
+        url += `?clinicId=${clinicId}`;
+    }
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error('Failed to fetch services');
+    }
+    const result = await response.json();
+    return result.data || [];
 }
 
 export async function getPublicClinics(serviceId?: string) {
-  let url = `${API_BASE_URL}/api/public/clinics`;
-  if (serviceId) {
-    url += `?serviceId=${serviceId}`;
-  }
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error('Failed to fetch clinics');
-  }
-  const result = await response.json();
-  // The backend nests the array in a 'data' property.
-  return result.data || [];
+    let url = `${API_BASE_URL}/api/public/clinics`;
+    if (serviceId) {
+        url += `?serviceId=${serviceId}`;
+    }
+    const response = await fetch(url, { cache: 'no-store' }); // Use no-store for dynamic data
+    if (!response.ok) {
+        throw new Error('Failed to fetch clinics');
+    }
+    const result = await response.json();
+    return result.data || [];
 }
 
 export async function getPublicClinicDetails(clinicId: string) {
-  const url = `${API_BASE_URL}/api/public/clinics/${clinicId}`;
-  const response = await fetch(url, { cache: 'no-store' }); // No cache for fresh data
-  if (!response.ok) {
-    if (response.status === 404) {
-      return null; // Return null if not found, for the server component to handle
+    const url = `${API_BASE_URL}/api/public/clinics/${clinicId}`;
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) {
+        if (response.status === 404) return null;
+        throw new Error('Failed to fetch clinic details');
     }
-    const error = await response.json().catch(() => ({ message: `An error occurred fetching clinic details.` }));
-    throw new Error(error.message);
-  }
-  return response.json();
+    return response.json();
 }
 
-export async function getAvailableSlots(params: { serviceId: string; clinicId: string; date: string; }): Promise<string[]> {
-  const { serviceId, clinicId, date } = params;
-  const url = `${API_BASE_URL}/api/public/availability/slots?serviceId=${serviceId}&clinicId=${clinicId}&date=${date}`;
-  const response = await fetch(url, { cache: 'no-store' });
+/**
+ * [NEW] Defines the shape of a booked appointment fetched for availability checking.
+ */
+export type BookedAppointment = {
+  id: string;
+  appointmentTime: string; // ISO string
+  serviceId: string;
+  doctorId: string;
+};
+
+/**
+ * [NEW] Fetches all scheduled appointments for a given clinic within a date range.
+ * This replaces the old slot-by-slot availability check.
+ */
+export async function getClinicAppointments(params: {
+  clinicId: string;
+  startDate: string; // ISO String
+  endDate: string;   // ISO String
+}): Promise<BookedAppointment[]> {
+  const { clinicId, startDate, endDate } = params;
+  const queryParams = new URLSearchParams({ startDate, endDate });
+  const url = `${API_BASE_URL}/api/public/clinics/${clinicId}/appointments?${queryParams.toString()}`;
   
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.status}`}));
-    throw new Error(error.message || "Failed to fetch available slots.");
+  try {
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.status}` }));
+      throw new Error(error.message || `Failed to fetch appointments for clinic ${clinicId}.`);
+    }
+    const result = await response.json();
+    return result.data || [];
+  } catch (error) {
+    console.error(`Network or parsing error in getClinicAppointments for clinic ${clinicId}:`, error);
+    throw new Error("A network error occurred while fetching clinic appointments.");
   }
-  return response.json();
 }
 
 export async function getClinicDetails(clinicId: string) {
-  const url = `${API_BASE_URL}/api/public/clinics/${clinicId}`;
-  const response = await fetch(url, { cache: 'no-store' });
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: `Clinic not found.` }));
-    throw new Error(error.message);
-  }
-  return response.json();
+   const url = `${API_BASE_URL}/api/public/clinics/${clinicId}`;
+   const response = await fetch(url, { cache: 'no-store' });
+   if (!response.ok) {
+     const error = await response.json().catch(() => ({ message: `Clinic not found.` }));
+     throw new Error(error.message);
+   }
+   return response.json();
 }
 
-
 export async function getProvidersForService(serviceId: string) {
-    const url = `${API_BASE_URL}/api/public/services/${serviceId}/providers`;
-    const response = await fetch(url);
+    const response = await fetch(`${API_BASE_URL}/api/public/services/${serviceId}/providers`);
     if (!response.ok) {
         const error = await response.json().catch(() => ({ message: `Failed to fetch providers for service ${serviceId}` }));
         throw new Error(error.message);
