@@ -624,6 +624,37 @@ export async function getAdminStats(cookieStore: ReturnType<typeof cookies>) {
   }
 }
 
+export async function getAdminDashboardMetrics(cookieStore: ReturnType<typeof cookies>) {
+  const supabase = createClient(await cookieStore);
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) {
+    return { data: null, error: 'Not Authenticated' };
+  }
+
+  const headers = {
+    Authorization: `Bearer ${session.access_token}`,
+    'Content-Type': 'application/json',
+  };
+    
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/admin/dashboard-metrics`, { headers, cache: 'no-store' });
+    if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({ message: `HTTP Error: ${response.status} ${response.statusText}` }));
+        console.error("API Error in getAdminDashboardMetrics:", errorBody);
+        return { data: null, error: errorBody.message || 'Failed to fetch dashboard metrics' };
+    }
+    const result = await response.json();
+    return { data: result.data, error: null };
+  } catch (error: any) {
+    console.error("Network or parsing error in getAdminDashboardMetrics:", error);
+    return { data: null, error: "A network error occurred while fetching metrics." };
+  }
+}
+
 export async function getAdminUsers(accessToken: string): Promise<AdminUser[]> {
     const headers = await getAuthHeaders(accessToken);
     const response = await fetch(`${API_BASE_URL}/api/admin/users`, { headers });
