@@ -653,10 +653,10 @@ export async function cancelAppointment(appointmentId: string, accessToken: stri
 
     if (!response.ok) {
         const error = await response.json().catch(() => ({ message: "An unknown error occurred." }));
-        throw new Error(error.message || "Failed to cancel appointment.");
+        return { success: false, message: error.message || "Failed to cancel appointment." };
     }
 
-    return response.json();
+    return { success: true, data: await response.json() };
 }
 
 export async function deleteClinic(clinicId: string, accessToken: string) {

@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { cancelAppointment } from '@/services/api';
 import type { Appointment, AppointmentWithRelations } from "@/lib/types";
+import { useAuth } from '@/lib/contexts/auth-context';
 
 // --- Type Definition ---
 /*
@@ -64,18 +65,25 @@ const getStatusVariant = (status: Appointment['status']) => {
 export function AppointmentsTable({ appointments }: AppointmentsTableProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { session } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
 
   const { mutate: handleCancel, isPending } = useMutation({
     mutationFn: (appointmentId: string) => {
-      return cancelAppointment(appointmentId);
+      if (!session?.access_token) {
+        throw new Error("You must be logged in to cancel an appointment.");
+      }
+      return cancelAppointment(appointmentId, session.access_token);
     },
-    onSuccess: () => {
-      toast({ title: "Success", description: "Your appointment has been canceled." });
-      // Invalidate both queries to ensure dashboard and the full list page are updated
-      queryClient.invalidateQueries({ queryKey: ['myAppointments'] }); 
-      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+    onSuccess: (result) => {
+      if (result.success) {
+        toast({ title: "Success", description: "Your appointment has been canceled." });
+        queryClient.invalidateQueries({ queryKey: ['myAppointments'] }); 
+        queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      } else {
+        toast({ title: "Cancellation Failed", description: result.message, variant: "destructive" });
+      }
     },
     onError: (error) => {
       toast({ title: "Cancellation Failed", description: error.message, variant: "destructive" });
