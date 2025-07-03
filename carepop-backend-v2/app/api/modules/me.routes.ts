@@ -317,15 +317,14 @@ meRoutes.put('/profile', zValidator('json', updateProfileSchema), async (c) => {
 // HEALTH BUDDY ROUTES
 // ============================================================================
 
-// Zod schema for health logs
+// "Golden Standard" Zod Schema for Health Logs
+const moodEnum = z.enum(['happy', 'neutral', 'sad', 'anxious', 'stressed']);
+
 const createHealthLogSchema = z.object({
-  logDate: z.string().datetime(),
-  symptoms: z.array(z.string()),
-  mood: z.preprocess(
-    (val) => (typeof val === 'string' ? val.toLowerCase() : val),
-    z.enum(['happy', 'sad', 'neutral', 'anxious', 'stressed']).optional()
-  ),
-  notes: z.string().nullable().optional().transform(val => val ?? undefined),
+  logDate: z.string().refine((val) => !isNaN(Date.parse(val)), { message: "Invalid date string" }),
+  mood: moodEnum,
+  symptoms: z.array(z.string()), // An array of symptom strings
+  notes: z.string().nullable(), // Allow null for notes
 });
 
 // Zod schema for menstrual logs

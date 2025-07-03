@@ -7,12 +7,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../../components/theme';
 
-import { getHealthLogSummary, getAiInsight, createHealthLog, createMenstrualLog } from '../../services/api';
+import { getHealthLogSummary, getAiInsight, createMenstrualLog } from '../../services/api';
 import type { HealthLogSummary, AIInsight, CreateHealthLogPayload } from '../../lib/types';
 import { HealthBuddyStackParamList } from '../../navigation/AppDrawerNavigator'; // Adjust this import to your actual navigator types
 
 import AiInsightModal from '../../components/health-buddy/AiInsightModal';
-import LogSymptomsForm, { LogSymptomsFormData } from '../../components/health-buddy/LogSymptomsForm';
 import LogPeriodForm, { PeriodFormData } from '../../components/health-buddy/LogPeriodForm';
 
 // --- Mock Data ---
@@ -29,12 +28,13 @@ const mockAiInsight: AIInsight = {
     insight: "We've noticed a pattern of headaches and fatigue. Consider discussing this with your provider. Remember to stay hydrated and get plenty of rest!"
 }
 
-type ActiveModal = 'symptoms' | 'period' | null;
+type ActiveModal = 'period' | null;
 
-type HealthBuddyNavigationProp = NativeStackNavigationProp<HealthBuddyStackParamList>;
+type HealthBuddyNavigationProp = NativeStackNavigationProp<HealthBuddyStackParamList, 'HealthBuddyDashboard'>;
 
 const HealthBuddyDashboardScreen = () => {
   const queryClient = useQueryClient();
+  const navigation = useNavigation<HealthBuddyNavigationProp>();
 
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [isFabMenuOpen, setIsFabMenuOpen] = useState(false);
@@ -53,18 +53,6 @@ const HealthBuddyDashboardScreen = () => {
     onError: () => setIsInsightModalVisible(true), // Show mock on error for demo
   });
   
-  const { mutate: submitSymptoms, isPending: isSubmittingSymptoms } = useMutation({
-    mutationFn: (data: CreateHealthLogPayload) => createHealthLog(data),
-    onSuccess: () => {
-      Alert.alert('Success', 'Your symptoms have been logged.');
-      setActiveModal(null);
-      queryClient.invalidateQueries({ queryKey: ['healthLogSummary'] });
-    },
-    onError: (error) => {
-      Alert.alert('Error', `Could not save your log: ${error.message}`);
-    },
-  });
-
   const { mutate: submitPeriod, isPending: isSubmittingPeriod } = useMutation({
       mutationFn: (data: PeriodFormData) => createMenstrualLog(data),
       onSuccess: () => {
@@ -90,16 +78,6 @@ const HealthBuddyDashboardScreen = () => {
     setIsFabMenuOpen(false);
   };
 
-  const handleSymptomSubmit = (data: LogSymptomsFormData) => {
-    const payload: CreateHealthLogPayload = {
-        logDate: new Date().toISOString(),
-        mood: data.mood ?? selectedMood ?? null,
-        symptoms: data.symptoms ?? [],
-        notes: data.notes ?? null,
-    };
-    submitSymptoms(payload);
-  };
-
   return (
     <View style={styles.screenContainer}>
         <ScrollView style={styles.container}>
@@ -120,7 +98,7 @@ const HealthBuddyDashboardScreen = () => {
 
             {isFabMenuOpen && (
             <View style={[styles.fabMenu, { top: headerHeight }]}>
-                <TouchableOpacity style={styles.fabMenuItem} onPress={() => handleFabMenuPress('symptoms')}>
+                <TouchableOpacity style={styles.fabMenuItem} onPress={() => navigation.navigate('LogSymptoms')}>
                 <Text style={styles.fabMenuText}>Log Symptoms</Text>
                 <View style={[styles.fabIconContainer, { backgroundColor: theme.colors.secondary}]}>
                     <Icon name="thermometer" size={24} color={theme.colors.secondaryForeground} />
@@ -202,12 +180,6 @@ const HealthBuddyDashboardScreen = () => {
                     <TouchableOpacity style={styles.modalCloseButton} onPress={() => setActiveModal(null)}>
                         <Icon name="x" size={24} color={theme.colors.mutedForeground} />
                     </TouchableOpacity>
-                    {activeModal === 'symptoms' && (
-                        <LogSymptomsForm
-                            onSubmit={handleSymptomSubmit}
-                            isSubmitting={isSubmittingSymptoms}
-                        />
-                    )}
                     {activeModal === 'period' && (
                         <LogPeriodForm
                             onSubmit={submitPeriod}
