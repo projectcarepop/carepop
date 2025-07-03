@@ -119,7 +119,14 @@ export const DashboardScreen = () => {
     },
   });
 
-  const nextAppointment = appointments?.[0];
+  // Use the app's own date parser to handle potential timezone issues.
+  const upcomingAppointments = appointments?.filter(
+    (apt) => {
+        const appointmentDate = parseISOString(apt.appointmentTime);
+        return appointmentDate ? appointmentDate > new Date() : false;
+    }
+  );
+  const nextAppointment = upcomingAppointments?.[0];
 
   const renderAppointmentCard = () => {
     if (isLoadingAppointments) {
@@ -469,4 +476,3 @@ const styles = StyleSheet.create({
       marginTop: theme.spacing.xs,
   },
 });
-

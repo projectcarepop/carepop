@@ -17,6 +17,7 @@ import type {
 } from "../lib/types";
 import type { RegisterFormValues, LoginFormValues } from '../lib/validation/auth';
 import { keysToCamel } from "../lib/utils/data-transformation";
+import { parseISOString } from "../lib/utils/date";
 
 export type ServiceCategory = {
   id: string;
@@ -141,7 +142,19 @@ export const getMyAppointments = async (): Promise<DetailedAppointment[]> => {
   const result = await apiFetch<{ appointments: DetailedAppointment[] }>("/api/me/appointments", {
     method: "GET",
   });
-  return result?.appointments || [];
+  
+  const appointments = result?.appointments || [];
+
+  // Sort appointments by date in ascending order (soonest first)
+  // MUST use the custom parser to handle non-standard date strings from the DB
+  return appointments.sort((a, b) => {
+    const dateA = parseISOString(a.appointmentTime);
+    const dateB = parseISOString(b.appointmentTime);
+    // Handle cases where parsing might fail
+    if (!dateA) return 1;
+    if (!dateB) return -1;
+    return dateA.getTime() - dateB.getTime();
+  });
 };
 
 /**
