@@ -13,20 +13,23 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Checkbox } from "@/components/ui/checkbox"
 
-// This type is manually defined for now. In a real app, it should
-// be generated from the database schema or API response.
 export type InventoryItem = {
   id: string
-  product: {
-    name: string
-    sku: string | null
-  }
+  name: string
+  sku: string | null
   quantityOnHand: number
   batchNumber: string | null
   expiryDate: string | null
+  // This should reflect the flat structure from the `inventory_items` table
 }
 
-export const columns: ColumnDef<InventoryItem>[] = [
+type ColumnsProps = {
+  onEdit: (item: InventoryItem) => void;
+  onDelete: (item: InventoryItem) => void;
+  onViewBatches: (item: InventoryItem) => void;
+}
+
+export const columns = ({ onEdit, onDelete, onViewBatches }: ColumnsProps): ColumnDef<InventoryItem, unknown>[] => [
   {
     id: "select",
     header: ({ table }) => (
@@ -50,12 +53,11 @@ export const columns: ColumnDef<InventoryItem>[] = [
     enableHiding: false,
   },
   {
-    accessorKey: "product.name",
+    accessorKey: "name",
     header: "Product",
-    cell: ({ row }) => <div>{row.original.product.name}</div>,
   },
   {
-    accessorKey: "product.sku",
+    accessorKey: "sku",
     header: "SKU",
   },
   {
@@ -89,14 +91,19 @@ export const columns: ColumnDef<InventoryItem>[] = [
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={() => navigator.clipboard.writeText(item.id)}
-            >
-              Copy Item ID
+            <DropdownMenuItem onClick={() => onEdit(item)}>
+              Edit Item
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onViewBatches(item)}>
+              View Batches
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Edit Stock</DropdownMenuItem>
-            <DropdownMenuItem className="text-red-600">Delete Item</DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-red-600"
+              onClick={() => onDelete(item)}
+            >
+              Delete Item
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       )

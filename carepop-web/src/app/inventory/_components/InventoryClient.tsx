@@ -73,9 +73,9 @@ export default function InventoryClient() {
     
     // TODO: Implement these functions
     const handleAddItem = () => console.log("Add new item");
-    const handleEditItem = (itemId: string) => console.log("Edit item:", itemId);
-    const handleDeleteItem = (itemId: string) => console.log("Delete item:", itemId);
-    const handleViewBatches = (itemId: string) => console.log("View batches for item:", itemId);
+    const handleEditItem = (item: InventoryItem) => console.log("Edit item:", item.id);
+    const handleDeleteItem = (item: InventoryItem) => console.log("Delete item:", item.id);
+    const handleViewBatches = (item: InventoryItem) => console.log("View batches for item:", item.id);
 
     if (!session) {
         return <p>Loading session...</p>;
