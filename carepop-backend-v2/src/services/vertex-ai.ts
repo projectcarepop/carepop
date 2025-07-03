@@ -19,7 +19,7 @@ const vertexAi = new VertexAI({ project, location });
 // 3. Initialize and export the specific model we will use.
 //    This makes it very easy to use in our route handlers.
 export const generativeModel = vertexAi.getGenerativeModel({
-  model: 'gemini-1.5-pro-preview-0514', // Use a valid and available model version
+  model: 'gemini-2.0-flash-lite-001', // Using the model specified by the user.
 });
 
 console.log("✅ Vertex AI service initialized successfully."); 
