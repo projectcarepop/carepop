@@ -43,16 +43,17 @@ const LogPeriodScreen = () => {
   const markedDates = useMemo(() => {
     const marked: { [key: string]: any } = {};
     if (periodRange.startDate) {
-      let start = new Date(periodRange.startDate + 'T00:00:00'); // Ensure local time
-      let end = periodRange.endDate ? new Date(periodRange.endDate + 'T00:00:00') : start;
+      const start = new Date(periodRange.startDate + 'T00:00:00');
+      const end = periodRange.endDate ? new Date(periodRange.endDate + 'T00:00:00') : new Date(start);
 
-      for (let d = start; d <= end; d.setDate(d.getDate() + 1)) {
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         const dateString = d.toISOString().split('T')[0];
         marked[dateString] = {
           color: theme.colors.primary,
           textColor: theme.colors.primaryForeground,
           startingDay: dateString === periodRange.startDate,
           endingDay: dateString === periodRange.endDate,
+          selected: true,
         };
       }
     }

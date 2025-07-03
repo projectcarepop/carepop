@@ -347,11 +347,15 @@ meRoutes.post(
     const logData = c.req.valid('json');
     try {
       console.log(`Attempting to insert health log for user ${user.id}`, logData);
+      
+      // Convert the incoming ISO date string to YYYY-MM-DD format for the 'date' column type
+      const formattedLogDate = new Date(logData.logDate).toISOString().split('T')[0];
+
       const [newLog] = await db
         .insert(healthLogs)
         .values({
           patientId: user.id,
-          logDate: logData.logDate,
+          logDate: formattedLogDate,
           mood: logData.mood,
           symptoms: logData.symptoms,
           notes: logData.notes,
