@@ -52,6 +52,7 @@ export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
 });
 
 /**
+ * @deprecated Use adminOrManagerMiddleware instead.
  * Middleware to ensure the authenticated user has the 'admin' role.
  * This should run *after* authMiddleware.
  */
@@ -84,4 +85,36 @@ export const adminMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
   }
 
   await next();
+});
+
+/**
+ * Middleware to ensure the authenticated user has either the 'admin' or 'manager' role.
+ * This should run *after* authMiddleware.
+ */
+export const adminOrManagerMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
+    const user = c.get('user');
+
+    if (!user) {
+        return c.json({ error: 'Forbidden', message: 'Authentication required' }, 403);
+    }
+
+    const supabase = c.get('supabase');
+
+    const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+    if (error || !profile) {
+        console.error('Error fetching user profile for role check:', error?.message);
+        return c.json({ error: 'Forbidden', message: 'Could not verify user role.' }, 403);
+    }
+
+    const authorizedRoles = ['admin', 'manager'];
+    if (!authorizedRoles.includes(profile.role)) {
+        return c.json({ error: 'Forbidden', message: 'Admin or Manager access required' }, 403);
+    }
+
+    await next();
 });

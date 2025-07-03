@@ -11,7 +11,7 @@ import {
   Stethoscope,
   Pill,
   Calendar,
-  Package,
+  //Package,
 } from 'lucide-react';
 
 const sidebarNavItems = [
@@ -45,11 +45,11 @@ const sidebarNavItems = [
     href: '/admin/appointments',
     icon: Calendar,
   },
-  {
-    title: 'Inventory',
-    href: '/admin/inventory',
-    icon: Package,
-  },
+  //{
+  //  title: 'Inventory',
+  //  href: '/admin/inventory',
+  //  icon: Package,
+  //},
 ];
 
 export default function AdminSidebar() {

@@ -2,9 +2,9 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { db } from '../lib/db';
-import { clinics, profiles, doctors, services, productCategories, products, inventory, serviceCategories, appointments, medicalRecords, recordDoctorNotes, recordPrescriptions, recordDocuments, clinicServices } from '../../../drizzle/schema';
+import { clinics, profiles, doctors, services, productCategories, products, inventory_items, serviceCategories, appointments, medicalRecords, recordDoctorNotes, recordPrescriptions, recordDocuments, clinicServices } from '../../../drizzle/schema';
 import { eq, sql, count, asc, and, gte, lt, getTableColumns, desc, inArray } from 'drizzle-orm';
-import { authMiddleware, adminMiddleware, AuthEnv } from '../middleware/auth';
+import { authMiddleware, adminOrManagerMiddleware, AuthEnv } from '../middleware/auth';
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -27,7 +27,7 @@ adminRoutes.use('*', async (c, next) => {
 // --- END DIAGNOSTIC MIDDLEWARE ---
 
 // Apply middleware to all routes in this file
-adminRoutes.use('*', authMiddleware, adminMiddleware);
+adminRoutes.use('*', authMiddleware, adminOrManagerMiddleware);
 
 // --- Zod Schemas for Validation ---
 const createClinicSchema = z.object({
@@ -80,18 +80,20 @@ const productCategorySchema = z.object({
     description: z.string().optional(),
 });
 
-// Schema for creating/updating products
-const productSchema = z.object({
-    name: z.string().min(1, 'Product name is required'),
-    description: z.string().optional(),
-    price: z.string(), // Prices are often handled as strings to avoid floating point issues
-    categoryId: z.string().uuid('A valid category ID is required'),
-    isActive: z.boolean().optional().default(true),
+// Schema for creating a new inventory item
+const createInventoryItemSchema = z.object({
+    productId: z.string().uuid(),
+    clinicId: z.string().uuid(),
+    quantityOnHand: z.number().int().min(0),
+    batchNumber: z.string().optional(),
+    expiryDate: z.string().date().optional(), // Expecting 'YYYY-MM-DD'
 });
 
-// Schema for updating stock
-const updateStockSchema = z.object({
-    quantityOnHand: z.number().int('Quantity must be a whole number.'),
+// Schema for updating an existing inventory item
+const updateInventoryItemSchema = z.object({
+    quantityOnHand: z.number().int().min(0).optional(),
+    batchNumber: z.string().optional(),
+    expiryDate: z.string().date().optional(),
 });
 
 // Schema for creating/updating services
@@ -289,140 +291,87 @@ adminRoutes.put('/clinics/:id/services', zValidator('json', assignServicesSchema
     }
 });
 
-// --- Inventory Management Endpoints ---
-
-// -- Product Categories --
+// --- Product Categories Endpoints ---
 adminRoutes
   .get('/product-categories', async (c) => {
-    const categories = await db.select({
-      id: productCategories.id,
-      name: productCategories.name,
-      description: productCategories.description,
-    }).from(productCategories).orderBy(asc(productCategories.name));
+    const categories = await db.select().from(productCategories).orderBy(asc(productCategories.name));
     return c.json({ data: categories });
   })
   .post('/product-categories', zValidator('json', productCategorySchema), async (c) => {
     const newCategoryData = c.req.valid('json');
-
-    // Linter Workaround: The Drizzle schema in memory is incorrect and expects a `price`.
-    // We satisfy the type checker here and then delete the property before insertion.
-    const valuesToInsert: any = { ...newCategoryData, price: "0" };
-    delete valuesToInsert.price;
-
-    const [createdCategory] = await db.insert(productCategories).values(valuesToInsert).returning({
-      id: productCategories.id,
-      name: productCategories.name,
-      description: productCategories.description,
-    });
+    const [createdCategory] = await db.insert(productCategories).values(newCategoryData).returning();
     return c.json(createdCategory, 201);
-  });
-
-adminRoutes
-  .get('/product-categories/:id', async (c) => {
-    const { id } = c.req.param();
-    const [category] = await db.select({
-      id: productCategories.id,
-      name: productCategories.name,
-      description: productCategories.description,
-    }).from(productCategories).where(eq(productCategories.id, id));
-    if (!category) return c.json({ error: 'Not Found' }, 404);
-    return c.json(category);
   })
   .put('/product-categories/:id', zValidator('json', productCategorySchema.partial()), async (c) => {
     const { id } = c.req.param();
     const values = c.req.valid('json');
-    const [updatedCategory] = await db.update(productCategories).set(values).where(eq(productCategories.id, id)).returning({
-      id: productCategories.id,
-      name: productCategories.name,
-      description: productCategories.description,
-    });
+    const [updatedCategory] = await db.update(productCategories).set(values).where(eq(productCategories.id, id)).returning();
     if (!updatedCategory) return c.json({ error: 'Not Found' }, 404);
     return c.json(updatedCategory);
   })
   .delete('/product-categories/:id', async (c) => {
     const { id } = c.req.param();
-    // TODO: Add logic to handle products associated with this category before deleting.
     const [deleted] = await db.delete(productCategories).where(eq(productCategories.id, id)).returning({ id: productCategories.id });
     if (!deleted) return c.json({ error: 'Not Found' }, 404);
     return c.json({ success: true });
   });
 
-// -- Products --
-adminRoutes
-  .get('/products', async (c) => {
-    const allProducts = await db.query.products.findMany({
-      with: {
-        productCategory: {
-          columns: { name: true }
+// --- NEW Inventory Management Endpoints ---
+
+// Get all inventory items for a specific clinic
+adminRoutes.get('/clinics/:clinicId/inventory', async (c) => {
+    const { clinicId } = c.req.param();
+    const items = await db.query.inventory_items.findMany({
+        where: eq(inventory_items.clinicId, clinicId),
+        with: {
+            product: true, // Also fetch the related product details
         },
-        inventory: {
-            columns: { quantityOnHand: true }
-        }
-      },
-      orderBy: (products, { asc }) => [asc(products.name)],
+        orderBy: asc(inventory_items.updatedAt),
     });
+    return c.json({ data: items });
+});
 
-    const responseData = allProducts.map((p: any) => ({
-        ...p,
-        categoryName: p.productCategory?.name || 'N/A',
-        quantityOnHand: p.inventory?.quantityOnHand ?? 0,
-        inventory: undefined, 
-        productCategory: undefined,
-    }));
-
-    return c.json({ data: responseData });
-  })
-  .post('/products', zValidator('json', productSchema), async (c) => {
-    const newProductData = c.req.valid('json');
-    // Use a transaction to ensure both product and inventory are created
-    const newProduct = await db.transaction(async (tx) => {
-        const [createdProduct] = await tx.insert(products).values(newProductData).returning();
-        await tx.insert(inventory).values({ productId: createdProduct.id, quantityOnHand: 0 });
-        return createdProduct;
+// Get all stock for a specific product across all clinics
+adminRoutes.get('/products/:productId/inventory', async (c) => {
+    const { productId } = c.req.param();
+    const items = await db.query.inventory_items.findMany({
+        where: eq(inventory_items.productId, productId),
+        with: {
+            clinic: {
+                columns: { name: true, id: true }
+            }
+        },
     });
-    return c.json(newProduct, 201);
-  });
+    return c.json({ data: items });
+});
 
-adminRoutes
-  .get('/products/:id', async (c) => {
-    const { id } = c.req.param();
-    const [product] = await db.select().from(products).where(eq(products.id, id));
-    if (!product) return c.json({ error: 'Not Found' }, 404);
-    return c.json(product);
-  })
-  .put('/products/:id', zValidator('json', productSchema.partial()), async (c) => {
-    const { id } = c.req.param();
-    const values = c.req.valid('json');
-    const [updatedProduct] = await db.update(products).set(values).where(eq(products.id, id)).returning();
-    if (!updatedProduct) return c.json({ error: 'Not Found' }, 404);
-    return c.json(updatedProduct);
-  })
-  .delete('/products/:id', async (c) => {
-    const { id } = c.req.param();
-    // Drizzle will handle cascading deletes if set up in the DB.
-    // Explicitly deleting from inventory first is safer if not.
-    await db.delete(inventory).where(eq(inventory.productId, id));
-    const [deleted] = await db.delete(products).where(eq(products.id, id)).returning();
+// Add a new inventory item/batch to a clinic
+adminRoutes.post('/inventory-items', zValidator('json', createInventoryItemSchema), async (c) => {
+    const newItemData = c.req.valid('json');
+    const [createdItem] = await db.insert(inventory_items).values(newItemData).returning();
+    return c.json(createdItem, 201);
+});
+
+// Update an existing inventory item
+adminRoutes.put('/inventory-items/:itemId', zValidator('json', updateInventoryItemSchema), async (c) => {
+    const { itemId } = c.req.param();
+    const updatedValues = c.req.valid('json');
+    const [updatedItem] = await db.update(inventory_items).set({
+        ...updatedValues,
+        updatedAt: new Date().toISOString(),
+    }).where(eq(inventory_items.id, itemId)).returning();
+
+    if (!updatedItem) return c.json({ error: 'Inventory item not found' }, 404);
+    return c.json(updatedItem);
+});
+
+// Delete an inventory item
+adminRoutes.delete('/inventory-items/:itemId', async (c) => {
+    const { itemId } = c.req.param();
+    const [deleted] = await db.delete(inventory_items).where(eq(inventory_items.id, itemId)).returning({ id: inventory_items.id });
     if (!deleted) return c.json({ error: 'Not Found' }, 404);
     return c.json({ success: true });
-  });
-
-// -- Stock Management --
-adminRoutes
-  .put('/inventory/:productId', zValidator('json', updateStockSchema), async (c) => {
-      const { productId } = c.req.param();
-      const { quantityOnHand } = c.req.valid('json');
-
-      const [updatedStock] = await db
-        .update(inventory)
-        .set({ quantityOnHand, updatedAt: new Date().toISOString() })
-        .where(eq(inventory.productId, productId))
-        .returning();
-
-      if (!updatedStock) return c.json({ error: 'Inventory record not found for this product' }, 404);
-
-      return c.json({ success: true, updatedStock });
-  });
+});
 
 // --- Doctor Management Endpoints ---
 

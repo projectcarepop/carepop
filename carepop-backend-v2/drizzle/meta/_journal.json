@@ -15,6 +15,13 @@
       "when": 1751172628170,
       "tag": "0001_sad_captain_cross",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1751538269805,
+      "tag": "0002_robust_fallen_one",
+      "breakpoints": true
     }
   ]
 }

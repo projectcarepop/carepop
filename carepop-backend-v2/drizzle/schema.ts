@@ -12,7 +12,7 @@ export const usersInAuth = pgTable("users", {
 export const appointmentStatus = pgEnum("appointment_status", ['scheduled', 'completed', 'canceled_by_patient', 'canceled_by_admin', 'no_show'])
 export const medicalRecordType = pgEnum("medical_record_type", ['PRESCRIPTION', 'LAB_ORDER', 'DOCTOR_NOTE', 'LAB_RESULT', 'CLINICAL_DOCUMENT'])
 export const orderStatus = pgEnum("order_status", ['pending_payment', 'processing', 'shipped', 'delivered', 'canceled'])
-export const userRole = pgEnum("user_role", ['patient', 'admin'])
+export const userRole = pgEnum("user_role", ['patient', 'admin', 'manager'])
 export const dayOfWeekEnum = pgEnum("day_of_week", [
   "SUNDAY",
   "MONDAY",
@@ -208,12 +208,17 @@ export const products = pgTable("products", {
     priceCheck: check("products_price_check", sql`price >= 0`),
 }));
 
-export const inventory = pgTable("inventory", {
-	productId: uuid("product_id").primaryKey().notNull().references(() => products.id, { onDelete: 'cascade' }),
+export const inventory_items = pgTable("inventory_items", {
+	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+	productId: uuid("product_id").notNull().references(() => products.id, { onDelete: 'cascade' }),
+	clinicId: uuid("clinic_id").notNull().references(() => clinics.id, { onDelete: 'cascade' }),
 	quantityOnHand: integer("quantity_on_hand").default(0).notNull(),
+	batchNumber: text("batch_number"),
+	expiryDate: date("expiry_date"),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, () => ({
-    quantityCheck: check("inventory_quantity_on_hand_check", sql`quantity_on_hand >= 0`),
+}, (table) => ({
+	productClinicIdx: index("inventory_product_clinic_idx").on(table.productId, table.clinicId),
+    quantityCheck: check("inventory_quantity_on_hand_check", sql`"quantity_on_hand" >= 0`),
 }));
 
 export const moodEnum = pgEnum("mood", ['happy', 'sad', 'neutral', 'anxious', 'stressed']);
@@ -344,22 +349,23 @@ export const productCategoriesRelations = relations(productCategories, ({ many }
 	products: many(products),
 }));
 
-export const productsRelations = relations(products, ({ one }) => ({
+export const productsRelations = relations(products, ({ one, many }) => ({
 	productCategory: one(productCategories, {
 		fields: [products.categoryId],
 		references: [productCategories.id]
 	}),
-	inventory: one(inventory, {
-        fields: [products.id],
-        references: [inventory.productId]
-    }),
+	inventory: many(inventory_items),
 }));
 
-export const inventoryRelations = relations(inventory, ({ one }) => ({
+export const inventoryItemsRelations = relations(inventory_items, ({ one }) => ({
 	product: one(products, {
-		fields: [inventory.productId],
+		fields: [inventory_items.productId],
 		references: [products.id]
 	}),
+    clinic: one(clinics, {
+        fields: [inventory_items.clinicId],
+        references: [clinics.id]
+    }),
 }));
 
 export const healthLogsRelations = relations(healthLogs, ({ one }) => ({
