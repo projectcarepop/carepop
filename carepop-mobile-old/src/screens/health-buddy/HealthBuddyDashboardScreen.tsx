@@ -7,8 +7,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../../components/theme';
 
-import { getHealthLogSummary, getAiInsight } from '../../services/api';
-import type { HealthLogSummary, AIInsight } from '../../lib/types';
+import { getHealthLogSummary, getAiInsight, createHealthLog } from '../../services/api';
+import type { HealthLogSummary, AIInsight, CreateHealthLogPayload } from '../../lib/types';
 import { HealthBuddyStackParamList } from '../../navigation/AppDrawerNavigator';
 
 import AiInsightModal from '../../components/health-buddy/AiInsightModal';
@@ -30,6 +30,31 @@ const HealthBuddyDashboardScreen = () => {
     onSuccess: () => setIsInsightModalVisible(true),
     onError: () => setIsInsightModalVisible(true), 
   });
+
+  const { mutate: quickLogMood, isPending: isLoggingMood } = useMutation({
+    mutationFn: (payload: CreateHealthLogPayload) => createHealthLog(payload),
+    onSuccess: () => {
+      Alert.alert('Success', 'Your mood has been logged.');
+      queryClient.invalidateQueries({ queryKey: ['healthLogSummary'] });
+    },
+    onError: (error: any) => {
+      Alert.alert('Error', error.message || 'Could not log your mood.');
+    },
+    onSettled: () => {
+        setSelectedMood(null); // Deselect mood after action
+    }
+  });
+
+  const handleMoodPress = (moodLabel: string) => {
+    setSelectedMood(moodLabel);
+    const payload: CreateHealthLogPayload = {
+        logDate: new Date().toISOString(),
+        mood: moodLabel.toLowerCase() as any, // Cast as a workaround for the enum type
+        symptoms: [],
+        notes: null,
+    };
+    quickLogMood(payload);
+  };
   
   const moods = [
     { icon: 'smile', label: 'Happy' },
@@ -54,9 +79,13 @@ const HealthBuddyDashboardScreen = () => {
                 <Text style={styles.cardInstruction}>Select a mood to quickly log how you feel.</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.moodSelector}>
                 {moods.map((mood) => (
-                    <TouchableOpacity key={mood.label} onPress={() => setSelectedMood(mood.label)}>
+                    <TouchableOpacity key={mood.label} onPress={() => handleMoodPress(mood.label)} disabled={isLoggingMood}>
                     <View style={[styles.moodCard, selectedMood === mood.label && styles.moodCardSelected]}>
-                        <Icon name={mood.icon as any} size={28} color={selectedMood === mood.label ? theme.colors.primary : theme.colors.secondary} />
+                        {isLoggingMood && selectedMood === mood.label ? (
+                            <ActivityIndicator color={theme.colors.primary} />
+                        ) : (
+                            <Icon name={mood.icon as any} size={28} color={selectedMood === mood.label ? theme.colors.primary : theme.colors.secondary} />
+                        )}
                         <Text style={[styles.moodLabel, selectedMood === mood.label && styles.moodLabelSelected]}>{mood.label}</Text>
                     </View>
                     </TouchableOpacity>

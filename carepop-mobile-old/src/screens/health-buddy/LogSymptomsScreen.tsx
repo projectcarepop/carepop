@@ -41,7 +41,7 @@ const LogSymptomsScreen = () => {
     mutationFn: createHealthLog,
     onSuccess: () => {
       Alert.alert('Success', 'Your health log has been saved.');
-      queryClient.invalidateQueries({ queryKey: ['health-insights'] }); // To refresh dashboard data
+      queryClient.invalidateQueries({ queryKey: ['healthLogSummary'] }); // To refresh dashboard data
       navigation.goBack();
     },
     onError: (error: any) => {

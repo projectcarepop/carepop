@@ -231,8 +231,7 @@ export const menstrualLogs = pgTable("menstrual_logs", {
 	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
 	patientId: uuid("patient_id").notNull().references(() => profiles.id, { onDelete: 'cascade' } ),
 	startDate: date("start_date", { mode: 'string' }).notNull(),
-	endDate: date("end_date", { mode: 'string' }).notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	endDate: date("end_date", { mode: 'string' }),
 });
 
 
