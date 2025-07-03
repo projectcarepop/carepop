@@ -98,12 +98,16 @@ export default function InventoryClient() {
         }
         setIsSubmitting(true);
         try {
+            // Ensure numeric values are numbers, not strings from the form
             const payload = {
                 ...values,
                 clinicId: selectedClinic,
-                // The API expects productCategoryId, which we don't have a form field for yet.
-                // This will need to be added later. For now, we omit it or handle it in the backend.
+                quantityOnHand: Number(values.quantityOnHand),
+                reorderLevel: Number(values.reorderLevel),
+                purchasePrice: values.purchasePrice ? Number(values.purchasePrice) : null,
+                sellingPrice: values.sellingPrice ? Number(values.sellingPrice) : null,
             };
+
             await upsertInventoryItem(payload, session.access_token, editingItem?.id);
             toast({
                 title: "Success",

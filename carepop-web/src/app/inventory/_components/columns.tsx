@@ -15,12 +15,19 @@ import { Checkbox } from "@/components/ui/checkbox"
 
 export type InventoryItem = {
   id: string
-  name: string
+  itemName: string
+  genericName: string | null
+  brandName: string | null
   sku: string | null
+  dosageForm: string | null
+  strength: string | null
   quantityOnHand: number
+  reorderLevel: number
+  purchasePrice: number | null
+  sellingPrice: number | null
   batchNumber: string | null
   expiryDate: string | null
-  // This should reflect the flat structure from the `inventory_items` table
+  location: string | null
 }
 
 type ColumnsProps = {
@@ -53,16 +60,32 @@ export const columns = ({ onEdit, onDelete, onViewBatches }: ColumnsProps): Colu
     enableHiding: false,
   },
   {
-    accessorKey: "name",
-    header: "Product",
+    accessorKey: "itemName",
+    header: "Product Name",
   },
   {
-    accessorKey: "sku",
-    header: "SKU",
+    accessorKey: "brandName",
+    header: "Brand Name",
   },
   {
-    accessorKey: "batchNumber",
-    header: "Batch No.",
+    accessorKey: "strength",
+    header: "Strength",
+  },
+  {
+    accessorKey: "quantityOnHand",
+    header: "Quantity",
+  },
+  {
+    accessorKey: "sellingPrice",
+    header: "Price (PHP)",
+    cell: ({ row }) => {
+      const price = parseFloat(row.getValue("sellingPrice"))
+      const formatted = new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "PHP",
+      }).format(price)
+      return <div className="text-right font-medium">{formatted}</div>
+    },
   },
   {
     accessorKey: "expiryDate",
@@ -71,10 +94,6 @@ export const columns = ({ onEdit, onDelete, onViewBatches }: ColumnsProps): Colu
       const expiryDate = row.original.expiryDate
       return expiryDate ? new Date(expiryDate).toLocaleDateString() : "N/A"
     },
-  },
-  {
-    accessorKey: "quantityOnHand",
-    header: "Quantity",
   },
   {
     id: "actions",

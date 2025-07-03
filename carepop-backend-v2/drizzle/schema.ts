@@ -210,15 +210,32 @@ export const products = pgTable("products", {
 
 export const inventory_items = pgTable("inventory_items", {
 	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
-	productId: uuid("product_id").notNull().references(() => products.id, { onDelete: 'cascade' }),
 	clinicId: uuid("clinic_id").notNull().references(() => clinics.id, { onDelete: 'cascade' }),
+	productCategoryId: uuid("product_category_id").references(() => productCategories.id, { onDelete: 'set null' }),
+	
+	itemName: text("item_name").notNull(),
+	sku: text("sku").unique(),
+	genericName: text("generic_name"),
+	brandName: text("brand_name"),
+	dosageForm: text("dosage_form"),
+	strength: text("strength"),
+	
 	quantityOnHand: integer("quantity_on_hand").default(0).notNull(),
+	reorderLevel: integer("reorder_level").default(10).notNull(),
+
+	purchasePrice: numeric("purchase_price", { precision: 10, scale: 2 }),
+	sellingPrice: numeric("selling_price", { precision: 10, scale: 2 }),
+	
 	batchNumber: text("batch_number"),
 	expiryDate: date("expiry_date"),
+	location: text("location"),
+
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => ({
-	productClinicIdx: index("inventory_product_clinic_idx").on(table.productId, table.clinicId),
+    skuIdx: index("inventory_sku_idx").on(table.sku),
+    clinicIdIdx: index("inventory_clinic_id_idx").on(table.clinicId),
     quantityCheck: check("inventory_quantity_on_hand_check", sql`"quantity_on_hand" >= 0`),
+	reorderLevelCheck: check("inventory_reorder_level_check", sql`"reorder_level" >= 0`),
 }));
 
 export const moodEnum = pgEnum("mood", ['happy', 'sad', 'neutral', 'anxious', 'stressed']);
