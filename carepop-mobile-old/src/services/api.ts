@@ -246,21 +246,37 @@ export const getHealthLogs = async (): Promise<HealthLog[]> => {
 
 /**
  * Fetches a summary of health logs, like most frequent symptoms for the last 7 days.
+ * This is now a client-side function that processes the raw logs.
  */
 export const getHealthLogSummary = async (): Promise<HealthLogSummary> => {
-  // Assuming a backend endpoint like '/api/me/health-logs/summary'
-  // This will need to be created in the backend.
-  const summary = await apiFetch<HealthLogSummary>('/api/me/health-logs/summary');
-  return summary ?? { frequentSymptoms: [] };
+    const logs = await getHealthLogs();
+    
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const recentLogs = logs.filter(log => new Date(log.logDate) >= sevenDaysAgo);
+
+    const symptomCounts = recentLogs
+        .flatMap(log => log.symptoms || [])
+        .reduce((acc, symptom) => {
+            acc[symptom] = (acc[symptom] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+
+    const frequentSymptoms = Object.entries(symptomCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([symptom, count]) => ({ symptom, count }));
+
+    return { frequentSymptoms };
 };
 
 /**
- * Fetches an AI insight based on the user's health logs.
- * @returns A promise that resolves to an object containing the AI insight.
+ * Generates a health insight based on recent logs by calling the backend AI service.
  */
 export const getAiInsight = async (): Promise<AIInsight> => {
-  return apiFetch<AIInsight>("/api/me/ai/insight", {
-    method: "POST", // This is a POST as it triggers a generation process
+  return apiFetch<AIInsight>('/api/me/ai/insight', {
+    method: 'GET',
   });
 };
 

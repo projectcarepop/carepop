@@ -7,8 +7,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../../components/theme';
 
-import { getHealthLogSummary, getAiInsight, createHealthLog } from '../../services/api';
-import type { HealthLogSummary, AIInsight, CreateHealthLogPayload } from '../../lib/types';
+import { getHealthLogSummary, getAiInsight, createHealthLog, getHealthLogs } from '../../services/api';
+import type { HealthLog, HealthLogSummary, AIInsight, CreateHealthLogPayload } from '../../lib/types';
 import { HealthBuddyStackParamList } from '../../navigation/AppDrawerNavigator';
 
 import AiInsightModal from '../../components/health-buddy/AiInsightModal';
@@ -18,12 +18,19 @@ const HealthBuddyDashboardScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<HealthBuddyStackParamList>>();
 
   const [isInsightModalVisible, setIsInsightModalVisible] = useState(false);
-  const [selectedMood, setSelectedMood] = useState<string | null>(null);
   
   const { data: summary, isLoading: isLoadingSummary } = useQuery<HealthLogSummary>({
     queryKey: ['healthLogSummary'],
     queryFn: getHealthLogSummary,
   });
+
+  const { data: healthLogs } = useQuery<HealthLog[]>({
+    queryKey: ['healthLogs'],
+    queryFn: getHealthLogs,
+  });
+
+  const today = new Date().toISOString().split('T')[0];
+  const hasLoggedToday = healthLogs?.some(log => log.logDate.split('T')[0] === today);
 
   const { mutate: fetchAiInsight, data: aiInsight, isPending: isFetchingInsight } = useMutation<AIInsight>({
     mutationFn: getAiInsight,
@@ -40,29 +47,7 @@ const HealthBuddyDashboardScreen = () => {
     onError: (error: any) => {
       Alert.alert('Error', error.message || 'Could not log your mood.');
     },
-    onSettled: () => {
-        setSelectedMood(null); // Deselect mood after action
-    }
   });
-
-  const handleMoodPress = (moodLabel: string) => {
-    setSelectedMood(moodLabel);
-    const payload: CreateHealthLogPayload = {
-        logDate: new Date().toISOString(),
-        mood: moodLabel.toLowerCase() as any, // Cast as a workaround for the enum type
-        symptoms: [],
-        notes: null,
-    };
-    quickLogMood(payload);
-  };
-  
-  const moods = [
-    { icon: 'smile', label: 'Happy' },
-    { icon: 'meh', label: 'Neutral' },
-    { icon: 'frown', label: 'Sad' },
-    { icon: 'alert-circle', label: 'Anxious' },
-    { icon: 'activity', label: 'Stressed' },
-  ];
 
   return (
     <View style={styles.screenContainer}>
@@ -75,27 +60,22 @@ const HealthBuddyDashboardScreen = () => {
             </View>
             
             <View style={styles.card}>
-                <Text style={styles.cardTitle}>How are you feeling today?</Text>
-                <Text style={styles.cardInstruction}>Select a mood to quickly log how you feel.</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.moodSelector}>
-                {moods.map((mood) => (
-                    <TouchableOpacity key={mood.label} onPress={() => handleMoodPress(mood.label)} disabled={isLoggingMood}>
-                    <View style={[styles.moodCard, selectedMood === mood.label && styles.moodCardSelected]}>
-                        {isLoggingMood && selectedMood === mood.label ? (
-                            <ActivityIndicator color={theme.colors.primary} />
-                        ) : (
-                            <Icon name={mood.icon as any} size={28} color={selectedMood === mood.label ? theme.colors.primary : theme.colors.secondary} />
-                        )}
-                        <Text style={[styles.moodLabel, selectedMood === mood.label && styles.moodLabelSelected]}>{mood.label}</Text>
-                    </View>
-                    </TouchableOpacity>
-                ))}
-                </ScrollView>
-            </View>
-
-            <View style={styles.card}>
                 <Text style={styles.cardTitle}>Your Week in Symptoms</Text>
                 <Text style={styles.cardInstruction}>Here are the symptoms you&apos;ve logged most frequently this week.</Text>
+                
+                <TouchableOpacity 
+                    style={[styles.actionButton, hasLoggedToday && styles.disabledButton]} 
+                    onPress={() => navigation.navigate('LogSymptoms')}
+                    disabled={hasLoggedToday}
+                    >
+                    <Icon name="plus" size={16} color={hasLoggedToday ? theme.colors.mutedForeground : theme.colors.primary} />
+                    <Text style={[styles.actionButtonText, hasLoggedToday && styles.disabledButtonText]}>Log Symptoms & Mood</Text>
+                </TouchableOpacity>
+
+                {hasLoggedToday && (
+                    <Text style={styles.loggedTodayText}>You&apos;ve already logged your symptoms today. Come back tomorrow!</Text>
+                )}
+
                 {isLoadingSummary ? (
                     <ActivityIndicator color={theme.colors.primary} style={{marginTop: theme.spacing.lg}} />
                 ) : (
@@ -116,19 +96,16 @@ const HealthBuddyDashboardScreen = () => {
                 )}
             </View>
 
-            {/* --- Side-by-side Buttons --- */}
-            <View style={styles.actionButtonContainer}>
+            <View style={styles.card}>
+                <Text style={styles.cardTitle}>Track Your Cycle</Text>
+                <Text style={styles.cardInstruction}>Log the start and end of your menstrual flow to see patterns over time.</Text>
                 <TouchableOpacity 
-                    style={styles.actionButton} 
-                    onPress={() => navigation.navigate('LogSymptoms')}>
-                    <Icon name="plus" size={16} color={theme.colors.primary} />
-                    <Text style={styles.actionButtonText}>Log Symptoms</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                    style={styles.actionButton}
-                    onPress={() => navigation.navigate('LogPeriod')}>
-                    <Icon name="plus" size={16} color={theme.colors.primary} />
-                    <Text style={styles.actionButtonText}>Log Flow</Text>
+                    style={[styles.actionButton, hasLoggedToday && styles.disabledButton]}
+                    onPress={() => navigation.navigate('LogPeriod')}
+                    disabled={hasLoggedToday}
+                    >
+                    <Icon name="droplet" size={16} color={hasLoggedToday ? theme.colors.mutedForeground : theme.colors.primary} />
+                    <Text style={[styles.actionButtonText, hasLoggedToday && styles.disabledButtonText]}>Log Flow</Text>
                 </TouchableOpacity>
             </View>
 
@@ -199,36 +176,8 @@ const styles = StyleSheet.create({
         color: theme.colors.mutedForeground,
         marginBottom: theme.spacing.lg,
     },
-    moodSelector: {
-        flexDirection: 'row',
-    },
-    moodCard: {
-        backgroundColor: theme.colors.background,
-        borderRadius: theme.radius.md,
-        padding: theme.spacing.md,
-        alignItems: 'center',
-        marginRight: theme.spacing.md,
-        borderWidth: 2,
-        borderColor: 'transparent',
-        width: 90,
-        height: 90,
-        justifyContent: 'center',
-    },
-    moodCardSelected: {
-        borderColor: theme.colors.primary,
-        backgroundColor: theme.colors.destructiveMuted,
-    },
-    moodLabel: {
-        ...theme.typography.small,
-        fontFamily: theme.typography.fontFamilyMedium,
-        color: theme.colors.secondary,
-        marginTop: theme.spacing.sm,
-    },
-    moodLabelSelected: {
-        color: theme.colors.primary,
-    },
     symptomListContainer: {
-        marginTop: theme.spacing.sm,
+        marginTop: theme.spacing.lg,
     },
     symptomItem: {
         flexDirection: 'row',
@@ -254,27 +203,34 @@ const styles = StyleSheet.create({
         color: theme.colors.mutedForeground,
         fontFamily: theme.typography.fontFamilyMedium,
     },
-    actionButtonContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginHorizontal: -theme.spacing.sm, // Counteract button margin
-        marginBottom: theme.spacing.lg,
-    },
     actionButton: {
-        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: theme.colors.muted,
         padding: theme.spacing.md,
         borderRadius: theme.radius.md,
-        marginHorizontal: theme.spacing.sm,
+        marginBottom: theme.spacing.lg,
     },
     actionButtonText: {
         color: theme.colors.primary,
         ...theme.typography.body,
         fontFamily: theme.typography.fontFamilySemiBold,
         marginLeft: theme.spacing.sm,
+    },
+    disabledButton: {
+        backgroundColor: theme.colors.background,
+        borderColor: theme.colors.border,
+        borderWidth: 1,
+    },
+    disabledButtonText: {
+        color: theme.colors.mutedForeground,
+    },
+    loggedTodayText: {
+        ...theme.typography.small,
+        color: theme.colors.mutedForeground,
+        textAlign: 'center',
+        marginBottom: theme.spacing.lg,
     },
     aiCard: {
         backgroundColor: theme.colors.secondary,

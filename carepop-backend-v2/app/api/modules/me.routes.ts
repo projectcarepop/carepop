@@ -396,56 +396,72 @@ meRoutes.get('/ai/insight', async (c) => {
   const user = c.get('user');
 
   try {
-    // Step 1: Fetch the user's recent health data
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // Step 1: Fetch the user's recent health data (last 7 days for more relevant insights)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const formattedDate = sevenDaysAgo.toISOString().split('T')[0]; // YYYY-MM-DD
 
     const recentHealthLogs = await db.query.healthLogs.findMany({
       where: and(
         eq(healthLogs.patientId, user.id),
-        gte(healthLogs.logDate, thirtyDaysAgo.toISOString())
+        gte(healthLogs.logDate, formattedDate)
       ),
       orderBy: (logs, { desc }) => [desc(logs.logDate)],
     });
 
-    const recentMenstrualLogs = await db.query.menstrualLogs.findMany({
-        where: eq(menstrualLogs.patientId, user.id),
-        orderBy: (logs, { desc }) => [desc(logs.startDate)],
-        limit: 1,
-    });
-    
-    // Step 2: Process and summarize the data for the prompt
-    if (recentHealthLogs.length === 0 && recentMenstrualLogs.length === 0) {
-        return c.json({ insight: "We don't have enough data to generate an insight yet. Try logging your symptoms or period for a few days!" });
+    if (recentHealthLogs.length === 0) {
+        return c.json({ insight: "We don't have enough data to generate an insight yet. Try logging your symptoms for a day or two!" });
     }
 
-    const symptomsSummary = recentHealthLogs.flatMap(log => log.symptoms || []);
-    const moodSummary = recentHealthLogs.map(log => log.mood).filter(Boolean);
-    const notesSummary = recentHealthLogs.map(log => log.notes).filter(Boolean).join('\\n- ');
+    // Determine if we should generate a daily or weekly insight
+    const uniqueLogDays = new Set(recentHealthLogs.map(log => log.logDate.split('T')[0]));
 
-    const healthData = {
-       symptoms: [...new Set(symptomsSummary)], // Unique symptoms
-       moods: [...new Set(moodSummary)], // Unique moods
-       notes: notesSummary,
-       lastPeriod: recentMenstrualLogs[0] ? `from ${new Date(recentMenstrualLogs[0].startDate).toLocaleDateString()} to ${new Date(recentMenstrualLogs[0].endDate).toLocaleDateString()}` : "not logged in the last month",
-    };
+    let prompt = '';
 
-    // Step 3: Build a dynamic, detailed prompt
-    const prompt = `
-        Analyze the following health data for a user over the last 30 days and provide a short, supportive, and actionable insight.
-        The user is part of the LGBTQ+ community, so use inclusive and gender-neutral language (e.g., "your body" instead of gendered terms).
-        Do not provide medical advice. Focus on wellness, self-care, and potential patterns.
-        If a data point is empty or not available, do not mention it.
+    // Common instructions for the AI
+    const basePromptInstructions = `
+        You are CarePoP's AI Health Buddy, a wellness assistant with a unique personality: you are nuanced, a bit quirky, and deeply supportive. Think of yourself as a wise, slightly eccentric friend who sees things from a different angle.
         
-        Data:
-        - Symptoms logged: ${healthData.symptoms.length > 0 ? healthData.symptoms.join(', ') : 'None'}
-        - Moods logged: ${healthData.moods.length > 0 ? healthData.moods.join(', ') : 'None'}
-        - Last menstrual cycle logged: ${healthData.lastPeriod}
-        - User's notes include:
-        - ${healthData.notes.length > 0 ? healthData.notes : 'None'}
-
-        Generate a one-paragraph insight based on this data.
+        Your core mission is to analyze the user's health log and provide a short (2-3 sentences), actionable insight.
+        
+        Here are your rules:
+        1.  **Nuanced & Quirky Tone:** Use interesting analogies or a clever turn of phrase. Acknowledge that wellness isn't always straightforward. Be playful but always empathetic.
+        2.  **Inclusivity is Key:** The user is part of the LGBTQ+ community. ALWAYS use inclusive and gender-neutral language (e.g., "your body," "your energy," "this experience" instead of gendered terms).
+        3.  **Safety First (No Medical Advice):** STRICTLY DO NOT PROVIDE MEDICAL ADVICE. Your focus is on wellness, self-care, noticing patterns, and offering gentle, creative suggestions.
+        4.  **Be Data-Driven:** If a data point is empty, don't mention it.
+        5.  **Speak Directly:** Frame the output as a helpful, encouraging message directly to the user.
     `;
+
+    if (uniqueLogDays.size === 1) {
+      // --- DAILY INSIGHT ---
+      const todayLog = recentHealthLogs[0];
+      prompt = `
+        ${basePromptInstructions}
+        The user has logged their feelings for today. Based on this single day's entry, provide a wellness suggestion for them to consider today.
+
+        Today's Data:
+        - Symptoms logged: ${todayLog.symptoms?.join(', ') || 'None'}
+        - Mood logged: ${todayLog.mood || 'None'}
+        - Notes: ${todayLog.notes || 'None'}
+
+        Generate a one-paragraph wellness suggestion for today.
+      `;
+    } else {
+      // --- PATTERN INSIGHT ---
+      const symptomsSummary = [...new Set(recentHealthLogs.flatMap(log => log.symptoms || []))];
+      const moodSummary = [...new Set(recentHealthLogs.map(log => log.mood).filter(Boolean))];
+      
+      prompt = `
+        ${basePromptInstructions}
+        The user has logged their health for multiple days this past week. Look for potential patterns or connections in their data and provide an insight.
+
+        Data from the last ${uniqueLogDays.size} days:
+        - Common symptoms logged: ${symptomsSummary.join(', ') || 'None'}
+        - Moods experienced: ${moodSummary.join(', ') || 'None'}
+
+        Generate a one-paragraph insight about potential patterns.
+      `;
+    }
 
     // Step 4: Generate content
     const result = await generativeModel.generateContent(prompt);

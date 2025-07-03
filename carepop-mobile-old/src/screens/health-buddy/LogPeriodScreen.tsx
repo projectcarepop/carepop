@@ -130,6 +130,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: theme.spacing.md,
+    marginTop: theme.spacing.xl*2,
   },
   headerTitle: {
     ...theme.typography.h2,

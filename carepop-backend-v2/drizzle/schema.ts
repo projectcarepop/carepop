@@ -225,7 +225,9 @@ export const healthLogs = pgTable("health_logs", {
 	mood: moodEnum("mood"),
 	symptoms: text("symptoms").array(),
 	notes: text("notes"),
-});
+}, (table) => ({
+    patientDateConstraint: index("health_logs_patient_id_log_date_key").on(table.patientId, table.logDate),
+}));
 
 export const menstrualLogs = pgTable("menstrual_logs", {
 	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
