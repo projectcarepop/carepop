@@ -4,20 +4,22 @@ import { useNavigation } from '@react-navigation/native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createHealthLog } from '../../services/api'; // Assuming this service function exists
 import { Ionicons } from '@expo/vector-icons';
+import { Feather as Icon } from '@expo/vector-icons';
+import { theme } from '../../components/theme';
 
 // --- Type Definitions ---
 type Mood = {
   name: 'happy' | 'neutral' | 'sad' | 'anxious' | 'stressed';
-  emoji: string;
+  iconName: keyof typeof Icon.glyphMap;
 };
 
 // --- Constants ---
 const MOODS: Mood[] = [
-  { name: 'happy', emoji: '😊' },
-  { name: 'neutral', emoji: '😐' },
-  { name: 'sad', emoji: '😢' },
-  { name: 'anxious', emoji: '😟' },
-  { name: 'stressed', emoji: '😫' },
+  { name: 'happy', iconName: 'smile' },
+  { name: 'neutral', iconName: 'meh' },
+  { name: 'sad', iconName: 'frown' },
+  { name: 'anxious', iconName: 'alert-circle' },
+  { name: 'stressed', iconName: 'zap' },
 ];
 
 const SYMPTOMS = [
@@ -35,10 +37,11 @@ const LogSymptomsScreen = () => {
   const [selectedSymptoms, setSelectedSymptoms] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState('');
 
-  const { mutate: submitHealthLog, isLoading } = useMutation(createHealthLog, {
+  const { mutate: submitHealthLog, isPending } = useMutation({
+    mutationFn: createHealthLog,
     onSuccess: () => {
       Alert.alert('Success', 'Your health log has been saved.');
-      queryClient.invalidateQueries('health-insights'); // To refresh dashboard data
+      queryClient.invalidateQueries({ queryKey: ['health-insights'] }); // To refresh dashboard data
       navigation.goBack();
     },
     onError: (error: any) => {
@@ -81,7 +84,7 @@ const LogSymptomsScreen = () => {
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={24} color="#333" />
+            <Ionicons name="arrow-back" size={24} color={theme.colors.secondary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Log Symptoms</Text>
       </View>
@@ -92,18 +95,25 @@ const LogSymptomsScreen = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>How are you feeling?</Text>
         <View style={styles.moodsContainer}>
-          {MOODS.map(mood => (
-            <TouchableOpacity
-              key={mood.name}
-              style={[styles.moodChip, selectedMood === mood.name && styles.moodChipSelected]}
-              onPress={() => setSelectedMood(mood.name)}
-            >
-              <Text style={styles.moodEmoji}>{mood.emoji}</Text>
-              <Text style={[styles.moodText, selectedMood === mood.name && styles.moodTextSelected]}>
-                {mood.name.charAt(0).toUpperCase() + mood.name.slice(1)}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {MOODS.map(mood => {
+            const isSelected = selectedMood === mood.name;
+            return (
+              <TouchableOpacity
+                key={mood.name}
+                style={[styles.moodChip, isSelected && styles.moodChipSelected]}
+                onPress={() => setSelectedMood(mood.name)}
+              >
+                <Icon 
+                  name={mood.iconName} 
+                  size={28} 
+                  color={isSelected ? theme.colors.primary : theme.colors.secondary} 
+                />
+                <Text style={[styles.moodText, isSelected && styles.moodTextSelected]}>
+                  {mood.name.charAt(0).toUpperCase() + mood.name.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            )
+          })}
         </View>
       </View>
 
@@ -134,17 +144,17 @@ const LogSymptomsScreen = () => {
           placeholder="Anything else to add?"
           value={notes}
           onChangeText={setNotes}
-          placeholderTextColor="#999"
+          placeholderTextColor={theme.colors.secondary}
         />
       </View>
 
       {/* --- Submission Button --- */}
       <TouchableOpacity 
-        style={[styles.submitButton, isLoading && styles.submitButtonDisabled]} 
+        style={[styles.submitButton, isPending && styles.submitButtonDisabled]} 
         onPress={handleSubmit}
-        disabled={isLoading}
+        disabled={isPending}
       >
-        <Text style={styles.submitButtonText}>{isLoading ? 'Saving...' : 'Save Log'}</Text>
+        <Text style={styles.submitButtonText}>{isPending ? 'Saving...' : 'Save Log'}</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -154,24 +164,25 @@ const LogSymptomsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7F8FA',
+    backgroundColor: theme.colors.background,
     paddingHorizontal: 20,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 50,
+    paddingTop: theme.spacing.lg*2  ,
     paddingBottom: 20,
+    marginTop: theme.spacing.xl*2,
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: 'bold',
     marginLeft: 16,
-    color: '#333',
+    color: theme.colors.secondary,
   },
   dateText: {
     fontSize: 16,
-    color: '#666',
+    color: theme.colors.secondary,
     textAlign: 'center',
     marginBottom: 20,
     fontWeight: '600',
@@ -182,36 +193,34 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#444',
+    color: theme.colors.secondary,
     marginBottom: 15,
   },
   moodsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
   },
   moodChip: {
+    flex: 1,
     alignItems: 'center',
-    padding: 10,
+    paddingVertical: 10,
+    marginHorizontal: 4,
     borderRadius: 15,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    backgroundColor: '#FFFFFF',
-    width: 65,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.card,
   },
   moodChipSelected: {
-    backgroundColor: '#E6F3FF',
-    borderColor: '#007AFF',
-  },
-  moodEmoji: {
-    fontSize: 28,
+    backgroundColor: theme.colors.muted,
+    borderColor: theme.colors.primary,
   },
   moodText: {
     marginTop: 5,
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.secondary,
   },
   moodTextSelected: {
-    color: '#007AFF',
+    color: theme.colors.primary,
     fontWeight: 'bold',
   },
   symptomsContainer: {
@@ -223,35 +232,35 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: theme.colors.border,
   },
   symptomChipSelected: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
   },
   symptomText: {
-    color: '#333',
+    color: theme.colors.cardForeground,
     fontSize: 14,
   },
   symptomTextSelected: {
-    color: '#FFFFFF',
+    color: theme.colors.primaryForeground,
     fontWeight: 'bold',
   },
   notesInput: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: theme.colors.border,
     padding: 15,
     minHeight: 100,
     textAlignVertical: 'top',
     fontSize: 16,
-    color: '#333',
+    color: theme.colors.secondary,
   },
   submitButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: theme.colors.primary,
     borderRadius: 15,
     paddingVertical: 18,
     alignItems: 'center',
@@ -259,10 +268,10 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   submitButtonDisabled: {
-    backgroundColor: '#B0D7FF',
+    backgroundColor: theme.colors.muted,
   },
   submitButtonText: {
-    color: '#FFFFFF',
+    color: theme.colors.primaryForeground,
     fontSize: 18,
     fontWeight: 'bold',
   },

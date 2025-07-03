@@ -1,85 +1,88 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
-import { theme } from '../../components/theme';
 import { useNavigation } from '@react-navigation/native';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Ionicons } from '@expo/vector-icons';
 
-type Period = {
-  startingDay: DateData | null;
-  endingDay: DateData | null;
-};
+import { theme } from '../../components/theme';
+import { createMenstrualLog } from '../../services/api';
+import type { CreateMenstrualLogPayload } from '../../lib/types';
 
 const LogPeriodScreen = () => {
   const navigation = useNavigation();
-  const [period, setPeriod] = useState<Period>({ startingDay: null, endingDay: null });
-  const [markedDates, setMarkedDates] = useState({});
-  const [isLoading, setIsLoading] = useState(false);
+  const queryClient = useQueryClient();
+
+  const [periodRange, setPeriodRange] = useState<{ startDate: string; endDate: string }>({ startDate: '', endDate: '' });
+
+  const { mutate: submitPeriodLog, isPending } = useMutation({
+    mutationFn: createMenstrualLog,
+    onSuccess: () => {
+      Alert.alert('Success', 'Your period has been logged.');
+      queryClient.invalidateQueries({ queryKey: ['healthLogSummary'] });
+      navigation.goBack();
+    },
+    onError: (error: any) => {
+      Alert.alert('Error', error.message || 'Could not save your log. Please try again.');
+    },
+  });
 
   const onDayPress = (day: DateData) => {
-    if (!period.startingDay || (period.startingDay && period.endingDay)) {
-      // Start a new period selection
-      const newMarked = {
-        [day.dateString]: { startingDay: true, color: theme.colors.primary, textColor: theme.colors.primaryForeground },
-      };
-      setPeriod({ startingDay: day, endingDay: null });
-      setMarkedDates(newMarked);
+    if (!periodRange.startDate || (periodRange.startDate && periodRange.endDate)) {
+      setPeriodRange({ startDate: day.dateString, endDate: '' });
     } else {
-      // End the period selection
-      let start = new Date(period.startingDay.dateString);
-      let end = new Date(day.dateString);
-
-      if (start > end) {
-        [start, end] = [end, start]; // Swap if end is before start
+      let start = periodRange.startDate;
+      let end = day.dateString;
+      if (new Date(start) > new Date(end)) {
+        [start, end] = [end, start]; // Swap
       }
-      
-      const newMarked = { ...markedDates };
-      for (let d = start; d <= end; d.setDate(d.getDate() + 1)) {
-        const dateString = d.toISOString().split('T')[0];
-        newMarked[dateString] = {
-          ...newMarked[dateString],
-          color: theme.colors.primary,
-          textColor: theme.colors.primaryForeground,
-        };
-      }
-
-      const startString = start.toISOString().split('T')[0];
-      const endString = end.toISOString().split('T')[0];
-      
-      newMarked[startString] = { ...newMarked[startString], startingDay: true };
-      newMarked[endString] = { ...newMarked[endString], endingDay: true };
-
-      setPeriod({ startingDay: {dateString: startString, day: start.getDate(), month: start.getMonth()+1, year: start.getFullYear(), timestamp: start.getTime()}, endingDay: {dateString: endString, day: end.getDate(), month: end.getMonth()+1, year: end.getFullYear(), timestamp: end.getTime()} });
-      setMarkedDates(newMarked);
+      setPeriodRange({ startDate: start, endDate: end });
     }
   };
 
+  const markedDates = useMemo(() => {
+    const marked: { [key: string]: any } = {};
+    if (periodRange.startDate) {
+      let start = new Date(periodRange.startDate + 'T00:00:00'); // Ensure local time
+      let end = periodRange.endDate ? new Date(periodRange.endDate + 'T00:00:00') : start;
+
+      for (let d = start; d <= end; d.setDate(d.getDate() + 1)) {
+        const dateString = d.toISOString().split('T')[0];
+        marked[dateString] = {
+          color: theme.colors.primary,
+          textColor: theme.colors.primaryForeground,
+          startingDay: dateString === periodRange.startDate,
+          endingDay: dateString === periodRange.endDate,
+        };
+      }
+    }
+    return marked;
+  }, [periodRange]);
+
   const handleSave = () => {
-    setIsLoading(true);
-    // Mock API call
-    setTimeout(() => {
-      setIsLoading(false);
-      navigation.goBack();
-    }, 1500);
+    if (!periodRange.startDate) {
+      Alert.alert('Incomplete', 'Please select a start date.');
+      return;
+    }
+    const payload: CreateMenstrualLogPayload = {
+      startDate: periodRange.startDate,
+      // The backend expects an end date. If only one day is selected, start and end are the same.
+      endDate: periodRange.endDate || periodRange.startDate, 
+    };
+    submitPeriodLog(payload);
   };
 
   const calendarTheme = {
-    backgroundColor: theme.colors.card,
+    backgroundColor: theme.colors.background,
     calendarBackground: theme.colors.background,
     selectedDayBackgroundColor: theme.colors.primary,
     todayTextColor: theme.colors.primary,
     dotColor: theme.colors.primary,
     arrowColor: theme.colors.primary,
-    monthTextColor: theme.colors.foreground,
+    monthTextColor: theme.colors.secondary,
     textSectionTitleColor: theme.colors.mutedForeground,
     dayTextColor: theme.colors.foreground,
     textDisabledColor: theme.colors.muted,
-    'stylesheet.calendar.header': {
-      week: {
-        marginTop: theme.spacing.sm,
-        flexDirection: 'row',
-        justifyContent: 'space-between'
-      }
-    },
     textDayFontFamily: theme.typography.fontFamily,
     textMonthFontFamily: theme.typography.fontFamilyBold,
     textDayHeaderFontFamily: theme.typography.fontFamilyMedium,
@@ -87,8 +90,14 @@ const LogPeriodScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Log Your Period</Text>
-      <Text style={styles.subtitle}>Select the start and end dates of your last period.</Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color={theme.colors.secondary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Log Your Period</Text>
+      </View>
+
+      <Text style={styles.subtitle}>Select the start and end dates of your cycle.</Text>
       
       <Calendar
         onDayPress={onDayPress}
@@ -98,12 +107,12 @@ const LogPeriodScreen = () => {
         style={styles.calendar}
       />
       
-      <TouchableOpacity style={styles.button} onPress={handleSave} disabled={isLoading || !period.endingDay}>
-        {isLoading ? (
-          <ActivityIndicator color={theme.colors.primaryForeground} />
-        ) : (
-          <Text style={styles.buttonText}>Save Period</Text>
-        )}
+      <TouchableOpacity 
+        style={[styles.button, (isPending || !periodRange.startDate) && styles.buttonDisabled]} 
+        onPress={handleSave} 
+        disabled={isPending || !periodRange.startDate}
+      >
+        {isPending ? <ActivityIndicator color={theme.colors.primaryForeground} /> : <Text style={styles.buttonText}>Save Period</Text>}
       </TouchableOpacity>
     </View>
   );
@@ -114,16 +123,23 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
     padding: theme.spacing.lg,
+    paddingTop: theme.spacing.xl * 2,
   },
-  title: {
-    ...theme.typography.h1,
-    color: theme.colors.foreground,
-    marginBottom: theme.spacing.xs,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  headerTitle: {
+    ...theme.typography.h2,
+    color: theme.colors.secondary,
+    marginLeft: theme.spacing.md,
   },
   subtitle: {
     ...theme.typography.body,
     color: theme.colors.mutedForeground,
     marginBottom: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.md,
   },
   calendar: {
     borderRadius: theme.radius.lg,
@@ -136,6 +152,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     height: 50,
+  },
+  buttonDisabled: {
+    backgroundColor: theme.colors.muted,
   },
   buttonText: {
     ...theme.typography.h4,

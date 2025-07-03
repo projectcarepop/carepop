@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions, Modal, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Feather as Icon } from '@expo/vector-icons';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
@@ -7,40 +7,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../../components/theme';
 
-import { getHealthLogSummary, getAiInsight, createMenstrualLog } from '../../services/api';
-import type { HealthLogSummary, AIInsight, CreateHealthLogPayload } from '../../lib/types';
-import { HealthBuddyStackParamList } from '../../navigation/AppDrawerNavigator'; // Adjust this import to your actual navigator types
+import { getHealthLogSummary, getAiInsight } from '../../services/api';
+import type { HealthLogSummary, AIInsight } from '../../lib/types';
+import { HealthBuddyStackParamList } from '../../navigation/AppDrawerNavigator';
 
 import AiInsightModal from '../../components/health-buddy/AiInsightModal';
-import LogPeriodForm, { PeriodFormData } from '../../components/health-buddy/LogPeriodForm';
-
-// --- Mock Data ---
-const mockSummary: HealthLogSummary = {
-  frequentSymptoms: [
-    { symptom: 'Headache', count: 4 },
-    { symptom: 'Fatigue', count: 5 },
-    { symptom: 'Nausea', count: 2 },
-    { symptom: 'Bloating', count: 3 },
-  ],
-};
-
-const mockAiInsight: AIInsight = {
-    insight: "We've noticed a pattern of headaches and fatigue. Consider discussing this with your provider. Remember to stay hydrated and get plenty of rest!"
-}
-
-type ActiveModal = 'period' | null;
-
-type HealthBuddyNavigationProp = NativeStackNavigationProp<HealthBuddyStackParamList, 'HealthBuddyDashboard'>;
 
 const HealthBuddyDashboardScreen = () => {
   const queryClient = useQueryClient();
-  const navigation = useNavigation<HealthBuddyNavigationProp>();
+  const navigation = useNavigation<NativeStackNavigationProp<HealthBuddyStackParamList>>();
 
-  const [activeModal, setActiveModal] = useState<ActiveModal>(null);
-  const [isFabMenuOpen, setIsFabMenuOpen] = useState(false);
   const [isInsightModalVisible, setIsInsightModalVisible] = useState(false);
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
-  const [headerHeight, setHeaderHeight] = useState(0);
   
   const { data: summary, isLoading: isLoadingSummary } = useQuery<HealthLogSummary>({
     queryKey: ['healthLogSummary'],
@@ -50,21 +28,9 @@ const HealthBuddyDashboardScreen = () => {
   const { mutate: fetchAiInsight, data: aiInsight, isPending: isFetchingInsight } = useMutation<AIInsight>({
     mutationFn: getAiInsight,
     onSuccess: () => setIsInsightModalVisible(true),
-    onError: () => setIsInsightModalVisible(true), // Show mock on error for demo
+    onError: () => setIsInsightModalVisible(true), 
   });
   
-  const { mutate: submitPeriod, isPending: isSubmittingPeriod } = useMutation({
-      mutationFn: (data: PeriodFormData) => createMenstrualLog(data),
-      onSuccess: () => {
-          Alert.alert('Success', 'Your period has been logged.');
-          setActiveModal(null);
-          queryClient.invalidateQueries({ queryKey: ['healthLogSummary'] });
-      },
-      onError: (error) => {
-          Alert.alert('Error', `Could not save your log: ${error.message}`);
-      },
-  });
-
   const moods = [
     { icon: 'smile', label: 'Happy' },
     { icon: 'meh', label: 'Neutral' },
@@ -73,47 +39,16 @@ const HealthBuddyDashboardScreen = () => {
     { icon: 'activity', label: 'Stressed' },
   ];
 
-  const handleFabMenuPress = (modal: ActiveModal) => {
-    setActiveModal(modal);
-    setIsFabMenuOpen(false);
-  };
-
   return (
     <View style={styles.screenContainer}>
         <ScrollView style={styles.container}>
-            <View 
-                style={styles.header}
-                onLayout={(event) => {
-                    setHeaderHeight(event.nativeEvent.layout.height);
-                }}
-            >
+            <View style={styles.header}>
                 <View>
                     <Text style={styles.headerTitle}>Health Buddy</Text>
                     <Text style={styles.headerSubtitle}>Your personal health companion</Text>
                 </View>
-                <TouchableOpacity style={styles.fab} onPress={() => setIsFabMenuOpen(!isFabMenuOpen)}>
-                    <Icon name={isFabMenuOpen ? "x" : "plus"} size={24} color={theme.colors.primaryForeground} />
-                </TouchableOpacity>
             </View>
-
-            {isFabMenuOpen && (
-            <View style={[styles.fabMenu, { top: headerHeight }]}>
-                <TouchableOpacity style={styles.fabMenuItem} onPress={() => navigation.navigate('LogSymptoms')}>
-                <Text style={styles.fabMenuText}>Log Symptoms</Text>
-                <View style={[styles.fabIconContainer, { backgroundColor: theme.colors.secondary}]}>
-                    <Icon name="thermometer" size={24} color={theme.colors.secondaryForeground} />
-                </View>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.fabMenuItem} onPress={() => handleFabMenuPress('period')}>
-                <Text style={styles.fabMenuText}>Log Period</Text>
-                <View style={[styles.fabIconContainer, { backgroundColor: theme.colors.secondary}]}>
-                    <Icon name="droplet" size={24} color={theme.colors.secondaryForeground} />
-                </View>
-                </TouchableOpacity>
-            </View>
-            )}
-
-            {/* Mood Selector Card */}
+            
             <View style={styles.card}>
                 <Text style={styles.cardTitle}>How are you feeling today?</Text>
                 <Text style={styles.cardInstruction}>Select a mood to quickly log how you feel.</Text>
@@ -129,7 +64,6 @@ const HealthBuddyDashboardScreen = () => {
                 </ScrollView>
             </View>
 
-            {/* Symptoms Summary Card */}
             <View style={styles.card}>
                 <Text style={styles.cardTitle}>Your Week in Symptoms</Text>
                 <Text style={styles.cardInstruction}>Here are the symptoms you&apos;ve logged most frequently this week.</Text>
@@ -153,7 +87,22 @@ const HealthBuddyDashboardScreen = () => {
                 )}
             </View>
 
-            {/* AI Insight Card */}
+            {/* --- Side-by-side Buttons --- */}
+            <View style={styles.actionButtonContainer}>
+                <TouchableOpacity 
+                    style={styles.actionButton} 
+                    onPress={() => navigation.navigate('LogSymptoms')}>
+                    <Icon name="plus" size={16} color={theme.colors.primary} />
+                    <Text style={styles.actionButtonText}>Log Symptoms</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                    style={styles.actionButton}
+                    onPress={() => navigation.navigate('LogPeriod')}>
+                    <Icon name="plus" size={16} color={theme.colors.primary} />
+                    <Text style={styles.actionButtonText}>Log Flow</Text>
+                </TouchableOpacity>
+            </View>
+
             <TouchableOpacity style={[styles.card, styles.aiCard]} onPress={() => fetchAiInsight()}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Ionicons name="sparkles" size={24} color={theme.colors.accentForeground} style={{ marginRight: theme.spacing.lg }} />
@@ -167,28 +116,7 @@ const HealthBuddyDashboardScreen = () => {
             <View style={{ height: 120 }} />
         </ScrollView>
 
-        {/* Modals */}
-        {isInsightModalVisible && <AiInsightModal visible={isInsightModalVisible} insight={aiInsight?.insight || mockAiInsight.insight} onClose={() => setIsInsightModalVisible(false)} />}
-        <Modal
-            animationType="slide"
-            transparent={true}
-            visible={activeModal !== null}
-            onRequestClose={() => setActiveModal(null)}
-        >
-            <View style={styles.modalBackdrop}>
-                <View style={styles.modalContainer}>
-                    <TouchableOpacity style={styles.modalCloseButton} onPress={() => setActiveModal(null)}>
-                        <Icon name="x" size={24} color={theme.colors.mutedForeground} />
-                    </TouchableOpacity>
-                    {activeModal === 'period' && (
-                        <LogPeriodForm
-                            onSubmit={submitPeriod}
-                            isSubmitting={isSubmittingPeriod}
-                        />
-                    )}
-                </View>
-            </View>
-        </Modal>
+        {isInsightModalVisible && <AiInsightModal visible={isInsightModalVisible} insight={aiInsight?.insight || "An error occurred, but here's a general tip: Stay hydrated!"} onClose={() => setIsInsightModalVisible(false)} />}
     </View>
   );
 };
@@ -297,6 +225,28 @@ const styles = StyleSheet.create({
         color: theme.colors.mutedForeground,
         fontFamily: theme.typography.fontFamilyMedium,
     },
+    actionButtonContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginHorizontal: -theme.spacing.sm, // Counteract button margin
+        marginBottom: theme.spacing.lg,
+    },
+    actionButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: theme.colors.muted,
+        padding: theme.spacing.md,
+        borderRadius: theme.radius.md,
+        marginHorizontal: theme.spacing.sm,
+    },
+    actionButtonText: {
+        color: theme.colors.primary,
+        ...theme.typography.body,
+        fontFamily: theme.typography.fontFamilySemiBold,
+        marginLeft: theme.spacing.sm,
+    },
     aiCard: {
         backgroundColor: theme.colors.secondary,
         padding: theme.spacing.lg,
@@ -310,72 +260,6 @@ const styles = StyleSheet.create({
         color: theme.colors.accentForeground,
         opacity: 0.9,
         marginTop: theme.spacing.xs,
-    },
-    fab: {
-        backgroundColor: theme.colors.secondary,
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        justifyContent: 'center',
-        alignItems: 'center',
-        elevation: 8,
-        shadowColor: theme.colors.secondary,
-    },
-    fabMenu: {
-        position: 'absolute',
-        right: 0,
-        zIndex: 10,
-        alignItems: 'flex-end',
-        marginBottom: theme.spacing.lg,
-    },
-    fabMenuItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    fabMenuText: {
-        ...theme.typography.h4,
-        color: theme.colors.secondary,
-        backgroundColor: theme.colors.card,
-        paddingHorizontal: theme.spacing.md,
-        paddingVertical: theme.spacing.sm,
-        borderRadius: theme.radius.md,
-        marginRight: theme.spacing.md,
-        elevation: 5,
-        shadowColor: theme.colors.secondary,
-    },
-    fabIconContainer: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        justifyContent: 'center',
-        alignItems: 'center',
-        elevation: 5,
-        shadowColor: theme.colors.secondary,
-    },
-    modalBackdrop: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    modalContainer: {
-        backgroundColor: 'white',
-        borderRadius: 20,
-        paddingVertical: theme.spacing.lg,
-        margin: 24,
-        width: '90%',
-        maxHeight: '85%',
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-        elevation: 5
-    },
-    modalCloseButton: {
-        position: 'absolute',
-        top: theme.spacing.md,
-        right: theme.spacing.md,
-        zIndex: 1,
     },
 });
 

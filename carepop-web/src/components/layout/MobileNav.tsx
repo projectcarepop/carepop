@@ -34,10 +34,10 @@ export default function MobileNav({ user }: { user: User | null }) {
             <Link href="/contact">Contact Us</Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild className="hover:bg-transparent focus:bg-transparent hover:text-primary focus:text-primary font-medium">
-            <Link href="/book-service">Book a Service</Link>
+            <Link href="/book-appointment">Book a Service</Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild className="hover:bg-transparent focus:bg-transparent hover:text-primary focus:text-primary font-medium">
-            <Link href="/clinic-finder">Find a Clinic</Link>
+            <Link href="/find-a-clinic">Find a Clinic</Link>
           </DropdownMenuItem>
           
           {user && (

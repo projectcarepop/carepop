@@ -223,14 +223,16 @@ export const createHealthLog = async (payload: CreateHealthLogPayload): Promise<
 /**
  * Creates a new menstrual cycle log for the authenticated user.
  */
-export const createMenstrualLog = async (payload: CreateMenstrualLogPayload): Promise<MenstrualLog> => {
-  // Assuming a backend endpoint like '/api/me/menstrual-logs'
-  // This will need to be created in the backend.
+export async function createMenstrualLog(logData: { startDate: string; endDate?: string }): Promise<MenstrualLog> {
+  const payload = {
+    start_date: logData.startDate,
+    end_date: logData.endDate || logData.startDate, // Ensure end_date is always sent
+  };
   return apiFetch<MenstrualLog>('/api/me/menstrual-logs', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
-};
+}
 
 /**
  * Fetches all health logs for the authenticated user.

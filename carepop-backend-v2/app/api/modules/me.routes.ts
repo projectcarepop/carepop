@@ -7,6 +7,7 @@ import { appointments, doctors, clinics, services, medicalRecords, recordDoctorN
 import { and, eq, gte } from 'drizzle-orm';
 import { authMiddleware, AuthEnv } from '../middleware/auth';
 import { generativeModel } from '../../../src/services/vertex-ai';
+import type { InferInsertModel } from 'drizzle-orm';
 
 const meRoutes = new Hono<AuthEnv>();
 
@@ -327,11 +328,11 @@ const createHealthLogSchema = z.object({
   notes: z.string().nullable(), // Allow null for notes
 });
 
-// Zod schema for menstrual logs
-const createMenstrualLogSchema = z.object({
-  startDate: z.string().datetime(),
-  endDate: z.string().datetime(),
-  notes: z.string().optional(),
+// "Golden Standard" Zod Schema for Menstrual Logs
+export const menstrualLogSchema = z.object({
+  // Dates should be received as strings in YYYY-MM-DD format
+  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid start date format. Use YYYY-MM-DD."),
+  end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid end date format. Use YYYY-MM-DD."),
 });
 
 /**
@@ -357,9 +358,9 @@ meRoutes.post(
         })
         .returning();
       return c.json(newLog, 201);
-    } catch (error) {
+    } catch (error: any) {
       console.error("CRASH in /health-logs:", error);
-      return c.json({ error: 'Failed to save health log' }, 500);
+      return c.json({ error: 'Failed to save health log', message: error.message }, 500);
     }
   }
 );
@@ -458,24 +459,27 @@ meRoutes.get('/ai/insight', async (c) => {
  * POST /me/menstrual-logs
  * Creates a new menstrual cycle log for the authenticated user.
  */
-meRoutes.post('/menstrual-logs', zValidator('json', createMenstrualLogSchema), async (c) => {
+meRoutes.post('/menstrual-logs', zValidator('json', menstrualLogSchema), async (c) => {
   const user = c.get('user');
-  const logData = c.req.valid('json');
+  const { start_date, end_date } = c.req.valid('json');
+  const userId = user?.id;
+
+  if (!userId) {
+      return c.json({ error: 'User not authenticated' }, 401);
+  }
 
   try {
-    const [newLog] = await db
-      .insert(menstrualLogs)
-      .values({
-        patientId: user.id,
-        startDate: logData.startDate,
-        endDate: logData.endDate,
-        notes: logData.notes,
-      })
-      .returning();
-    return c.json(newLog, 201);
-  } catch (error) {
-    console.error("CRASH in /menstrual-logs:", error);
-    return c.json({ error: 'Failed to save menstrual log' }, 500);
+    const [newLog] = await db.insert(menstrualLogs).values({
+        patientId: userId,
+        startDate: start_date,
+        endDate: end_date,
+    }).returning();
+    
+    return c.json({ data: newLog }, 201);
+
+  } catch (error: any) {
+      console.error('Error in menstrual log creation:', error);
+      return c.json({ error: 'Failed to save menstrual log', message: error.message }, 500);
   }
 });
 

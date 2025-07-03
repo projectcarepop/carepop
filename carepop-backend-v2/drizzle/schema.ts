@@ -230,9 +230,9 @@ export const healthLogs = pgTable("health_logs", {
 
 export const menstrualLogs = pgTable("menstrual_logs", {
 	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
-	patientId: uuid("patient_id").notNull().references(() => profiles.id, { onDelete: 'cascade' }),
-	startDate: timestamp("start_date", { withTimezone: true, mode: 'string' }).notNull(),
-	endDate: timestamp("end_date", { withTimezone: true, mode: 'string' }).notNull(),
+	patientId: uuid("patient_id").notNull().references(() => profiles.id, { onDelete: 'cascade' } ),
+	startDate: date("start_date", { mode: 'string' }).notNull(),
+	endDate: date("end_date", { mode: 'string' }).notNull(),
 	notes: text("notes"),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 });
