@@ -1,107 +1,128 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DataTable } from '@/components/ui/data-table';
-import { columns, type InventoryItem } from './columns';
+import { columns } from './columns';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { getAdminClinics, getInventoryForClinic } from '@/services/api';
 
-// This is a placeholder for the actual clinic type
-type Clinic = {
-    id: string;
-    name: string;
-};
-
-interface InventoryClientProps {
-    // We will pass the initial list of clinics from the server component
-    clinics: Clinic[];
+interface Clinic {
+  id: string;
+  name: string;
 }
 
-export default function InventoryClient({ clinics }: InventoryClientProps) {
+interface InventoryItem {
+    id: string;
+    name: string;
+    // This can be expanded based on the `columns.tsx` definition
+}
+
+export default function InventoryClient() {
     const { session } = useAuth();
-    const [selectedClinicId, setSelectedClinicId] = useState<string | null>(null);
-    const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+    const [clinics, setClinics] = useState<Clinic[]>([]);
+    const [selectedClinic, setSelectedClinic] = useState<string | null>(null);
+    const [inventory, setInventory] = useState<InventoryItem[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [globalFilter, setGlobalFilter] = useState('');
+    const [error, setError] = useState<string | null>(null);
 
-    const handleClinicChange = async (clinicId: string) => {
-        if (!session) return;
-        
-        setSelectedClinicId(clinicId);
-        setIsLoading(true);
-
-        try {
-            const response = await fetch(`/api/admin/clinics/${clinicId}/inventory`, {
-                headers: {
-                    'Authorization': `Bearer ${session.access_token}`
+    useEffect(() => {
+        if (session?.access_token) {
+            const fetchClinics = async () => {
+                try {
+                    const fetchedClinics = await getAdminClinics(session.access_token);
+                    setClinics(fetchedClinics);
+                    if (fetchedClinics.length > 0 && !selectedClinic) {
+                        setSelectedClinic(fetchedClinics[0].id);
+                    }
+                } catch (err: any) {
+                    setError(err.message || 'Failed to fetch clinics');
                 }
-            });
-            if (!response.ok) {
-                throw new Error('Failed to fetch inventory data');
-            }
-            const data = await response.json();
-            setInventoryItems(data.data || []);
-        } catch (error) {
-            console.error(error);
-            // Handle error state in UI
-            setInventoryItems([]);
-        } finally {
-            setIsLoading(false);
+            };
+            fetchClinics();
         }
+    }, [session, selectedClinic]);
+
+    useEffect(() => {
+        const fetchInventory = async () => {
+            if (selectedClinic && session?.access_token) {
+                setIsLoading(true);
+                setError(null);
+                try {
+                    const data = await getInventoryForClinic(selectedClinic, session.access_token);
+                    setInventory(data);
+                } catch (err: any) {
+                    setError(err.message || "Failed to fetch inventory.");
+                } finally {
+                    setIsLoading(false);
+                }
+            } else {
+                setInventory([]); 
+            }
+        };
+
+        fetchInventory();
+    }, [selectedClinic, session]);
+
+
+    const handleClinicChange = (clinicId: string) => {
+        setSelectedClinic(clinicId);
     };
+    
+    // TODO: Implement these functions
+    const handleAddItem = () => console.log("Add new item");
+    const handleEditItem = (itemId: string) => console.log("Edit item:", itemId);
+    const handleDeleteItem = (itemId: string) => console.log("Delete item:", itemId);
+    const handleViewBatches = (itemId: string) => console.log("View batches for item:", itemId);
+
+    if (!session) {
+        return <p>Loading session...</p>;
+    }
 
     return (
-        <div className="p-4 sm:p-6 lg:p-8 space-y-6">
-            <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold tracking-tight">Inventory Management</h1>
-                {selectedClinicId && (
-                    <Button>Add Stock</Button>
-                )}
-            </div>
-            
+        <div className="space-y-6">
             <Card>
                 <CardHeader>
-                    <CardTitle>Select a Clinic</CardTitle>
+                    <CardTitle>Inventory Management</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                        Select a clinic to view and manage its inventory.
+                    </p>
                 </CardHeader>
-                <CardContent>
-                    <Select onValueChange={handleClinicChange} disabled={!session}>
-                        <SelectTrigger className="w-full md:w-1/3">
-                            <SelectValue placeholder="Select a clinic to view its inventory" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {clinics.map((clinic) => (
-                                <SelectItem key={clinic.id} value={clinic.id}>
-                                    {clinic.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                <CardContent className="space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <Select onValueChange={handleClinicChange} value={selectedClinic ?? ""}>
+                            <SelectTrigger className="w-full sm:w-[300px]">
+                                <SelectValue placeholder="Select a clinic..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {clinics.map((clinic) => (
+                                    <SelectItem key={clinic.id} value={clinic.id}>
+                                        {clinic.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Button onClick={handleAddItem} disabled={!selectedClinic}>
+                            Add New Item
+                        </Button>
+                    </div>
+
+                    {error && <p className="text-red-500">{error}</p>}
                 </CardContent>
             </Card>
 
-            {selectedClinicId && (
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                        <CardTitle>Clinic Stock</CardTitle>
-                        <div className="w-full max-w-sm">
-                            <Input 
-                                placeholder="Filter products..."
-                                value={globalFilter}
-                                onChange={(e) => setGlobalFilter(e.target.value)}
-                            />
-                        </div>
+            {selectedClinic && (
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>Inventory Items</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <DataTable 
-                            columns={columns} 
-                            data={inventoryItems} 
-                            isLoading={isLoading}
-                            filterColumn="product.name"
-                            globalFilter={globalFilter}
-                            setGlobalFilter={setGlobalFilter}
+                            columns={columns({ onEdit: handleEditItem, onDelete: handleDeleteItem, onViewBatches: handleViewBatches })} 
+                            data={inventory}
+                            isLoading={isLoading} 
                         />
                     </CardContent>
                 </Card>

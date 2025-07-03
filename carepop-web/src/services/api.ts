@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/server';
 export type AdminUser = {
   id: string;
   email?: string;
-  role: 'admin' | 'patient';
+  role: 'admin' | 'patient' | 'manager'; // Added manager
   fullName?: string | null;
   // Add other fields as necessary from your 'get_all_users_with_roles' RPC or profiles table
 };
@@ -22,7 +22,7 @@ if (rawApiUrl && !rawApiUrl.startsWith('http')) {
 if (rawApiUrl.endsWith('/')) {
   rawApiUrl = rawApiUrl.slice(0, -1);
 }
-const API_BASE_URL = rawApiUrl;
+export const API_BASE_URL = rawApiUrl;
 
 // It is intended for CLIENT-SIDE use only.
 async function getAuthHeaders(accessToken: string) {
@@ -221,7 +221,7 @@ export async function getSingleMedicalRecord(recordId: string, accessToken: stri
     return response.json();
 }
 
-// --- Admin Service (Requires Admin Role) ---
+// --- Admin Service (Requires Admin/Manager Role) ---
 // The functions in this section are designed for both client-side and server-side usage.
 // When calling from a server component, pass the access token directly.
 // When calling from a client component, get the token from the session context.
@@ -250,52 +250,33 @@ export async function getAdminAppointments(accessToken: string, filters?: Record
       throw new Error(error.message || 'Failed to fetch appointments.');
   }
   const result = await response.json();
-  // FIX: The backend returns data nested under a 'data' property.
   return result.data || [];
 }
 
 export async function getAppointmentDetails(appointmentId: string, accessToken: string) {
+  const headers = await getAuthHeaders(accessToken);
+  const url = `${API_BASE_URL}/api/admin/appointments/${appointmentId}`;
+  const response = await fetch(url, { headers, cache: 'no-store' });
+
+  if (!response.ok) {
+    if (response.status === 404) return null;
+    const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
+    throw new Error(error.message || `Failed to fetch details for appointment ${appointmentId}.`);
+  }
+  return response.json();
+}
+
+export async function getAdminClinics(accessToken: string) {
   const headers = {
     'Authorization': `Bearer ${accessToken}`,
     'Content-Type': 'application/json'
   };
-  const url = `${API_BASE_URL}/api/admin/appointments/${appointmentId}`;
-
-  const response = await fetch(url, { headers, cache: 'no-store' });
+  const response = await fetch(`${API_BASE_URL}/api/admin/clinics`, { headers, cache: 'no-store' });
   if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-      throw new Error(error.message || `Failed to fetch details for appointment ${appointmentId}.`);
+      throw new Error('Failed to fetch clinics.');
   }
   const result = await response.json();
-  return result.data; // The backend wraps this response in a 'data' property
-}
-
-export async function getAdminProducts(accessToken: string) {
-    const headers = {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    };
-    const response = await fetch(`${API_BASE_URL}/api/admin/products`, { headers, cache: 'no-store' });
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-        throw new Error(error.message || 'Failed to fetch products.');
-    }
-    const result = await response.json();
-    return result.data || [];
-}
-
-export async function getAdminClinics(accessToken: string) {
-    const headers = {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    };
-    const response = await fetch(`${API_BASE_URL}/api/admin/clinics`, { headers, cache: 'no-store' });
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-        throw new Error(error.message || 'Failed to fetch clinics.');
-    }
-    const result = await response.json();
-    return result.data || [];
+  return result.data || [];
 }
 
 export async function getAdminDoctors(accessToken: string) {
@@ -421,52 +402,76 @@ export async function upsertClinic(clinicData: any, accessToken: string, clinicI
     return response.json();
 }
 
-export async function getAdminProductCategories(accessToken: string) {
-    const headers = await getAuthHeaders(accessToken);
-    const response = await fetch(`${API_BASE_URL}/api/admin/product-categories`, { headers });
-    if (!response.ok) throw new Error("Failed to fetch product categories.");
-    const result = await response.json();
-    return result.data;
-}
+// --- NEW: Inventory & Product Category Service (Admin/Manager only) ---
 
-export async function upsertProduct(productData: any, accessToken: string, productId?: string) {
+export async function getProductCategories(accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
-    const url = productId ? `${API_BASE_URL}/api/admin/products/${productId}` : `${API_BASE_URL}/api/admin/products`;
-    const method = productId ? 'PUT' : 'POST';
-
-    const response = await fetch(url, { method, headers, body: JSON.stringify(productData) });
+    const response = await fetch(`${API_BASE_URL}/api/admin/product-categories`, { headers, cache: 'no-store' });
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-        throw new Error(error.message || `Failed to ${method === 'POST' ? 'create' : 'update'} product.`);
+        const error = await response.json().catch(() => ({ message: 'Failed to fetch product categories' }));
+        throw new Error(error.message);
     }
-    return response.json();
+    const result = await response.json();
+    return result.data || [];
 }
 
-export async function upsertProductCategory(categoryData: any, accessToken: string, categoryId?: string) {
+export async function upsertProductCategory(categoryData: { name: string; description?: string }, accessToken: string, categoryId?: string) {
     const headers = await getAuthHeaders(accessToken);
-    const url = categoryId ? `${API_BASE_URL}/api/admin/product-categories/${categoryId}` : `${API_BASE_URL}/api/admin/product-categories`;
+    const url = categoryId
+        ? `${API_BASE_URL}/api/admin/product-categories/${categoryId}`
+        : `${API_BASE_URL}/api/admin/product-categories`;
     const method = categoryId ? 'PUT' : 'POST';
 
     const response = await fetch(url, { method, headers, body: JSON.stringify(categoryData) });
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-        throw new Error(error.message || `Failed to ${method === 'POST' ? 'create' : 'update'} category.`);
+        const error = await response.json().catch(() => ({ message: 'Failed to save product category' }));
+        throw new Error(error.message);
     }
     return response.json();
 }
 
-export async function updateStock(productId: string, quantity: number, accessToken: string) {
+export async function deleteProductCategory(categoryId: string, accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
-    const url = `${API_BASE_URL}/api/admin/inventory/${productId}`;
-    const payload = { quantityOnHand: quantity };
-    const response = await fetch(url, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(payload)
-    });
+    const response = await fetch(`${API_BASE_URL}/api/admin/product-categories/${categoryId}`, { method: 'DELETE', headers });
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-        throw new Error(error.message || 'Failed to update stock.');
+        const error = await response.json().catch(() => ({ message: 'Failed to delete product category' }));
+        throw new Error(error.message);
+    }
+    return response.json();
+}
+
+export async function getInventoryForClinic(clinicId: string, accessToken: string) {
+    const headers = await getAuthHeaders(accessToken);
+    const response = await fetch(`${API_BASE_URL}/api/admin/clinics/${clinicId}/inventory`, { headers, cache: 'no-store' });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: `Failed to fetch inventory for clinic ${clinicId}` }));
+        throw new Error(error.message);
+    }
+    const result = await response.json();
+    return result.data || [];
+}
+
+export async function upsertInventoryItem(itemData: any, accessToken: string, itemId?: string) {
+    const headers = await getAuthHeaders(accessToken);
+    const url = itemId 
+        ? `${API_BASE_URL}/api/admin/inventory-items/${itemId}`
+        : `${API_BASE_URL}/api/admin/inventory-items`;
+    const method = itemId ? 'PUT' : 'POST';
+
+    const response = await fetch(url, { method, headers, body: JSON.stringify(itemData) });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Failed to save inventory item' }));
+        throw new Error(error.message);
+    }
+    return response.json();
+}
+
+export async function deleteInventoryItem(itemId: string, accessToken: string) {
+    const headers = await getAuthHeaders(accessToken);
+    const response = await fetch(`${API_BASE_URL}/api/admin/inventory-items/${itemId}`, { method: 'DELETE', headers });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Failed to delete inventory item' }));
+        throw new Error(error.message);
     }
     return response.json();
 }
@@ -667,7 +672,7 @@ export async function getAdminUsers(accessToken: string): Promise<AdminUser[]> {
 }
 
 export async function updateUserRole(
-  { userId, role }: { userId: string; role: 'patient' | 'admin' },
+  { userId, role }: { userId: string; role: 'patient' | 'admin' | 'manager' }, // added manager
   accessToken: string
 ) {
     const headers = await getAuthHeaders(accessToken);
@@ -726,7 +731,6 @@ export async function deleteClinic(clinicId: string, accessToken: string) {
         const error = await response.json().catch(() => ({ message: "An unknown error occurred" }));
         throw new Error(error.message || `Failed to delete clinic`);
     }
-    // The backend now returns a JSON object. We must parse it.
     return response.json();
 }
 
@@ -742,32 +746,6 @@ export async function deleteDoctor(doctorId: string, accessToken: string) {
     throw new Error(error.message || 'Failed to delete doctor.');
   }
   return response.json();
-}
-
-export async function deleteProduct(productId: string, accessToken: string) {
-    const headers = await getAuthHeaders(accessToken);
-    const response = await fetch(`${API_BASE_URL}/api/admin/products/${productId}`, {
-        method: 'DELETE',
-        headers,
-    });
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-        throw new Error(error.message || 'Failed to delete product.');
-    }
-    return response.json();
-}
-
-export async function deleteProductCategory(categoryId: string, accessToken: string) {
-    const headers = await getAuthHeaders(accessToken);
-    const response = await fetch(`${API_BASE_URL}/api/admin/product-categories/${categoryId}`, {
-        method: 'DELETE',
-        headers,
-    });
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-        throw new Error(error.message || 'Failed to delete product category.');
-    }
-    return response.json();
 }
 
 type NotePayload = { recordType: 'DOCTOR_NOTE'; details: { note: string } };
@@ -798,12 +776,10 @@ export async function addMedicalRecord(appointmentId: string, payload: MedicalRe
 export async function uploadDocument(appointmentId: string, documentName: string, file: File, token: string) {
   const formData = new FormData();
   formData.append('documentName', documentName);
-  formData.append('document', file); // The key 'document' must match the backend's c.req.parseBody() expectation
+  formData.append('document', file);
 
   const headers = {
     'Authorization': `Bearer ${token}`,
-    // DO NOT set 'Content-Type': 'multipart/form-data'. 
-    // The browser will do it automatically with the correct boundary.
   };
 
   const url = `${API_BASE_URL}/api/admin/appointments/${appointmentId}/documents`;
