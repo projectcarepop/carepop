@@ -4,30 +4,49 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DataTable } from '@/components/ui/data-table';
-import { columns } from './columns';
+import { columns, InventoryItem } from './columns';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { Button } from '@/components/ui/button';
-import { getAdminClinics, getInventoryForClinic } from '@/services/api';
+import { getAdminClinics, getInventoryForClinic, upsertInventoryItem } from '@/services/api';
+import { useToast } from "@/components/ui/use-toast"
+import UpsertInventoryItemModal from './UpsertInventoryItemModal';
 
 interface Clinic {
   id: string;
   name: string;
 }
 
-interface InventoryItem {
-    id: string;
-    name: string;
-    // This can be expanded based on the `columns.tsx` definition
-}
-
 export default function InventoryClient() {
     const { session } = useAuth();
+    const { toast } = useToast();
     const [clinics, setClinics] = useState<Clinic[]>([]);
     const [selectedClinic, setSelectedClinic] = useState<string | null>(null);
     const [inventory, setInventory] = useState<InventoryItem[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // Modal State
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+
+    const fetchInventory = async () => {
+        if (selectedClinic && session?.access_token) {
+            setIsLoading(true);
+            setError(null);
+            try {
+                const data = await getInventoryForClinic(selectedClinic, session.access_token);
+                setInventory(data);
+            } catch (err: any) {
+                setError(err.message || "Failed to fetch inventory.");
+            } finally {
+                setIsLoading(false);
+            }
+        } else {
+            setInventory([]); 
+        }
+    };
+    
     useEffect(() => {
         if (session?.access_token) {
             const fetchClinics = async () => {
@@ -46,36 +65,62 @@ export default function InventoryClient() {
     }, [session, selectedClinic]);
 
     useEffect(() => {
-        const fetchInventory = async () => {
-            if (selectedClinic && session?.access_token) {
-                setIsLoading(true);
-                setError(null);
-                try {
-                    const data = await getInventoryForClinic(selectedClinic, session.access_token);
-                    setInventory(data);
-                } catch (err: any) {
-                    setError(err.message || "Failed to fetch inventory.");
-                } finally {
-                    setIsLoading(false);
-                }
-            } else {
-                setInventory([]); 
-            }
-        };
-
         fetchInventory();
     }, [selectedClinic, session]);
 
-
-    const handleClinicChange = (clinicId: string) => {
-        setSelectedClinic(clinicId);
+    const handleAddItem = () => {
+        setEditingItem(null);
+        setIsModalOpen(true);
     };
-    
-    // TODO: Implement these functions
-    const handleAddItem = () => console.log("Add new item");
-    const handleEditItem = (item: InventoryItem) => console.log("Edit item:", item.id);
-    const handleDeleteItem = (item: InventoryItem) => console.log("Delete item:", item.id);
-    const handleViewBatches = (item: InventoryItem) => console.log("View batches for item:", item.id);
+
+    const handleEditItem = (item: InventoryItem) => {
+        setEditingItem(item);
+        setIsModalOpen(true);
+    };
+
+    const handleDeleteItem = (item: InventoryItem) => {
+        // TODO: Implement delete functionality
+        console.log("Delete item:", item.id);
+    };
+
+    const handleViewBatches = (item: InventoryItem) => {
+        console.log("View batches for item:", item.id);
+    };
+
+    const handleSubmit = async (values: any) => {
+        if (!selectedClinic || !session?.access_token) {
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Cannot save item. No clinic selected or not authenticated.",
+            });
+            return;
+        }
+        setIsSubmitting(true);
+        try {
+            const payload = {
+                ...values,
+                clinicId: selectedClinic,
+                // The API expects productCategoryId, which we don't have a form field for yet.
+                // This will need to be added later. For now, we omit it or handle it in the backend.
+            };
+            await upsertInventoryItem(payload, session.access_token, editingItem?.id);
+            toast({
+                title: "Success",
+                description: `Inventory item has been successfully ${editingItem ? 'updated' : 'added'}.`,
+            });
+            setIsModalOpen(false);
+            fetchInventory(); // Refresh the list
+        } catch (error: any) {
+            toast({
+                variant: "destructive",
+                title: "Failed to save item",
+                description: error.message || "An unknown error occurred.",
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     if (!session) {
         return <p>Loading session...</p>;
@@ -92,7 +137,7 @@ export default function InventoryClient() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <Select onValueChange={handleClinicChange} value={selectedClinic ?? ""}>
+                        <Select onValueChange={setSelectedClinic} value={selectedClinic ?? ""}>
                             <SelectTrigger className="w-full sm:w-[300px]">
                                 <SelectValue placeholder="Select a clinic..." />
                             </SelectTrigger>
@@ -119,14 +164,23 @@ export default function InventoryClient() {
                         <CardTitle>Inventory Items</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <DataTable 
-                            columns={columns({ onEdit: handleEditItem, onDelete: handleDeleteItem, onViewBatches: handleViewBatches })} 
-                            data={inventory}
-                            isLoading={isLoading} 
-                        />
+                    <DataTable 
+    columns={columns({ onEdit: handleEditItem, onDelete: handleDeleteItem, onViewBatches: handleViewBatches })} 
+    data={inventory}
+    isLoading={isLoading} 
+    filterColumn="name"
+/>
                     </CardContent>
                 </Card>
             )}
+
+            <UpsertInventoryItemModal 
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onSubmit={handleSubmit}
+                item={editingItem}
+                isLoading={isSubmitting}
+            />
         </div>
     );
 } 
