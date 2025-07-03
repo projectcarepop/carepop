@@ -6,8 +6,9 @@ import { Button } from '../../src/components/button.native';
 import { theme } from '../../src/components/theme';
 import { AuthStackParamList } from '../../src/navigation/AuthNavigator';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../navigation/AppNavigator';
 
-type OnboardingNavigationProp = NativeStackNavigationProp<AuthStackParamList>;
+type OnboardingNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 // This screen will likely be part of a larger stack that, upon completion,
 // navigates the user to the main app (e.g., Auth or Dashboard).
@@ -18,11 +19,15 @@ export const OnboardingScreenThree = () => {
   const handleGetStarted = async () => {
     try {
       await AsyncStorage.setItem('hasOnboarded', 'true');
+      // The RootAppNavigator will automatically handle the switch to the Auth stack
+      // when the `hasOnboarded` state changes. We can just navigate to the Auth
+      // entry point as a fallback or to trigger the re-render.
+      navigation.replace('Auth');
     } catch (e) {
       console.error('Failed to save onboarding status', e);
+      // Even if it fails, we should still try to navigate.
+      navigation.replace('Auth');
     }
-    // Navigate to the Register screen within the Auth stack
-    navigation.navigate('Register');
   };
 
   return (
