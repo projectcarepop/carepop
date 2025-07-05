@@ -195,47 +195,29 @@ export const productCategories = pgTable("product_categories", {
 	description: text("description"),
 });
 
-export const products = pgTable("products", {
-	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
-	categoryId: uuid("category_id").references(() => productCategories.id, { onDelete: 'set null' }),
-	name: text("name").notNull(),
-	description: text("description"),
-	sku: text("sku").unique(),
-	price: numeric("price", { precision: 10, scale:  2 }).notNull(),
-	requiresPrescription: boolean("requires_prescription").default(false).notNull(),
-	isActive: boolean("is_active").default(true).notNull(),
-}, () => ({
-    priceCheck: check("products_price_check", sql`price >= 0`),
-}));
-
 export const inventory_items = pgTable("inventory_items", {
 	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
 	clinicId: uuid("clinic_id").notNull().references(() => clinics.id, { onDelete: 'cascade' }),
 	productCategoryId: uuid("product_category_id").references(() => productCategories.id, { onDelete: 'set null' }),
-	
 	itemName: text("item_name").notNull(),
 	sku: text("sku").unique(),
 	genericName: text("generic_name"),
 	brandName: text("brand_name"),
 	dosageForm: text("dosage_form"),
 	strength: text("strength"),
-	
-	quantityOnHand: integer("quantity_on_hand").default(0).notNull(),
 	reorderLevel: integer("reorder_level").default(10).notNull(),
-
-	purchasePrice: numeric("purchase_price", { precision: 10, scale: 2 }).map(Number),
-	sellingPrice: numeric("selling_price", { precision: 10, scale: 2 }).map(Number),
-	
+	purchasePrice: numeric("purchase_price", { precision: 10, scale:  2 }),
+	sellingPrice: numeric("selling_price", { precision: 10, scale:  2 }),
+	location: text("location"),
+	quantityOnHand: integer("quantity_on_hand").default(0).notNull(),
 	batchNumber: text("batch_number"),
 	expiryDate: date("expiry_date"),
-	location: text("location"),
-
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => ({
-    skuIdx: index("inventory_sku_idx").on(table.sku),
-    clinicIdIdx: index("inventory_clinic_id_idx").on(table.clinicId),
-    quantityCheck: check("inventory_quantity_on_hand_check", sql`"quantity_on_hand" >= 0`),
-	reorderLevelCheck: check("inventory_reorder_level_check", sql`"reorder_level" >= 0`),
+	clinicIdx: index("inventory_clinic_id_idx").on(table.clinicId),
+	skuIdx: index("inventory_sku_idx").on(table.sku),
+    quantityCheck: check("inventory_quantity_check", sql`"quantity_on_hand" >= 0`),
+    reorderLevelCheck: check("inventory_reorder_level_check", sql`"reorder_level" >= 0`),
 }));
 
 export const moodEnum = pgEnum("mood", ['happy', 'sad', 'neutral', 'anxious', 'stressed']);
@@ -278,12 +260,17 @@ export const usersInAuthRelations = relations(usersInAuth, ({ one }) => ({
 
 export const clinicsRelations = relations(clinics, ({ many }) => ({
 	appointments: many(appointments),
+	inventoryItems: many(inventory_items),
 	clinicServices: many(clinicServices),
+	doctorClinics: many(doctorClinics),
 }));
 
 export const doctorsRelations = relations(doctors, ({ many }) => ({
 	appointments: many(appointments),
 	reviews: many(reviews),
+	doctorClinics: many(doctorClinics),
+	doctorServices: many(doctorServices),
+    providerAvailability: many(providerAvailability),
 }));
 
 export const servicesRelations = relations(services, ({ one, many }) => ({
@@ -293,6 +280,7 @@ export const servicesRelations = relations(services, ({ one, many }) => ({
 	}),
 	appointments: many(appointments),
 	clinicServices: many(clinicServices),
+	doctorServices: many(doctorServices),
 }));
 
 export const appointmentsRelations = relations(appointments, ({ one, many }) => ({
@@ -363,26 +351,18 @@ export const reviewsRelations = relations(reviews, ({ one }) => ({
 }));
 
 export const productCategoriesRelations = relations(productCategories, ({ many }) => ({
-	products: many(products),
-}));
-
-export const productsRelations = relations(products, ({ one, many }) => ({
-	productCategory: one(productCategories, {
-		fields: [products.categoryId],
-		references: [productCategories.id]
-	}),
-	inventory: many(inventory_items),
+    inventoryItems: many(inventory_items),
 }));
 
 export const inventoryItemsRelations = relations(inventory_items, ({ one }) => ({
 	clinic: one(clinics, {
 		fields: [inventory_items.clinicId],
-		references: [clinics.id],
+		references: [clinics.id]
 	}),
-	productCategory: one(productCategories, {
-		fields: [inventory_items.productCategoryId],
-		references: [productCategories.id],
-	}),
+    productCategory: one(productCategories, {
+        fields: [inventory_items.productCategoryId],
+        references: [productCategories.id]
+    }),
 }));
 
 export const healthLogsRelations = relations(healthLogs, ({ one }) => ({
@@ -396,5 +376,44 @@ export const menstrualLogsRelations = relations(menstrualLogs, ({ one }) => ({
 	patient: one(profiles, {
 		fields: [menstrualLogs.patientId],
 		references: [profiles.id]
+	}),
+}));
+
+export const orders = pgTable("orders", {
+	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+	patientId: uuid("patient_id").notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+	status: orderStatus("status").default('pending_payment').notNull(),
+	totalAmount: numeric("total_amount", { precision: 10, scale:  2 }).notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, () => ({
+	totalAmountCheck: check("orders_total_amount_check", sql`"total_amount" >= 0`),
+}));
+
+export const orderItems = pgTable("order_items", {
+	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+	orderId: uuid("order_id").notNull().references(() => orders.id, { onDelete: 'cascade' }),
+	inventoryItemId: uuid("inventory_item_id").notNull().references(() => inventory_items.id, { onDelete: 'restrict' }),
+	quantity: integer("quantity").notNull(),
+	priceAtTimeOfSale: numeric("price_at_time_of_sale", { precision: 10, scale:  2 }).notNull(),
+}, () => ({
+	quantityCheck: check("order_items_quantity_check", sql`quantity > 0`),
+}));
+
+export const ordersRelations = relations(orders, ({ one, many }) => ({
+	patient: one(profiles, {
+		fields: [orders.patientId],
+		references: [profiles.id]
+	}),
+	orderItems: many(orderItems),
+}));
+
+export const orderItemsRelations = relations(orderItems, ({ one }) => ({
+	order: one(orders, {
+		fields: [orderItems.orderId],
+		references: [orders.id]
+	}),
+	inventoryItem: one(inventory_items, {
+		fields: [orderItems.inventoryItemId],
+		references: [inventory_items.id]
 	}),
 }));
