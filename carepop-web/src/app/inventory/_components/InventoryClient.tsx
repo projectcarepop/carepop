@@ -56,7 +56,7 @@ export default function InventoryClient() {
         if (!selectedClinic && clinics && clinics.length > 0) {
             setSelectedClinic(clinics[0].id);
         }
-    }, [clinics, selectedClinic]);
+    }, [clinics]);
 
     const { data: inventory = [], isLoading: isLoadingInventory } = useQuery({
         queryKey: ['inventory', selectedClinic],
