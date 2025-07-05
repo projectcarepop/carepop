@@ -67,7 +67,7 @@ export default function UpsertInventoryItemModal({
 
   useEffect(() => {
     form.reset({
-      productCategoryId: item?.productCategoryId ?? undefined,
+      productCategoryId: item?.productCategoryId ?? '',
       itemName: item?.itemName ?? "",
       genericName: item?.genericName ?? "",
       brandName: item?.brandName ?? "",

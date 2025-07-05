@@ -21,6 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { PlusCircle } from 'lucide-react';
 
 // This type should match the form's output, which uses numbers for price
 type FormValues = Omit<UpsertInventoryItemPayload, 'purchasePrice' | 'sellingPrice'> & {
@@ -151,17 +152,21 @@ export default function InventoryClient() {
                                 ))}
                             </SelectContent>
                         </Select>
-                        <Button onClick={handleAddItem} disabled={!selectedClinic}>
-                            Add New Item
-                        </Button>
                     </div>
                 </CardContent>
             </Card>
 
             {selectedClinic && (
                  <Card>
-                    <CardHeader>
-                        <CardTitle>Inventory Items</CardTitle>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                        <div>
+                            <CardTitle>Inventory Items</CardTitle>
+                            <p className="text-sm text-muted-foreground">Items available at the selected clinic.</p>
+                        </div>
+                        <Button onClick={handleAddItem}>
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Create Item
+                        </Button>
                     </CardHeader>
                     <CardContent>
                         <DataTable 
