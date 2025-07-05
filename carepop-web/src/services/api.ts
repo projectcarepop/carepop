@@ -490,6 +490,37 @@ export async function deleteInventoryItem(itemId: string, accessToken: string) {
   return response.json();
 }
 
+export async function getItemBatches(itemId: string, accessToken: string) {
+  const headers = await getAuthHeaders(accessToken);
+  const response = await fetch(`${API_BASE_URL}/api/admin/inventory-items/${itemId}/batches`, { headers, cache: 'no-store' });
+  if (!response.ok) throw new Error("Failed to fetch item batches.");
+  return response.json();
+}
+
+export async function addBatchToItem(itemId: string, batchData: { quantity: number; batchNumber?: string; expiryDate: string; }, accessToken: string) {
+  const headers = await getAuthHeaders(accessToken);
+  const response = await fetch(`${API_BASE_URL}/api/admin/inventory-items/${itemId}/batches`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(batchData),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: "Failed to add batch." }));
+    throw new Error(error.message);
+  }
+  return response.json();
+}
+
+export async function deleteItemBatch(batchId: string, accessToken: string) {
+  const headers = await getAuthHeaders(accessToken);
+  const response = await fetch(`${API_BASE_URL}/api/admin/inventory-item-batches/${batchId}`, {
+    method: 'DELETE',
+    headers,
+  });
+  if (!response.ok) throw new Error("Failed to delete item batch.");
+  return response.json();
+}
+
 // --- END: Inventory and Product Category Management ---
 
 export async function getPublicServiceCategories() {

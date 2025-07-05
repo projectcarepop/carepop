@@ -18,16 +18,28 @@ export type InventoryItem = {
   id: string;
   clinicId: string;
   itemName: string;
-  brand?: string | null;
-  itemCode?: string | null;
-  description?: string | null;
   productCategoryId: string;
-  supplier?: string | null;
+  sku?: string | null;
+  genericName?: string | null;
+  brandName?: string | null;
+  dosageForm?: string | null;
+  strength?: string | null;
   quantityInStock: number;
-  unit?: string | null;
+  reorderLevel: number;
   purchasePrice?: number | null;
   sellingPrice?: number | null;
+  location?: string | null;
+  description?: string | null;
   updatedAt: string;
+};
+
+export type InventoryItemBatch = {
+  id: string;
+  inventoryItemId: string;
+  batchNumber?: string | null;
+  quantity: number;
+  expiryDate: string; // ISO String
+  createdAt: string;
 };
 
 export type ProductCategory = {
@@ -70,8 +82,12 @@ export const columns = ({ onEdit, onDelete, onViewBatches }: ColumnsProps): Colu
     header: "Product Name",
   },
   {
-    accessorKey: "brand",
+    accessorKey: "brandName",
     header: "Brand",
+  },
+  {
+    accessorKey: "strength",
+    header: "Strength",
   },
   {
     accessorKey: "quantityInStock",

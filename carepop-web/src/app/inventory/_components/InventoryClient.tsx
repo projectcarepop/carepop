@@ -11,6 +11,8 @@ import { Button } from '@/components/ui/button';
 import { getAdminClinics, getInventoryForClinic, upsertInventoryItem, deleteInventoryItem, getProductCategories, UpsertInventoryItemPayload } from '@/services/api';
 import { useToast } from "@/components/ui/use-toast";
 import { UpsertInventoryItemForm } from './UpsertInventoryItemForm';
+import { ProductCategoryManager } from './ProductCategoryManager';
+import { ManageItemBatchesModal } from './ManageItemBatchesModal';
 import {
   Dialog,
   DialogContent,
@@ -45,6 +47,7 @@ export default function InventoryClient() {
     const [editingItem, setEditingItem] = React.useState<InventoryItem | undefined>(undefined);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
     const [itemToDelete, setItemToDelete] = React.useState<InventoryItem | undefined>(undefined);
+    const [batchModalItem, setBatchModalItem] = React.useState<InventoryItem | null>(null);
 
     const { data: clinics, isLoading: isLoadingClinics } = useQuery({
         queryKey: ['adminClinics'],
@@ -60,7 +63,7 @@ export default function InventoryClient() {
 
     const { data: inventory = [], isLoading: isLoadingInventory } = useQuery({
         queryKey: ['inventory', selectedClinic],
-        fn: () => getInventoryForClinic(selectedClinic!, session!.access_token!).then(res => res.data),
+        queryFn: () => getInventoryForClinic(selectedClinic!, session!.access_token!).then(res => res.data),
         enabled: !!selectedClinic && !!session?.access_token,
     });
     
@@ -76,8 +79,9 @@ export default function InventoryClient() {
             const payload: UpsertInventoryItemPayload = {
                 ...values,
                 clinicId: selectedClinic,
-                purchasePrice: values.purchasePrice ? String(values.purchasePrice) : undefined,
-                sellingPrice: values.sellingPrice ? String(values.sellingPrice) : undefined,
+                // The API expects strings for numeric types, but the form gives numbers.
+                purchasePrice: values.purchasePrice,
+                sellingPrice: values.sellingPrice,
             };
             return upsertInventoryItem(payload, session!.access_token!, editingItem?.id);
         },
@@ -115,6 +119,10 @@ export default function InventoryClient() {
     const handleDeleteClick = (item: InventoryItem) => {
         setItemToDelete(item);
         setIsDeleteDialogOpen(true);
+    };
+
+    const handleViewBatches = (item: InventoryItem) => {
+        setBatchModalItem(item);
     };
 
     const handleSubmit = (values: FormValues) => {
@@ -157,15 +165,18 @@ export default function InventoryClient() {
                             <CardTitle>Inventory Items</CardTitle>
                             <p className="text-sm text-muted-foreground">Items available at the selected clinic.</p>
                         </div>
-                        <Button onClick={() => { setEditingItem(undefined); setIsModalOpen(true); }}>
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Create Item
-                        </Button>
+                        <div className="flex space-x-2">
+                            <ProductCategoryManager />
+                            <Button onClick={() => { setEditingItem(undefined); setIsModalOpen(true); }}>
+                                <PlusCircle className="mr-2 h-4 w-4" />
+                                Create Item
+                            </Button>
+                        </div>
                     </CardHeader>
                     <CardContent>
                         <DataTable 
-                            columns={columns({ onEdit: handleEditItem, onDelete: handleDeleteClick, onViewBatches: () => {} })} 
-                            data={inventory}
+                            columns={columns({ onEdit: handleEditItem, onDelete: handleDeleteClick, onViewBatches: handleViewBatches })} 
+                            data={inventory as InventoryItem[]}
                             isLoading={isLoadingInventory} 
                             filterColumn="itemName"
                         />
@@ -187,6 +198,12 @@ export default function InventoryClient() {
                     />
                 </DialogContent>
             </Dialog>
+
+            <ManageItemBatchesModal 
+                isOpen={!!batchModalItem}
+                onClose={() => setBatchModalItem(null)}
+                item={batchModalItem}
+            />
 
             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                 <AlertDialogContent>
