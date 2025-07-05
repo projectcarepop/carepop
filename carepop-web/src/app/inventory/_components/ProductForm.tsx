@@ -25,7 +25,7 @@ import {
 import { type InventoryItem, type ProductCategory } from '@/lib/types/inventory';
 import { Loader2 } from 'lucide-react';
 
-// This schema defines the form's structure.
+// This schema defines the form's structure and validation.
 const formSchema = z.object({
   itemName: z.string().min(2, "Item name must be at least 2 characters."),
   productCategoryId: z.string({ required_error: "Please select a category." }).nullable(),
@@ -54,7 +54,7 @@ export function ProductForm({ initialData, onSubmit, isPending, categories }: Pr
     resolver: zodResolver(formSchema),
     defaultValues: {
       itemName: '',
-      productCategoryId: '',
+      productCategoryId: null,
       sellingPrice: '',
       purchasePrice: '',
       sku: '',
@@ -67,6 +67,7 @@ export function ProductForm({ initialData, onSubmit, isPending, categories }: Pr
     },
   });
   
+  // Use React.useEffect to populate the form when initialData is available.
   React.useEffect(() => {
     if (initialData) {
       form.reset({
@@ -83,7 +84,7 @@ export function ProductForm({ initialData, onSubmit, isPending, categories }: Pr
         location: initialData.location ?? '',
       });
     }
-  }, [initialData, form.reset]);
+  }, [initialData, form]);
 
   return (
     <Form {...form}>
@@ -109,7 +110,7 @@ export function ProductForm({ initialData, onSubmit, isPending, categories }: Pr
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Category</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined}>
+                <Select onValueChange={field.onChange} value={field.value ?? undefined}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a category" />
@@ -164,7 +165,7 @@ export function ProductForm({ initialData, onSubmit, isPending, categories }: Pr
                     <Input placeholder="e.g., Paracetamol" {...field} value={field.value ?? ''}/>
                   </FormControl>
                   <FormMessage />
-                </FormItem>.
+                </FormItem>
               )}
             />
         </div>
