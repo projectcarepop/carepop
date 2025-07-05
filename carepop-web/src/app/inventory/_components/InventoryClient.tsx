@@ -52,7 +52,17 @@ export default function InventoryClient() {
 
     const { data: clinics, isLoading: isLoadingClinics } = useQuery<Clinic[]>({
         queryKey: ['adminClinics'],
-        queryFn: () => getAdminClinics(session!.access_token!),
+        queryFn: async () => {
+            console.log("Attempting to fetch admin clinics...");
+            try {
+                const data = await getAdminClinics(session!.access_token!);
+                console.log("Successfully fetched clinics data:", data);
+                return data;
+            } catch (error) {
+                console.error("Failed to fetch admin clinics:", error);
+                throw error; // Re-throw the error to be handled by react-query
+            }
+        },
         enabled: !!session?.access_token,
     });
 
