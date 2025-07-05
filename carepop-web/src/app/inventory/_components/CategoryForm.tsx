@@ -1,61 +1,42 @@
 'use client';
 
-import { zodResolver } from '@hookform/resolvers/zod';
+import React from 'react';
 import { useForm } from 'react-hook-form';
-import * as z from 'zod';
-
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Button } from '@/components/ui/button';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { type ProductCategory } from '@/lib/types/inventory';
 import { Loader2 } from 'lucide-react';
-import React from 'react';
 
 const formSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters.'),
+  name: z.string().min(2, { message: "Category name must be at least 2 characters." }),
   description: z.string().optional(),
 });
 
-type FormValues = z.infer<typeof formSchema>;
-
 interface CategoryFormProps {
   initialData?: ProductCategory;
-  onSubmit: (values: FormValues) => void;
+  onSubmit: (values: z.infer<typeof formSchema>) => void;
   isPending: boolean;
 }
 
-export function CategoryForm({
-  initialData,
-  onSubmit,
-  isPending,
-}: CategoryFormProps) {
-  const form = useForm<FormValues>({
+export function CategoryForm({ initialData, onSubmit, isPending }: CategoryFormProps) {
+  const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-        name: initialData?.name || '',
-        description: initialData?.description || '',
+      name: initialData?.name || '',
+      description: initialData?.description || '',
     },
   });
 
   React.useEffect(() => {
     if (initialData) {
-        form.reset({
-            name: initialData.name,
-            description: initialData.description || '',
-        });
-    } else {
-        form.reset({
-            name: '',
-            description: '',
-        });
+      form.reset({
+        ...initialData,
+        description: initialData.description ?? '',
+      });
     }
   }, [initialData, form]);
 
@@ -69,11 +50,7 @@ export function CategoryForm({
             <FormItem>
               <FormLabel>Category Name</FormLabel>
               <FormControl>
-                <Input
-                  placeholder="e.g., Vitamins & Supplements"
-                  {...field}
-                  disabled={isPending}
-                />
+                <Input placeholder="e.g., Medications" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -84,23 +61,21 @@ export function CategoryForm({
           name="description"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Description</FormLabel>
+              <FormLabel>Description (Optional)</FormLabel>
               <FormControl>
                 <Textarea
-                  placeholder="A brief description of this product category."
+                  placeholder="A brief description of the category."
                   className="resize-none"
                   {...field}
-                  value={field.value || ''}
-                  disabled={isPending}
                 />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        <Button type="submit" disabled={isPending}>
-          {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {initialData ? 'Save changes' : 'Create Category'}
+        <Button type="submit" disabled={isPending} className="w-full">
+          {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          {isPending ? 'Saving...' : 'Save Changes'}
         </Button>
       </form>
     </Form>

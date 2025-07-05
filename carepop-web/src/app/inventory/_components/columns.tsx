@@ -1,89 +1,76 @@
 "use client"
 
-import { ColumnDef } from "@tanstack/react-table"
-import { MoreHorizontal } from "lucide-react"
+import { type ColumnDef } from "@tanstack/react-table"
+import { MoreHorizontal, ArrowUpDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Checkbox } from "@/components/ui/checkbox"
-import { InventoryItem } from "@/lib/types/inventory"
+import { type InventoryItem, type ProductCategory } from "@/lib/types/inventory"
+import { Badge } from "@/components/ui/badge"
 
-type ColumnsProps = {
+// Props for the columns functions to accept handlers from the client component
+interface ProductColumnsProps {
   onEdit: (item: InventoryItem) => void;
   onDelete: (item: InventoryItem) => void;
-  onViewBatches: (item: InventoryItem) => void;
+  onUpdateStock: (item: InventoryItem) => void;
 }
 
-export const columns = ({ onEdit, onDelete, onViewBatches }: ColumnsProps): ColumnDef<InventoryItem, unknown>[] => [
-  {
-    id: "select",
-    header: ({ table }) => (
-      <Checkbox
-        checked={
-          table.getIsAllPageRowsSelected() ||
-          (table.getIsSomePageRowsSelected() && "indeterminate")
-        }
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-        aria-label="Select all"
-      />
-    ),
-    cell: ({ row }) => (
-      <Checkbox
-        checked={row.getIsSelected()}
-        onCheckedChange={(value) => row.toggleSelected(!!value)}
-        aria-label="Select row"
-      />
-    ),
-    enableSorting: false,
-    enableHiding: false,
-  },
+interface CategoryColumnsProps {
+  onEdit: (category: ProductCategory) => void;
+  onDelete: (category: ProductCategory) => void;
+}
+
+export const productColumns = ({ onEdit, onDelete, onUpdateStock }: ProductColumnsProps): ColumnDef<InventoryItem>[] => [
   {
     accessorKey: "itemName",
-    header: "Product Name",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Name
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
   },
   {
-    accessorKey: "brandName",
-    header: "Brand",
-  },
-  {
-    accessorKey: "strength",
-    header: "Strength",
+    accessorKey: "categoryName",
+    header: "Category",
   },
   {
     accessorKey: "quantityInStock",
-    header: "Quantity",
+    header: "Stock",
+    cell: ({ row }) => <div className="text-center">{row.original.quantityInStock}</div>,
   },
   {
-    accessorKey: "sellingPrice",
-    header: "Price (PHP)",
+    accessorKey: "price",
+    header: "Price",
     cell: ({ row }) => {
-      const price = row.original.sellingPrice ?? 0;
-      const formatted = new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "PHP",
-      }).format(price)
-      return <div className="text-right font-medium">{formatted}</div>
-    },
+        const amount = parseFloat(row.getValue("price"))
+        const formatted = new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency: "PHP",
+        }).format(amount)
+        return <div className="font-medium">{formatted}</div>
+    }
   },
   {
-    accessorKey: "updatedAt",
-    header: "Last Updated",
+    accessorKey: "isActive",
+    header: "Status",
     cell: ({ row }) => {
-      const date = row.original.updatedAt;
-      return date ? new Date(date).toLocaleDateString() : "N/A"
+      const isActive = row.getValue("isActive");
+      return <Badge variant={isActive ? "default" : "secondary"}>{isActive ? 'Active' : 'Archived'}</Badge>
     },
   },
   {
     id: "actions",
     cell: ({ row }) => {
-      const item = row.original
-
+      const item = row.original;
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -94,22 +81,54 @@ export const columns = ({ onEdit, onDelete, onViewBatches }: ColumnsProps): Colu
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => onEdit(item)}>
-              Edit Item
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onViewBatches(item)}>
-              View Batches
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onEdit(item)}>Edit Details</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onUpdateStock(item)}>Update Stock</DropdownMenuItem>
             <DropdownMenuItem
               className="text-red-600"
               onClick={() => onDelete(item)}
             >
-              Delete Item
+              Delete Product
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      )
+      );
     },
   },
-] 
+];
+
+export const categoryColumns = ({ onEdit, onDelete }: CategoryColumnsProps): ColumnDef<ProductCategory>[] => [
+    {
+      accessorKey: "name",
+      header: "Category Name",
+    },
+    {
+      accessorKey: "description",
+      header: "Description",
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        const category = row.original
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => onEdit(category)}>Edit</DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-red-600"
+                onClick={() => onDelete(category)}
+              >
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+]; 
