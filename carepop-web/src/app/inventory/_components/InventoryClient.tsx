@@ -1,16 +1,22 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import * as React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DataTable } from '@/components/ui/data-table';
 import { columns, InventoryItem } from './columns';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { getAdminClinics, getInventoryForClinic, upsertInventoryItem, deleteInventoryItem, getProductCategories, UpsertInventoryItemPayload } from '@/services/api';
-import { useToast } from "@/components/ui/use-toast"
-import UpsertInventoryItemModal from './UpsertInventoryItemModal';
+import { useToast } from "@/components/ui/use-toast";
+import { UpsertInventoryItemForm } from './UpsertInventoryItemModal'; // Renamed to UpsertInventoryItemForm
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,13 +40,11 @@ export default function InventoryClient() {
     const { toast } = useToast();
     const queryClient = useQueryClient();
     
-    const [selectedClinic, setSelectedClinic] = useState<string | null>(null);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingItem, setEditingItem] = useState<InventoryItem | undefined>(undefined);
-
-    // State for controlling the Delete confirmation dialog
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-    const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null);
+    const [selectedClinic, setSelectedClinic] = React.useState<string | undefined>(undefined);
+    const [isModalOpen, setIsModalOpen] = React.useState(false);
+    const [editingItem, setEditingItem] = React.useState<InventoryItem | undefined>(undefined);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
+    const [itemToDelete, setItemToDelete] = React.useState<InventoryItem | undefined>(undefined);
 
     const { data: clinics, isLoading: isLoadingClinics } = useQuery({
         queryKey: ['adminClinics'],
@@ -48,9 +52,8 @@ export default function InventoryClient() {
         enabled: !!session?.access_token,
     });
 
-    // Set the first clinic as selected by default once clinics have loaded
-    useEffect(() => {
-        if (clinics && clinics.length > 0 && !selectedClinic) {
+    React.useEffect(() => {
+        if (!selectedClinic && clinics && clinics.length > 0) {
             setSelectedClinic(clinics[0].id);
         }
     }, [clinics, selectedClinic]);
@@ -69,10 +72,7 @@ export default function InventoryClient() {
 
     const upsertMutation = useMutation({
         mutationFn: (values: FormValues) => {
-            if (!selectedClinic) {
-                throw new Error("No clinic selected.");
-            }
-            // Convert numbers to strings for the API payload
+            if (!selectedClinic) throw new Error("No clinic selected.");
             const payload: UpsertInventoryItemPayload = {
                 ...values,
                 clinicId: selectedClinic,
@@ -82,9 +82,10 @@ export default function InventoryClient() {
             return upsertInventoryItem(payload, session!.access_token!, editingItem?.id);
         },
         onSuccess: () => {
-            toast({ title: "Success", description: `Item ${editingItem ? 'updated' : 'created'}.` });
+            toast({ title: "Success", description: `Item has been saved.` });
             queryClient.invalidateQueries({ queryKey: ['inventory', selectedClinic] });
             setIsModalOpen(false);
+            setEditingItem(undefined);
         },
         onError: (error: any) => {
             toast({ variant: "destructive", title: "Error", description: error.message });
@@ -102,21 +103,16 @@ export default function InventoryClient() {
         },
         onSettled: () => {
             setIsDeleteDialogOpen(false);
-            setItemToDelete(null);
+            setItemToDelete(undefined);
         }
     });
-
-    const handleAddItem = () => {
-        setEditingItem(undefined);
-        setIsModalOpen(true);
-    };
 
     const handleEditItem = (item: InventoryItem) => {
         setEditingItem(item);
         setIsModalOpen(true);
     };
 
-    const handleDeleteItem = (item: InventoryItem) => {
+    const handleDeleteClick = (item: InventoryItem) => {
         setItemToDelete(item);
         setIsDeleteDialogOpen(true);
     };
@@ -134,25 +130,23 @@ export default function InventoryClient() {
             <Card>
                 <CardHeader>
                     <CardTitle>Inventory Management</CardTitle>
-                    <p className="text-sm text-muted-foreground">
+                    <CardDescription>
                         Select a clinic to view and manage its inventory.
-                    </p>
+                    </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <Select onValueChange={setSelectedClinic} value={selectedClinic ?? ""}>
-                            <SelectTrigger className="w-full sm:w-[300px]">
-                                <SelectValue placeholder="Select a clinic..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {clinics?.map((clinic: { id: string; name: string }) => (
-                                    <SelectItem key={clinic.id} value={clinic.id}>
-                                        {clinic.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
+                <CardContent>
+                    <Select onValueChange={setSelectedClinic} value={selectedClinic ?? ""}>
+                        <SelectTrigger className="w-full sm:w-[300px]">
+                            <SelectValue placeholder="Select a clinic..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {clinics?.map((clinic: { id: string; name: string }) => (
+                                <SelectItem key={clinic.id} value={clinic.id}>
+                                    {clinic.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </CardContent>
             </Card>
 
@@ -163,14 +157,14 @@ export default function InventoryClient() {
                             <CardTitle>Inventory Items</CardTitle>
                             <p className="text-sm text-muted-foreground">Items available at the selected clinic.</p>
                         </div>
-                        <Button onClick={handleAddItem}>
+                        <Button onClick={() => { setEditingItem(undefined); setIsModalOpen(true); }}>
                             <PlusCircle className="mr-2 h-4 w-4" />
                             Create Item
                         </Button>
                     </CardHeader>
                     <CardContent>
                         <DataTable 
-                            columns={columns({ onEdit: handleEditItem, onDelete: handleDeleteItem, onViewBatches: () => {} })} 
+                            columns={columns({ onEdit: handleEditItem, onDelete: handleDeleteClick, onViewBatches: () => {} })} 
                             data={inventory}
                             isLoading={isLoadingInventory} 
                             filterColumn="itemName"
@@ -179,14 +173,20 @@ export default function InventoryClient() {
                 </Card>
             )}
 
-            <UpsertInventoryItemModal 
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                onSubmit={handleSubmit}
-                item={editingItem}
-                isLoading={upsertMutation.isPending}
-                productCategories={productCategories}
-            />
+            <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+                <DialogContent className="sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>{editingItem ? 'Edit Inventory Item' : 'Add New Inventory Item'}</DialogTitle>
+                    </DialogHeader>
+                    <UpsertInventoryItemForm 
+                        initialData={editingItem}
+                        onSubmit={handleSubmit}
+                        isPending={upsertMutation.isPending}
+                        productCategories={productCategories}
+                        onClose={() => setIsModalOpen(false)}
+                    />
+                </DialogContent>
+            </Dialog>
 
             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                 <AlertDialogContent>
