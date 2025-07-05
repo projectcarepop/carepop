@@ -1,8 +1,8 @@
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { type LucideIcon, DollarSign, Package, Archive, TrendingDown, AlertTriangle } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 export type InventoryStats = {
   totalProducts: number;
@@ -24,9 +24,19 @@ interface StatCardProps {
   icon: LucideIcon;
   description?: string;
   isLoading: boolean;
+  iconColor?: string;
 }
 
-const StatCard = ({ title, value, icon: Icon, description, isLoading }: StatCardProps) => {
+const brandColors = {
+  primary: '#4F46E5', // Indigo
+  secondary: '#10B981', // Emerald
+  accent: '#F59E0B', // Amber
+  danger: '#EF4444', // Red
+  info: '#3B82F6',  // Blue
+  neutral: '#6B7280' // Gray
+};
+
+const StatCard = ({ title, value, icon: Icon, description, isLoading, iconColor }: StatCardProps) => {
   if (isLoading) {
     return (
       <Card>
@@ -46,7 +56,7 @@ const StatCard = ({ title, value, icon: Icon, description, isLoading }: StatCard
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
+        <Icon className="h-4 w-4 text-muted-foreground" style={{ color: iconColor }} />
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">{value}</div>
@@ -64,21 +74,29 @@ export function InventoryDashboard({ stats, isLoading }: InventoryDashboardProps
   };
 
   const dashboardStats: Omit<StatCardProps, 'isLoading'>[] = [
-    { title: "Total Products", value: stats?.totalProducts ?? 0, icon: Package, description: "Number of unique items" },
-    { title: "Total Units", value: stats?.totalQuantity ?? 0, icon: Archive, description: "Total quantity of all items" },
-    { title: "Total Purchase Value", value: formatCurrency(stats?.totalPurchaseValue), icon: DollarSign, description: "Based on purchase price" },
-    { title: "Total Selling Value", value: formatCurrency(stats?.totalSellingValue), icon: DollarSign, description: "Based on selling price" },
-    { title: "Low Stock Items", value: stats?.lowStockCount ?? 0, icon: TrendingDown, description: "Items at or below reorder level" },
-    { title: "Expiring Soon", value: stats?.expiringSoonCount ?? 0, icon: AlertTriangle, description: "Items expiring in next 30 days" },
+    { title: "Total Products", value: stats?.totalProducts ?? 0, icon: Package, description: "Number of unique items", iconColor: brandColors.primary },
+    { title: "Total Units", value: stats?.totalQuantity ?? 0, icon: Archive, description: "Total quantity of all items", iconColor: brandColors.secondary },
+    { title: "Low Stock Items", value: stats?.lowStockCount ?? 0, icon: TrendingDown, description: "Items at or below reorder level", iconColor: brandColors.accent },
+    { title: "Expiring Soon", value: stats?.expiringSoonCount ?? 0, icon: AlertTriangle, description: "Items expiring in next 30 days", iconColor: brandColors.danger },
+    { title: "Total Purchase Value", value: formatCurrency(stats?.totalPurchaseValue), icon: DollarSign, description: "Based on purchase price", iconColor: brandColors.info },
+    { title: "Total Selling Value", value: formatCurrency(stats?.totalSellingValue), icon: DollarSign, description: "Potential revenue", iconColor: brandColors.neutral },
   ];
 
-  const chartData = [
-    { name: 'Overview', "Total Products": stats?.totalProducts ?? 0, "Low Stock": stats?.lowStockCount ?? 0, "Expiring Soon": stats?.expiringSoonCount ?? 0 },
+  const valueDistributionData = [
+    { name: 'Total Purchase Value', value: stats?.totalPurchaseValue ?? 0 },
+    { name: 'Total Selling Value', value: stats?.totalSellingValue ?? 0 },
+  ];
+  
+  const valueChartColors = [brandColors.info, brandColors.secondary];
+
+  const overviewChartData = [
+    { name: 'Products vs Units', "Products": stats?.totalProducts ?? 0, "Units": stats?.totalQuantity ?? 0 },
+    { name: 'Issues', "Low Stock": stats?.lowStockCount ?? 0, "Expiring Soon": stats?.expiringSoonCount ?? 0 },
   ];
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {dashboardStats.map((stat) => (
           <StatCard
             key={stat.title}
@@ -87,34 +105,68 @@ export function InventoryDashboard({ stats, isLoading }: InventoryDashboardProps
             icon={stat.icon}
             description={stat.description}
             isLoading={isLoading}
+            iconColor={stat.iconColor}
           />
         ))}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Inventory Overview</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: 'hsl(var(--background))', 
-                  borderColor: 'hsl(var(--border))' 
-                }}
-              />
-              <Legend />
-              <Bar dataKey="Total Products" fill="#8884d8" />
-              <Bar dataKey="Low Stock" fill="#82ca9d" />
-              <Bar dataKey="Expiring Soon" fill="#ffc658" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
+        <Card className="lg:col-span-4">
+          <CardHeader>
+            <CardTitle>Inventory At-a-Glance</CardTitle>
+            <CardDescription>
+                A side-by-side comparison of key inventory metrics.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pl-2">
+            <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={overviewChartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))' }}/>
+                    <Legend />
+                    <Bar dataKey="Products" fill={brandColors.primary} />
+                    <Bar dataKey="Units" fill={brandColors.secondary} />
+                    <Bar dataKey="Low Stock" fill={brandColors.accent} />
+                    <Bar dataKey="Expiring Soon" fill={brandColors.danger} />
+                </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-3">
+            <CardHeader>
+                <CardTitle>Inventory Value Distribution</CardTitle>
+                <CardDescription>
+                    The split between the cost of your inventory and its potential revenue.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                 <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                        <Pie
+                            data={valueDistributionData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            outerRadius={80}
+                            fill="#8884d8"
+                            dataKey="value"
+                            nameKey="name"
+                            label={(entry) => `${entry.name}: ${formatCurrency(entry.value)}`}
+                        >
+                            {valueDistributionData.map((_entry, index) => (
+                                <Cell key={`cell-${index}`} fill={valueChartColors[index % valueChartColors.length]} />
+                            ))}
+                        </Pie>
+                         <Tooltip formatter={(value) => formatCurrency(Number(value))} contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))' }}/>
+                        <Legend />
+                    </PieChart>
+                </ResponsiveContainer>
+            </CardContent>
+        </Card>
+      </div>
     </div>
   );
 } 

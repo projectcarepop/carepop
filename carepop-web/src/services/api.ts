@@ -349,15 +349,15 @@ export async function upsertService(serviceData: any, accessToken: string, servi
     return response.json();
 }
 
-export async function deleteServiceCategory(categoryId: string, accessToken:string) {
+export async function deleteProductCategory(categoryId: string, accessToken: string) {
   const headers = await getAuthHeaders(accessToken);
-  const response = await fetch(`${API_BASE_URL}/api/admin/service-categories/${categoryId}`, {
+  const response = await fetch(`${API_BASE_URL}/api/admin/product-categories/${categoryId}`, {
     method: 'DELETE',
     headers,
   });
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-    throw new Error(error.message || 'Failed to delete service category.');
+    const error = await response.json().catch(() => ({ message: "Failed to delete product category." }));
+    throw new Error(error.message);
   }
   return response.json();
 }
@@ -444,16 +444,6 @@ export async function upsertProductCategory(categoryData: NewProductCategoryPayl
     const error = await response.json().catch(() => ({ message: `Failed to save product category.` }));
     throw new Error(error.message);
   }
-  return response.json();
-}
-
-export async function deleteProductCategory(categoryId: string, accessToken: string) {
-  const headers = await getAuthHeaders(accessToken);
-  const response = await fetch(`${API_BASE_URL}/api/admin/product-categories/${categoryId}`, {
-    method: 'DELETE',
-    headers,
-  });
-  if (!response.ok) throw new Error("Failed to delete product category.");
   return response.json();
 }
 

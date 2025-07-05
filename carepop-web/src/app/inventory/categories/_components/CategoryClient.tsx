@@ -10,7 +10,7 @@ import { DataTable } from '@/components/ui/data-table';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { getProductCategories, upsertProductCategory } from '@/services/api';
+import { getProductCategories, upsertProductCategory, deleteProductCategory } from '@/services/api';
 import { type ProductCategory } from '@/lib/types/inventory';
 import { categoryColumns } from '../../_components/category-columns';
 import { CategoryForm, type CategoryFormValues } from '../../_components/CategoryForm';
@@ -55,6 +55,17 @@ export default function CategoryClient({ initialCategories }: CategoryClientProp
         onError: handleMutationError,
     });
 
+    const deleteCategoryMutation = useMutation({
+        mutationFn: (id: string) => deleteProductCategory(id, accessToken!),
+        onSuccess: () => {
+            toast({ title: 'Category deleted successfully.' });
+            queryClient.invalidateQueries({ queryKey: ['admin-product-categories'] });
+        },
+        onError: (error: Error) => {
+            toast({ title: 'Error deleting category', description: error.message, variant: 'destructive' });
+        }
+    });
+
     const handleOpenSheet = React.useCallback((
         mode: 'addCategory' | 'editCategory',
         item?: ProductCategory
@@ -64,9 +75,16 @@ export default function CategoryClient({ initialCategories }: CategoryClientProp
         setIsSheetOpen(true);
     }, []);
 
+    const handleDeleteCategory = (category: ProductCategory) => {
+        if (window.confirm(`Are you sure you want to delete the category "${category.name}"? This action cannot be undone.`)) {
+            deleteCategoryMutation.mutate(category.id);
+        }
+    };
+
     const categoryCols = React.useMemo(() => categoryColumns({
         openSheet: (mode, category) => handleOpenSheet(mode, category),
-    }), [handleOpenSheet]);
+        onDelete: handleDeleteCategory,
+    }), [handleOpenSheet, handleDeleteCategory]);
 
     return (
         <>

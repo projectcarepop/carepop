@@ -1,26 +1,16 @@
 -- This script seeds the inventory_items table with a variety of test products
 -- for two different clinics.
 
--- IMPORTANT: You MUST replace the placeholder UUIDs below with actual UUIDs
--- from your 'clinics' and 'product_categories' tables.
-
--- To get your Clinic IDs, you can run:
--- SELECT id, name FROM clinics;
-
--- To get your Product Category IDs, you can run:
--- SELECT id, name FROM product_categories;
-
-
 DO $$
 DECLARE
     -- !!! REPLACE THESE PLACEHOLDERS !!!
-    clinic_id_1 uuid := 'YOUR_CLINIC_ID_1'; -- e.g., '1a7a8e5a-7284-4e44-8f15-3e283f6f1f3a'
-    clinic_id_2 uuid := 'YOUR_CLINIC_ID_2'; -- e.g., 'b2b1c3e4-8d5e-4f6g-9h1i-2j3k4l5m6n7o'
+    clinic_id_1 uuid := '9f73a667-62b1-475f-be33-42f935122e83'; -- e.g., '1a7a8e5a-7284-4e44-8f15-3e283f6f1f3a'
+    clinic_id_2 uuid := '9a872c9b-3ccf-4c64-963a-d1db1f7c1440'; -- e.g., 'b2b1c3e4-8d5e-4f6g-9h1i-2j3k4l5m6n7o'
     
-    category_pain_relief uuid := 'YOUR_PAIN_RELIEF_CATEGORY_ID';     -- e.g., 'c3c2b1a0-9e8d-7f6e-5d4c-3b2a10987654'
-    category_antibiotics uuid := 'YOUR_ANTIBIOTICS_CATEGORY_ID';   -- e.g., 'd4d3c2b1-0f9e-8d7c-6b5a-498765432109'
-    category_vitamins uuid := 'YOUR_VITAMINS_CATEGORY_ID';         -- e.g., 'e5e4d3c2-1g0f-9e8d-7c6b-5a4b3c2d1e0f'
-    category_contraceptives uuid := 'YOUR_CONTRACEPTIVES_CATEGORY_ID'; -- e.g., 'f6f5e4d3-2h1g-0f9e-8d7c-6b5a4b3c2d1e'
+    category_pain_relief uuid := '4e6ff962-e28b-45dc-8557-2c33c1136e10';     -- e.g., 'c3c2b1a0-9e8d-7f6e-5d4c-3b2a10987654'
+    category_antibiotics uuid := 'c594baac-4add-418c-a631-743959e9cb7d';   -- e.g., 'd4d3c2b1-0f9e-8d7c-6b5a-498765432109'
+    category_vitamins uuid := 'f2b9ff23-5325-42a1-9a60-23adf6da5bab';         -- e.g., 'e5e4d3c2-1g0f-9e8d-7c6b-5a4b3c2d1e0f'
+    category_contraceptives uuid := '238ee133-4f08-4e87-bf71-3ad88f98df76'; -- e.g., 'f6f5e4d3-2h1g-0f9e-8d7c-6b5a4b3c2d1e'
 
 BEGIN
     -- --- Products for Clinic 1 ---

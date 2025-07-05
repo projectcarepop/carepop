@@ -41,6 +41,7 @@ export default function ProductsClient() {
   const [showLowStockOnly, setShowLowStockOnly] = React.useState(false);
   const [showExpiringSoon, setShowExpiringSoon] = React.useState(false);
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = React.useState(false);
   const [sheetMode, setSheetMode] = React.useState<'addProduct' | 'editProduct' | 'updateStock' | null>(null);
   const [selectedItem, setSelectedItem] = React.useState<InventoryItem | null>(null);
 
@@ -118,6 +119,13 @@ export default function ProductsClient() {
     onError: (error) => handleMutationError(error, 'Product deletion'),
   });
 
+  const handleViewDetails = React.useCallback((item: InventoryItem | null) => {
+    if (item) {
+      setSelectedItem(item);
+    }
+    setIsDetailsModalOpen(true);
+  }, []);
+
   const handleOpenSheet = React.useCallback((
     mode: 'addProduct' | 'editProduct' | 'updateStock', 
     item?: InventoryItem
@@ -128,7 +136,9 @@ export default function ProductsClient() {
   }, []);
   
   const handleDeleteProduct = (item: InventoryItem) => {
-    deleteProductMutation.mutate(item);
+    if (window.confirm(`Are you sure you want to delete "${item.itemName}"? This action cannot be undone.`)) {
+      deleteProductMutation.mutate(item);
+    }
   }
   
   const handleClinicSelect = (clinicId: string | null) => {
@@ -144,8 +154,9 @@ export default function ProductsClient() {
   const columns = React.useMemo(() => productColumns({
     onEdit: (item) => handleOpenSheet('editProduct', item),
     onDelete: handleDeleteProduct,
-    onUpdateStock: (item) => handleOpenSheet('updateStock', item)
-  }), [handleOpenSheet]);
+    onUpdateStock: (item) => handleOpenSheet('updateStock', item),
+    onViewDetails: handleViewDetails
+  }), [handleOpenSheet, handleViewDetails]);
 
   return (
     <div className="space-y-4">
@@ -251,6 +262,46 @@ export default function ProductsClient() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {selectedItem && (
+        <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
+            <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>{selectedItem.itemName}</DialogTitle>
+                    <DialogDescription>
+                        Detailed information for {selectedItem.brandName || 'this product'}.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                   <div className="grid grid-cols-2 gap-2">
+                        <p className="text-sm font-medium text-muted-foreground">SKU</p>
+                        <p>{selectedItem.sku ?? 'N/A'}</p>
+
+                        <p className="text-sm font-medium text-muted-foreground">Generic Name</p>
+                        <p>{selectedItem.genericName ?? 'N/A'}</p>
+                   </div>
+                   <div className="grid grid-cols-2 gap-2">
+                        <p className="text-sm font-medium text-muted-foreground">Selling Price</p>
+                        <p>{selectedItem.sellingPrice ? `₱${Number(selectedItem.sellingPrice).toFixed(2)}` : 'N/A'}</p>
+                        
+                        <p className="text-sm font-medium text-muted-foreground">Purchase Price</p>
+                        <p>{selectedItem.purchasePrice ? `₱${Number(selectedItem.purchasePrice).toFixed(2)}` : 'N/A'}</p>
+                   </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <p className="text-sm font-medium text-muted-foreground">Reorder Level</p>
+                        <p>{selectedItem.reorderLevel}</p>
+
+                        <p className="text-sm font-medium text-muted-foreground">Location</p>
+                        <p>{selectedItem.location ?? 'N/A'}</p>
+                    </div>
+                     <div className="grid grid-cols-2 gap-2">
+                        <p className="text-sm font-medium text-muted-foreground">Last Updated</p>
+                        <p>{new Date(selectedItem.updatedAt).toLocaleString()}</p>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 } 

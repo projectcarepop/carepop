@@ -353,9 +353,25 @@ adminRoutes
   })
   .delete('/product-categories/:id', async (c) => {
     const { id } = c.req.param();
-    const [deleted] = await db.delete(productCategories).where(eq(productCategories.id, id)).returning({ id: productCategories.id });
-    if (!deleted) return c.json({ error: 'Not Found' }, 404);
-    return c.json({ success: true });
+
+    // Check if any products are using this category
+    const productsInCategory = await db.select({ id: inventory_items.id }).from(inventory_items).where(eq(inventory_items.productCategoryId, id)).limit(1);
+
+    if (productsInCategory.length > 0) {
+      return c.json({ 
+        error: 'Cannot delete category', 
+        message: 'This category is still associated with one or more products. Please reassign them before deleting.' 
+      }, 409); // 409 Conflict
+    }
+
+    try {
+        const [deleted] = await db.delete(productCategories).where(eq(productCategories.id, id)).returning({ id: productCategories.id });
+        if (!deleted) return c.json({ error: 'Not Found' }, 404);
+        return c.json({ success: true, message: 'Category deleted successfully.' });
+    } catch (error: any) {
+        console.error(`Error deleting product category ${id}:`, error);
+        return c.json({ error: 'Failed to delete category', message: error.message }, 500);
+    }
   });
 
 // --- Inventory Management ---
@@ -545,34 +561,47 @@ adminRoutes
     const user = c.get('user');
     
     try {
-      await db.transaction(async (tx) => {
+      const deletedItems = await db.transaction(async (tx) => {
         const [currentItem] = await tx.select({
             quantityOnHand: inventory_items.quantityOnHand
-        }).from(inventory_items).where(eq(inventory_items.id, itemId));
+        }).from(inventory_items).where(and(eq(inventory_items.id, itemId), eq(inventory_items.clinicId, clinicId)));
 
         if (!currentItem) {
-            throw new Error('Item not found');
+            // Throw an error to be caught by the outer catch block, which will return a 404.
+            throw new Error('Item not found in this clinic.');
         }
 
-        await tx.delete(inventory_items)
-            .where(and(eq(inventory_items.id, itemId), eq(inventory_items.clinicId, clinicId)));
-
-        await tx.insert(inventoryAuditLog).values({
-            itemId: itemId,
-            clinicId: clinicId,
-            userId: user.id,
-            changeType: 'deletion',
-            quantityChange: -currentItem.quantityOnHand,
-            oldQuantity: currentItem.quantityOnHand,
-            newQuantity: 0,
-            reason: 'Item deleted from inventory.',
-        });
+        const [deleted] = await tx.delete(inventory_items)
+            .where(and(eq(inventory_items.id, itemId), eq(inventory_items.clinicId, clinicId)))
+            .returning({ id: inventory_items.id });
+        
+        // Only log if deletion was successful
+        if (deleted) {
+            await tx.insert(inventoryAuditLog).values({
+                itemId: itemId,
+                clinicId: clinicId,
+                userId: user.id,
+                changeType: 'deletion',
+                quantityChange: -currentItem.quantityOnHand,
+                oldQuantity: currentItem.quantityOnHand,
+                newQuantity: 0,
+                reason: 'Item deleted from inventory.',
+            });
+        }
+        return deleted;
       });
+      
+      if (!deletedItems) {
+          return c.json({ error: 'Item not found or does not belong to this clinic.'}, 404);
+      }
 
       return c.json({ success: true, message: 'Item deleted successfully.' });
 
     } catch (error: any) {
       console.error(`Error deleting inventory item ${itemId}:`, error);
+      if (error.message.includes('Item not found')) {
+        return c.json({ error: 'Item not found or does not belong to this clinic.' }, 404);
+      }
       return c.json({ error: 'Failed to delete item', message: error.message }, 500);
     }
   });

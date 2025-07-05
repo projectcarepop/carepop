@@ -15,9 +15,10 @@ import { type ProductCategory } from '@/lib/types/inventory';
 
 type CategoryColumnsProps = {
   openSheet: (mode: 'editCategory', category: ProductCategory) => void;
+  onDelete: (category: ProductCategory) => void;
 };
 
-export const categoryColumns = ({ openSheet }: CategoryColumnsProps): ColumnDef<ProductCategory>[] => [
+export const categoryColumns = ({ openSheet, onDelete }: CategoryColumnsProps): ColumnDef<ProductCategory>[] => [
   {
     accessorKey: 'name',
     header: 'Name',
@@ -56,7 +57,12 @@ export const categoryColumns = ({ openSheet }: CategoryColumnsProps): ColumnDef<
             <DropdownMenuItem onClick={() => openSheet('editCategory', category)}>
               Edit Category
             </DropdownMenuItem>
-            {/* Add delete functionality here */}
+            <DropdownMenuItem
+              className="text-red-600"
+              onClick={() => onDelete(category)}
+            >
+              Delete Category
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       );
