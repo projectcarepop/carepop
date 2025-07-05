@@ -32,4 +32,10 @@ export type ProductCategory = {
   id:string;
   name: string;
   description?: string | null;
+};
+
+export type Clinic = {
+  id: string;
+  name: string;
+  // Add other clinic properties as needed
 }; 

@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DataTable } from '@/components/ui/data-table';
-import { columns, InventoryItem } from './columns';
+import { columns } from './columns';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { getAdminClinics, getInventoryForClinic, upsertInventoryItem, deleteInventoryItem, getProductCategories, UpsertInventoryItemPayload } from '@/services/api';
@@ -13,6 +13,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { UpsertInventoryItemForm } from './UpsertInventoryItemForm';
 import { ProductCategoryManager } from './ProductCategoryManager';
 import { ManageItemBatchesModal } from './ManageItemBatchesModal';
+import { InventoryItem, Clinic } from '@/lib/types/inventory';
 import {
   Dialog,
   DialogContent,
@@ -49,7 +50,7 @@ export default function InventoryClient() {
     const [itemToDelete, setItemToDelete] = React.useState<InventoryItem | undefined>(undefined);
     const [batchModalItem, setBatchModalItem] = React.useState<InventoryItem | null>(null);
 
-    const { data: clinics, isLoading: isLoadingClinics } = useQuery({
+    const { data: clinics, isLoading: isLoadingClinics } = useQuery<Clinic[]>({
         queryKey: ['adminClinics'],
         queryFn: () => getAdminClinics(session!.access_token!),
         enabled: !!session?.access_token,
@@ -78,12 +79,11 @@ export default function InventoryClient() {
             if (!selectedClinic) throw new Error("No clinic selected.");
             const payload: UpsertInventoryItemPayload = {
                 ...values,
-                clinicId: selectedClinic,
-                // The API expects strings for numeric types, but the form gives numbers.
                 purchasePrice: values.purchasePrice,
                 sellingPrice: values.sellingPrice,
             };
-            return upsertInventoryItem(payload, session!.access_token!, editingItem?.id);
+            const completePayload = { ...payload, clinicId: selectedClinic };
+            return upsertInventoryItem(completePayload, session!.access_token!, editingItem?.id);
         },
         onSuccess: () => {
             toast({ title: "Success", description: `Item has been saved.` });
@@ -148,7 +148,7 @@ export default function InventoryClient() {
                             <SelectValue placeholder="Select a clinic..." />
                         </SelectTrigger>
                         <SelectContent>
-                            {clinics?.map((clinic: { id: string; name: string }) => (
+                            {clinics?.map((clinic) => (
                                 <SelectItem key={clinic.id} value={clinic.id}>
                                     {clinic.name}
                                 </SelectItem>
@@ -176,7 +176,7 @@ export default function InventoryClient() {
                     <CardContent>
                         <DataTable 
                             columns={columns({ onEdit: handleEditItem, onDelete: handleDeleteClick, onViewBatches: handleViewBatches })} 
-                            data={inventory as InventoryItem[]}
+                            data={inventory}
                             isLoading={isLoadingInventory} 
                             filterColumn="itemName"
                         />
