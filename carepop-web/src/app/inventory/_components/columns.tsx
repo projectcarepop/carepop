@@ -11,7 +11,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { type InventoryItem, type ProductCategory } from "@/lib/types/inventory"
-import { Badge } from "@/components/ui/badge"
 
 // Props for the columns functions to accept handlers from the client component
 interface ProductColumnsProps {
@@ -39,33 +38,28 @@ export const productColumns = ({ onEdit, onDelete, onUpdateStock }: ProductColum
     ),
   },
   {
-    accessorKey: "categoryName",
+    accessorKey: "productCategory.name",
     header: "Category",
+    cell: ({ row }) => row.original.productCategory?.name ?? "N/A",
   },
   {
-    accessorKey: "quantityInStock",
+    accessorKey: "quantityOnHand",
     header: "Stock",
-    cell: ({ row }) => <div className="text-center">{row.original.quantityInStock}</div>,
+    cell: ({ row }) => <div className="text-center">{row.original.quantityOnHand}</div>,
   },
   {
-    accessorKey: "price",
+    accessorKey: "sellingPrice",
     header: "Price",
     cell: ({ row }) => {
-        const amount = parseFloat(row.getValue("price"))
+        const price = row.original.sellingPrice;
+        if (price === null || price === undefined) return "N/A";
+        const amount = typeof price === 'string' ? parseFloat(price) : price;
         const formatted = new Intl.NumberFormat("en-US", {
             style: "currency",
             currency: "PHP",
-        }).format(amount)
+        }).format(amount);
         return <div className="font-medium">{formatted}</div>
     }
-  },
-  {
-    accessorKey: "isActive",
-    header: "Status",
-    cell: ({ row }) => {
-      const isActive = row.getValue("isActive");
-      return <Badge variant={isActive ? "default" : "secondary"}>{isActive ? 'Active' : 'Archived'}</Badge>
-    },
   },
   {
     id: "actions",

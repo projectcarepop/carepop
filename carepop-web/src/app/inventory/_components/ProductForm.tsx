@@ -22,50 +22,68 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
 import { type InventoryItem, type ProductCategory } from '@/lib/types/inventory';
 import { Loader2 } from 'lucide-react';
 
+// This schema defines the form's structure.
 const formSchema = z.object({
   itemName: z.string().min(2, "Item name must be at least 2 characters."),
-  productCategoryId: z.string({ required_error: "Please select a category." }),
-  price: z.coerce.number().min(0, "Price cannot be negative."),
-  isActive: z.boolean().default(true),
-  description: z.string().optional(),
-  // Add other fields from InventoryItem as needed
+  productCategoryId: z.string({ required_error: "Please select a category." }).nullable(),
+  sellingPrice: z.string().optional().nullable(),
+  purchasePrice: z.string().optional().nullable(),
+  sku: z.string().optional().nullable(),
+  genericName: z.string().optional().nullable(),
+  brandName: z.string().optional().nullable(),
+  dosageForm: z.string().optional().nullable(),
+  strength: z.string().optional().nullable(),
+  reorderLevel: z.coerce.number().int().min(0).default(10),
+  location: z.string().optional().nullable(),
 });
+
+export type ProductFormValues = z.infer<typeof formSchema>;
 
 interface ProductFormProps {
   initialData?: InventoryItem;
-  onSubmit: (values: z.infer<typeof formSchema>) => void;
+  onSubmit: (values: ProductFormValues) => void;
   isPending: boolean;
   categories: ProductCategory[];
 }
 
 export function ProductForm({ initialData, onSubmit, isPending, categories }: ProductFormProps) {
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<ProductFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      itemName: initialData?.itemName || '',
-      productCategoryId: initialData?.productCategoryId || '',
-      price: initialData?.sellingPrice || 0,
-      isActive: initialData?.isActive ?? true,
-      description: initialData?.description || '',
+      itemName: '',
+      productCategoryId: '',
+      sellingPrice: '',
+      purchasePrice: '',
+      sku: '',
+      genericName: '',
+      brandName: '',
+      dosageForm: '',
+      strength: '',
+      reorderLevel: 10,
+      location: '',
     },
   });
   
   React.useEffect(() => {
-      if (initialData) {
-          form.reset({
-              itemName: initialData.itemName,
-              productCategoryId: initialData.productCategoryId,
-              price: initialData.sellingPrice,
-              isActive: initialData.isActive,
-              description: initialData.description ?? '',
-          });
-      }
-  }, [initialData, form]);
+    if (initialData) {
+      form.reset({
+        itemName: initialData.itemName,
+        productCategoryId: initialData.productCategoryId ?? null,
+        sellingPrice: initialData.sellingPrice?.toString() ?? '',
+        purchasePrice: initialData.purchasePrice?.toString() ?? '',
+        sku: initialData.sku ?? '',
+        genericName: initialData.genericName ?? '',
+        brandName: initialData.brandName ?? '',
+        dosageForm: initialData.dosageForm ?? '',
+        strength: initialData.strength ?? '',
+        reorderLevel: initialData.reorderLevel ?? 10,
+        location: initialData.location ?? '',
+      });
+    }
+  }, [initialData, form.reset]);
 
   return (
     <Form {...form}>
@@ -85,36 +103,123 @@ export function ProductForm({ initialData, onSubmit, isPending, categories }: Pr
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <FormField
+            control={form.control}
+            name="productCategoryId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Category</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="sku"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>SKU (Stock Keeping Unit)</FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g., PARA-500-100" {...field} value={field.value ?? ''} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <FormField
               control={form.control}
-              name="productCategoryId"
+              name="brandName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Category</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a category" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FormLabel>Brand Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Biogesic" {...field} value={field.value ?? ''}/>
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
             <FormField
               control={form.control}
-              name="price"
+              name="genericName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Generic Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Paracetamol" {...field} value={field.value ?? ''}/>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>.
+              )}
+            />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <FormField
+              control={form.control}
+              name="strength"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Strength</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., 500mg" {...field} value={field.value ?? ''}/>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="dosageForm"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Dosage Form</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Tablet" {...field} value={field.value ?? ''}/>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <FormField
+              control={form.control}
+              name="purchasePrice"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Purchase Price (PHP)</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.01" placeholder="e.g., 8.00" {...field} value={field.value ?? ''}/>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="sellingPrice"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Selling Price (PHP)</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="e.g., 10.50" {...field} />
+                    <Input type="number" step="0.01" placeholder="e.g., 10.50" {...field} value={field.value ?? ''}/>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -122,47 +227,46 @@ export function ProductForm({ initialData, onSubmit, isPending, categories }: Pr
             />
         </div>
         
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Description (Optional)</FormLabel>
-              <FormControl>
-                <Textarea placeholder="A brief description of the product." {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <FormField
+              control={form.control}
+              name="reorderLevel"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Re-order Level</FormLabel>
+                  <FormControl>
+                    <Input type="number" {...field} />
+                  </FormControl>
+                   <FormDescription>
+                    Min. stock level before re-ordering.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="location"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Storage Location</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Shelf A-1" {...field} value={field.value ?? ''}/>
+                  </FormControl>
+                   <FormDescription>
+                    Where the item is stored in the clinic.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+        </div>
 
-        <FormField
-          control={form.control}
-          name="isActive"
-          render={({ field }) => (
-            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-              <div className="space-y-0.5">
-                <FormLabel className="text-base">
-                  Active
-                </FormLabel>
-                <FormDescription>
-                  Uncheck this to archive the product instead of deleting it.
-                </FormDescription>
-              </div>
-              <FormControl>
-                <Checkbox
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                />
-              </FormControl>
-            </FormItem>
-          )}
-        />
-        <Button type="submit" disabled={isPending} className="w-full">
-          {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          {isPending ? 'Saving...' : 'Save Product'}
+        <Button type="submit" disabled={isPending}>
+          {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {initialData ? 'Save Changes' : 'Create Product'}
         </Button>
       </form>
     </Form>
   );
-} 
+}

@@ -16,6 +16,8 @@ const formSchema = z.object({
   description: z.string().optional(),
 });
 
+export type CategoryFormValues = z.infer<typeof formSchema>;
+
 interface CategoryFormProps {
   initialData?: ProductCategory;
   onSubmit: (values: z.infer<typeof formSchema>) => void;

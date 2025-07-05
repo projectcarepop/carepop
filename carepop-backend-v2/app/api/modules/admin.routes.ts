@@ -80,41 +80,37 @@ const productCategorySchema = z.object({
     description: z.string().optional(),
 });
 
-// Schema for creating a new inventory item - ALIGNED WITH NEW SCHEMA
+// Schema for creating a new inventory item - THIS IS THE FIX
 const createInventoryItemSchema = z.object({
-    clinicId: z.string().uuid(),
-    productCategoryId: z.string().uuid().optional(),
-    itemName: z.string().min(1),
-    sku: z.string().optional(),
-    genericName: z.string().optional(),
-    brandName: z.string().optional(),
-    dosageForm: z.string().optional(),
-    strength: z.string().optional(),
-    quantityOnHand: z.number().int().min(0),
-    reorderLevel: z.number().int().min(0).optional(),
-    purchasePrice: z.string().optional(),
-    sellingPrice: z.string().optional(),
-    batchNumber: z.string().optional(),
-    expiryDate: z.string().date().optional(),
-    location: z.string().optional(),
+    clinicId: z.string().uuid("A valid clinic ID is required."),
+    productCategoryId: z.string().uuid("A valid category ID is required.").optional().nullable(),
+    itemName: z.string().min(1, "Item name is required."),
+    sku: z.string().optional().nullable(),
+    genericName: z.string().optional().nullable(),
+    brandName: z.string().optional().nullable(),
+    dosageForm: z.string().optional().nullable(),
+    strength: z.string().optional().nullable(),
+    quantityOnHand: z.coerce.number().int().min(0).optional().default(0),
+    reorderLevel: z.coerce.number().int().min(0).default(10),
+    purchasePrice: z.coerce.number().optional().nullable(),
+    sellingPrice: z.coerce.number().optional().nullable(),
+    location: z.string().optional().nullable(),
 });
 
-// Schema for updating an existing inventory item - ALIGNED WITH NEW SCHEMA
+// Schema for updating an existing inventory item - THIS IS THE FIX
 const updateInventoryItemSchema = z.object({
-    productCategoryId: z.string().uuid().optional(),
-    itemName: z.string().min(1).optional(),
-    sku: z.string().optional(),
-    genericName: z.string().optional(),
-    brandName: z.string().optional(),
-    dosageForm: z.string().optional(),
-    strength: z.string().optional(),
-    quantityOnHand: z.number().int().min(0).optional(),
-    reorderLevel: z.number().int().min(0).optional(),
-    purchasePrice: z.string().optional(),
-    sellingPrice: z.string().optional(),
-    batchNumber: z.string().optional(),
-    expiryDate: z.string().date().optional(),
-    location: z.string().optional(),
+    productCategoryId: z.string().uuid("A valid category ID is required.").optional().nullable(),
+    itemName: z.string().min(1, "Item name is required.").optional(),
+    sku: z.string().optional().nullable(),
+    genericName: z.string().optional().nullable(),
+    brandName: z.string().optional().nullable(),
+    dosageForm: z.string().optional().nullable(),
+    strength: z.string().optional().nullable(),
+    quantityOnHand: z.coerce.number().int().min(0).optional(),
+    reorderLevel: z.coerce.number().int().min(0).optional(),
+    purchasePrice: z.coerce.number().optional().nullable(),
+    sellingPrice: z.coerce.number().optional().nullable(),
+    location: z.string().optional().nullable(),
 });
 
 // Schema for creating/updating services
@@ -367,11 +363,16 @@ adminRoutes
 // Get all inventory items for a specific clinic
 adminRoutes.get('/clinics/:clinicId/inventory', async (c) => {
     const { clinicId } = c.req.param();
-    // The query is now simplified as the relation to `products` is removed.
-    // All necessary data is on the inventory_items table itself.
     const items = await db.query.inventory_items.findMany({
         where: eq(inventory_items.clinicId, clinicId),
         orderBy: asc(inventory_items.updatedAt),
+        with: {
+            productCategory: {
+                columns: {
+                    name: true,
+                }
+            }
+        }
     });
     return c.json({ data: items });
 });
@@ -411,8 +412,14 @@ adminRoutes.post('/inventory-items', zValidator('json', createInventoryItemSchem
         return c.json({ error: `'${newItemData.itemName}' is already listed in this clinic's inventory. Please update the existing item's quantity or details instead of adding a duplicate.` }, 409);
     }
 
+    const dbPayload = {
+        ...newItemData,
+        purchasePrice: newItemData.purchasePrice?.toString(),
+        sellingPrice: newItemData.sellingPrice?.toString(),
+    };
+
     // The data from the validator is already in the correct shape for the new schema
-    const [createdItem] = await db.insert(inventory_items).values(newItemData).returning();
+    const [createdItem] = await db.insert(inventory_items).values(dbPayload).returning();
     return c.json(createdItem, 201);
 });
 
@@ -420,10 +427,15 @@ adminRoutes.post('/inventory-items', zValidator('json', createInventoryItemSchem
 adminRoutes.put('/inventory-items/:itemId', zValidator('json', updateInventoryItemSchema), async (c) => {
     const { itemId } = c.req.param();
     const updatedValues = c.req.valid('json');
-    const [updatedItem] = await db.update(inventory_items).set({
+    
+    const dbPayload = {
         ...updatedValues,
+        purchasePrice: updatedValues.purchasePrice?.toString(),
+        sellingPrice: updatedValues.sellingPrice?.toString(),
         updatedAt: new Date().toISOString(), // Ensure updatedAt is updated on every modification
-    }).where(eq(inventory_items.id, itemId)).returning();
+    };
+
+    const [updatedItem] = await db.update(inventory_items).set(dbPayload).where(eq(inventory_items.id, itemId)).returning();
 
     if (!updatedItem) return c.json({ error: 'Inventory item not found' }, 404);
     return c.json(updatedItem);

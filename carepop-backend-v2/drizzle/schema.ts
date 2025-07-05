@@ -223,8 +223,8 @@ export const inventory_items = pgTable("inventory_items", {
 	quantityOnHand: integer("quantity_on_hand").default(0).notNull(),
 	reorderLevel: integer("reorder_level").default(10).notNull(),
 
-	purchasePrice: numeric("purchase_price", { precision: 10, scale: 2 }),
-	sellingPrice: numeric("selling_price", { precision: 10, scale: 2 }),
+	purchasePrice: numeric("purchase_price", { precision: 10, scale: 2 }).map(Number),
+	sellingPrice: numeric("selling_price", { precision: 10, scale: 2 }).map(Number),
 	
 	batchNumber: text("batch_number"),
 	expiryDate: date("expiry_date"),

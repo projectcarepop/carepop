@@ -4,22 +4,20 @@ export type InventoryItem = {
   id: string;
   clinicId: string;
   itemName: string;
-  productCategoryId: string;
+  productCategoryId: string | null;
   sku?: string | null;
   genericName?: string | null;
   brandName?: string | null;
   dosageForm?: string | null;
   strength?: string | null;
-  quantityInStock: number;
+  quantityOnHand: number;
   reorderLevel: number;
   purchasePrice?: number | null;
   sellingPrice?: number | null;
   location?: string | null;
-  description?: string | null;
   updatedAt: string;
-  // Optional nested object for joined data
+  // This is the shape of the joined data from the backend
   productCategory?: {
-    id: string;
     name: string;
   } | null;
 };
