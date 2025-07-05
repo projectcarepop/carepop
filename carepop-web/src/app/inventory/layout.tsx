@@ -36,7 +36,7 @@ export default async function InventoryLayout({
     return (
         <div className="flex min-h-screen w-full">
             <InventorySidebar />
-            <main className="flex-1 sm:ml-64">
+            <main className="flex-1">
                 <div className="p-4 sm:p-6">
                     {children}
                 </div>

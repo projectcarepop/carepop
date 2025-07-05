@@ -1,5 +1,5 @@
-import InventoryClient from "../_components/InventoryClient";
+import ProductsClient from "../_components/ProductsClient";
 
-export default async function InventoryPage() {
-    return <InventoryClient />;
+export default async function InventoryProductsPage() {
+    return <ProductsClient />;
 } 
