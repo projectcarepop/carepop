@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { db } from '../lib/db';
 import { clinics, profiles, doctors, services, productCategories, inventory_items, serviceCategories, appointments, medicalRecords, recordDoctorNotes, recordPrescriptions, recordDocuments, clinicServices, inventoryAuditLog } from '../../../drizzle/schema';
-import { eq, sql, count, asc, and, gte, lt, getTableColumns, desc, inArray, SQL } from 'drizzle-orm';
+import { eq, sql, count, asc, and, gte, lt, getTableColumns, desc, inArray, SQL, sum } from 'drizzle-orm';
 import { authMiddleware, adminOrManagerMiddleware, AuthEnv } from '../middleware/auth';
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
@@ -397,6 +397,46 @@ adminRoutes
     .orderBy(desc(inventory_items.updatedAt));
 
     return c.json({ data: items });
+  })
+  .get('/clinics/:clinicId/inventory/stats', async (c) => {
+    const { clinicId } = c.req.param();
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+    try {
+      const [stats] = await db.select({
+        totalProducts: count(inventory_items.id),
+        totalQuantity: sum(inventory_items.quantityOnHand).mapWith(Number),
+        totalPurchaseValue: sum(sql<number>`${inventory_items.purchasePrice} * ${inventory_items.quantityOnHand}`).mapWith(Number),
+        totalSellingValue: sum(sql<number>`${inventory_items.sellingPrice} * ${inventory_items.quantityOnHand}`).mapWith(Number),
+      }).from(inventory_items).where(eq(inventory_items.clinicId, clinicId));
+
+      const [lowStockCount] = await db.select({
+        count: count()
+      }).from(inventory_items).where(and(
+        eq(inventory_items.clinicId, clinicId),
+        sql`${inventory_items.quantityOnHand} <= ${inventory_items.reorderLevel}`
+      ));
+
+      const [expiringSoonCount] = await db.select({
+        count: count()
+      }).from(inventory_items).where(and(
+        eq(inventory_items.clinicId, clinicId),
+        sql`${inventory_items.expiryDate} IS NOT NULL`,
+        lt(inventory_items.expiryDate, thirtyDaysFromNow.toISOString())
+      ));
+
+      return c.json({
+        data: {
+          ...stats,
+          lowStockCount: lowStockCount.count,
+          expiringSoonCount: expiringSoonCount.count,
+        }
+      });
+    } catch (error: any) {
+        console.error(`Error fetching inventory stats for clinic ${clinicId}:`, error);
+        return c.json({ error: 'Failed to fetch inventory stats', message: error.message }, 500);
+    }
   })
   .post('/clinics/:clinicId/inventory', zValidator('json', createInventoryItemSchema), async (c) => {
     const { clinicId } = c.req.param();

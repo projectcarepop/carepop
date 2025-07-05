@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
-import { getNearbyClinics } from '@/services/api';
+import { useQuery } from '@tanstack/react-query';
+import { searchClinics } from '@/services/api';
+import { Loader2 } from 'lucide-react';
 
 // Child Component Imports
 import ClinicList from './ClinicList';
@@ -10,8 +12,6 @@ import SlidingPanel, { PanelState } from './SlidingPanel';
 import ClinicDetailModal from './ClinicDetailModal';
 import DynamicMapLoader from './DynamicMapLoader';
 import ServiceFilter from './ServiceFilter';
-import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
 
 // --- CANONICAL TYPE DEFINITIONS ---
 // This is the single, consistent shape we will use for all clinic-related
@@ -29,14 +29,6 @@ export type ClinicForFinder = {
   services_offered?: string[];
   fpop_chapter_affiliation?: string | null;
   distance_km?: number | null;
-};
-
-// This matches the data shape from the /public/clinics/nearby API endpoint
-type NearbyClinicFromAPI = {
-    id: string;
-    name: string;
-    address: { street: string; city: string; zip: string; } | null;
-    location: string; // The backend returns "POINT(lon lat)"
 };
 
 // This is the shape for the Service type
@@ -97,37 +89,30 @@ const transformToClinicForFinder = (clinicData: any): ClinicForFinder => {
 export default function ClinicFinderClient({ initialClinics, initialServices }: ClinicFinderClientProps) {
   const { toast } = useToast();
   const [panelState, setPanelState] = useState<PanelState>('partial');
-  const [isLoading, setIsLoading] = useState(false);
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
-
-  const [clinics, setClinics] = useState<ClinicForFinder[]>(() =>
-    initialClinics.map(transformToClinicForFinder)
-  );
 
   const [selectedClinic, setSelectedClinic] = useState<ClinicForFinder | null>(null);
   const [highlightedClinic, setHighlightedClinic] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
   const [routeDestination, setRouteDestination] = useState<ClinicForFinder | null>(null);
 
-  const filteredClinics = clinics.filter(clinic => {
-    if (selectedServiceIds.length === 0) return true;
-    // A clinic's services_offered is an array of service IDs.
-    // Check if there is an intersection between the clinic's services and the selected services.
-    return clinic.services_offered?.some(serviceId => selectedServiceIds.includes(serviceId));
+  // Use React Query to fetch and manage clinic data
+  const { data: clinics, isLoading } = useQuery({
+    // Query key changes when filters change, triggering a refetch
+    queryKey: ['clinics', { services: selectedServiceIds, location: userLocation }],
+    queryFn: async () => {
+      const filters = {
+        serviceId: selectedServiceIds.length > 0 ? selectedServiceIds[0] : null, // Assuming single select for now
+        userLocation: userLocation,
+      };
+      const results = await searchClinics(filters);
+      return results.map(transformToClinicForFinder);
+    },
+    // The query will not run until a user location is available
+    enabled: !!userLocation,
+    initialData: initialClinics.map(transformToClinicForFinder),
+    placeholderData: (previousData) => previousData,
   });
-
-  const handleSearch = async (lat: number, lon: number) => {
-      setIsLoading(true);
-      try {
-          const nearbyClinicsFromApi: NearbyClinicFromAPI[] = await getNearbyClinics(lat, lon);
-          setClinics(nearbyClinicsFromApi.map(transformToClinicForFinder));
-      } catch (error) {
-          console.error(error);
-          toast({ title: "Error", description: "Could not find nearby clinics." });
-      } finally {
-          setIsLoading(false);
-      }
-  };
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -140,6 +125,8 @@ export default function ClinicFinderClient({ initialClinics, initialServices }: 
         },
         () => {
           toast({ title: "Location Access Denied", description: "Map will be centered generally." });
+          // If they deny location, we can still show the initial clinics without a location filter
+          setUserLocation({ lat: 0, lon: 0 }); // Use a dummy location to enable the query
         }
       );
     }
@@ -148,7 +135,7 @@ export default function ClinicFinderClient({ initialClinics, initialServices }: 
   return (
     <div className="relative w-full h-screen">
       <DynamicMapLoader
-        clinics={clinics}
+        clinics={clinics || []}
         userLocation={userLocation}
         routeDestination={routeDestination}
         highlightedClinic={highlightedClinic}
@@ -165,20 +152,22 @@ export default function ClinicFinderClient({ initialClinics, initialServices }: 
           />
           <div className="flex items-center justify-between my-4">
              <h2 className="text-xl font-bold">Nearby Clinics</h2>
-             <Button onClick={() => userLocation && handleSearch(userLocation.lat, userLocation.lon)} disabled={isLoading || !userLocation}>
-                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Search This Area
-            </Button>
           </div>
 
           <div className="flex-grow overflow-y-auto">
-            <ClinicList
-              clinics={filteredClinics}
-              onViewDetails={setSelectedClinic}
-              onShowRoute={setRouteDestination}
-              highlightedClinic={highlightedClinic}
-              onHighlightChange={setHighlightedClinic}
-            />
+            {isLoading ? (
+                <div className="flex justify-center items-center h-48">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+            ) : (
+                <ClinicList
+                  clinics={clinics || []}
+                  onViewDetails={setSelectedClinic}
+                  onShowRoute={setRouteDestination}
+                  highlightedClinic={highlightedClinic}
+                  onHighlightChange={setHighlightedClinic}
+                />
+            )}
           </div>
         </div>
       </SlidingPanel>

@@ -14,7 +14,9 @@ import { useAuth } from '@/lib/contexts/auth-context';
 import { 
   getInventoryForClinic, 
   getProductCategories,
-  upsertInventoryItem, 
+  getInventoryStats,
+  upsertInventoryItem,
+  deleteInventoryItem,
   upsertProductCategory,
   getAdminClinics,
 } from '@/services/api';
@@ -25,6 +27,7 @@ import { ProductForm, type ProductFormValues } from './_components/ProductForm';
 import { CategoryForm, type CategoryFormValues } from './_components/CategoryForm';
 import { ClinicSelector } from './_components/ClinicSelector';
 import { UpdateStockForm, type UpdateStockFormValues } from './_components/UpdateStockForm';
+import { InventoryDashboard } from './_components/InventoryDashboard';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 
@@ -54,6 +57,13 @@ export default function InventoryClient() {
     select: (data) => data.data,
   });
 
+  const { data: inventoryStats, isLoading: isLoadingStats } = useQuery({
+    queryKey: ['inventory-stats', selectedClinicId],
+    queryFn: () => getInventoryStats(selectedClinicId!, accessToken!),
+    enabled: !!accessToken && !!selectedClinicId,
+    select: (data) => data.data,
+  });
+
   const { data: categories, isLoading: isLoadingCategories } = useQuery({
     queryKey: ['admin-product-categories'],
     queryFn: () => getProductCategories(accessToken!),
@@ -71,7 +81,8 @@ export default function InventoryClient() {
   const handleMutationSuccess = (entity: string) => {
     toast({ title: `${entity} saved successfully.` });
     setIsSheetOpen(false);
-    if (entity === 'Product') {
+    queryClient.invalidateQueries({ queryKey: ['inventory-stats', selectedClinicId] });
+    if (entity === 'Product' || entity === 'Stock') {
       queryClient.invalidateQueries({ queryKey: ['inventory-items', selectedClinicId] });
     } else {
       queryClient.invalidateQueries({ queryKey: ['admin-product-categories'] });
@@ -88,12 +99,11 @@ export default function InventoryClient() {
         
         const payload = {
             ...rest,
-            clinicId: selectedClinicId!,
             sellingPrice: sellingPrice ? parseFloat(sellingPrice) : null,
             purchasePrice: purchasePrice ? parseFloat(purchasePrice) : null,
             expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
         };
-        return upsertInventoryItem(payload, accessToken!, data.id);
+        return upsertInventoryItem(selectedClinicId!, payload, accessToken!, data.id);
     },
     onSuccess: () => handleMutationSuccess('Product'),
     onError: (error) => handleMutationError(error, 'Product'),
@@ -110,10 +120,20 @@ export default function InventoryClient() {
       const payload = {
         quantityOnHand: data.values.quantityOnHand,
       };
-      return upsertInventoryItem(payload, accessToken!, data.id);
+      return upsertInventoryItem(selectedClinicId!, payload, accessToken!, data.id);
     },
     onSuccess: () => handleMutationSuccess('Stock'),
     onError: (error) => handleMutationError(error, 'Stock'),
+  });
+
+  const deleteProductMutation = useMutation({
+    mutationFn: (item: InventoryItem) => deleteInventoryItem(selectedClinicId!, item.id, accessToken!),
+    onSuccess: () => {
+        toast({ title: 'Product deleted successfully.' });
+        queryClient.invalidateQueries({ queryKey: ['inventory-items', selectedClinicId] });
+        queryClient.invalidateQueries({ queryKey: ['inventory-stats', selectedClinicId] });
+    },
+    onError: (error) => handleMutationError(error, 'Product deletion'),
   });
 
   const handleOpenSheet = React.useCallback((
@@ -125,7 +145,9 @@ export default function InventoryClient() {
     setIsSheetOpen(true);
   }, []);
   
-  const handleDeleteProduct = (item: InventoryItem) => console.log('Delete product', item);
+  const handleDeleteProduct = (item: InventoryItem) => {
+    deleteProductMutation.mutate(item);
+  }
 
   const columns = React.useMemo(() => productColumns({
     onEdit: (item) => handleOpenSheet('editProduct', item),
@@ -148,6 +170,9 @@ export default function InventoryClient() {
             onClinicSelect={setSelectedClinicId}
             isLoading={isLoadingClinics}
           />
+      </div>
+      <div className="mb-4">
+        <InventoryDashboard stats={inventoryStats} isLoading={isLoadingStats} />
       </div>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="flex items-center justify-between">

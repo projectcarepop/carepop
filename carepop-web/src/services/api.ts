@@ -480,17 +480,39 @@ export async function getInventoryForClinic(
     return response.json();
 }
 
-export async function upsertInventoryItem(itemData: UpsertInventoryItemPayload, accessToken: string, itemId?: string) {
+export async function getInventoryStats(clinicId: string, accessToken: string) {
+  const headers = await getAuthHeaders(accessToken);
+  const url = `${API_BASE_URL}/api/admin/clinics/${clinicId}/inventory/stats`;
+  const response = await fetch(url, { headers, cache: 'no-store' });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: "Failed to fetch inventory stats." }));
+    throw new Error(error.message);
+  }
+  return response.json();
+}
+
+export async function upsertInventoryItem(
+  clinicId: string, 
+  itemData: UpsertInventoryItemPayload, 
+  accessToken: string, 
+  itemId?: string
+) {
   const method = itemId ? 'PUT' : 'POST';
   const url = itemId
-    ? `${API_BASE_URL}/api/admin/inventory-items/${itemId}`
-    : `${API_BASE_URL}/api/admin/inventory-items`;
+    ? `${API_BASE_URL}/api/admin/clinics/${clinicId}/inventory/${itemId}`
+    : `${API_BASE_URL}/api/admin/clinics/${clinicId}/inventory`;
 
   const headers = await getAuthHeaders(accessToken);
+
+  // For POST requests, we must include the clinicId in the body.
+  const body = method === 'POST' 
+    ? JSON.stringify({ ...itemData, clinicId })
+    : JSON.stringify(itemData);
+
   const response = await fetch(url, {
     method,
     headers,
-    body: JSON.stringify(itemData),
+    body: body,
   });
   
   if (!response.ok) {
@@ -501,9 +523,9 @@ export async function upsertInventoryItem(itemData: UpsertInventoryItemPayload, 
 }
 export const upsertProduct = upsertInventoryItem; // Alias for compatibility
 
-export async function deleteInventoryItem(itemId: string, accessToken: string) {
+export async function deleteInventoryItem(clinicId: string, itemId: string, accessToken: string) {
   const headers = await getAuthHeaders(accessToken);
-  const response = await fetch(`${API_BASE_URL}/api/admin/inventory-items/${itemId}`, {
+  const response = await fetch(`${API_BASE_URL}/api/admin/clinics/${clinicId}/inventory/${itemId}`, {
     method: 'DELETE',
     headers,
   });
