@@ -34,10 +34,12 @@ export default async function InventoryLayout({
     }
 
     return (
-        <div className="w-full">
+        <div className="flex min-h-screen w-full">
             <InventorySidebar />
-            <main className="sm:ml-14 flex-1">
-                {children}
+            <main className="flex-1 sm:ml-64">
+                <div className="p-4 sm:p-6">
+                    {children}
+                </div>
             </main>
         </div>
     );
