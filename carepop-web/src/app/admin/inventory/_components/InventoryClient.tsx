@@ -4,25 +4,26 @@ import * as React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { PlusCircle } from 'lucide-react';
-import { 
-  getAdminProducts, 
-  upsertProduct, 
-  deleteProduct,
-  getAdminProductCategories, 
+import {
+  getAdminProducts,
+  upsertInventoryItem as upsertProduct,
+  deleteInventoryItem as deleteProduct,
+  getProductCategories as getAdminProductCategories,
   upsertProductCategory,
   deleteProductCategory,
-  updateStock
+  addBatchToItem,
+  type NewProductCategoryPayload,
 } from '@/services/api';
 import { DataTable } from '@/components/ui/data-table';
-import { type AdminProduct, type ProductCategory } from '@/lib/types';
+import { type InventoryItem, type ProductCategory } from '@/lib/types/inventory';
 import { columns as productColumns } from './columns-product';
 import { columns as categoryColumns } from './columns-category';
 import { Button } from '@/components/ui/button';
-import { 
-    Dialog, 
-    DialogContent, 
-    DialogHeader, 
-    DialogTitle 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle
 } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -43,7 +44,7 @@ import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 
 interface InventoryClientProps {
-  initialProducts: AdminProduct[];
+  initialProducts: InventoryItem[];
   initialCategories: ProductCategory[];
 }
 
@@ -56,18 +57,32 @@ export default function InventoryClient({ initialProducts, initialCategories }: 
   const [stockModal, setStockModal] = React.useState(false);
   const [deleteDialog, setDeleteDialog] = React.useState<{ type: 'product' | 'category' | null, id: string | null, name: string | null }>({ type: null, id: null, name: null });
 
-  const [selectedProduct, setSelectedProduct] = React.useState<AdminProduct | undefined>(undefined);
+  const [selectedProduct, setSelectedProduct] = React.useState<InventoryItem | undefined>(undefined);
   const [selectedCategory, setSelectedCategory] = React.useState<ProductCategory | undefined>(undefined);
   const [globalFilter, setGlobalFilter] = React.useState('');
   const [activeTab, setActiveTab] = React.useState('products');
 
   // Queries
-  const { data: products, isError: isErrorProducts } = useQuery({ queryKey: ['adminProducts'], queryFn: () => getAdminProducts(session!.access_token), initialData: initialProducts, enabled: !!session });
-  const { data: categories, isError: isErrorCategories } = useQuery({ queryKey: ['adminProductCategories'], queryFn: () => getAdminProductCategories(session!.access_token), initialData: initialCategories, enabled: !!session });
+  const { data: products, isError: isErrorProducts } = useQuery({
+    queryKey: ['adminProducts'],
+    queryFn: () => getAdminProducts(session!.access_token),
+    initialData: initialProducts,
+    enabled: !!session,
+    select: (data: any) => data.data || [], // Select the nested data array safely
+  });
+
+  const { data: categories, isError: isErrorCategories } = useQuery({
+    queryKey: ['adminProductCategories'],
+    queryFn: () => getAdminProductCategories(session!.access_token),
+    initialData: initialCategories,
+    enabled: !!session,
+    select: (data: any) => data.data || [], // Select the nested data array safely
+  });
+
 
   // Mutations
   const productMutation = useMutation({
-    mutationFn: (data: Partial<AdminProduct>) => upsertProduct(data, session!.access_token, data.id),
+    mutationFn: (data: Partial<InventoryItem>) => upsertProduct(data, session!.access_token, data.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminProducts'] });
       toast({ title: 'Success!', description: 'Product has been saved.' });
@@ -77,7 +92,7 @@ export default function InventoryClient({ initialProducts, initialCategories }: 
   });
 
   const categoryMutation = useMutation({
-    mutationFn: (data: Partial<ProductCategory>) => upsertProductCategory(data, session!.access_token, data.id),
+    mutationFn: (data: NewProductCategoryPayload) => upsertProductCategory(data, session!.access_token, (data as any).id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminProductCategories'] });
       toast({ title: 'Success!', description: 'Category has been saved.' });
@@ -107,7 +122,7 @@ export default function InventoryClient({ initialProducts, initialCategories }: 
   });
 
   const updateStockMutation = useMutation({
-    mutationFn: (data: { productId: string; quantity: number }) => updateStock(data.productId, data.quantity, session!.access_token),
+    mutationFn: (data: { productId: string; quantity: number, batchNumber?: string, expiryDate: string }) => addBatchToItem(data.productId, { quantity: data.quantity, batchNumber: data.batchNumber, expiryDate: data.expiryDate }, session!.access_token),
     onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['adminProducts'] });
         toast({ title: 'Stock Updated' });
@@ -117,19 +132,24 @@ export default function InventoryClient({ initialProducts, initialCategories }: 
   });
 
   // Handlers
-  const handleEditProduct = (p: AdminProduct) => { setSelectedProduct(p); setProductModal(true); };
+  const handleEditProduct = (p: InventoryItem) => { setSelectedProduct(p); setProductModal(true); };
   const handleEditCategory = (c: ProductCategory) => { setSelectedCategory(c); setCategoryModal(true); };
-  const handleDeleteProduct = (p: AdminProduct) => setDeleteDialog({ type: 'product', id: p.id, name: p.name });
+  const handleDeleteProduct = (p: InventoryItem) => setDeleteDialog({ type: 'product', id: p.id, name: p.itemName });
   const handleDeleteCategory = (c: ProductCategory) => setDeleteDialog({ type: 'category', id: c.id, name: c.name });
-  const handleUpdateStock = (p: AdminProduct) => { setSelectedProduct(p); setStockModal(true); };
+  const handleUpdateStock = (p: InventoryItem) => { setSelectedProduct(p); setStockModal(true); };
   
   const handleProductSubmit = (values: any) => {
     productMutation.mutate({ ...values, id: selectedProduct?.id, price: String(values.price) });
   };
   
-  const handleStockSubmit = (values: { quantity: number }) => {
+  const handleStockSubmit = (values: { quantity: number, batchNumber?: string, expiryDate: string }) => {
     if (selectedProduct) {
-        updateStockMutation.mutate({ productId: selectedProduct.id, quantity: values.quantity });
+        updateStockMutation.mutate({ 
+            productId: selectedProduct.id, 
+            quantity: values.quantity,
+            batchNumber: values.batchNumber,
+            expiryDate: values.expiryDate
+        });
     }
   }
 
@@ -145,7 +165,7 @@ export default function InventoryClient({ initialProducts, initialCategories }: 
 
   const filterConfig = {
     products: {
-      column: 'name',
+      column: 'itemName',
       placeholder: 'Filter products...',
     },
     categories: {
@@ -227,7 +247,7 @@ export default function InventoryClient({ initialProducts, initialCategories }: 
       <Dialog open={stockModal} onOpenChange={setStockModal}>
         <DialogContent className="sm:max-w-md">
             <DialogHeader>
-                <DialogTitle>Update Stock for {selectedProduct?.name}</DialogTitle>
+                <DialogTitle>Update Stock for {selectedProduct?.itemName}</DialogTitle>
             </DialogHeader>
             <UpdateStockForm
                 product={selectedProduct}
@@ -249,9 +269,7 @@ export default function InventoryClient({ initialProducts, initialCategories }: 
               </AlertDialogHeader>
               <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={confirmDelete} disabled={deleteProductMutation.isPending || deleteCategoryMutation.isPending}>
-                      Continue
-                  </AlertDialogAction>
+                  <AlertDialogAction onClick={confirmDelete}>Continue</AlertDialogAction>
               </AlertDialogFooter>
           </AlertDialogContent>
       </AlertDialog>

@@ -1,6 +1,7 @@
 import { type InferSelectModel, type InferInsertModel } from "drizzle-orm";
 import * as schema from "../drizzle/schema";
 import { z } from "zod";
+import { type Database } from './supabase/types';
 
 // =================================================================
 // ENUMS
@@ -13,7 +14,7 @@ export const userRoleEnum = schema.userRole.enumValues;
 // =================================================================
 // PROFILES & USERS
 // =================================================================
-export type Profile = InferSelectModel<typeof schema.profiles>;
+export type Profile = Database['public']['Tables']['profiles']['Row'];
 export type NewProfile = InferInsertModel<typeof schema.profiles>;
 
 // =================================================================
@@ -78,8 +79,12 @@ export type NewAppointment = InferInsertModel<typeof schema.appointments>;
 
 // To satisfy the simplified booking flow, let's make doctorId optional
 // on the type used by the frontend form.
-export type AppointmentBookingPayload = Omit<NewAppointment, 'doctorId'> & {
-  doctorId?: string | null;
+export type AppointmentBookingPayload = {
+  clinic_id: string;
+  doctor_id: string;
+  service_id: string;
+  appointment_time: string; // ISO 8601 format
+  patient_notes?: string;
 };
 
 // =================================================================
@@ -236,10 +241,7 @@ export type AdminStats = {
   totalServices: number;
   upcomingAppointments: number;
   productsOutOfStock: number;
-};export const adminUserSchema = z.object({
-    id: z.string(),
-    // ... existing code ...
-});
+};
 
 // --- Custom Types for Enriched Data ---
 export type MedicalRecordWithDetails = MedicalRecord & {
@@ -266,3 +268,19 @@ export type MedicalRecordWithRelations = {
   };
 };
 
+// This is the shape the Admin UI for inventory expects.
+// It might be a flattened/transformed version of the database types.
+export type AdminProduct = {
+  id: string;
+  name: string;
+  description: string | null;
+  price: string;
+  isActive: boolean;
+  categoryName: string;
+  quantityOnHand: number;
+};
+
+export const adminUserSchema = z.object({
+    id: z.string(),
+    // ... existing code ...
+});

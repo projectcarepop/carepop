@@ -12,29 +12,29 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { AdminProduct } from '@/lib/types';
+import { type InventoryItem } from '@/lib/types/inventory';
 
 interface ColumnActions {
-  onEdit: (product: AdminProduct) => void;
-  onDelete: (product: AdminProduct) => void;
-  onUpdateStock: (product: AdminProduct) => void;
+  onEdit: (product: InventoryItem) => void;
+  onDelete: (product: InventoryItem) => void;
+  onUpdateStock: (product: InventoryItem) => void;
 }
 
-export const columns = ({ onEdit, onDelete, onUpdateStock }: ColumnActions): ColumnDef<AdminProduct>[] => [
+export const columns = ({ onEdit, onDelete, onUpdateStock }: ColumnActions): ColumnDef<InventoryItem>[] => [
   {
-    accessorKey: 'name',
+    accessorKey: 'itemName',
     header: 'Name',
   },
   {
-    accessorKey: 'categoryName',
+    accessorKey: 'productCategory.name',
     header: 'Category',
-    cell: ({ row }) => <Badge variant="outline">{row.getValue('categoryName')}</Badge>,
+    cell: ({ row }) => <Badge variant="outline">{row.original.productCategory?.name || 'N/A'}</Badge>,
   },
   {
     accessorKey: 'price',
     header: 'Price',
     cell: ({ row }) => {
-      const amount = parseFloat(row.getValue('price'));
+      const amount = parseFloat(row.original.sellingPrice?.toString() || '0');
       const formatted = new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'PHP',
@@ -43,10 +43,10 @@ export const columns = ({ onEdit, onDelete, onUpdateStock }: ColumnActions): Col
     },
   },
   {
-    accessorKey: 'quantityOnHand',
+    accessorKey: 'quantityInStock',
     header: 'Stock',
     cell: ({ row }) => {
-        const stock = row.getValue('quantityOnHand') as number;
+        const stock = row.getValue('quantityInStock') as number;
         const lowStockThreshold = 10;
         return (
             <div className={stock < lowStockThreshold ? "text-red-600 font-medium" : ""}>
@@ -58,8 +58,8 @@ export const columns = ({ onEdit, onDelete, onUpdateStock }: ColumnActions): Col
   {
     accessorKey: 'isActive',
     header: 'Status',
-    cell: ({ row }) => {
-      const isActive = row.getValue('isActive');
+    cell: () => {
+      const isActive = true; // Placeholder
       return (
         <Badge variant={isActive ? 'default' : 'secondary'}>
           {isActive ? 'Active' : 'Archived'}

@@ -17,6 +17,11 @@ export type InventoryItem = {
   location?: string | null;
   description?: string | null;
   updatedAt: string;
+  // Optional nested object for joined data
+  productCategory?: {
+    id: string;
+    name: string;
+  } | null;
 };
 
 export type InventoryItemBatch = {

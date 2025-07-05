@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -17,7 +16,6 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -25,21 +23,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AdminProduct, ProductCategory } from '@/lib/types';
+import { type InventoryItem, type ProductCategory } from '@/lib/types/inventory';
 import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters.'),
+  itemName: z.string().min(2, 'Name must be at least 2 characters.'),
   description: z.string().optional(),
-  price: z.coerce.number().min(0, 'Price must be a positive number.'),
-  categoryId: z.string().uuid('Please select a valid category.'),
-  isActive: z.boolean(),
+  sellingPrice: z.coerce.number().min(0, 'Price must be a positive number.'),
+  productCategoryId: z.string().uuid('Please select a valid category.'),
+  // isActive is not a direct property anymore, so we remove it from the schema
+  // and handle it based on business logic if needed, or add it to the type.
+  // For now, we assume all upserted items are active.
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
 interface ProductFormProps {
-  initialData?: AdminProduct;
+  initialData?: InventoryItem;
   onSubmit: (values: FormValues) => void;
   isPending: boolean;
   categories: ProductCategory[];
@@ -54,22 +54,20 @@ export function ProductForm({
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: initialData?.name || '',
+      itemName: initialData?.itemName || '',
       description: initialData?.description || '',
-      price: initialData ? parseFloat(initialData.price) : 0,
-      categoryId: categories.find(c => c.name === initialData?.categoryName)?.id || '',
-      isActive: initialData?.isActive ?? true,
+      sellingPrice: initialData?.sellingPrice || 0,
+      productCategoryId: initialData?.productCategoryId || '',
     },
   });
 
   React.useEffect(() => {
     if (initialData) {
         form.reset({
-            name: initialData.name,
+            itemName: initialData.itemName,
             description: initialData.description || '',
-            price: parseFloat(initialData.price),
-            categoryId: categories.find(c => c.name === initialData.categoryName)?.id || '',
-            isActive: initialData.isActive,
+            sellingPrice: initialData.sellingPrice || 0,
+            productCategoryId: initialData.productCategoryId,
         });
     }
   }, [initialData, categories, form]);
@@ -79,7 +77,7 @@ export function ProductForm({
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <FormField
           control={form.control}
-          name="name"
+          name="itemName"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Product Name</FormLabel>
@@ -111,7 +109,7 @@ export function ProductForm({
         />
         <FormField
           control={form.control}
-          name="price"
+          name="sellingPrice"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Price (PHP)</FormLabel>
@@ -124,7 +122,7 @@ export function ProductForm({
         />
         <FormField
           control={form.control}
-          name="categoryId"
+          name="productCategoryId"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Category</FormLabel>
@@ -146,27 +144,7 @@ export function ProductForm({
             </FormItem>
           )}
         />
-        <FormField
-          control={form.control}
-          name="isActive"
-          render={({ field }) => (
-            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-              <div className="space-y-0.5">
-                <FormLabel className="text-base">Product Status</FormLabel>
-                <FormDescription>
-                  Inactive products will not be visible in the store.
-                </FormDescription>
-              </div>
-              <FormControl>
-                <Switch
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                  disabled={isPending}
-                />
-              </FormControl>
-            </FormItem>
-          )}
-        />
+        {/* The isActive switch is removed as it's not part of the core InventoryItem schema */}
         <Button type="submit" disabled={isPending}>
           {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {initialData ? 'Save changes' : 'Create Product'}
