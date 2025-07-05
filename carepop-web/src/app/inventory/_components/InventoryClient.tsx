@@ -1,267 +1,253 @@
-"use client";
+'use client';
 
 import * as React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from '@/hooks/use-toast';
 import { PlusCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { DataTable } from '@/components/ui/data-table';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/lib/contexts/auth-context';
 import {
-  getAdminProducts,
+  getInventoryForClinic,
+  getProductCategories,
+  getInventoryStats,
   upsertInventoryItem,
   deleteInventoryItem,
-  getProductCategories,
-  upsertProductCategory,
-  deleteProductCategory,
-  addBatchToItem,
-  type NewProductCategoryPayload,
+  getAdminClinics,
 } from '@/services/api';
-import { DataTable } from '@/components/ui/data-table';
-import { type InventoryItem, type ProductCategory } from '@/lib/types/inventory';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { 
-  AlertDialog, 
-  AlertDialogAction, 
-  AlertDialogCancel, 
-  AlertDialogContent, 
-  AlertDialogDescription, 
-  AlertDialogFooter, 
-  AlertDialogHeader, 
-  AlertDialogTitle 
-} from '@/components/ui/alert-dialog';
-import { ProductForm } from './ProductForm';
-import { CategoryForm } from './CategoryForm';
-import { UpdateStockForm } from './UpdateStockForm';
-import { productColumns, categoryColumns } from './columns';
-import { useAuth } from '@/lib/contexts/auth-context';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { type InventoryItem } from '@/lib/types/inventory';
+import { productColumns } from './columns';
+import { ProductForm, type ProductFormValues } from './ProductForm';
+import { ClinicSelector } from './ClinicSelector';
+import { UpdateStockForm, type UpdateStockFormValues } from './UpdateStockForm';
+import { InventoryDashboard } from './InventoryDashboard';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 export default function InventoryClient() {
+  const { toast } = useToast();
   const { session } = useAuth();
+  const accessToken = session?.access_token;
+
+  const [globalFilter, setGlobalFilter] = React.useState('');
+  const [showLowStockOnly, setShowLowStockOnly] = React.useState(false);
+  const [showExpiringSoon, setShowExpiringSoon] = React.useState(false);
+  const [isSheetOpen, setIsSheetOpen] = React.useState(false);
+  const [sheetMode, setSheetMode] = React.useState<'addProduct' | 'editProduct' | 'updateStock' | null>(null);
+  const [selectedItem, setSelectedItem] = React.useState<InventoryItem | null>(null);
+  const [selectedClinicId, setSelectedClinicId] = React.useState<string | null>(null);
+
   const queryClient = useQueryClient();
 
-  const [productModal, setProductModal] = React.useState(false);
-  const [categoryModal, setCategoryModal] = React.useState(false);
-  const [stockModal, setStockModal] = React.useState(false);
-  const [deleteDialog, setDeleteDialog] = React.useState<{ type: 'product' | 'category' | null, id: string | null, name: string | null }>({ type: null, id: null, name: null });
-
-  const [selectedProduct, setSelectedProduct] = React.useState<InventoryItem | undefined>(undefined);
-  const [selectedCategory, setSelectedCategory] = React.useState<ProductCategory | undefined>(undefined);
-  const [globalFilter, setGlobalFilter] = React.useState('');
-  const [activeTab, setActiveTab] = React.useState('products');
-
-  // Queries
-  const { data: products, isError: isErrorProducts } = useQuery({
-    queryKey: ['adminProducts'],
-    queryFn: () => getAdminProducts(session!.access_token),
-    initialData: { data: [] },
-    enabled: !!session,
-    select: (data: any) => data.data || [],
+  const { data: products, isLoading: isLoadingProducts } = useQuery({
+    queryKey: ['inventory-items', selectedClinicId, { lowStock: showLowStockOnly, expiringSoon: showExpiringSoon }],
+    queryFn: () => {
+        if (!selectedClinicId || !accessToken) return Promise.resolve({ data: [] });
+        return getInventoryForClinic(selectedClinicId, accessToken, {
+            lowStock: showLowStockOnly,
+            expiringSoon: showExpiringSoon,
+        });
+    },
+    enabled: !!accessToken && !!selectedClinicId,
+    select: (data) => data.data,
   });
 
-  const { data: categories, isError: isErrorCategories } = useQuery({
-    queryKey: ['adminProductCategories'],
-    queryFn: () => getProductCategories(session!.access_token),
-    initialData: { data: [] },
-    enabled: !!session,
-    select: (data: any) => data.data || [],
+  const { data: inventoryStats, isLoading: isLoadingStats } = useQuery({
+    queryKey: ['inventory-stats', selectedClinicId],
+    queryFn: () => {
+        if (!selectedClinicId || !accessToken) return Promise.resolve({ data: null });
+        return getInventoryStats(selectedClinicId, accessToken);
+    },
+    enabled: !!accessToken && !!selectedClinicId,
+    select: (data) => data.data,
   });
 
+  const { data: categories } = useQuery({
+    queryKey: ['admin-product-categories'],
+    queryFn: () => getProductCategories(accessToken!),
+    enabled: !!accessToken,
+    select: (data) => data.data,
+  });
 
-  // Mutations
+  const { data: clinics, isLoading: isLoadingClinics } = useQuery({
+    queryKey: ['admin-clinics'],
+    queryFn: () => getAdminClinics(accessToken!),
+    enabled: !!accessToken,
+    select: (data) => data.data,
+  });
+
+  const handleMutationSuccess = (entity: string) => {
+    toast({ title: `${entity} saved successfully.` });
+    setIsSheetOpen(false);
+    queryClient.invalidateQueries({ queryKey: ['inventory-stats', selectedClinicId] });
+    queryClient.invalidateQueries({ queryKey: ['inventory-items', selectedClinicId] });
+  };
+
+  const handleMutationError = (error: Error, entity: string) => {
+    toast({ title: `Error saving ${entity}`, description: error.message, variant: 'destructive' });
+  };
+
   const productMutation = useMutation({
-    mutationFn: (data: Partial<InventoryItem> & { price?: number }) => {
-      // Ensure price is a number before it's sent
-      const payload = { ...data, sellingPrice: data.price };
-      delete (payload as any).price; // remove the form's price field
-      return upsertInventoryItem(payload, session!.access_token, data.id);
+    mutationFn: (data: { item: ProductFormValues; id?: string }) => {
+        const { sellingPrice, purchasePrice, expiryDate, ...rest } = data.item;
+
+        const payload = {
+            ...rest,
+            sellingPrice: sellingPrice ? parseFloat(sellingPrice) : undefined,
+            purchasePrice: purchasePrice ? parseFloat(purchasePrice) : undefined,
+            expiryDate: expiryDate ? new Date(expiryDate).toISOString() : undefined,
+        };
+        return upsertInventoryItem(selectedClinicId!, payload, accessToken!, data.id);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['adminProducts'] });
-      toast({ title: 'Success!', description: 'Product has been saved.' });
-      setProductModal(false);
-    },
-    onError: (e: any) => toast({ title: 'Error', description: `Failed to save product: ${e.message}`, variant: 'destructive' }),
+    onSuccess: () => handleMutationSuccess('Product'),
+    onError: (error) => handleMutationError(error, 'Product'),
   });
 
-  const categoryMutation = useMutation({
-    mutationFn: (data: NewProductCategoryPayload & {id?: string}) => upsertProductCategory(data, session!.access_token, data.id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['adminProductCategories'] });
-      toast({ title: 'Success!', description: 'Category has been saved.' });
-      setCategoryModal(false);
+  const stockUpdateMutation = useMutation({
+    mutationFn: (data: { values: UpdateStockFormValues, id: string }) => {
+      const payload = {
+        quantityOnHand: data.values.quantityOnHand,
+      };
+      return upsertInventoryItem(selectedClinicId!, payload, accessToken!, data.id);
     },
-    onError: (e: any) => toast({ title: 'Error', description: `Failed to save category: ${e.message}`, variant: 'destructive' }),
+    onSuccess: () => handleMutationSuccess('Stock'),
+    onError: (error) => handleMutationError(error, 'Stock'),
   });
 
   const deleteProductMutation = useMutation({
-    mutationFn: (id: string) => deleteInventoryItem(id, session!.access_token),
+    mutationFn: (item: InventoryItem) => deleteInventoryItem(selectedClinicId!, item.id, accessToken!),
     onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ['adminProducts'] });
-        toast({ title: 'Product Deleted' });
+        toast({ title: 'Product deleted successfully.' });
+        queryClient.invalidateQueries({ queryKey: ['inventory-items', selectedClinicId] });
+        queryClient.invalidateQueries({ queryKey: ['inventory-stats', selectedClinicId] });
     },
-    onError: (e: any) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
-    onSettled: () => setDeleteDialog({ type: null, id: null, name: null }),
+    onError: (error) => handleMutationError(error, 'Product deletion'),
   });
 
-  const deleteCategoryMutation = useMutation({
-    mutationFn: (id: string) => deleteProductCategory(id, session!.access_token),
-    onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ['adminProductCategories'] });
-        toast({ title: 'Category Deleted' });
-    },
-    onError: (e: any) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
-    onSettled: () => setDeleteDialog({ type: null, id: null, name: null }),
-  });
+  const handleOpenSheet = React.useCallback((
+    mode: 'addProduct' | 'editProduct' | 'updateStock',
+    item?: InventoryItem
+  ) => {
+    setSheetMode(mode);
+    setSelectedItem(item || null);
+    setIsSheetOpen(true);
+  }, []);
 
-  const updateStockMutation = useMutation({
-    mutationFn: (data: { productId: string; quantity: number, batchNumber?: string, expiryDate: string }) => addBatchToItem(data.productId, { quantity: data.quantity, batchNumber: data.batchNumber, expiryDate: data.expiryDate }, session!.access_token),
-    onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ['adminProducts'] });
-        toast({ title: 'Stock Updated' });
-        setStockModal(false);
-    },
-    onError: (e: any) => toast({ title: 'Error', description: `Failed to update stock: ${e.message}`, variant: 'destructive' }),
-  });
-
-  // Handlers
-  const handleEditProduct = (p: InventoryItem) => { setSelectedProduct(p); setProductModal(true); };
-  const handleEditCategory = (c: ProductCategory) => { setSelectedCategory(c); setCategoryModal(true); };
-  const handleDeleteProduct = (p: InventoryItem) => setDeleteDialog({ type: 'product', id: p.id, name: p.itemName });
-  const handleDeleteCategory = (c: ProductCategory) => setDeleteDialog({ type: 'category', id: c.id, name: c.name });
-  const handleUpdateStock = (p: InventoryItem) => { setSelectedProduct(p); setStockModal(true); };
-  
-  const handleProductSubmit = (values: any) => {
-    productMutation.mutate({ ...values, id: selectedProduct?.id });
-  };
-  
-  const handleStockSubmit = (values: { quantity: number, batchNumber?: string, expiryDate: string }) => {
-    if (selectedProduct) {
-        updateStockMutation.mutate({ 
-            productId: selectedProduct.id, 
-            quantity: values.quantity,
-            batchNumber: values.batchNumber,
-            expiryDate: values.expiryDate
-        });
-    }
+  const handleDeleteProduct = (item: InventoryItem) => {
+    deleteProductMutation.mutate(item);
   }
 
-  const handleCategorySubmit = (values: NewProductCategoryPayload) => {
-      const payload = { ...values, id: selectedCategory?.id };
-      categoryMutation.mutate(payload);
-  }
-
-  const confirmDelete = () => {
-    if (deleteDialog.type === 'product' && deleteDialog.id) {
-        deleteProductMutation.mutate(deleteDialog.id);
-    } else if (deleteDialog.type === 'category' && deleteDialog.id) {
-        deleteCategoryMutation.mutate(deleteDialog.id);
-    }
-  }
-
-  if (isErrorProducts || isErrorCategories) return <div>Error loading data... Please refresh the page.</div>;
-
-  const currentFilterColumn = activeTab === 'products' ? 'itemName' : 'name';
-  const currentFilterPlaceholder = activeTab === 'products' ? 'Filter products...' : 'Filter categories...';
+  const columns = React.useMemo(() => productColumns({
+    onEdit: (item) => handleOpenSheet('editProduct', item),
+    onDelete: handleDeleteProduct,
+    onUpdateStock: (item) => handleOpenSheet('updateStock', item)
+  }), [handleOpenSheet]);
 
   return (
-    <div className="space-y-6">
-      <Tabs defaultValue="products" className="w-full" onValueChange={setActiveTab}>
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                    <CardTitle>Inventory</CardTitle>
-                    <CardDescription>
-                    Manage products and categories across your clinics.
-                    </CardDescription>
-                </div>
-                <div className='flex space-x-2'>
-                    {activeTab === 'products' && (
-                        <Button onClick={() => { setSelectedProduct(undefined); setProductModal(true); }}><PlusCircle className="mr-2 h-4 w-4" />Create Product</Button>
-                    )}
-                    {activeTab === 'categories' && (
-                        <Button onClick={() => { setSelectedCategory(undefined); setCategoryModal(true); }}><PlusCircle className="mr-2 h-4 w-4" />Create Category</Button>
-                    )}
-                </div>
-            </CardHeader>
-            <CardContent>
-                <div className='flex justify-between items-center py-4'>
-                    <TabsList>
-                        <TabsTrigger value="products">Manage Products</TabsTrigger>
-                        <TabsTrigger value="categories">Manage Categories</TabsTrigger>
-                    </TabsList>
-                    <Input
-                        placeholder={currentFilterPlaceholder}
-                        value={globalFilter}
-                        onChange={(e) => setGlobalFilter(e.target.value)}
-                        className="max-w-sm"
-                    />
-                </div>
-                <TabsContent value="products">
-                  <DataTable columns={productColumns({ onEdit: handleEditProduct, onDelete: handleDeleteProduct, onUpdateStock: handleUpdateStock })} data={products || []} filterColumn={currentFilterColumn} globalFilter={globalFilter} setGlobalFilter={setGlobalFilter}/>
-                </TabsContent>
-                <TabsContent value="categories">
-                  <DataTable columns={categoryColumns({ onEdit: handleEditCategory, onDelete: handleDeleteCategory })} data={categories || []} filterColumn={currentFilterColumn} globalFilter={globalFilter} setGlobalFilter={setGlobalFilter}/>
-                </TabsContent>
+    <>
+      <div className="flex items-center justify-between mb-4">
+          <h1 className="text-2xl font-bold">Inventory Dashboard</h1>
+          <ClinicSelector
+            clinics={clinics || []}
+            selectedClinicId={selectedClinicId}
+            onClinicSelect={setSelectedClinicId}
+            isLoading={isLoadingClinics}
+          />
+      </div>
+
+      {!selectedClinicId ? (
+        <Card className="flex items-center justify-center h-48">
+            <CardContent className="pt-6">
+                <p className="text-muted-foreground">Please select a clinic to view its inventory.</p>
             </CardContent>
         </Card>
-      </Tabs>
+      ) : (
+        <div className="space-y-4">
+            <InventoryDashboard stats={inventoryStats} isLoading={isLoadingStats} />
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle>Products</CardTitle>
+                    <CardDescription>Manage your products and view their inventory levels.</CardDescription>
+                </div>
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center space-x-2">
+                    <Checkbox
+                        id="low-stock"
+                        checked={showLowStockOnly}
+                        onCheckedChange={(checked) => setShowLowStockOnly(!!checked)}
+                    />
+                    <Label htmlFor="low-stock" className="whitespace-nowrap">Low Stock</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                    <Checkbox
+                        id="expiring-soon"
+                        checked={showExpiringSoon}
+                        onCheckedChange={(checked) => setShowExpiringSoon(!!checked)}
+                    />
+                    <Label htmlFor="expiring-soon" className="whitespace-nowrap">Expiring Soon</Label>
+                    </div>
+                    <Input
+                    placeholder="Filter by product name..."
+                    value={globalFilter}
+                    onChange={(e) => setGlobalFilter(e.target.value)}
+                    className="w-full md:w-64"
+                    />
+                    <Button onClick={() => handleOpenSheet('addProduct')}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Add Product
+                    </Button>
+                </div>
+                </CardHeader>
+                <CardContent>
+                <DataTable
+                    columns={columns}
+                    data={products || []}
+                    filterColumn="itemName"
+                    globalFilter={globalFilter}
+                    isLoading={isLoadingProducts}
+                />
+                </CardContent>
+            </Card>
+        </div>
+      )}
 
-      {/* Product Modal */}
-      <Dialog open={productModal} onOpenChange={setProductModal}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{selectedProduct ? 'Edit Product' : 'Create New Product'}</DialogTitle></DialogHeader>
-          <ProductForm 
-            initialData={selectedProduct} 
-            onSubmit={handleProductSubmit} 
-            isPending={productMutation.isPending} 
-            categories={categories || []} 
-          />
-        </DialogContent>
-      </Dialog>
-
-      {/* Category Modal */}
-      <Dialog open={categoryModal} onOpenChange={setCategoryModal}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{selectedCategory ? 'Edit Category' : 'Create New Category'}</DialogTitle></DialogHeader>
-          <CategoryForm 
-            initialData={selectedCategory} 
-            onSubmit={handleCategorySubmit} 
-            isPending={categoryMutation.isPending} 
-          />
-        </DialogContent>
-      </Dialog>
-      
-      {/* Update Stock Modal */}
-      <Dialog open={stockModal} onOpenChange={setStockModal}>
-        <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-                <DialogTitle>Add Stock for {selectedProduct?.itemName}</DialogTitle>
-            </DialogHeader>
-            <UpdateStockForm
-                onSubmit={handleStockSubmit}
-                isPending={updateStockMutation.isPending}
-            />
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deleteDialog.type} onOpenChange={(open) => !open && setDeleteDialog({ type: null, id: null, name: null })}>
-          <AlertDialogContent>
-              <AlertDialogHeader>
-                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                      This action cannot be undone. This will permanently delete the {' '}
-                      <span className="font-semibold">{deleteDialog.name}</span> {deleteDialog.type}.
-                  </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={confirmDelete}>Continue</AlertDialogAction>
-              </AlertDialogFooter>
-          </AlertDialogContent>
-      </AlertDialog>
-    </div>
+      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>
+              {sheetMode === 'updateStock' && 'Update Stock'}
+              {sheetMode !== 'updateStock' && `${sheetMode?.includes('edit') ? 'Edit' : 'Add'} Product`}
+            </SheetTitle>
+            <SheetDescription>
+              {sheetMode === 'updateStock'
+                ? 'Enter the new total quantity for this item.'
+                : `Fill in the details for the product.`
+              }
+            </SheetDescription>
+          </SheetHeader>
+          <div className="py-4">
+            { (sheetMode === 'addProduct' || sheetMode === 'editProduct') &&
+              <ProductForm
+                onSubmit={(values) => productMutation.mutate({ item: values, id: (selectedItem as InventoryItem)?.id })}
+                initialData={selectedItem as InventoryItem | undefined}
+                isPending={productMutation.isPending}
+                categories={categories || []}
+              />
+            }
+            { sheetMode === 'updateStock' &&
+              <UpdateStockForm
+                onSubmit={(values) => stockUpdateMutation.mutate({ values, id: (selectedItem as InventoryItem).id })}
+                initialData={selectedItem as InventoryItem}
+                isPending={stockUpdateMutation.isPending}
+              />
+            }
+          </div>
+        </SheetContent>
+      </Sheet>
+    </>
   );
-} 
+}
