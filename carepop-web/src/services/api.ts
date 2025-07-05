@@ -891,3 +891,20 @@ export async function getMyMedicalRecordsOnServer(accessToken: string) {
     const result = await response.json();
     return result.records || [];
 }
+
+export type ProductCategory = {
+    id: string;
+    name: string;
+    description?: string;
+};
+
+export const getProductCategories = async (token: string): Promise<ApiResponse<ProductCategory[]>> => {
+    const response = await api.get('/admin/product-categories', {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Failed to fetch product categories.' }));
+        throw new Error(error.message);
+    }
+    return response.data;
+};

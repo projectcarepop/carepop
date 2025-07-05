@@ -8,9 +8,9 @@ import { DataTable } from '@/components/ui/data-table';
 import { columns, InventoryItem } from './columns';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { Button } from '@/components/ui/button';
-import { getAdminClinics, getInventoryForClinic, deleteInventoryItem } from '@/services/api';
+import { getAdminClinics, getInventoryForClinic, upsertInventoryItem, deleteInventoryItem, getProductCategories, UpsertInventoryItemPayload } from '@/services/api';
 import { useToast } from "@/components/ui/use-toast";
-// import { UpsertInventoryItemForm } from './UpsertInventoryItemModal'; // Temporarily unused for testing
+import { UpsertInventoryItemForm } from './UpsertInventoryItemForm';
 import {
   Dialog,
   DialogContent,
@@ -30,10 +30,10 @@ import {
 import { PlusCircle } from 'lucide-react';
 
 // This type should match the form's output, which uses numbers for price
-/* type FormValues = Omit<UpsertInventoryItemPayload, 'purchasePrice' | 'sellingPrice'> & {
+type FormValues = Omit<UpsertInventoryItemPayload, 'purchasePrice' | 'sellingPrice'> & {
     purchasePrice?: number;
     sellingPrice?: number;
-};*/
+};
 
 export default function InventoryClient() {
     const { session } = useAuth();
@@ -60,15 +60,37 @@ export default function InventoryClient() {
 
     const { data: inventory = [], isLoading: isLoadingInventory } = useQuery({
         queryKey: ['inventory', selectedClinic],
-        queryFn: () => getInventoryForClinic(selectedClinic!, session!.access_token!).then(res => res.data),
+        fn: () => getInventoryForClinic(selectedClinic!, session!.access_token!).then(res => res.data),
         enabled: !!selectedClinic && !!session?.access_token,
     });
     
-    // const { data: productCategories = [] } = useQuery({
-    //     queryKey: ['productCategories'],
-    //     queryFn: () => getProductCategories(session!.access_token!).then(res => res.data),
-    //     enabled: !!session?.access_token,
-    // });
+    const { data: productCategories = [] } = useQuery({
+        queryKey: ['productCategories'],
+        queryFn: () => getProductCategories(session!.access_token!).then(res => res.data),
+        enabled: !!session?.access_token,
+    });
+
+    const upsertMutation = useMutation({
+        mutationFn: (values: FormValues) => {
+            if (!selectedClinic) throw new Error("No clinic selected.");
+            const payload: UpsertInventoryItemPayload = {
+                ...values,
+                clinicId: selectedClinic,
+                purchasePrice: values.purchasePrice ? String(values.purchasePrice) : undefined,
+                sellingPrice: values.sellingPrice ? String(values.sellingPrice) : undefined,
+            };
+            return upsertInventoryItem(payload, session!.access_token!, editingItem?.id);
+        },
+        onSuccess: () => {
+            toast({ title: "Success", description: `Item has been saved.` });
+            queryClient.invalidateQueries({ queryKey: ['inventory', selectedClinic] });
+            setIsModalOpen(false);
+            setEditingItem(undefined);
+        },
+        onError: (error: any) => {
+            toast({ variant: "destructive", title: "Error", description: error.message });
+        }
+    });
 
     const deleteMutation = useMutation({
         mutationFn: (itemId: string) => deleteInventoryItem(itemId, session!.access_token!),
@@ -95,9 +117,9 @@ export default function InventoryClient() {
         setIsDeleteDialogOpen(true);
     };
 
-    // const handleSubmit = (values: FormValues) => {
-    //     upsertMutation.mutate(values);
-    // };
+    const handleSubmit = (values: FormValues) => {
+        upsertMutation.mutate(values);
+    };
 
     if (isLoadingClinics) {
         return <p>Loading clinics...</p>;
@@ -156,7 +178,13 @@ export default function InventoryClient() {
                     <DialogHeader>
                         <DialogTitle>{editingItem ? 'Edit Inventory Item' : 'Add New Inventory Item'}</DialogTitle>
                     </DialogHeader>
-                    <div>Hello World - This is a test to see if the form is the problem.</div>
+                    <UpsertInventoryItemForm 
+                        initialData={editingItem}
+                        onSubmit={handleSubmit}
+                        isPending={upsertMutation.isPending}
+                        productCategories={productCategories}
+                        onClose={() => setIsModalOpen(false)}
+                    />
                 </DialogContent>
             </Dialog>
 

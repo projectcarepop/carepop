@@ -13,31 +13,21 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Checkbox } from "@/components/ui/checkbox"
 
-// Single source of truth for Inventory and Product Category types
+// This is the updated, single source of truth for the InventoryItem type in the UI
 export type InventoryItem = {
   id: string;
   clinicId: string;
-  productCategoryId?: string | null;
   itemName: string;
-  sku?: string | null;
-  genericName?: string | null;
-  brandName?: string | null;
-  dosageForm?: string | null;
-  strength?: string | null;
-  quantityOnHand: number;
-  reorderLevel: number;
-  purchasePrice?: string | null; // Drizzle numeric is a string
-  sellingPrice?: string | null; // Drizzle numeric is a string
-  batchNumber?: string | null;
-  expiryDate?: string | null;
-  location?: string | null;
-  updatedAt: string;
-};
-
-export type ProductCategory = {
-  id: string;
-  name: string;
+  brand?: string | null;
+  itemCode?: string | null;
   description?: string | null;
+  productCategoryId: string;
+  supplier?: string | null;
+  quantityInStock: number;
+  unit?: string | null;
+  purchasePrice?: number | null;
+  sellingPrice?: number | null;
+  updatedAt: string;
 };
 
 type ColumnsProps = {
@@ -74,22 +64,18 @@ export const columns = ({ onEdit, onDelete, onViewBatches }: ColumnsProps): Colu
     header: "Product Name",
   },
   {
-    accessorKey: "brandName",
-    header: "Brand Name",
+    accessorKey: "brand",
+    header: "Brand",
   },
   {
-    accessorKey: "strength",
-    header: "Strength",
-  },
-  {
-    accessorKey: "quantityOnHand",
+    accessorKey: "quantityInStock",
     header: "Quantity",
   },
   {
     accessorKey: "sellingPrice",
     header: "Price (PHP)",
     cell: ({ row }) => {
-      const price = parseFloat(row.getValue("sellingPrice") || "0")
+      const price = row.original.sellingPrice ?? 0;
       const formatted = new Intl.NumberFormat("en-US", {
         style: "currency",
         currency: "PHP",
@@ -98,11 +84,11 @@ export const columns = ({ onEdit, onDelete, onViewBatches }: ColumnsProps): Colu
     },
   },
   {
-    accessorKey: "expiryDate",
-    header: "Expiry Date",
+    accessorKey: "updatedAt",
+    header: "Last Updated",
     cell: ({ row }) => {
-      const expiryDate = row.original.expiryDate
-      return expiryDate ? new Date(expiryDate).toLocaleDateString() : "N/A"
+      const date = row.original.updatedAt;
+      return date ? new Date(date).toLocaleDateString() : "N/A"
     },
   },
   {
