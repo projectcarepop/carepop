@@ -319,14 +319,39 @@ adminRoutes
     return c.json({ data: categories });
   })
   .post('/product-categories', zValidator('json', productCategorySchema), async (c) => {
-    const newCategoryData = c.req.valid('json');
-    const [createdCategory] = await db.insert(productCategories).values(newCategoryData).returning();
+    const { name, description } = c.req.valid('json');
+
+    // Check for duplicate category name
+    const existingCategory = await db.query.productCategories.findFirst({
+        where: eq(productCategories.name, name),
+    });
+
+    if (existingCategory) {
+        return c.json({ error: 'A product category with this name already exists.' }, 409); // 409 Conflict
+    }
+
+    const [createdCategory] = await db.insert(productCategories).values({ name, description }).returning();
     return c.json(createdCategory, 201);
   })
   .put('/product-categories/:id', zValidator('json', productCategorySchema.partial()), async (c) => {
     const { id } = c.req.param();
-    const values = c.req.valid('json');
-    const [updatedCategory] = await db.update(productCategories).set(values).where(eq(productCategories.id, id)).returning();
+    const { name, description } = c.req.valid('json');
+
+    if (name) {
+        // Check if another category with the new name already exists
+        const existingCategory = await db.query.productCategories.findFirst({
+            where: and(
+                eq(productCategories.name, name),
+                sql`${productCategories.id} != ${id}`
+            ),
+        });
+
+        if (existingCategory) {
+            return c.json({ error: 'Another product category with this name already exists.' }, 409);
+        }
+    }
+
+    const [updatedCategory] = await db.update(productCategories).set({ name, description }).where(eq(productCategories.id, id)).returning();
     if (!updatedCategory) return c.json({ error: 'Not Found' }, 404);
     return c.json(updatedCategory);
   })
@@ -373,6 +398,19 @@ adminRoutes.get('/products/:productId/inventory', async (c) => {
 // Add a new inventory item/batch to a clinic
 adminRoutes.post('/inventory-items', zValidator('json', createInventoryItemSchema), async (c) => {
     const newItemData = c.req.valid('json');
+
+    // Business Rule: Prevent duplicate item names within the same clinic
+    const existingItem = await db.query.inventory_items.findFirst({
+        where: and(
+            eq(inventory_items.clinicId, newItemData.clinicId),
+            eq(inventory_items.itemName, newItemData.itemName)
+        )
+    });
+
+    if (existingItem) {
+        return c.json({ error: `'${newItemData.itemName}' is already listed in this clinic's inventory. Please update the existing item's quantity or details instead of adding a duplicate.` }, 409);
+    }
+
     // The data from the validator is already in the correct shape for the new schema
     const [createdItem] = await db.insert(inventory_items).values(newItemData).returning();
     return c.json(createdItem, 201);

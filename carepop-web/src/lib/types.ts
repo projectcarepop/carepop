@@ -236,9 +236,7 @@ export type AdminStats = {
   totalServices: number;
   upcomingAppointments: number;
   productsOutOfStock: number;
-};
-
-export const adminUserSchema = z.object({
+};export const adminUserSchema = z.object({
     id: z.string(),
     // ... existing code ...
 });
@@ -267,3 +265,4 @@ export type MedicalRecordWithRelations = {
     name: string | null;
   };
 };
+

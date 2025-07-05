@@ -13,22 +13,32 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Checkbox } from "@/components/ui/checkbox"
 
+// Single source of truth for Inventory and Product Category types
 export type InventoryItem = {
-  id: string
-  itemName: string
-  genericName: string | null
-  brandName: string | null
-  sku: string | null
-  dosageForm: string | null
-  strength: string | null
-  quantityOnHand: number
-  reorderLevel: number
-  purchasePrice: number | null
-  sellingPrice: number | null
-  batchNumber: string | null
-  expiryDate: string | null
-  location: string | null
-}
+  id: string;
+  clinicId: string;
+  productCategoryId?: string | null;
+  itemName: string;
+  sku?: string | null;
+  genericName?: string | null;
+  brandName?: string | null;
+  dosageForm?: string | null;
+  strength?: string | null;
+  quantityOnHand: number;
+  reorderLevel: number;
+  purchasePrice?: string | null; // Drizzle numeric is a string
+  sellingPrice?: string | null; // Drizzle numeric is a string
+  batchNumber?: string | null;
+  expiryDate?: string | null;
+  location?: string | null;
+  updatedAt: string;
+};
+
+export type ProductCategory = {
+  id: string;
+  name: string;
+  description?: string | null;
+};
 
 type ColumnsProps = {
   onEdit: (item: InventoryItem) => void;
@@ -79,7 +89,7 @@ export const columns = ({ onEdit, onDelete, onViewBatches }: ColumnsProps): Colu
     accessorKey: "sellingPrice",
     header: "Price (PHP)",
     cell: ({ row }) => {
-      const price = parseFloat(row.getValue("sellingPrice"))
+      const price = parseFloat(row.getValue("sellingPrice") || "0")
       const formatted = new Intl.NumberFormat("en-US", {
         style: "currency",
         currency: "PHP",

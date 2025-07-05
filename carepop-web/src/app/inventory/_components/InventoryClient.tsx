@@ -1,72 +1,91 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DataTable } from '@/components/ui/data-table';
 import { columns, InventoryItem } from './columns';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { Button } from '@/components/ui/button';
-import { getAdminClinics, getInventoryForClinic, upsertInventoryItem } from '@/services/api';
+import { getAdminClinics, getInventoryForClinic, upsertInventoryItem, deleteInventoryItem, getProductCategories, UpsertInventoryItemPayload } from '@/services/api';
 import { useToast } from "@/components/ui/use-toast"
 import UpsertInventoryItemModal from './UpsertInventoryItemModal';
 
-interface Clinic {
-  id: string;
-  name: string;
-}
+// This type should match the form's output, which uses numbers for price
+type FormValues = Omit<UpsertInventoryItemPayload, 'purchasePrice' | 'sellingPrice'> & {
+    purchasePrice?: number;
+    sellingPrice?: number;
+};
 
 export default function InventoryClient() {
     const { session } = useAuth();
     const { toast } = useToast();
-    const [clinics, setClinics] = useState<Clinic[]>([]);
+    const queryClient = useQueryClient();
+    
     const [selectedClinic, setSelectedClinic] = useState<string | null>(null);
-    const [inventory, setInventory] = useState<InventoryItem[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
 
-    const fetchInventory = async () => {
-        if (selectedClinic && session?.access_token) {
-            setIsLoading(true);
-            setError(null);
-            try {
-                const data = await getInventoryForClinic(selectedClinic, session.access_token);
-                setInventory(data);
-            } catch (err: any) {
-                setError(err.message || "Failed to fetch inventory.");
-            } finally {
-                setIsLoading(false);
-            }
-        } else {
-            setInventory([]); 
-        }
-    };
-    
-    useEffect(() => {
-        if (session?.access_token) {
-            const fetchClinics = async () => {
-                try {
-                    const fetchedClinics = await getAdminClinics(session.access_token);
-                    setClinics(fetchedClinics);
-                    if (fetchedClinics.length > 0 && !selectedClinic) {
-                        setSelectedClinic(fetchedClinics[0].id);
-                    }
-                } catch (err: any) {
-                    setError(err.message || 'Failed to fetch clinics');
-                }
-            };
-            fetchClinics();
-        }
-    }, [session, selectedClinic]);
+    const { data: clinics, isLoading: isLoadingClinics } = useQuery({
+        queryKey: ['adminClinics'],
+        queryFn: () => getAdminClinics(session!.access_token!),
+        enabled: !!session?.access_token,
+    });
 
+    // Set the first clinic as selected by default once clinics have loaded
     useEffect(() => {
-        fetchInventory();
-    }, [selectedClinic, session]);
+        if (clinics && clinics.length > 0 && !selectedClinic) {
+            setSelectedClinic(clinics[0].id);
+        }
+    }, [clinics, selectedClinic]);
+
+    const { data: inventory = [], isLoading: isLoadingInventory } = useQuery({
+        queryKey: ['inventory', selectedClinic],
+        queryFn: () => getInventoryForClinic(selectedClinic!, session!.access_token!).then(res => res.data),
+        enabled: !!selectedClinic && !!session?.access_token,
+    });
+    
+    const { data: productCategories = [] } = useQuery({
+        queryKey: ['productCategories'],
+        queryFn: () => getProductCategories(session!.access_token!).then(res => res.data),
+        enabled: !!session?.access_token,
+    });
+
+    const upsertMutation = useMutation({
+        mutationFn: (values: FormValues) => {
+            if (!selectedClinic) {
+                throw new Error("No clinic selected.");
+            }
+            // Convert numbers to strings for the API payload
+            const payload: UpsertInventoryItemPayload = {
+                ...values,
+                clinicId: selectedClinic,
+                purchasePrice: values.purchasePrice ? String(values.purchasePrice) : undefined,
+                sellingPrice: values.sellingPrice ? String(values.sellingPrice) : undefined,
+            };
+            return upsertInventoryItem(payload, session!.access_token!, editingItem?.id);
+        },
+        onSuccess: () => {
+            toast({ title: "Success", description: `Item ${editingItem ? 'updated' : 'created'}.` });
+            queryClient.invalidateQueries({ queryKey: ['inventory', selectedClinic] });
+            setIsModalOpen(false);
+        },
+        onError: (error: any) => {
+            toast({ variant: "destructive", title: "Error", description: error.message });
+        }
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: (itemId: string) => deleteInventoryItem(itemId, session!.access_token!),
+        onSuccess: () => {
+            toast({ title: "Success", description: "Item deleted." });
+            queryClient.invalidateQueries({ queryKey: ['inventory', selectedClinic] });
+        },
+        onError: (error: any) => {
+            toast({ variant: "destructive", title: "Error", description: error.message });
+        }
+    });
 
     const handleAddItem = () => {
         setEditingItem(null);
@@ -79,55 +98,16 @@ export default function InventoryClient() {
     };
 
     const handleDeleteItem = (item: InventoryItem) => {
-        // TODO: Implement delete functionality
-        console.log("Delete item:", item.id);
+        // TODO: Add a confirmation dialog before deleting
+        deleteMutation.mutate(item.id);
     };
 
-    const handleViewBatches = (item: InventoryItem) => {
-        console.log("View batches for item:", item.id);
+    const handleSubmit = (values: FormValues) => {
+        upsertMutation.mutate(values);
     };
 
-    const handleSubmit = async (values: any) => {
-        if (!selectedClinic || !session?.access_token) {
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Cannot save item. No clinic selected or not authenticated.",
-            });
-            return;
-        }
-        setIsSubmitting(true);
-        try {
-            // Ensure numeric values are numbers, not strings from the form
-            const payload = {
-                ...values,
-                clinicId: selectedClinic,
-                quantityOnHand: Number(values.quantityOnHand),
-                reorderLevel: Number(values.reorderLevel),
-                purchasePrice: values.purchasePrice ? Number(values.purchasePrice) : null,
-                sellingPrice: values.sellingPrice ? Number(values.sellingPrice) : null,
-            };
-
-            await upsertInventoryItem(payload, session.access_token, editingItem?.id);
-            toast({
-                title: "Success",
-                description: `Inventory item has been successfully ${editingItem ? 'updated' : 'added'}.`,
-            });
-            setIsModalOpen(false);
-            fetchInventory(); // Refresh the list
-        } catch (error: any) {
-            toast({
-                variant: "destructive",
-                title: "Failed to save item",
-                description: error.message || "An unknown error occurred.",
-            });
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    if (!session) {
-        return <p>Loading session...</p>;
+    if (isLoadingClinics) {
+        return <p>Loading clinics...</p>;
     }
 
     return (
@@ -146,7 +126,7 @@ export default function InventoryClient() {
                                 <SelectValue placeholder="Select a clinic..." />
                             </SelectTrigger>
                             <SelectContent>
-                                {clinics.map((clinic) => (
+                                {clinics?.map((clinic) => (
                                     <SelectItem key={clinic.id} value={clinic.id}>
                                         {clinic.name}
                                     </SelectItem>
@@ -157,8 +137,6 @@ export default function InventoryClient() {
                             Add New Item
                         </Button>
                     </div>
-
-                    {error && <p className="text-red-500">{error}</p>}
                 </CardContent>
             </Card>
 
@@ -168,12 +146,12 @@ export default function InventoryClient() {
                         <CardTitle>Inventory Items</CardTitle>
                     </CardHeader>
                     <CardContent>
-                    <DataTable 
-    columns={columns({ onEdit: handleEditItem, onDelete: handleDeleteItem, onViewBatches: handleViewBatches })} 
-    data={inventory}
-    isLoading={isLoading} 
-    filterColumn="name"
-/>
+                        <DataTable 
+                            columns={columns({ onEdit: handleEditItem, onDelete: handleDeleteItem, onViewBatches: () => {} })} 
+                            data={inventory}
+                            isLoading={isLoadingInventory} 
+                            filterColumn="itemName"
+                        />
                     </CardContent>
                 </Card>
             )}
@@ -183,7 +161,8 @@ export default function InventoryClient() {
                 onClose={() => setIsModalOpen(false)}
                 onSubmit={handleSubmit}
                 item={editingItem}
-                isLoading={isSubmitting}
+                isLoading={upsertMutation.isPending}
+                productCategories={productCategories}
             />
         </div>
     );

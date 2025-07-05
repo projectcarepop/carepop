@@ -2,6 +2,11 @@ import { type Profile, type AppointmentBookingPayload } from '@/lib/types'; // U
 import { type ProfileFormData } from '@/lib/validation/profile-schema';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { type InventoryItem, type ProductCategory } from '@/app/inventory/_components/columns';
+
+// Type definitions for method payloads
+export type NewProductCategoryPayload = Omit<ProductCategory, 'id'>;
+export type UpsertInventoryItemPayload = Partial<Omit<InventoryItem, 'id' | 'updatedAt'>>;
 
 // Simple type for AdminUser until we have a more formal definition
 export type AdminUser = {
@@ -402,81 +407,84 @@ export async function upsertClinic(clinicData: any, accessToken: string, clinicI
     return response.json();
 }
 
-// --- NEW: Inventory & Product Category Service (Admin/Manager only) ---
+// --- START: Inventory and Product Category Management ---
 
-export async function getProductCategories(accessToken: string) {
-    const headers = await getAuthHeaders(accessToken);
-    const response = await fetch(`${API_BASE_URL}/api/admin/product-categories`, { headers, cache: 'no-store' });
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Failed to fetch product categories' }));
-        throw new Error(error.message);
-    }
-    const result = await response.json();
-    return result.data || [];
+export async function getProductCategories(accessToken: string): Promise<{data: ProductCategory[]}> {
+  const headers = await getAuthHeaders(accessToken);
+  const response = await fetch(`${API_BASE_URL}/api/admin/product-categories`, { headers, cache: 'no-store' });
+  if (!response.ok) throw new Error("Failed to fetch product categories.");
+  const result = await response.json();
+  return result;
 }
 
-export async function upsertProductCategory(categoryData: { name: string; description?: string }, accessToken: string, categoryId?: string) {
-    const headers = await getAuthHeaders(accessToken);
-    const url = categoryId
-        ? `${API_BASE_URL}/api/admin/product-categories/${categoryId}`
-        : `${API_BASE_URL}/api/admin/product-categories`;
-    const method = categoryId ? 'PUT' : 'POST';
+export async function upsertProductCategory(categoryData: NewProductCategoryPayload, accessToken: string, categoryId?: string) {
+  const method = categoryId ? 'PUT' : 'POST';
+  const url = categoryId
+    ? `${API_BASE_URL}/api/admin/product-categories/${categoryId}`
+    : `${API_BASE_URL}/api/admin/product-categories`;
 
-    const response = await fetch(url, { method, headers, body: JSON.stringify(categoryData) });
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Failed to save product category' }));
-        throw new Error(error.message);
-    }
-    return response.json();
+  const headers = await getAuthHeaders(accessToken);
+  const response = await fetch(url, {
+    method,
+    headers,
+    body: JSON.stringify(categoryData),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: `Failed to save product category.` }));
+    throw new Error(error.message);
+  }
+  return response.json();
 }
 
 export async function deleteProductCategory(categoryId: string, accessToken: string) {
-    const headers = await getAuthHeaders(accessToken);
-    const response = await fetch(`${API_BASE_URL}/api/admin/product-categories/${categoryId}`, { method: 'DELETE', headers });
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Failed to delete product category' }));
-        throw new Error(error.message);
-    }
-    return response.json();
+  const headers = await getAuthHeaders(accessToken);
+  const response = await fetch(`${API_BASE_URL}/api/admin/product-categories/${categoryId}`, {
+    method: 'DELETE',
+    headers,
+  });
+  if (!response.ok) throw new Error("Failed to delete product category.");
+  return response.json();
 }
 
-export async function getInventoryForClinic(clinicId: string, accessToken: string) {
-    const headers = await getAuthHeaders(accessToken);
-    const response = await fetch(`${API_BASE_URL}/api/admin/clinics/${clinicId}/inventory`, { headers, cache: 'no-store' });
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: `Failed to fetch inventory for clinic ${clinicId}` }));
-        throw new Error(error.message);
-    }
-    const result = await response.json();
-    return result.data || [];
+export async function getInventoryForClinic(clinicId: string, accessToken: string): Promise<{data: InventoryItem[]}> {
+  const headers = await getAuthHeaders(accessToken);
+  const response = await fetch(`${API_BASE_URL}/api/admin/clinics/${clinicId}/inventory`, { headers, cache: 'no-store' });
+  if (!response.ok) throw new Error("Failed to fetch inventory.");
+  return response.json();
 }
 
-export async function upsertInventoryItem(itemData: any, accessToken: string, itemId?: string) {
-    const headers = await getAuthHeaders(accessToken);
-    const url = itemId 
-        ? `${API_BASE_URL}/api/admin/inventory-items/${itemId}`
-        : `${API_BASE_URL}/api/admin/inventory-items`;
-    const method = itemId ? 'PUT' : 'POST';
+export async function upsertInventoryItem(itemData: UpsertInventoryItemPayload, accessToken: string, itemId?: string) {
+  const method = itemId ? 'PUT' : 'POST';
+  const url = itemId
+    ? `${API_BASE_URL}/api/admin/inventory-items/${itemId}`
+    : `${API_BASE_URL}/api/admin/inventory-items`;
 
-    const response = await fetch(url, { method, headers, body: JSON.stringify(itemData) });
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Failed to save inventory item' }));
-        throw new Error(error.message);
-    }
-    return response.json();
+  const headers = await getAuthHeaders(accessToken);
+  const response = await fetch(url, {
+    method,
+    headers,
+    body: JSON.stringify(itemData),
+  });
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: `Failed to save inventory item.` }));
+    throw new Error(error.message);
+  }
+  return response.json();
 }
 
 export async function deleteInventoryItem(itemId: string, accessToken: string) {
-    const headers = await getAuthHeaders(accessToken);
-    const response = await fetch(`${API_BASE_URL}/api/admin/inventory-items/${itemId}`, { method: 'DELETE', headers });
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Failed to delete inventory item' }));
-        throw new Error(error.message);
-    }
-    return response.json();
+  const headers = await getAuthHeaders(accessToken);
+  const response = await fetch(`${API_BASE_URL}/api/admin/inventory-items/${itemId}`, {
+    method: 'DELETE',
+    headers,
+  });
+  if (!response.ok) throw new Error("Failed to delete inventory item.");
+  return response.json();
 }
 
-// --- Public Booking Services ---
+// --- END: Inventory and Product Category Management ---
 
 export async function getPublicServiceCategories() {
     const url = `${API_BASE_URL}/api/public/service-categories`;

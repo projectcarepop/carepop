@@ -21,10 +21,12 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { InventoryItem } from "./columns";
+import { InventoryItem, ProductCategory } from "./columns";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const upsertInventoryItemSchema = z.object({
+  productCategoryId: z.string().optional(),
   itemName: z.string().min(1, "Product name is required"),
   genericName: z.string().optional(),
   brandName: z.string().optional(),
@@ -48,6 +50,7 @@ interface UpsertInventoryItemModalProps {
   onSubmit: (values: UpsertInventoryItemFormValues) => void;
   item: InventoryItem | null;
   isLoading: boolean;
+  productCategories: ProductCategory[];
 }
 
 export default function UpsertInventoryItemModal({
@@ -56,6 +59,7 @@ export default function UpsertInventoryItemModal({
   onSubmit,
   item,
   isLoading,
+  productCategories,
 }: UpsertInventoryItemModalProps) {
   const form = useForm<UpsertInventoryItemFormValues>({
     resolver: zodResolver(upsertInventoryItemSchema),
@@ -63,6 +67,7 @@ export default function UpsertInventoryItemModal({
 
   useEffect(() => {
     form.reset({
+      productCategoryId: item?.productCategoryId ?? undefined,
       itemName: item?.itemName ?? "",
       genericName: item?.genericName ?? "",
       brandName: item?.brandName ?? "",
@@ -71,8 +76,8 @@ export default function UpsertInventoryItemModal({
       strength: item?.strength ?? "",
       quantityOnHand: item?.quantityOnHand ?? 0,
       reorderLevel: item?.reorderLevel ?? 10,
-      purchasePrice: item?.purchasePrice ?? undefined,
-      sellingPrice: item?.sellingPrice ?? undefined,
+      purchasePrice: item?.purchasePrice ? Number(item.purchasePrice) : undefined,
+      sellingPrice: item?.sellingPrice ? Number(item.sellingPrice) : undefined,
       batchNumber: item?.batchNumber ?? "",
       expiryDate: item?.expiryDate ? new Date(item.expiryDate).toISOString().split('T')[0] : "",
       location: item?.location ?? "",
@@ -91,6 +96,7 @@ export default function UpsertInventoryItemModal({
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <ScrollArea className="h-[60vh] p-4">
               <div className="space-y-4">
+                <FormField control={form.control} name="productCategoryId" render={({ field }) => ( <FormItem> <FormLabel>Category</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select a category (optional)" /> </SelectTrigger> </FormControl> <SelectContent> {productCategories.map(cat => ( <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem> ))} </SelectContent> </Select> <FormMessage /> </FormItem> )}/>
                 <FormField control={form.control} name="itemName" render={({ field }) => ( <FormItem> <FormLabel>Product Name</FormLabel> <FormControl> <Input placeholder="e.g., Paracetamol 500mg" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
                 <FormField control={form.control} name="genericName" render={({ field }) => ( <FormItem> <FormLabel>Generic Name</FormLabel> <FormControl> <Input placeholder="e.g., Paracetamol" {...field} value={field.value ?? ''} /> </FormControl> <FormMessage /> </FormItem> )}/>
                 <FormField control={form.control} name="brandName" render={({ field }) => ( <FormItem> <FormLabel>Brand Name</FormLabel> <FormControl> <Input placeholder="e.g., Biogesic" {...field} value={field.value ?? ''} /> </FormControl> <FormMessage /> </FormItem> )}/>
