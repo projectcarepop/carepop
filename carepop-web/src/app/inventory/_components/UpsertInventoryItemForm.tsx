@@ -21,8 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { DialogFooter } from '@/components/ui/dialog';
-import { ProductCategory } from '@/services/api'; 
-import { InventoryItem } from './columns';
+import { ProductCategory, InventoryItem } from '@/lib/types/inventory';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 const formSchema = z.object({

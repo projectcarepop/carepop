@@ -23,7 +23,8 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
-import { getProductCategories, upsertProductCategory, deleteProductCategory, NewProductCategoryPayload, ProductCategory } from '@/services/api';
+import { getProductCategories, upsertProductCategory, deleteProductCategory, NewProductCategoryPayload } from '@/services/api';
+import { ProductCategory } from '@/lib/types/inventory';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { Trash2, Edit, Loader2 } from 'lucide-react';
 

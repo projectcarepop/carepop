@@ -25,7 +25,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { getItemBatches, addBatchToItem, deleteItemBatch } from '@/services/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { Trash2, Loader2 } from 'lucide-react';
-import { InventoryItem, InventoryItemBatch } from './columns';
+import { InventoryItem, InventoryItemBatch } from '@/lib/types/inventory';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 

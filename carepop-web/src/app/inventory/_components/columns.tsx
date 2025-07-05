@@ -12,41 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Checkbox } from "@/components/ui/checkbox"
-
-// This is the updated, single source of truth for the InventoryItem type in the UI
-export type InventoryItem = {
-  id: string;
-  clinicId: string;
-  itemName: string;
-  productCategoryId: string;
-  sku?: string | null;
-  genericName?: string | null;
-  brandName?: string | null;
-  dosageForm?: string | null;
-  strength?: string | null;
-  quantityInStock: number;
-  reorderLevel: number;
-  purchasePrice?: number | null;
-  sellingPrice?: number | null;
-  location?: string | null;
-  description?: string | null;
-  updatedAt: string;
-};
-
-export type InventoryItemBatch = {
-  id: string;
-  inventoryItemId: string;
-  batchNumber?: string | null;
-  quantity: number;
-  expiryDate: string; // ISO String
-  createdAt: string;
-};
-
-export type ProductCategory = {
-  id: string;
-  name: string;
-  description?: string | null;
-};
+import { InventoryItem } from "@/lib/types/inventory"
 
 type ColumnsProps = {
   onEdit: (item: InventoryItem) => void;

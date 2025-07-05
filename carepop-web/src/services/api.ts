@@ -2,11 +2,11 @@ import { type Profile, type AppointmentBookingPayload } from '@/lib/types'; // U
 import { type ProfileFormData } from '@/lib/validation/profile-schema';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
-import { type InventoryItem } from '@/app/inventory/_components/columns';
+import { type InventoryItem, type ProductCategory } from '@/lib/types/inventory';
 
 // Type definitions for method payloads
-export type NewProductCategoryPayload = { name: string; description?: string };
-export type UpsertInventoryItemPayload = Partial<Omit<InventoryItem, 'id' | 'updatedAt'>>;
+export type NewProductCategoryPayload = Omit<ProductCategory, 'id'>;
+export type UpsertInventoryItemPayload = Partial<Omit<InventoryItem, 'id' | 'updatedAt' | 'clinicId'>>;
 
 // Simple type for AdminUser until we have a more formal definition
 export type AdminUser = {
@@ -408,12 +408,6 @@ export async function upsertClinic(clinicData: any, accessToken: string, clinicI
 }
 
 // --- START: Inventory and Product Category Management ---
-
-export type ProductCategory = {
-  id: string;
-  name: string;
-  description?: string | null;
-};
 
 export async function getProductCategories(accessToken: string): Promise<{data: ProductCategory[]}> {
   const headers = await getAuthHeaders(accessToken);
