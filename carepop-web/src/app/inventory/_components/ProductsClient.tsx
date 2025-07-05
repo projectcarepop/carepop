@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { DataTable } from '@/components/ui/data-table';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { 
@@ -50,7 +50,6 @@ export default function ProductsClient() {
         queryKey: ['admin-clinics'],
         queryFn: () => getAdminClinics(accessToken!),
         enabled: !!accessToken,
-        select: (data) => data.data,
     });
 
   const { data: products, isLoading: isLoadingProducts } = useQuery({
@@ -151,7 +150,12 @@ export default function ProductsClient() {
   return (
     <div className="space-y-4">
         <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold">Products</h1>
+            <div>
+                <h1 className="text-2xl font-bold">Products</h1>
+                <p className="text-muted-foreground">
+                    View, add, and manage product inventory for a selected clinic.
+                </p>
+            </div>
             <ClinicSelector
                 clinics={clinics || []}
                 selectedClinicId={selectedClinicId}
@@ -214,20 +218,20 @@ export default function ProductsClient() {
         </Card>
       )}
 
-      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent>
-          <SheetHeader>
-            <SheetTitle>
+      <Dialog open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
               {sheetMode === 'updateStock' && 'Update Stock'}
               {sheetMode !== 'updateStock' && `${sheetMode?.includes('edit') ? 'Edit' : 'Add'} Product`}
-            </SheetTitle>
-            <SheetDescription>
+            </DialogTitle>
+            <DialogDescription>
               {sheetMode === 'updateStock' 
                 ? 'Enter the new total quantity for this item.' 
                 : `Fill in the details for the product.`
               }
-            </SheetDescription>
-          </SheetHeader>
+            </DialogDescription>
+          </DialogHeader>
           <div className="py-4">
             { (sheetMode === 'addProduct' || sheetMode === 'editProduct') && 
               <ProductForm 
@@ -245,8 +249,8 @@ export default function ProductsClient() {
               />
             }
           </div>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 

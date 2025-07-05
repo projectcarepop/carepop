@@ -32,7 +32,6 @@ export default function InventoryClient() {
     queryKey: ['admin-clinics'],
     queryFn: () => getAdminClinics(accessToken!),
     enabled: !!accessToken,
-    select: (data) => data.data,
   });
 
   const handleClinicSelect = (clinicId: string | null) => {
@@ -48,7 +47,12 @@ export default function InventoryClient() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Inventory Dashboard</h1>
+          <div>
+            <h1 className="text-2xl font-bold">Inventory Dashboard</h1>
+            <p className="text-muted-foreground">
+                An overview of inventory statistics across all your clinics.
+            </p>
+          </div>
           <ClinicSelector 
             clinics={clinics || []}
             selectedClinicId={selectedClinicId}

@@ -71,7 +71,12 @@ export default function CategoryClient({ initialCategories }: CategoryClientProp
     return (
         <>
             <div className="flex items-center justify-between mb-4">
-                <h1 className="text-2xl font-bold">Product Categories</h1>
+                <div>
+                    <h1 className="text-2xl font-bold">Product Categories</h1>
+                    <p className="text-muted-foreground">
+                        Organize your products by grouping them into categories.
+                    </p>
+                </div>
                 <div className="flex items-center gap-4">
                     <Input
                         placeholder="Filter by category name..."
