@@ -2,10 +2,10 @@ import { type Profile, type AppointmentBookingPayload } from '@/lib/types'; // U
 import { type ProfileFormData } from '@/lib/validation/profile-schema';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
-import { type InventoryItem, type ProductCategory } from '@/app/inventory/_components/columns';
+import { type InventoryItem } from '@/app/inventory/_components/columns';
 
 // Type definitions for method payloads
-export type NewProductCategoryPayload = Omit<ProductCategory, 'id'>;
+export type NewProductCategoryPayload = { name: string; description?: string };
 export type UpsertInventoryItemPayload = Partial<Omit<InventoryItem, 'id' | 'updatedAt'>>;
 
 // Simple type for AdminUser until we have a more formal definition
@@ -409,6 +409,12 @@ export async function upsertClinic(clinicData: any, accessToken: string, clinicI
 
 // --- START: Inventory and Product Category Management ---
 
+export type ProductCategory = {
+  id: string;
+  name: string;
+  description?: string | null;
+};
+
 export async function getProductCategories(accessToken: string): Promise<{data: ProductCategory[]}> {
   const headers = await getAuthHeaders(accessToken);
   const response = await fetch(`${API_BASE_URL}/api/admin/product-categories`, { headers, cache: 'no-store' });
@@ -492,7 +498,8 @@ export async function getPublicServiceCategories() {
     if (!response.ok) {
         throw new Error('Failed to fetch service categories');
     }
-    return response.json();
+    const result = await response.json();
+    return result.records || [];
 }
 
 export async function getPublicServices(clinicId?: string) {
@@ -891,20 +898,3 @@ export async function getMyMedicalRecordsOnServer(accessToken: string) {
     const result = await response.json();
     return result.records || [];
 }
-
-export type ProductCategory = {
-    id: string;
-    name: string;
-    description?: string;
-};
-
-export const getProductCategories = async (token: string): Promise<ApiResponse<ProductCategory[]>> => {
-    const response = await api.get('/admin/product-categories', {
-        headers: { Authorization: `Bearer ${token}` }
-    });
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Failed to fetch product categories.' }));
-        throw new Error(error.message);
-    }
-    return response.data;
-};

@@ -30,6 +30,12 @@ export type InventoryItem = {
   updatedAt: string;
 };
 
+export type ProductCategory = {
+  id: string;
+  name: string;
+  description?: string | null;
+};
+
 type ColumnsProps = {
   onEdit: (item: InventoryItem) => void;
   onDelete: (item: InventoryItem) => void;
