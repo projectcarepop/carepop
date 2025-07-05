@@ -1,3 +1,5 @@
+import * as React from 'react';
+import InventorySidebar from './_components/InventorySidebar';
 import AccessDenied from "@/components/layout/AccessDenied";
 import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
@@ -31,5 +33,12 @@ export default async function InventoryLayout({
         return <AccessDenied pageName="the inventory management page" />;
     }
 
-    return <>{children}</>;
+    return (
+        <div className="w-full">
+            <InventorySidebar />
+            <main className="sm:ml-14 flex-1">
+                {children}
+            </main>
+        </div>
+    );
 } 

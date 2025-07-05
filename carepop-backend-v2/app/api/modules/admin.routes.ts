@@ -2,8 +2,8 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { db } from '../lib/db';
-import { clinics, profiles, doctors, services, productCategories, inventory_items, serviceCategories, appointments, medicalRecords, recordDoctorNotes, recordPrescriptions, recordDocuments, clinicServices } from '../../../drizzle/schema';
-import { eq, sql, count, asc, and, gte, lt, getTableColumns, desc, inArray } from 'drizzle-orm';
+import { clinics, profiles, doctors, services, productCategories, inventory_items, serviceCategories, appointments, medicalRecords, recordDoctorNotes, recordPrescriptions, recordDocuments, clinicServices, inventoryAuditLog } from '../../../drizzle/schema';
+import { eq, sql, count, asc, and, gte, lt, getTableColumns, desc, inArray, SQL } from 'drizzle-orm';
 import { authMiddleware, adminOrManagerMiddleware, AuthEnv } from '../middleware/auth';
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
@@ -358,79 +358,184 @@ adminRoutes
     return c.json({ success: true });
   });
 
-// --- NEW/REFACTORED Inventory Management Endpoints ---
-
-// GET all inventory items for a specific clinic
-adminRoutes.get('/clinics/:clinicId/inventory', async (c) => {
-    const { clinicId } = c.req.param();
-
-    const inventory = await db
-        .select({
-            // Select all columns from inventory_items
-            ...getTableColumns(inventory_items),
-            // And explicitly select the category name for the frontend
-            categoryName: productCategories.name,
-        })
-        .from(inventory_items)
-        .where(eq(inventory_items.clinicId, clinicId))
-        .leftJoin(productCategories, eq(inventory_items.productCategoryId, productCategories.id))
-        .orderBy(desc(inventory_items.updatedAt));
-
-    return c.json({ data: inventory });
+// --- Inventory Management ---
+const inventoryFilterSchema = z.object({
+  lowStock: z.enum(['true', 'false']).optional().transform(v => v === 'true'),
+  expiringSoon: z.enum(['true', 'false']).optional().transform(v => v === 'true'),
 });
 
-// POST (create) a new inventory item for a clinic
-adminRoutes.post('/inventory-items', zValidator('json', createInventoryItemSchema), async (c) => {
-    const newItemData = c.req.valid('json');
+adminRoutes
+  .get('/clinics/:clinicId/inventory', zValidator('query', inventoryFilterSchema), async (c) => {
+    const { clinicId } = c.req.param();
+    const { lowStock, expiringSoon } = c.req.valid('query');
 
-    // Business Rule: Prevent duplicate item names within the same clinic
-    const existingItem = await db.query.inventory_items.findFirst({
-        where: and(
-            eq(inventory_items.clinicId, newItemData.clinicId),
-            eq(inventory_items.itemName, newItemData.itemName)
-        )
-    });
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
 
-    if (existingItem) {
-        return c.json({ error: `'${newItemData.itemName}' is already listed in this clinic's inventory. Please update the existing item's quantity or details instead of adding a duplicate.` }, 409);
+    const conditions: (SQL | undefined)[] = [
+        eq(inventory_items.clinicId, clinicId)
+    ];
+
+    if (lowStock) {
+        conditions.push(sql`${inventory_items.quantityOnHand} <= ${inventory_items.reorderLevel}`);
     }
 
-    const dbPayload = {
-        ...newItemData,
-        purchasePrice: newItemData.purchasePrice?.toString(),
-        sellingPrice: newItemData.sellingPrice?.toString(),
-    };
-
-    // The data from the validator is already in the correct shape for the new schema
-    const [createdItem] = await db.insert(inventory_items).values(dbPayload).returning();
-    return c.json(createdItem, 201);
-});
-
-// Update an existing inventory item
-adminRoutes.put('/inventory-items/:itemId', zValidator('json', updateInventoryItemSchema), async (c) => {
-    const { itemId } = c.req.param();
-    const updatedValues = c.req.valid('json');
+    if (expiringSoon) {
+        conditions.push(sql`${inventory_items.expiryDate} IS NOT NULL`);
+        conditions.push(lt(inventory_items.expiryDate, thirtyDaysFromNow.toISOString()));
+    }
     
-    const dbPayload = {
-        ...updatedValues,
-        purchasePrice: updatedValues.purchasePrice?.toString(),
-        sellingPrice: updatedValues.sellingPrice?.toString(),
-        updatedAt: new Date().toISOString(), // Ensure updatedAt is updated on every modification
-    };
+    const items = await db.select({
+      // Select all columns from inventory_items
+      ...getTableColumns(inventory_items),
+      // And explicitly select the category name
+      categoryName: productCategories.name,
+    })
+    .from(inventory_items)
+    .leftJoin(productCategories, eq(inventory_items.productCategoryId, productCategories.id))
+    .where(and(...conditions.filter((c): c is SQL => !!c)))
+    .orderBy(desc(inventory_items.updatedAt));
 
-    const [updatedItem] = await db.update(inventory_items).set(dbPayload).where(eq(inventory_items.id, itemId)).returning();
+    return c.json({ data: items });
+  })
+  .post('/clinics/:clinicId/inventory', zValidator('json', createInventoryItemSchema), async (c) => {
+    const { clinicId } = c.req.param();
+    const itemData = c.req.valid('json');
+    const user = c.get('user');
 
-    if (!updatedItem) return c.json({ error: 'Inventory item not found' }, 404);
-    return c.json(updatedItem);
-});
+    if (itemData.clinicId !== clinicId) {
+        return c.json({ error: "Clinic ID in URL and body do not match." }, 400);
+    }
+    
+    try {
+        const newInventoryItem = await db.transaction(async (tx) => {
+            const dbPayload = {
+                ...itemData,
+                purchasePrice: itemData.purchasePrice?.toString(),
+                sellingPrice: itemData.sellingPrice?.toString(),
+            };
+            const [item] = await tx.insert(inventory_items).values(dbPayload).returning();
 
-// Delete an inventory item
-adminRoutes.delete('/inventory-items/:itemId', async (c) => {
-    const { itemId } = c.req.param();
-    const [deleted] = await db.delete(inventory_items).where(eq(inventory_items.id, itemId)).returning({ id: inventory_items.id });
-    if (!deleted) return c.json({ error: 'Not Found' }, 404);
-    return c.json({ success: true });
-});
+            if (item.quantityOnHand > 0) {
+                await tx.insert(inventoryAuditLog).values({
+                    itemId: item.id,
+                    clinicId: item.clinicId,
+                    userId: user.id,
+                    changeType: 'initial_stock',
+                    quantityChange: item.quantityOnHand,
+                    oldQuantity: 0,
+                    newQuantity: item.quantityOnHand,
+                    reason: 'Initial stock when creating item.',
+                });
+            }
+            return item;
+        });
+
+        return c.json(newInventoryItem, 201);
+    } catch (error: any) {
+        console.error("Error creating inventory item:", error);
+        return c.json({ error: "Failed to create inventory item.", message: error.message }, 500);
+    }
+  })
+  .put('/clinics/:clinicId/inventory/:itemId', zValidator('json', updateInventoryItemSchema), async (c) => {
+    const { clinicId, itemId } = c.req.param();
+    const itemData = c.req.valid('json');
+    const user = c.get('user');
+
+    try {
+        const updatedInventoryItem = await db.transaction(async (tx) => {
+            const dbPayload: Record<string, any> = { ...itemData };
+
+            if (itemData.purchasePrice !== undefined) {
+                dbPayload.purchasePrice = itemData.purchasePrice?.toString();
+            }
+            if (itemData.sellingPrice !== undefined) {
+                dbPayload.sellingPrice = itemData.sellingPrice?.toString();
+            }
+
+            if (itemData.quantityOnHand !== undefined) {
+                const [currentItem] = await tx.select({
+                    quantityOnHand: inventory_items.quantityOnHand
+                }).from(inventory_items).where(eq(inventory_items.id, itemId));
+
+                if (!currentItem) throw new Error("Inventory item not found.");
+                
+                const oldQuantity = currentItem.quantityOnHand;
+                const newQuantity = itemData.quantityOnHand;
+
+                const [updatedItem] = await tx.update(inventory_items)
+                    .set(dbPayload)
+                    .where(and(eq(inventory_items.id, itemId), eq(inventory_items.clinicId, clinicId)))
+                    .returning();
+                
+                if (!updatedItem) throw new Error("Update failed or item does not belong to the specified clinic.");
+                
+                await tx.insert(inventoryAuditLog).values({
+                    itemId: updatedItem.id,
+                    clinicId: updatedItem.clinicId,
+                    userId: user.id,
+                    changeType: 'manual_update',
+                    quantityChange: newQuantity - oldQuantity,
+                    oldQuantity: oldQuantity,
+                    newQuantity: newQuantity,
+                    reason: 'Manual stock adjustment by user.',
+                });
+
+                return updatedItem;
+            } else {
+                const [updatedItem] = await tx.update(inventory_items)
+                    .set(dbPayload)
+                    .where(and(eq(inventory_items.id, itemId), eq(inventory_items.clinicId, clinicId)))
+                    .returning();
+
+                if (!updatedItem) throw new Error("Update failed or item not found.");
+                
+                return updatedItem;
+            }
+        });
+
+        return c.json(updatedInventoryItem);
+    } catch (error: any) {
+        console.error("Error updating inventory item:", error);
+        return c.json({ error: "Failed to update inventory item.", message: error.message }, 500);
+    }
+  })
+  .delete('/clinics/:clinicId/inventory/:itemId', async (c) => {
+    const { clinicId, itemId } = c.req.param();
+    const user = c.get('user');
+    
+    try {
+      await db.transaction(async (tx) => {
+        const [currentItem] = await tx.select({
+            quantityOnHand: inventory_items.quantityOnHand
+        }).from(inventory_items).where(eq(inventory_items.id, itemId));
+
+        if (!currentItem) {
+            throw new Error('Item not found');
+        }
+
+        await tx.delete(inventory_items)
+            .where(and(eq(inventory_items.id, itemId), eq(inventory_items.clinicId, clinicId)));
+
+        await tx.insert(inventoryAuditLog).values({
+            itemId: itemId,
+            clinicId: clinicId,
+            userId: user.id,
+            changeType: 'deletion',
+            quantityChange: -currentItem.quantityOnHand,
+            oldQuantity: currentItem.quantityOnHand,
+            newQuantity: 0,
+            reason: 'Item deleted from inventory.',
+        });
+      });
+
+      return c.json({ success: true, message: 'Item deleted successfully.' });
+
+    } catch (error: any) {
+      console.error(`Error deleting inventory item ${itemId}:`, error);
+      return c.json({ error: 'Failed to delete item', message: error.message }, 500);
+    }
+  });
 
 // --- Doctor Management Endpoints ---
 

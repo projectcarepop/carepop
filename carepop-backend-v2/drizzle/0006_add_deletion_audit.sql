@@ -1,0 +1,1 @@
+ALTER TYPE "audit_change_type" ADD VALUE 'deletion'; 

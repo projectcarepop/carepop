@@ -220,6 +220,25 @@ export const inventory_items = pgTable("inventory_items", {
     reorderLevelCheck: check("inventory_reorder_level_check", sql`"reorder_level" >= 0`),
 }));
 
+export const auditChangeType = pgEnum("audit_change_type", ['initial_stock', 'manual_update', 'sale', 'return', 'spoilage', 'reconciliation', 'deletion']);
+
+export const inventoryAuditLog = pgTable("inventory_audit_log", {
+	id: uuid('id').default(sql`gen_random_uuid()`).primaryKey().notNull(),
+	itemId: uuid("item_id").notNull().references(() => inventory_items.id, { onDelete: 'cascade' }),
+	clinicId: uuid("clinic_id").notNull().references(() => clinics.id, { onDelete: 'cascade' }),
+	userId: uuid("user_id").notNull().references(() => usersInAuth.id, { onDelete: 'set null' }),
+	changeType: auditChangeType("change_type").notNull(),
+	quantityChange: integer("quantity_change").notNull(),
+	oldQuantity: integer("old_quantity").notNull(),
+	newQuantity: integer("new_quantity").notNull(),
+	reason: text("reason"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => ({
+	itemIdx: index("audit_item_idx").on(table.itemId),
+	clinicIdx: index("audit_clinic_idx").on(table.clinicId),
+	userIdx: index("audit_user_idx").on(table.userId),
+}));
+
 export const moodEnum = pgEnum("mood", ['happy', 'sad', 'neutral', 'anxious', 'stressed']);
 
 export const healthLogs = pgTable("health_logs", {

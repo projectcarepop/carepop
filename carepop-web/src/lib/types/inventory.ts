@@ -1,26 +1,31 @@
 // Single source of truth for all inventory-related types.
 
-export type InventoryItem = {
+export interface InventoryItem {
   id: string;
   clinicId: string;
   itemName: string;
   productCategoryId: string | null;
-  sku?: string | null;
-  genericName?: string | null;
-  brandName?: string | null;
-  dosageForm?: string | null;
-  strength?: string | null;
+  sku: string | null;
+  genericName: string | null;
+  brandName: string | null;
+  dosageForm: string | null;
+  strength: string | null;
   quantityOnHand: number;
   reorderLevel: number;
-  purchasePrice?: number | null;
-  sellingPrice?: number | null;
-  location?: string | null;
+  purchasePrice: number | null;
+  sellingPrice: number | null;
+  location: string | null;
   updatedAt: string;
+  // New fields from migrations
+  batchNumber: string | null;
+  expiryDate: string | null; // Keep as string to match form input
+  // Relation-like fields
+  categoryName?: string;
   // This is the shape of the joined data from the backend
   productCategory?: {
     name: string;
   } | null;
-};
+}
 
 export type InventoryItemBatch = {
   id: string;
@@ -31,11 +36,11 @@ export type InventoryItemBatch = {
   createdAt: string;
 };
 
-export type ProductCategory = {
+export interface ProductCategory {
   id:string;
   name: string;
   description?: string | null;
-};
+}
 
 export type Clinic = {
   id: string;

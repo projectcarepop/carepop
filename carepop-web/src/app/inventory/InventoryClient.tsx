@@ -8,36 +8,49 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { DataTable } from '@/components/ui/data-table';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { 
-  getAdminProducts, 
+  getInventoryForClinic, 
   getProductCategories,
   upsertInventoryItem, 
-  upsertProductCategory, 
+  upsertProductCategory,
+  getAdminClinics,
 } from '@/services/api';
 import { type InventoryItem, type ProductCategory } from '@/lib/types/inventory';
 import { productColumns } from './_components/columns';
 import { categoryColumns } from './_components/category-columns';
 import { ProductForm, type ProductFormValues } from './_components/ProductForm';
 import { CategoryForm, type CategoryFormValues } from './_components/CategoryForm';
+import { ClinicSelector } from './_components/ClinicSelector';
+import { UpdateStockForm, type UpdateStockFormValues } from './_components/UpdateStockForm';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 export default function InventoryClient() {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const { session } = useAuth();
   const accessToken = session?.access_token;
+
   const [activeTab, setActiveTab] = React.useState('products');
   const [globalFilter, setGlobalFilter] = React.useState('');
+  const [showLowStockOnly, setShowLowStockOnly] = React.useState(false);
+  const [showExpiringSoon, setShowExpiringSoon] = React.useState(false);
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
-  const [sheetMode, setSheetMode] = React.useState<'addProduct' | 'editProduct' | 'addCategory' | 'editCategory' | 'updateStock' | 'manageBatches' | null>(null);
+  const [sheetMode, setSheetMode] = React.useState<'addProduct' | 'editProduct' | 'addCategory' | 'editCategory' | 'updateStock' | null>(null);
   const [selectedItem, setSelectedItem] = React.useState<InventoryItem | ProductCategory | null>(null);
+  const [selectedClinicId, setSelectedClinicId] = React.useState<string | null>(null);
+
+  const queryClient = useQueryClient();
 
   const { data: products, isLoading: isLoadingProducts } = useQuery({
-    queryKey: ['admin-products'],
-    queryFn: () => getAdminProducts(accessToken!),
-    enabled: !!accessToken,
+    queryKey: ['inventory-items', selectedClinicId, { lowStock: showLowStockOnly, expiringSoon: showExpiringSoon }],
+    queryFn: () => getInventoryForClinic(selectedClinicId!, accessToken!, {
+      lowStock: showLowStockOnly,
+      expiringSoon: showExpiringSoon,
+    }),
+    enabled: !!accessToken && !!selectedClinicId,
     select: (data) => data.data,
   });
 
@@ -48,12 +61,21 @@ export default function InventoryClient() {
     select: (data) => data.data,
   });
 
+  const { data: clinics, isLoading: isLoadingClinics } = useQuery({
+    queryKey: ['admin-clinics'],
+    queryFn: () => getAdminClinics(accessToken!),
+    enabled: !!accessToken,
+    select: (data) => data.data,
+  });
+
   const handleMutationSuccess = (entity: string) => {
     toast({ title: `${entity} saved successfully.` });
-    queryClient.invalidateQueries({ queryKey: ['admin-products'] });
-    queryClient.invalidateQueries({ queryKey: ['admin-product-categories'] });
     setIsSheetOpen(false);
-    setSelectedItem(null);
+    if (entity === 'Product') {
+      queryClient.invalidateQueries({ queryKey: ['inventory-items', selectedClinicId] });
+    } else {
+      queryClient.invalidateQueries({ queryKey: ['admin-product-categories'] });
+    }
   };
 
   const handleMutationError = (error: Error, entity: string) => {
@@ -62,104 +84,109 @@ export default function InventoryClient() {
 
   const productMutation = useMutation({
     mutationFn: (data: { item: ProductFormValues; id?: string }) => {
-        const { sellingPrice, purchasePrice, ...rest } = data.item;
+        const { sellingPrice, purchasePrice, expiryDate, ...rest } = data.item;
         
         const payload = {
             ...rest,
-            clinicId: 'f8d3e236-8c6e-4b99-9e0a-1b0b3a3b3a3b',
+            clinicId: selectedClinicId!,
             sellingPrice: sellingPrice ? parseFloat(sellingPrice) : null,
             purchasePrice: purchasePrice ? parseFloat(purchasePrice) : null,
+            expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
         };
         return upsertInventoryItem(payload, accessToken!, data.id);
     },
     onSuccess: () => handleMutationSuccess('Product'),
-    onError: (error: Error) => handleMutationError(error, 'product'),
+    onError: (error) => handleMutationError(error, 'Product'),
   });
 
   const categoryMutation = useMutation({
     mutationFn: (data: { item: CategoryFormValues; id?: string }) => upsertProductCategory(data.item, accessToken!, data.id),
     onSuccess: () => handleMutationSuccess('Category'),
-    onError: (error: Error) => handleMutationError(error, 'category'),
+    onError: (error) => handleMutationError(error, 'Category'),
   });
-  
-  const handleOpenSheet = (mode: typeof sheetMode, item: InventoryItem | ProductCategory | null = null) => {
+
+  const stockUpdateMutation = useMutation({
+    mutationFn: (data: { values: UpdateStockFormValues, id: string }) => {
+      const payload = {
+        quantityOnHand: data.values.quantityOnHand,
+      };
+      return upsertInventoryItem(payload, accessToken!, data.id);
+    },
+    onSuccess: () => handleMutationSuccess('Stock'),
+    onError: (error) => handleMutationError(error, 'Stock'),
+  });
+
+  const handleOpenSheet = React.useCallback((
+    mode: 'addProduct' | 'editProduct' | 'addCategory' | 'editCategory' | 'updateStock', 
+    item?: InventoryItem | ProductCategory
+  ) => {
     setSheetMode(mode);
-    setSelectedItem(item);
+    setSelectedItem(item || null);
     setIsSheetOpen(true);
-  };
+  }, []);
   
-  const handleEditProduct = (item: InventoryItem) => handleOpenSheet('editProduct', item);
-  const handleEditCategory = (category: ProductCategory) => handleOpenSheet('editCategory', category);
-  const handleUpdateStock = (item: InventoryItem) => handleOpenSheet('updateStock', item);
-  
-  const handleDeleteProduct = (item: InventoryItem) => console.log('Delete product', item.id);
-  const handleDeleteCategory = (category: ProductCategory) => console.log('Delete category', category.id);
+  const handleDeleteProduct = (item: InventoryItem) => console.log('Delete product', item);
 
-  const renderSheetContent = () => {
-    if (!isSheetOpen || !sheetMode) return null;
+  const columns = React.useMemo(() => productColumns({
+    onEdit: (item) => handleOpenSheet('editProduct', item),
+    onDelete: handleDeleteProduct,
+    onUpdateStock: (item) => handleOpenSheet('updateStock', item)
+  }), [handleOpenSheet]);
 
-    switch (sheetMode) {
-      case 'addProduct':
-      case 'editProduct':
-        return (
-          <SheetContent className="sm:max-w-2xl">
-            <SheetHeader>
-              <SheetTitle>{sheetMode === 'addProduct' ? 'Add New Product' : 'Edit Product'}</SheetTitle>
-            </SheetHeader>
-            <ProductForm
-              initialData={selectedItem as InventoryItem | undefined}
-              categories={categories || []}
-              isPending={productMutation.isPending}
-              onSubmit={(values) => productMutation.mutate({ item: values, id: (selectedItem as InventoryItem)?.id })}
-            />
-          </SheetContent>
-        );
-      case 'addCategory':
-      case 'editCategory':
-        return (
-          <SheetContent>
-            <SheetHeader>
-              <SheetTitle>{sheetMode === 'addCategory' ? 'Add New Category' : 'Edit Category'}</SheetTitle>
-            </SheetHeader>
-            <CategoryForm
-              initialData={selectedItem as ProductCategory | undefined}
-              isPending={categoryMutation.isPending}
-              onSubmit={(values) => categoryMutation.mutate({ item: values, id: (selectedItem as ProductCategory)?.id })}
-            />
-          </SheetContent>
-        );
-      default:
-        return null;
-    }
-  };
+  const categoryCols = React.useMemo(() => categoryColumns({
+    openSheet: (mode, category) => handleOpenSheet(mode, category),
+  }), [handleOpenSheet]);
 
-  const filterColumn = activeTab === 'products' ? 'itemName' : 'name';
   const filterPlaceholder = activeTab === 'products' ? 'Filter by product name...' : 'Filter by category name...';
 
   return (
     <>
+      <div className="flex items-center justify-between mb-4">
+          <ClinicSelector 
+            clinics={clinics || []}
+            selectedClinicId={selectedClinicId}
+            onClinicSelect={setSelectedClinicId}
+            isLoading={isLoadingClinics}
+          />
+      </div>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="flex items-center justify-between">
           <TabsList>
             <TabsTrigger value="products">Products</TabsTrigger>
             <TabsTrigger value="categories">Categories</TabsTrigger>
           </TabsList>
-          <div className="ml-auto flex items-center gap-2">
-            <Button size="sm" className="h-8 gap-1" onClick={() => handleOpenSheet(activeTab === 'products' ? 'addProduct' : 'addCategory')}>
-              <PlusCircle className="h-3.5 w-3.5" />
-              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                {activeTab === 'products' ? 'Add Product' : 'Add Category'}
-              </span>
+          <div className="ml-auto flex items-center gap-4">
+            {activeTab === 'products' && (
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="low-stock"
+                    checked={showLowStockOnly}
+                    onCheckedChange={(checked) => setShowLowStockOnly(!!checked)}
+                  />
+                  <Label htmlFor="low-stock" className="whitespace-nowrap">Low Stock</Label>
+                </div>
+                 <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="expiring-soon"
+                    checked={showExpiringSoon}
+                    onCheckedChange={(checked) => setShowExpiringSoon(!!checked)}
+                  />
+                  <Label htmlFor="expiring-soon" className="whitespace-nowrap">Expiring Soon</Label>
+                </div>
+              </div>
+            )}
+            <Input
+              placeholder={filterPlaceholder}
+              value={globalFilter}
+              onChange={(e) => setGlobalFilter(e.target.value)}
+              className="w-full md:w-64"
+            />
+            <Button onClick={() => handleOpenSheet(activeTab === 'products' ? 'addProduct' : 'addCategory')}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              {activeTab === 'products' ? 'Add Product' : 'Add Category'}
             </Button>
           </div>
-        </div>
-        <div className="py-4">
-           <Input
-                placeholder={filterPlaceholder}
-                value={globalFilter}
-                onChange={(event) => setGlobalFilter(event.target.value)}
-                className="w-full"
-            />
         </div>
         <TabsContent value="products">
           <Card>
@@ -169,11 +196,11 @@ export default function InventoryClient() {
             </CardHeader>
             <CardContent>
               <DataTable
-                columns={productColumns({ onEdit: handleEditProduct, onDelete: handleDeleteProduct, onUpdateStock: handleUpdateStock })}
+                columns={columns}
                 data={products || []}
-                isLoading={isLoadingProducts}
-                filterColumn={filterColumn}
+                filterColumn="itemName"
                 globalFilter={globalFilter}
+                isLoading={isLoadingProducts}
               />
             </CardContent>
           </Card>
@@ -186,18 +213,55 @@ export default function InventoryClient() {
             </CardHeader>
             <CardContent>
               <DataTable
-                 columns={categoryColumns({ onEdit: handleEditCategory, onDelete: handleDeleteCategory })}
-                 data={categories || []}
-                 isLoading={isLoadingCategories}
-                 filterColumn={filterColumn}
-                 globalFilter={globalFilter}
+                columns={categoryCols}
+                data={categories || []}
+                filterColumn="name"
+                globalFilter={globalFilter}
+                isLoading={isLoadingCategories}
               />
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        {renderSheetContent()}
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>
+              {sheetMode === 'updateStock' && 'Update Stock'}
+              {sheetMode !== 'updateStock' && `${sheetMode?.includes('edit') ? 'Edit' : 'Add'} ${sheetMode?.includes('Category') ? 'Category' : 'Product'}`}
+            </SheetTitle>
+            <SheetDescription>
+              {sheetMode === 'updateStock' 
+                ? 'Enter the new total quantity for this item.' 
+                : `Fill in the details for the ${sheetMode?.includes('Category') ? 'category' : 'product'}.`
+              }
+            </SheetDescription>
+          </SheetHeader>
+          <div className="py-4">
+            { (sheetMode === 'addProduct' || sheetMode === 'editProduct') && 
+              <ProductForm 
+                onSubmit={(values) => productMutation.mutate({ item: values, id: (selectedItem as InventoryItem)?.id })} 
+                initialData={selectedItem as InventoryItem | undefined}
+                isPending={productMutation.isPending}
+                categories={categories || []}
+              />
+            }
+            { (sheetMode === 'addCategory' || sheetMode === 'editCategory') &&
+              <CategoryForm 
+                onSubmit={(values) => categoryMutation.mutate({ item: values, id: (selectedItem as ProductCategory)?.id })}
+                initialData={selectedItem as ProductCategory | undefined}
+                isPending={categoryMutation.isPending}
+              />
+            }
+            { sheetMode === 'updateStock' &&
+              <UpdateStockForm
+                onSubmit={(values) => stockUpdateMutation.mutate({ values, id: (selectedItem as InventoryItem).id })}
+                initialData={selectedItem as InventoryItem}
+                isPending={stockUpdateMutation.isPending}
+              />
+            }
+          </div>
+        </SheetContent>
       </Sheet>
     </>
   );

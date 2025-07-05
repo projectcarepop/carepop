@@ -457,11 +457,27 @@ export async function deleteProductCategory(categoryId: string, accessToken: str
   return response.json();
 }
 
-export async function getInventoryForClinic(clinicId: string, accessToken: string): Promise<{data: InventoryItem[]}> {
-  const headers = await getAuthHeaders(accessToken);
-  const response = await fetch(`${API_BASE_URL}/api/admin/clinics/${clinicId}/inventory`, { headers, cache: 'no-store' });
-  if (!response.ok) throw new Error("Failed to fetch inventory.");
-  return response.json();
+export async function getInventoryForClinic(
+  clinicId: string, 
+  accessToken: string,
+  filters?: { lowStock?: boolean; expiringSoon?: boolean }
+): Promise<{data: InventoryItem[]}> {
+    const headers = await getAuthHeaders(accessToken);
+    
+    const params = new URLSearchParams();
+    if (filters?.lowStock) {
+      params.append('lowStock', 'true');
+    }
+    if (filters?.expiringSoon) {
+      params.append('expiringSoon', 'true');
+    }
+    
+    const queryString = params.toString();
+    const url = `${API_BASE_URL}/api/admin/clinics/${clinicId}/inventory${queryString ? `?${queryString}` : ''}`;
+    
+    const response = await fetch(url, { headers, cache: 'no-store' });
+    if (!response.ok) throw new Error('Failed to fetch inventory');
+    return response.json();
 }
 
 export async function upsertInventoryItem(itemData: UpsertInventoryItemPayload, accessToken: string, itemId?: string) {

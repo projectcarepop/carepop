@@ -24,6 +24,12 @@ import {
 } from '@/components/ui/select';
 import { type InventoryItem, type ProductCategory } from '@/lib/types/inventory';
 import { Loader2 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { CalendarIcon } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+
 
 // This schema defines the form's structure and validation.
 const formSchema = z.object({
@@ -38,6 +44,8 @@ const formSchema = z.object({
   strength: z.string().optional().nullable(),
   reorderLevel: z.coerce.number().int().min(0).default(10),
   location: z.string().optional().nullable(),
+  batchNumber: z.string().optional().nullable(),
+  expiryDate: z.date().optional().nullable(),
 });
 
 export type ProductFormValues = z.infer<typeof formSchema>;
@@ -64,24 +72,20 @@ export function ProductForm({ initialData, onSubmit, isPending, categories }: Pr
       strength: '',
       reorderLevel: 10,
       location: '',
+      batchNumber: '',
+      expiryDate: null,
     },
   });
   
-  // Use React.useEffect to populate the form when initialData is available.
   React.useEffect(() => {
     if (initialData) {
       form.reset({
-        itemName: initialData.itemName,
+        ...initialData,
         productCategoryId: initialData.productCategoryId ?? null,
         sellingPrice: initialData.sellingPrice?.toString() ?? '',
         purchasePrice: initialData.purchasePrice?.toString() ?? '',
-        sku: initialData.sku ?? '',
-        genericName: initialData.genericName ?? '',
-        brandName: initialData.brandName ?? '',
-        dosageForm: initialData.dosageForm ?? '',
-        strength: initialData.strength ?? '',
-        reorderLevel: initialData.reorderLevel ?? 10,
-        location: initialData.location ?? '',
+        batchNumber: initialData.batchNumber ?? '',
+        expiryDate: initialData.expiryDate ? new Date(initialData.expiryDate) : null,
       });
     }
   }, [initialData, form]);
@@ -89,6 +93,7 @@ export function ProductForm({ initialData, onSubmit, isPending, categories }: Pr
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {/* Existing Fields Go Here */}
         <FormField
           control={form.control}
           name="itemName"
@@ -202,12 +207,12 @@ export function ProductForm({ initialData, onSubmit, isPending, categories }: Pr
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <FormField
               control={form.control}
-              name="purchasePrice"
+              name="sellingPrice"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Purchase Price (PHP)</FormLabel>
+                  <FormLabel>Selling Price (PHP)</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" placeholder="e.g., 8.00" {...field} value={field.value ?? ''}/>
+                    <Input type="number" placeholder="e.g., 100.00" {...field} value={field.value ?? ''}/>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -215,31 +220,31 @@ export function ProductForm({ initialData, onSubmit, isPending, categories }: Pr
             />
             <FormField
               control={form.control}
-              name="sellingPrice"
+              name="purchasePrice"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Selling Price (PHP)</FormLabel>
+                  <FormLabel>Purchase Price (PHP)</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" placeholder="e.g., 10.50" {...field} value={field.value ?? ''}/>
+                    <Input type="number" placeholder="e.g., 80.00" {...field} value={field.value ?? ''}/>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <FormField
               control={form.control}
               name="reorderLevel"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Re-order Level</FormLabel>
+                  <FormLabel>Reorder Level</FormLabel>
                   <FormControl>
-                    <Input type="number" {...field} />
+                    <Input type="number" placeholder="e.g., 10" {...field} />
                   </FormControl>
                    <FormDescription>
-                    Min. stock level before re-ordering.
+                    The stock level that triggers a reorder.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -262,10 +267,67 @@ export function ProductForm({ initialData, onSubmit, isPending, categories }: Pr
               )}
             />
         </div>
-
-        <Button type="submit" disabled={isPending}>
-          {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {initialData ? 'Save Changes' : 'Create Product'}
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <FormField
+              control={form.control}
+              name="batchNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Batch Number</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., B12345" {...field} value={field.value ?? ''}/>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="expiryDate"
+              render={({ field }) => (
+                <FormItem className="flex flex-col pt-2">
+                  <FormLabel>Expiry Date</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "pl-3 text-left font-normal",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          {field.value ? (
+                            format(field.value, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value ?? undefined}
+                        onSelect={field.onChange}
+                        disabled={(date) =>
+                          date < new Date()
+                        }
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+        </div>
+        
+        <Button type="submit" disabled={isPending} className="w-full">
+          {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          {isPending ? 'Saving...' : 'Save Changes'}
         </Button>
       </form>
     </Form>
