@@ -80,20 +80,41 @@ const productCategorySchema = z.object({
     description: z.string().optional(),
 });
 
-// Schema for creating a new inventory item
+// Schema for creating a new inventory item - ALIGNED WITH NEW SCHEMA
 const createInventoryItemSchema = z.object({
-    productId: z.string().uuid(),
     clinicId: z.string().uuid(),
+    productCategoryId: z.string().uuid().optional(),
+    itemName: z.string().min(1),
+    sku: z.string().optional(),
+    genericName: z.string().optional(),
+    brandName: z.string().optional(),
+    dosageForm: z.string().optional(),
+    strength: z.string().optional(),
     quantityOnHand: z.number().int().min(0),
-    batchNumber: z.string().optional(),
-    expiryDate: z.string().date().optional(), // Expecting 'YYYY-MM-DD'
-});
-
-// Schema for updating an existing inventory item
-const updateInventoryItemSchema = z.object({
-    quantityOnHand: z.number().int().min(0).optional(),
+    reorderLevel: z.number().int().min(0).optional(),
+    purchasePrice: z.string().optional(),
+    sellingPrice: z.string().optional(),
     batchNumber: z.string().optional(),
     expiryDate: z.string().date().optional(),
+    location: z.string().optional(),
+});
+
+// Schema for updating an existing inventory item - ALIGNED WITH NEW SCHEMA
+const updateInventoryItemSchema = z.object({
+    productCategoryId: z.string().uuid().optional(),
+    itemName: z.string().min(1).optional(),
+    sku: z.string().optional(),
+    genericName: z.string().optional(),
+    brandName: z.string().optional(),
+    dosageForm: z.string().optional(),
+    strength: z.string().optional(),
+    quantityOnHand: z.number().int().min(0).optional(),
+    reorderLevel: z.number().int().min(0).optional(),
+    purchasePrice: z.string().optional(),
+    sellingPrice: z.string().optional(),
+    batchNumber: z.string().optional(),
+    expiryDate: z.string().date().optional(),
+    location: z.string().optional(),
 });
 
 // Schema for creating/updating services
@@ -321,17 +342,20 @@ adminRoutes
 // Get all inventory items for a specific clinic
 adminRoutes.get('/clinics/:clinicId/inventory', async (c) => {
     const { clinicId } = c.req.param();
+    // The query is now simplified as the relation to `products` is removed.
+    // All necessary data is on the inventory_items table itself.
     const items = await db.query.inventory_items.findMany({
         where: eq(inventory_items.clinicId, clinicId),
-        with: {
-            product: true, // Also fetch the related product details
-        },
         orderBy: asc(inventory_items.updatedAt),
     });
     return c.json({ data: items });
 });
 
 // Get all stock for a specific product across all clinics
+// THIS ROUTE IS NO LONGER VALID as productId is removed.
+// It should be based on a different identifier, like SKU, if needed.
+// For now, we will disable it to prevent errors.
+/*
 adminRoutes.get('/products/:productId/inventory', async (c) => {
     const { productId } = c.req.param();
     const items = await db.query.inventory_items.findMany({
@@ -344,10 +368,12 @@ adminRoutes.get('/products/:productId/inventory', async (c) => {
     });
     return c.json({ data: items });
 });
+*/
 
 // Add a new inventory item/batch to a clinic
 adminRoutes.post('/inventory-items', zValidator('json', createInventoryItemSchema), async (c) => {
     const newItemData = c.req.valid('json');
+    // The data from the validator is already in the correct shape for the new schema
     const [createdItem] = await db.insert(inventory_items).values(newItemData).returning();
     return c.json(createdItem, 201);
 });
@@ -358,7 +384,7 @@ adminRoutes.put('/inventory-items/:itemId', zValidator('json', updateInventoryIt
     const updatedValues = c.req.valid('json');
     const [updatedItem] = await db.update(inventory_items).set({
         ...updatedValues,
-        updatedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(), // Ensure updatedAt is updated on every modification
     }).where(eq(inventory_items.id, itemId)).returning();
 
     if (!updatedItem) return c.json({ error: 'Inventory item not found' }, 404);

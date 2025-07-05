@@ -375,14 +375,14 @@ export const productsRelations = relations(products, ({ one, many }) => ({
 }));
 
 export const inventoryItemsRelations = relations(inventory_items, ({ one }) => ({
-	product: one(products, {
-		fields: [inventory_items.productId],
-		references: [products.id]
+	clinic: one(clinics, {
+		fields: [inventory_items.clinicId],
+		references: [clinics.id],
 	}),
-    clinic: one(clinics, {
-        fields: [inventory_items.clinicId],
-        references: [clinics.id]
-    }),
+	productCategory: one(productCategories, {
+		fields: [inventory_items.productCategoryId],
+		references: [productCategories.id],
+	}),
 }));
 
 export const healthLogsRelations = relations(healthLogs, ({ one }) => ({
