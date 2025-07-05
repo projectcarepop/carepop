@@ -66,22 +66,24 @@ export default function UpsertInventoryItemModal({
   });
 
   useEffect(() => {
-    form.reset({
-      productCategoryId: item?.productCategoryId ?? '',
-      itemName: item?.itemName ?? "",
-      genericName: item?.genericName ?? "",
-      brandName: item?.brandName ?? "",
-      sku: item?.sku ?? "",
-      dosageForm: item?.dosageForm ?? "",
-      strength: item?.strength ?? "",
-      quantityOnHand: item?.quantityOnHand ?? 0,
-      reorderLevel: item?.reorderLevel ?? 10,
-      purchasePrice: item?.purchasePrice ? Number(item.purchasePrice) : undefined,
-      sellingPrice: item?.sellingPrice ? Number(item.sellingPrice) : undefined,
-      batchNumber: item?.batchNumber ?? "",
-      expiryDate: item?.expiryDate ? new Date(item.expiryDate).toISOString().split('T')[0] : "",
-      location: item?.location ?? "",
-    });
+    if (isOpen) {
+      form.reset({
+        productCategoryId: item?.productCategoryId ?? '',
+        itemName: item?.itemName ?? "",
+        genericName: item?.genericName ?? "",
+        brandName: item?.brandName ?? "",
+        sku: item?.sku ?? "",
+        dosageForm: item?.dosageForm ?? "",
+        strength: item?.strength ?? "",
+        quantityOnHand: item?.quantityOnHand ?? 0,
+        reorderLevel: item?.reorderLevel ?? 10,
+        purchasePrice: item?.purchasePrice ? Number(item.purchasePrice) : undefined,
+        sellingPrice: item?.sellingPrice ? Number(item.sellingPrice) : undefined,
+        batchNumber: item?.batchNumber ?? "",
+        expiryDate: item?.expiryDate ? new Date(item.expiryDate).toISOString().split('T')[0] : "",
+        location: item?.location ?? "",
+      });
+    }
   }, [item, form, isOpen]);
 
   const dialogTitle = item ? "Edit Inventory Item" : "Add New Inventory Item";
