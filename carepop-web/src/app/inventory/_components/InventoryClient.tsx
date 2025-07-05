@@ -11,6 +11,16 @@ import { Button } from '@/components/ui/button';
 import { getAdminClinics, getInventoryForClinic, upsertInventoryItem, deleteInventoryItem, getProductCategories, UpsertInventoryItemPayload } from '@/services/api';
 import { useToast } from "@/components/ui/use-toast"
 import UpsertInventoryItemModal from './UpsertInventoryItemModal';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 // This type should match the form's output, which uses numbers for price
 type FormValues = Omit<UpsertInventoryItemPayload, 'purchasePrice' | 'sellingPrice'> & {
@@ -26,6 +36,10 @@ export default function InventoryClient() {
     const [selectedClinic, setSelectedClinic] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+
+    // State for controlling the Delete confirmation dialog
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null);
 
     const { data: clinics, isLoading: isLoadingClinics } = useQuery({
         queryKey: ['adminClinics'],
@@ -84,6 +98,10 @@ export default function InventoryClient() {
         },
         onError: (error: any) => {
             toast({ variant: "destructive", title: "Error", description: error.message });
+        },
+        onSettled: () => {
+            setIsDeleteDialogOpen(false);
+            setItemToDelete(null);
         }
     });
 
@@ -98,8 +116,8 @@ export default function InventoryClient() {
     };
 
     const handleDeleteItem = (item: InventoryItem) => {
-        // TODO: Add a confirmation dialog before deleting
-        deleteMutation.mutate(item.id);
+        setItemToDelete(item);
+        setIsDeleteDialogOpen(true);
     };
 
     const handleSubmit = (values: FormValues) => {
@@ -126,7 +144,7 @@ export default function InventoryClient() {
                                 <SelectValue placeholder="Select a clinic..." />
                             </SelectTrigger>
                             <SelectContent>
-                                {clinics?.map((clinic) => (
+                                {clinics?.map((clinic: { id: string; name: string }) => (
                                     <SelectItem key={clinic.id} value={clinic.id}>
                                         {clinic.name}
                                     </SelectItem>
@@ -164,6 +182,26 @@ export default function InventoryClient() {
                 isLoading={upsertMutation.isPending}
                 productCategories={productCategories}
             />
+
+            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently delete the item: <span className="font-semibold">{itemToDelete?.itemName}</span>. This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => itemToDelete && deleteMutation.mutate(itemToDelete.id)}
+                            disabled={deleteMutation.isPending}
+                        >
+                            {deleteMutation.isPending ? 'Deleting...' : 'Continue'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 } 
