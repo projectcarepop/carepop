@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { db } from '../lib/db';
-import { clinics, profiles, doctors, services, productCategories, products, inventory_items, serviceCategories, appointments, medicalRecords, recordDoctorNotes, recordPrescriptions, recordDocuments, clinicServices } from '../../../drizzle/schema';
+import { clinics, profiles, doctors, services, productCategories, inventory_items, serviceCategories, appointments, medicalRecords, recordDoctorNotes, recordPrescriptions, recordDocuments, clinicServices } from '../../../drizzle/schema';
 import { eq, sql, count, asc, and, gte, lt, getTableColumns, desc, inArray } from 'drizzle-orm';
 import { authMiddleware, adminOrManagerMiddleware, AuthEnv } from '../middleware/auth';
 import { createClient } from '@supabase/supabase-js';
@@ -358,45 +358,28 @@ adminRoutes
     return c.json({ success: true });
   });
 
-// --- NEW Inventory Management Endpoints ---
+// --- NEW/REFACTORED Inventory Management Endpoints ---
 
-// Get all inventory items for a specific clinic
+// GET all inventory items for a specific clinic
 adminRoutes.get('/clinics/:clinicId/inventory', async (c) => {
     const { clinicId } = c.req.param();
-    const items = await db.query.inventory_items.findMany({
-        where: eq(inventory_items.clinicId, clinicId),
-        orderBy: asc(inventory_items.updatedAt),
-        with: {
-            productCategory: {
-                columns: {
-                    name: true,
-                }
-            }
-        }
-    });
-    return c.json({ data: items });
+
+    const inventory = await db
+        .select({
+            // Select all columns from inventory_items
+            ...getTableColumns(inventory_items),
+            // And explicitly select the category name for the frontend
+            categoryName: productCategories.name,
+        })
+        .from(inventory_items)
+        .where(eq(inventory_items.clinicId, clinicId))
+        .leftJoin(productCategories, eq(inventory_items.productCategoryId, productCategories.id))
+        .orderBy(desc(inventory_items.updatedAt));
+
+    return c.json({ data: inventory });
 });
 
-// Get all stock for a specific product across all clinics
-// THIS ROUTE IS NO LONGER VALID as productId is removed.
-// It should be based on a different identifier, like SKU, if needed.
-// For now, we will disable it to prevent errors.
-/*
-adminRoutes.get('/products/:productId/inventory', async (c) => {
-    const { productId } = c.req.param();
-    const items = await db.query.inventory_items.findMany({
-        where: eq(inventory_items.productId, productId),
-        with: {
-            clinic: {
-                columns: { name: true, id: true }
-            }
-        },
-    });
-    return c.json({ data: items });
-});
-*/
-
-// Add a new inventory item/batch to a clinic
+// POST (create) a new inventory item for a clinic
 adminRoutes.post('/inventory-items', zValidator('json', createInventoryItemSchema), async (c) => {
     const newItemData = c.req.valid('json');
 
@@ -793,32 +776,55 @@ adminRoutes.post(
   }
 );
 
+// --- User Management ---
+
 adminRoutes
     .get('/users', async (c) => {
-        try {
-            const allUsers = await db.select().from(profiles);
-            return c.json({ data: allUsers });
-        } catch (error) {
-            console.error('Error fetching users:', error);
-            return c.json({ error: 'Internal Server Error', message: 'Failed to fetch users.' }, 500);
+        // This is a sensitive operation, ensure only super-admins can do this if needed.
+        // For now, any 'admin' can.
+
+        // Get the Supabase client from context, which was created by the auth middleware
+        const supabase = c.get('supabase');
+
+        const { data: { users }, error } = await supabase.auth.admin.listUsers();
+
+        if (error) {
+            console.error("Error fetching users:", error);
+            return c.json({ error: "Failed to fetch users", details: error.message }, 500);
         }
+        return c.json({ data: users });
+    })
+    .get('/users/:userId', async (c) => {
+        const { userId } = c.req.param();
+        const supabase = c.get('supabase');
+
+        const { data: { user }, error } = await supabase.auth.admin.getUserById(userId);
+
+        if (error) {
+            return c.json({ error: "Failed to fetch user", details: error.message }, 500);
+        }
+        if (!user) {
+            return c.json({ error: "User not found" }, 404);
+        }
+
+        return c.json({ data: user });
+    })
+    .patch('/users/:userId/role', zValidator('json', updateUserRoleSchema), async (c) => {
+        const { userId } = c.req.param();
+        const { role } = c.req.valid('json');
+        const supabase = c.get('supabase');
+
+        const { data, error } = await supabase.auth.admin.updateUserById(
+            userId,
+            { app_metadata: { role: role } }
+        );
+
+        if (error) {
+            return c.json({ error: "Failed to update user role", details: error.message }, 500);
+        }
+
+        return c.json({ data: data.user });
     });
-
-adminRoutes.put('/users/:id/role', zValidator('json', updateUserRoleSchema), async (c) => {
-  const { id } = c.req.param();
-  const { role } = c.req.valid('json');
-
-  const [updatedUser] = await db.update(profiles)
-    .set({ role })
-    .where(eq(profiles.id, id))
-    .returning();
-  
-  if (!updatedUser) {
-    return c.json({ error: 'User not found' }, 404);
-  }
-
-  return c.json(updatedUser);
-});
 
 adminRoutes.delete('/users/:id', async (c) => {
     const { id } = c.req.param();
