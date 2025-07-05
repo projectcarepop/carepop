@@ -36,7 +36,7 @@ export default function InventoryClient() {
     
     const [selectedClinic, setSelectedClinic] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+    const [editingItem, setEditingItem] = useState<InventoryItem | undefined>(undefined);
 
     // State for controlling the Delete confirmation dialog
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -107,7 +107,7 @@ export default function InventoryClient() {
     });
 
     const handleAddItem = () => {
-        setEditingItem(null);
+        setEditingItem(undefined);
         setIsModalOpen(true);
     };
 

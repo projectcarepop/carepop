@@ -48,7 +48,7 @@ interface UpsertInventoryItemModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (values: UpsertInventoryItemFormValues) => void;
-  item: InventoryItem | null;
+  item: InventoryItem | undefined;
   isLoading: boolean;
   productCategories: ProductCategory[];
 }
