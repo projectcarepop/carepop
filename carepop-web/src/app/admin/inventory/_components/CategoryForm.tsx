@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { ProductCategory } from '@/lib/types';
+import { type ProductCategory } from '@/lib/types/inventory';
 import { Loader2 } from 'lucide-react';
 import React from 'react';
 

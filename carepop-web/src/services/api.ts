@@ -401,13 +401,21 @@ export async function upsertClinic(clinicData: any, accessToken: string, clinicI
 
     const response = await fetch(url, { method, headers, body: JSON.stringify(clinicData) });
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-        throw new Error(error.message || `Failed to ${method === 'POST' ? 'create' : 'update'} clinic.`);
+        const error = await response.json().catch(() => ({ message: 'Failed to save clinic.'}));
+        throw new Error(error.message);
     }
     return response.json();
 }
 
 // --- START: Inventory and Product Category Management ---
+export async function getAdminProducts(accessToken: string): Promise<any> {
+    const headers = await getAuthHeaders(accessToken);
+    const response = await fetch(`${API_BASE_URL}/api/admin/inventory/products`, { headers, cache: 'no-store' });
+    if (!response.ok) {
+        throw new Error('Failed to fetch all admin products');
+    }
+    return response.json();
+}
 
 export async function getProductCategories(accessToken: string): Promise<{data: ProductCategory[]}> {
   const headers = await getAuthHeaders(accessToken);
@@ -416,6 +424,8 @@ export async function getProductCategories(accessToken: string): Promise<{data: 
   const result = await response.json();
   return result;
 }
+export const getAdminProductCategories = getProductCategories; // Alias for compatibility
+
 
 export async function upsertProductCategory(categoryData: NewProductCategoryPayload, accessToken: string, categoryId?: string) {
   const method = categoryId ? 'PUT' : 'POST';
@@ -473,6 +483,7 @@ export async function upsertInventoryItem(itemData: UpsertInventoryItemPayload, 
   }
   return response.json();
 }
+export const upsertProduct = upsertInventoryItem; // Alias for compatibility
 
 export async function deleteInventoryItem(itemId: string, accessToken: string) {
   const headers = await getAuthHeaders(accessToken);
@@ -483,6 +494,7 @@ export async function deleteInventoryItem(itemId: string, accessToken: string) {
   if (!response.ok) throw new Error("Failed to delete inventory item.");
   return response.json();
 }
+export const deleteProduct = deleteInventoryItem; // Alias for compatibility
 
 export async function getItemBatches(itemId: string, accessToken: string) {
   const headers = await getAuthHeaders(accessToken);

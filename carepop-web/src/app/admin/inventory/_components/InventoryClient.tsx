@@ -6,9 +6,9 @@ import { toast } from '@/hooks/use-toast';
 import { PlusCircle } from 'lucide-react';
 import {
   getAdminProducts,
-  upsertInventoryItem as upsertProduct,
-  deleteInventoryItem as deleteProduct,
-  getProductCategories as getAdminProductCategories,
+  upsertInventoryItem,
+  deleteInventoryItem,
+  getProductCategories,
   upsertProductCategory,
   deleteProductCategory,
   addBatchToItem,
@@ -16,28 +16,22 @@ import {
 } from '@/services/api';
 import { DataTable } from '@/components/ui/data-table';
 import { type InventoryItem, type ProductCategory } from '@/lib/types/inventory';
-import { columns as productColumns } from './columns-product';
-import { columns as categoryColumns } from './columns-category';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle
-} from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
 } from '@/components/ui/alert-dialog';
 import { ProductForm } from './ProductForm';
 import { CategoryForm } from './CategoryForm';
 import { UpdateStockForm } from './UpdateStockForm';
+import { productColumns, categoryColumns } from './columns';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -73,7 +67,7 @@ export default function InventoryClient({ initialProducts, initialCategories }: 
 
   const { data: categories, isError: isErrorCategories } = useQuery({
     queryKey: ['adminProductCategories'],
-    queryFn: () => getAdminProductCategories(session!.access_token),
+    queryFn: () => getProductCategories(session!.access_token),
     initialData: initialCategories,
     enabled: !!session,
     select: (data: any) => data.data || [], // Select the nested data array safely
@@ -82,7 +76,7 @@ export default function InventoryClient({ initialProducts, initialCategories }: 
 
   // Mutations
   const productMutation = useMutation({
-    mutationFn: (data: Partial<InventoryItem>) => upsertProduct(data, session!.access_token, data.id),
+    mutationFn: (data: Partial<InventoryItem>) => upsertInventoryItem(data, session!.access_token, data.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminProducts'] });
       toast({ title: 'Success!', description: 'Product has been saved.' });
@@ -102,7 +96,7 @@ export default function InventoryClient({ initialProducts, initialCategories }: 
   });
 
   const deleteProductMutation = useMutation({
-    mutationFn: (id: string) => deleteProduct(id, session!.access_token),
+    mutationFn: (id: string) => deleteInventoryItem(id, session!.access_token),
     onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['adminProducts'] });
         toast({ title: 'Product Deleted' });
@@ -250,7 +244,6 @@ export default function InventoryClient({ initialProducts, initialCategories }: 
                 <DialogTitle>Update Stock for {selectedProduct?.itemName}</DialogTitle>
             </DialogHeader>
             <UpdateStockForm
-                product={selectedProduct}
                 onSubmit={handleStockSubmit}
                 isPending={updateStockMutation.isPending}
             />

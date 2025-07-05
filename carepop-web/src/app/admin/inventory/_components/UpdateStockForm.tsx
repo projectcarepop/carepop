@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -15,41 +16,40 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Loader2 } from 'lucide-react';
-import { AdminProduct } from '@/lib/types';
 
+// Updated schema to include batch details
 const formSchema = z.object({
-  quantity: z.coerce.number().int().min(0, 'Stock cannot be negative.'),
+  quantity: z.coerce.number().int().min(1, 'Quantity must be at least 1.'),
+  batchNumber: z.string().optional(),
+  expiryDate: z.string().refine((val) => !isNaN(Date.parse(val)), {
+    message: "Please enter a valid date.",
+  }),
 });
 
 interface UpdateStockFormProps {
-  product?: AdminProduct;
   onSubmit: (values: z.infer<typeof formSchema>) => void;
   isPending: boolean;
 }
 
-export function UpdateStockForm({ product, onSubmit, isPending }: UpdateStockFormProps) {
+export function UpdateStockForm({ onSubmit, isPending }: UpdateStockFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      quantity: product?.quantityOnHand || 0,
+      quantity: 1, // Default to adding 1 unit
+      batchNumber: '',
+      expiryDate: '',
     },
   });
 
-  React.useEffect(() => {
-    if (product) {
-      form.reset({ quantity: product.quantityOnHand || 0 });
-    }
-  }, [product, form]);
-
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <FormField
           control={form.control}
           name="quantity"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>New Stock Quantity</FormLabel>
+              <FormLabel>Quantity to Add</FormLabel>
               <FormControl>
                 <Input type="number" placeholder="e.g., 50" {...field} />
               </FormControl>
@@ -57,9 +57,38 @@ export function UpdateStockForm({ product, onSubmit, isPending }: UpdateStockFor
             </FormItem>
           )}
         />
+        <FormField
+          control={form.control}
+          name="batchNumber"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Batch Number (Optional)</FormLabel>
+              <FormControl>
+                <Input placeholder="e.g., B12345" {...field} />
+              </FormControl>
+               <FormDescription>
+                Leave blank if not applicable.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="expiryDate"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Expiry Date</FormLabel>
+              <FormControl>
+                <Input type="date" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <Button type="submit" disabled={isPending} className="w-full">
           {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          {isPending ? 'Saving...' : 'Save Changes'}
+          {isPending ? 'Adding Stock...' : 'Add Stock'}
         </Button>
       </form>
     </Form>
