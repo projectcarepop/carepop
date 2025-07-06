@@ -97,11 +97,11 @@ export default function CategoryClient({ initialCategories }: CategoryClientProp
         setIsDialogOpen(true);
     }, []);
 
-    const handleDeleteCategory = (category: ProductCategory) => {
+    const handleDeleteCategory = React.useCallback((category: ProductCategory) => {
         setSelectedItem(category);
         setDeleteError(null); // Clear previous errors
         setIsDeleteAlertOpen(true);
-    };
+    }, []);
 
     const categoryCols = React.useMemo(() => categoryColumns({
         openSheet: (mode, category) => handleOpenDialog(mode, category),
