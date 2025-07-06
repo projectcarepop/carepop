@@ -309,7 +309,7 @@ export async function getAdminClinics(accessToken: string) {
       throw new Error('Failed to fetch clinics.');
   }
   const result = await response.json();
-  return result.data || [];
+  return result;
 }
 
 export async function getAdminDoctors(accessToken: string) {
@@ -610,12 +610,14 @@ export async function getPublicClinics(serviceId?: string) {
     if (serviceId) {
         url += `?serviceId=${serviceId}`;
     }
-    const response = await fetch(url, { cache: 'no-store' }); // Use no-store for dynamic data
+    const response = await fetch(url);
     if (!response.ok) {
         throw new Error('Failed to fetch clinics');
     }
     const result = await response.json();
-    return result.data || [];
+    // Always return the full result object for consistency.
+    // The calling components are responsible for selecting the .data property.
+    return result;
 }
 
 export async function getPublicClinicDetails(clinicId: string) {
