@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { db } from '../lib/db';
 import { clinics, profiles, doctors, services, productCategories, inventory_items, serviceCategories, appointments, medicalRecords, recordDoctorNotes, recordPrescriptions, recordDocuments, clinicServices, inventoryAuditLog, inventoryItemBatches } from '../../../drizzle/schema';
-import { eq, sql, count, asc, and, gte, lt, getTableColumns, desc, inArray, SQL, sum } from 'drizzle-orm';
+import { eq, sql, count, asc, and, gte, lt, getTableColumns, desc, inArray, SQL, sum, isNotNull } from 'drizzle-orm';
 import { authMiddleware, adminOrManagerMiddleware, AuthEnv } from '../middleware/auth';
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
@@ -443,19 +443,23 @@ adminRoutes
         sql`${inventory_items.quantityOnHand} <= ${inventory_items.reorderLevel}`
       ));
 
-      const [expiringSoonCount] = await db.select({
-        count: count()
-      }).from(inventory_items).where(and(
-        eq(inventory_items.clinicId, clinicId),
-        sql`${inventory_items.expiryDate} IS NOT NULL`,
-        lt(inventory_items.expiryDate, thirtyDaysFromNow.toISOString())
+      const expiringItems = await db.selectDistinct({ 
+        itemId: inventoryItemBatches.itemId 
+      }).from(inventoryItemBatches)
+        .innerJoin(inventory_items, eq(inventoryItemBatches.itemId, inventory_items.id))
+        .where(and(
+          eq(inventory_items.clinicId, clinicId),
+          isNotNull(inventoryItemBatches.expiryDate),
+          lt(inventoryItemBatches.expiryDate, thirtyDaysFromNow)
       ));
+      
+      const expiringSoonCount = expiringItems.length;
 
       return c.json({
         data: {
           ...stats,
           lowStockCount: lowStockCount.count,
-          expiringSoonCount: expiringSoonCount.count,
+          expiringSoonCount: expiringSoonCount,
         }
       });
     } catch (error: any) {
