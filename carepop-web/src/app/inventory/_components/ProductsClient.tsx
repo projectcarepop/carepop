@@ -36,7 +36,7 @@ import { Label } from '@/components/ui/label';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { ClinicSelector } from './ClinicSelector';
 import { getAdminClinics } from '@/services/api';
-import { ManageItemBatchesModal } from './ManageItemBatchesModal';
+import { ManageItemBatchesView } from './ManageItemBatchesView';
 import { useDebounce } from '@/hooks/useDebounce';
 
 
@@ -333,6 +333,23 @@ export default function ProductsClient() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={isBatchModalOpen} onOpenChange={setIsBatchModalOpen}>
+          <DialogContent className="sm:max-w-4xl">
+              <DialogHeader>
+                  <DialogTitle>Manage Batches for: {selectedItem?.itemName}</DialogTitle>
+                  <DialogDescription>
+                    Add new stock or remove existing batches for this item.
+                  </DialogDescription>
+              </DialogHeader>
+              {selectedItem && (
+                  <ManageItemBatchesView
+                      item={selectedItem}
+                      onDeleteBatch={handleDeleteBatch}
+                  />
+              )}
+          </DialogContent>
+      </Dialog>
+
       {selectedItem && (
         <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
             <DialogContent className="sm:max-w-lg">
@@ -459,16 +476,6 @@ export default function ProductsClient() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <ManageItemBatchesModal 
-        item={selectedItem}
-        isOpen={isBatchModalOpen}
-        onClose={() => {
-            setIsBatchModalOpen(false);
-            setSelectedItem(null);
-        }}
-        onDeleteBatch={handleDeleteBatch}
-      />
     </div>
   );
 } 
