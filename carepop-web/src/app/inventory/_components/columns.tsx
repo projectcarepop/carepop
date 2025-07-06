@@ -48,19 +48,6 @@ export const productColumns = ({ onEdit, onDelete, onUpdateStock, onViewDetails,
     header: 'Qty on Hand',
   },
   {
-    accessorKey: 'batchNumber',
-    header: 'Batch No.',
-    cell: ({ row }) => row.original.batchNumber ?? <span className="text-muted-foreground">N/A</span>,
-  },
-  {
-    accessorKey: 'expiryDate',
-    header: 'Expiry Date',
-    cell: ({ row }) => {
-      const date = row.original.expiryDate;
-      return date ? new Date(date).toLocaleDateString() : 'N/A';
-    },
-  },
-  {
     id: 'actions',
     cell: ({ row }) => {
       const item = row.original;
