@@ -2,11 +2,12 @@
 
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getClinics } from '../../../services/api';
+import { getPublicClinics } from '../../../services/api';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import type { BookingData } from './BookingFlowManager';
+import { type Clinic } from '@/lib/types';
 
 interface Step1_ClinicSelectionProps {
   updateBookingData: (data: Partial<BookingData>) => void;
@@ -16,7 +17,8 @@ interface Step1_ClinicSelectionProps {
 export const Step1_ClinicSelection: React.FC<Step1_ClinicSelectionProps> = ({ updateBookingData, goToNextStep }) => {
   const { data: clinics, isLoading, isError, error } = useQuery({
     queryKey: ['clinics'],
-    queryFn: getClinics,
+    queryFn: () => getPublicClinics(),
+    select: (data) => data.data,
   });
 
   const handleSelect = (clinicId: string) => {
@@ -48,11 +50,11 @@ export const Step1_ClinicSelection: React.FC<Step1_ClinicSelectionProps> = ({ up
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Find a Clinic Near You</CardTitle>
+        <CardTitle>Step 1: Find a Clinic Near You</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {clinics?.map((clinic: any) => (
+          {clinics?.map((clinic: Clinic) => (
             <Card 
               key={clinic.id} 
               className="cursor-pointer hover:shadow-lg transition-shadow"
@@ -62,7 +64,7 @@ export const Step1_ClinicSelection: React.FC<Step1_ClinicSelectionProps> = ({ up
                 <CardTitle>{clinic.name}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">{clinic.address}</p>
+                <p className="text-sm text-muted-foreground">{typeof clinic.address === 'string' ? clinic.address : 'Address not available'}</p>
               </CardContent>
             </Card>
           ))}

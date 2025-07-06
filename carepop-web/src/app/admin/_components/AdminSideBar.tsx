@@ -45,6 +45,11 @@ const sidebarNavItems = [
     href: '/admin/appointments',
     icon: Calendar,
   },
+  {
+    title: 'Booking Management',
+    href: '/admin/booking-management',
+    icon: Calendar,
+  },
   //{
   //  title: 'Inventory',
   //  href: '/admin/inventory',
