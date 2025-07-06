@@ -255,7 +255,7 @@ export function ProductForm({
                 <FormItem>
                   <FormLabel>Purchase Price (PHP)</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="e.g., 80.00" {...field} value={field.value ?? ''}/>
+                    <Input type="number" placeholder="e.g., 50.00" {...field} value={field.value ?? ''}/>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -271,7 +271,7 @@ export function ProductForm({
                 <FormItem>
                   <FormLabel>Reorder Level</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="e.g., 10" {...field} />
+                    <Input type="number" {...field} />
                   </FormControl>
                    <FormDescription>
                     The stock level that triggers a reorder.
@@ -285,81 +285,92 @@ export function ProductForm({
               name="location"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Storage Location</FormLabel>
+                  <FormLabel>Location</FormLabel>
                   <FormControl>
                     <Input placeholder="e.g., Shelf A-1" {...field} value={field.value ?? ''}/>
                   </FormControl>
-                   <FormDescription>
-                    Where the item is stored in the clinic.
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
         </div>
-        
+
+        <div className="border-t pt-6">
+            <h3 className="text-lg font-medium">Initial Stock (Optional)</h3>
+            <p className="text-sm text-muted-foreground">
+                If you are adding a new product with existing stock, you can enter the details for the first batch here.
+                This is only used when creating a new product.
+            </p>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FormField
-              control={form.control}
-              name="batchNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Batch Number</FormLabel>
-                  <FormControl>
+           <FormField
+            control={form.control}
+            name="expiryDate"
+            render={({ field }) => (
+              <FormItem className="flex flex-col">
+                <FormLabel>Expiry Date</FormLabel>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <FormControl>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full pl-3 text-left font-normal",
+                          !field.value && "text-muted-foreground"
+                        )}
+                      >
+                        {field.value ? (
+                          format(field.value, "PPP")
+                        ) : (
+                          <span>Pick a date</span>
+                        )}
+                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      </Button>
+                    </FormControl>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={field.value ?? undefined}
+                      onSelect={field.onChange}
+                      disabled={(date) =>
+                        date < new Date("1900-01-01")
+                      }
+                      initialFocus
+                      captionLayout="dropdown-buttons"
+                      fromYear={new Date().getFullYear() - 10}
+                      toYear={new Date().getFullYear() + 10}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+           <FormField
+            control={form.control}
+            name="batchNumber"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Batch Number</FormLabel>
+                 <FormControl>
                     <Input placeholder="e.g., B12345" {...field} value={field.value ?? ''}/>
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="expiryDate"
-              render={({ field }) => (
-                <FormItem className="flex flex-col pt-2">
-                  <FormLabel>Expiry Date</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "pl-3 text-left font-normal",
-                            !field.value && "text-muted-foreground"
-                          )}
-                        >
-                          {field.value ? (
-                            format(field.value, "PPP")
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value ?? undefined}
-                        onSelect={field.onChange}
-                        disabled={(date) =>
-                          date < new Date()
-                        }
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </div>
-        
-        <Button type="submit" disabled={isPending} className="w-full">
-          {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          {isPending ? 'Saving...' : 'Save Changes'}
-        </Button>
+
+
+        <div className="flex justify-end pt-4">
+          <Button type="submit" disabled={isPending}>
+            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Save Changes
+          </Button>
+        </div>
       </form>
     </Form>
   );
-}
+} 

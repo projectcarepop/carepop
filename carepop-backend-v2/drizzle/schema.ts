@@ -239,6 +239,15 @@ export const inventoryAuditLog = pgTable("inventory_audit_log", {
 	userIdx: index("audit_user_idx").on(table.userId),
 }));
 
+export const inventoryItemBatches = pgTable('inventory_item_batches', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  itemId: uuid('item_id').notNull().references(() => inventory_items.id, { onDelete: 'cascade' }),
+  batchNumber: text('batch_number'),
+  quantity: integer('quantity').notNull(),
+  expiryDate: timestamp('expiry_date', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});
+
 export const moodEnum = pgEnum("mood", ['happy', 'sad', 'neutral', 'anxious', 'stressed']);
 
 export const healthLogs = pgTable("health_logs", {
@@ -373,15 +382,17 @@ export const productCategoriesRelations = relations(productCategories, ({ many }
     inventoryItems: many(inventory_items),
 }));
 
-export const inventoryItemsRelations = relations(inventory_items, ({ one }) => ({
+export const inventory_itemsRelations = relations(inventory_items, ({ one, many }) => ({
+	productCategory: one(productCategories, {
+		fields: [inventory_items.productCategoryId],
+		references: [productCategories.id]
+	}),
 	clinic: one(clinics, {
 		fields: [inventory_items.clinicId],
 		references: [clinics.id]
 	}),
-    productCategory: one(productCategories, {
-        fields: [inventory_items.productCategoryId],
-        references: [productCategories.id]
-    }),
+	auditLogs: many(inventoryAuditLog),
+	batches: many(inventoryItemBatches),
 }));
 
 export const healthLogsRelations = relations(healthLogs, ({ one }) => ({
@@ -435,4 +446,39 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
 		fields: [orderItems.inventoryItemId],
 		references: [inventory_items.id]
 	}),
+}));
+
+export const inventoryAuditLogRelations = relations(inventoryAuditLog, ({ one }) => ({
+    item: one(inventory_items, {
+        fields: [inventoryAuditLog.itemId],
+        references: [inventory_items.id]
+    }),
+    clinic: one(clinics, {
+        fields: [inventoryAuditLog.clinicId],
+        references: [clinics.id]
+    }),
+    user: one(profiles, {
+        fields: [inventoryAuditLog.userId],
+        references: [profiles.id]
+    })
+}));
+
+export const inventoryItemBatchesRelations = relations(inventoryItemBatches, ({ one }) => ({
+    item: one(inventory_items, {
+        fields: [inventoryItemBatches.itemId],
+        references: [inventory_items.id]
+    })
+}));
+
+// Patient App Specific Relations
+
+export const userProfilesRelations = relations(profiles, ({ many, one }) => ({
+    appointments: many(appointments),
+    reviews: many(reviews),
+    healthLogs: many(healthLogs),
+    menstrualLogs: many(menstrualLogs),
+    user: one(usersInAuth, {
+        fields: [profiles.id],
+        references: [usersInAuth.id]
+    })
 }));

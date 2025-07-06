@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { db } from '../lib/db';
-import { clinics, profiles, doctors, services, productCategories, inventory_items, serviceCategories, appointments, medicalRecords, recordDoctorNotes, recordPrescriptions, recordDocuments, clinicServices, inventoryAuditLog } from '../../../drizzle/schema';
+import { clinics, profiles, doctors, services, productCategories, inventory_items, serviceCategories, appointments, medicalRecords, recordDoctorNotes, recordPrescriptions, recordDocuments, clinicServices, inventoryAuditLog, inventoryItemBatches } from '../../../drizzle/schema';
 import { eq, sql, count, asc, and, gte, lt, getTableColumns, desc, inArray, SQL, sum } from 'drizzle-orm';
 import { authMiddleware, adminOrManagerMiddleware, AuthEnv } from '../middleware/auth';
 import { createClient } from '@supabase/supabase-js';
@@ -111,6 +111,14 @@ const updateInventoryItemSchema = z.object({
     purchasePrice: z.coerce.number().optional().nullable(),
     sellingPrice: z.coerce.number().optional().nullable(),
     location: z.string().optional().nullable(),
+});
+
+const batchSchema = z.object({
+  quantity: z.coerce.number().int().min(1, 'Quantity must be at least 1'),
+  batchNumber: z.string().optional().nullable(),
+  expiryDate: z.string().refine((val) => val && !isNaN(Date.parse(val)), {
+    message: "A valid expiry date is required",
+  }),
 });
 
 // Schema for creating/updating services
@@ -628,6 +636,64 @@ adminRoutes
       return c.json({ error: 'Failed to delete item', message: error.message }, 500);
     }
   });
+
+// --- NEW: Inventory Item Batch Management ---
+adminRoutes
+    .get('/inventory-items/:itemId/batches', async (c) => {
+        const { itemId } = c.req.param();
+        const batches = await db.select()
+            .from(inventoryItemBatches)
+            .where(eq(inventoryItemBatches.itemId, itemId))
+            .orderBy(desc(inventoryItemBatches.expiryDate));
+        return c.json({ data: batches });
+    })
+    .post('/inventory-items/:itemId/batches', zValidator('json', batchSchema), async (c) => {
+        const { itemId } = c.req.param();
+        const batchData = c.req.valid('json');
+        
+        const [newBatch] = await db.insert(inventoryItemBatches).values({
+            itemId,
+            ...batchData,
+            expiryDate: new Date(batchData.expiryDate as string),
+        }).returning();
+
+        // After adding a batch, we MUST update the main item's total quantity
+        await db.execute(sql`
+            UPDATE ${inventory_items}
+            SET quantity_on_hand = (
+                SELECT SUM(quantity)
+                FROM ${inventoryItemBatches}
+                WHERE item_id = ${itemId}
+            )
+            WHERE id = ${itemId};
+        `);
+
+        return c.json({ data: newBatch }, 201);
+    });
+
+adminRoutes
+    .delete('/inventory-item-batches/:batchId', async (c) => {
+        const { batchId } = c.req.param();
+        
+        const [deletedBatch] = await db.delete(inventoryItemBatches)
+            .where(eq(inventoryItemBatches.id, batchId))
+            .returning({ itemId: inventoryItemBatches.itemId });
+
+        if (deletedBatch) {
+            // After deleting a batch, we MUST update the main item's total quantity
+             await db.execute(sql`
+                UPDATE ${inventory_items}
+                SET quantity_on_hand = (
+                    SELECT COALESCE(SUM(quantity), 0)
+                    FROM ${inventoryItemBatches}
+                    WHERE item_id = ${deletedBatch.itemId}
+                )
+                WHERE id = ${deletedBatch.itemId};
+            `);
+        }
+        
+        return c.json({ success: true });
+    });
 
 // --- Doctor Management Endpoints ---
 
