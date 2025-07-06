@@ -1599,6 +1599,31 @@ adminRoutes.delete(
     }
 );
 
+// --- NEWLY ADDED: Get Doctors for a specific clinic ---
+adminRoutes.get('/clinics/:id/doctors', async (c) => {
+    const { id: clinicId } = c.req.param();
+
+    try {
+        // CORRECTED QUERY: Selects directly from `doctors` and filters based on the `doctor_clinics` link table.
+        const doctorsInClinic = await db.select({
+            id: doctors.id,
+            fullName: doctors.fullName,
+            specialtyText: doctors.specialtyText,
+            avatarUrl: doctors.avatarUrl
+        })
+        .from(doctors)
+        .where(sql`EXISTS (
+            SELECT 1 FROM doctor_clinics dc 
+            WHERE dc.doctor_id = ${doctors.id} AND dc.clinic_id = ${clinicId}
+        ) AND ${doctors.isActive} = true`);
+
+        return c.json({ data: doctorsInClinic });
+    } catch (error: any) {
+        console.error(`Error fetching doctors for clinic ${clinicId}:`, error);
+        return c.json({ error: 'Failed to fetch doctors for clinic', message: error.message }, 500);
+    }
+});
+
 // Add other admin routes here in the future...
 
 export default adminRoutes;

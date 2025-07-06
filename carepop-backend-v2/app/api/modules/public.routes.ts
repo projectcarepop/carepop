@@ -11,6 +11,7 @@ import {
     serviceCategories, 
     doctorServices, 
     doctorClinics, 
+    profiles,
 } from '../../../drizzle/schema';
 import { and, eq, sql, inArray, SQL, asc, getTableColumns, type AnyColumn, ne, gte, lt, notInArray } from 'drizzle-orm';
 import { getDay, parseISO, format, startOfDay, endOfDay, setHours, setMinutes, setSeconds, isBefore, addMinutes, isEqual } from 'date-fns';
@@ -605,5 +606,40 @@ publicRoutes.get(
         }
     }
 );
+
+/**
+ * NEW: GET /public/services/:serviceId/providers
+ * Returns a list of all active doctors (providers) who offer a specific service.
+ */
+publicRoutes.get('/services/:serviceId/providers', async (c) => {
+    const { serviceId } = c.req.param();
+
+    if (!serviceId) {
+        return c.json({ error: 'Service ID is required' }, 400);
+    }
+
+    try {
+        // CORRECTED QUERY: Selects directly from `doctors` and filters by the `doctor_services` link table.
+        const providers = await db.selectDistinct({
+            id: doctors.id,
+            fullName: doctors.fullName,
+            specialtyText: doctors.specialtyText,
+            avatarUrl: doctors.avatarUrl,
+            bio: doctors.bio,
+        })
+        .from(doctors)
+        .innerJoin(doctorServices, eq(doctors.id, doctorServices.doctorId))
+        .where(and(
+            eq(doctors.isActive, true),
+            eq(doctorServices.serviceId, serviceId)
+        ));
+
+        return c.json({ data: providers });
+
+    } catch (error: any) {
+        console.error(`Error fetching providers for service ${serviceId}:`, error);
+        return c.json({ error: 'Internal Server Error', message: error.message }, 500);
+    }
+});
 
 export default publicRoutes;
