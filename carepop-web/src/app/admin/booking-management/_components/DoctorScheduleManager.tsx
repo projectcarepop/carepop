@@ -23,13 +23,14 @@ import { Input } from '@/components/ui/input';
 import { PlusCircle, MoreHorizontal } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-// We'll need a proper type for this later
+// CORRECTED: The Doctor type should match the flat structure from the API
 type Doctor = {
     id: string;
-    profile: {
-        fullName: string;
-    }
+    fullName: string;
+    specialtyText?: string | null;
+    avatarUrl?: string | null;
 }
+
 type DoctorSchedule = {
     id: string;
     dayOfWeek: number;
@@ -156,7 +157,7 @@ export const DoctorScheduleManager: React.FC<DoctorScheduleManagerProps> = ({ cl
                 <SelectContent>
                 {doctors && doctors.map(doctor => (
                     <SelectItem key={doctor.id} value={doctor.id}>
-                        {doctor.profile.fullName}
+                        {doctor.fullName}
                     </SelectItem>
                 ))}
                 </SelectContent>

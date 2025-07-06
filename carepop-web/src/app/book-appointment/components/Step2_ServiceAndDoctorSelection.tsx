@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getClinicDetails, getDoctorsForService } from '@/services/api';
+import { getClinicDetails, getProvidersForService } from '@/services/api';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
@@ -29,7 +29,6 @@ export const Step2_ServiceAndDoctorSelection: React.FC<Step2_ServiceAndDoctorSel
     isError, 
     error 
   } = useQuery({
-    // The query will only run if clinicId exists.
     queryKey: ['clinicDetails', bookingData.clinicId],
     queryFn: () => getClinicDetails(bookingData.clinicId!),
     enabled: !!bookingData.clinicId,
@@ -39,9 +38,10 @@ export const Step2_ServiceAndDoctorSelection: React.FC<Step2_ServiceAndDoctorSel
     data: doctors,
     isLoading: isLoadingDoctors,
   } = useQuery({
-    queryKey: ['doctorsForService', selectedServiceId, bookingData.clinicId],
-    queryFn: () => getDoctorsForService(selectedServiceId!, bookingData.clinicId!),
-    enabled: !!selectedServiceId && !!bookingData.clinicId,
+    queryKey: ['providersForService', selectedServiceId],
+    queryFn: () => getProvidersForService(selectedServiceId!),
+    enabled: !!selectedServiceId,
+    select: (data) => data.data,
   });
 
   const services = clinicDetails?.services || [];
