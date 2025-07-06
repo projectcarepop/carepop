@@ -46,8 +46,6 @@ const formSchema = z.object({
   strength: z.string().optional().nullable(),
   reorderLevel: z.coerce.number().int().min(0).default(10),
   location: z.string().optional().nullable(),
-  batchNumber: z.string().optional().nullable(),
-  expiryDate: z.date().optional().nullable(),
 });
 
 export type ProductFormValues = z.infer<typeof formSchema>;
@@ -83,8 +81,6 @@ export function ProductForm({
       strength: '',
       reorderLevel: 10,
       location: '',
-      batchNumber: '',
-      expiryDate: null,
     },
   });
   
@@ -95,8 +91,6 @@ export function ProductForm({
         productCategoryId: initialData.productCategoryId ?? null,
         sellingPrice: initialData.sellingPrice?.toString() ?? '',
         purchasePrice: initialData.purchasePrice?.toString() ?? '',
-        batchNumber: initialData.batchNumber ?? '',
-        expiryDate: initialData.expiryDate ? new Date(initialData.expiryDate) : null,
       });
     }
   }, [initialData, form]);
@@ -294,75 +288,6 @@ export function ProductForm({
               )}
             />
         </div>
-
-        <div className="border-t pt-6">
-            <h3 className="text-lg font-medium">Initial Stock (Optional)</h3>
-            <p className="text-sm text-muted-foreground">
-                If you are adding a new product with existing stock, you can enter the details for the first batch here.
-                This is only used when creating a new product.
-            </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-           <FormField
-            control={form.control}
-            name="expiryDate"
-            render={({ field }) => (
-              <FormItem className="flex flex-col">
-                <FormLabel>Expiry Date</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full pl-3 text-left font-normal",
-                          !field.value && "text-muted-foreground"
-                        )}
-                      >
-                        {field.value ? (
-                          format(field.value, "PPP")
-                        ) : (
-                          <span>Pick a date</span>
-                        )}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={field.value ?? undefined}
-                      onSelect={field.onChange}
-                      disabled={(date) =>
-                        date < new Date("1900-01-01")
-                      }
-                      initialFocus
-                      captionLayout="dropdown-buttons"
-                      fromYear={new Date().getFullYear() - 10}
-                      toYear={new Date().getFullYear() + 10}
-                    />
-                  </PopoverContent>
-                </Popover>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-           <FormField
-            control={form.control}
-            name="batchNumber"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Batch Number</FormLabel>
-                 <FormControl>
-                    <Input placeholder="e.g., B12345" {...field} value={field.value ?? ''}/>
-                  </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
 
         <div className="flex justify-end pt-4">
           <Button type="submit" disabled={isPending}>

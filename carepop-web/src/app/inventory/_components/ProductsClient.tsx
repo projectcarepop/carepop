@@ -26,6 +26,7 @@ import {
   upsertInventoryItem,
   deleteInventoryItem,
   deleteItemBatch,
+  getItemBatches,
 } from '@/services/api';
 import { type InventoryItem, type InventoryItemBatch } from '@/lib/types/inventory';
 import { productColumns } from './columns';
@@ -38,6 +39,7 @@ import { ClinicSelector } from './ClinicSelector';
 import { getAdminClinics } from '@/services/api';
 import { ManageItemBatchesView } from './ManageItemBatchesView';
 import { useDebounce } from '@/hooks/useDebounce';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 
 export default function ProductsClient() {
@@ -93,6 +95,12 @@ export default function ProductsClient() {
     select: (data) => data.data,
   });
 
+  const { data: itemBatches, isLoading: isLoadingBatches } = useQuery({
+    queryKey: ['itemBatches', selectedItem?.id],
+    queryFn: () => getItemBatches(selectedItem!.id, accessToken!).then(res => res.data),
+    enabled: !!selectedItem && isDetailsModalOpen,
+  });
+
   const handleMutationSuccess = (entity: string) => {
     toast({ title: `${entity} saved successfully.` });
     setIsSheetOpen(false);
@@ -110,13 +118,12 @@ export default function ProductsClient() {
 
   const productMutation = useMutation({
     mutationFn: (data: { item: ProductFormValues; id?: string }) => {
-        const { sellingPrice, purchasePrice, expiryDate, ...rest } = data.item;
+        const { sellingPrice, purchasePrice, ...rest } = data.item;
         
         const payload = {
             ...rest,
             sellingPrice: sellingPrice ? parseFloat(sellingPrice) : undefined,
             purchasePrice: purchasePrice ? parseFloat(purchasePrice) : undefined,
-            expiryDate: expiryDate ? new Date(expiryDate).toISOString() : undefined,
         };
         return upsertInventoryItem(selectedClinicId!, payload, accessToken!, data.id);
     },
@@ -396,18 +403,48 @@ export default function ProductsClient() {
                         <p>{selectedItem.purchasePrice ? `₱${Number(selectedItem.purchasePrice).toFixed(2)}` : 'N/A'}</p>
                    </div>
                     <div className="grid grid-cols-2 gap-2">
-                        <p className="text-sm font-medium text-muted-foreground">Batch Number</p>
-                        <p>{selectedItem.batchNumber ?? 'N/A'}</p>
-                        
-                        <p className="text-sm font-medium text-muted-foreground">Expiry Date</p>
-                        <p>{selectedItem.expiryDate ? new Date(selectedItem.expiryDate).toLocaleDateString() : 'N/A'}</p>
-
                         <p className="text-sm font-medium text-muted-foreground">Location</p>
                         <p>{selectedItem.location ?? 'N/A'}</p>
-                    </div>
-                     <div className="grid grid-cols-2 gap-2">
+                        
                         <p className="text-sm font-medium text-muted-foreground">Last Updated</p>
                         <p>{new Date(selectedItem.updatedAt).toLocaleString()}</p>
+                    </div>
+                </div>
+                <div className="pt-4">
+                    <h4 className="text-md font-medium mb-2">Stock Batches</h4>
+                    <div className="rounded-md border max-h-[200px] overflow-y-auto">
+                        {isLoadingBatches ? (
+                            <div className="flex items-center justify-center h-24">
+                                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                            </div>
+                        ) : (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Batch #</TableHead>
+                                    <TableHead>Quantity</TableHead>
+                                    <TableHead>Expires</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {itemBatches && itemBatches.length > 0 ? (
+                                    itemBatches.map((batch: InventoryItemBatch) => (
+                                        <TableRow key={batch.id}>
+                                            <TableCell>{batch.batchNumber || 'N/A'}</TableCell>
+                                            <TableCell>{batch.quantity}</TableCell>
+                                            <TableCell>{new Date(batch.expiryDate).toLocaleDateString()}</TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={3} className="text-center h-24">
+                                            No batch information available.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                        )}
                     </div>
                 </div>
             </DialogContent>
