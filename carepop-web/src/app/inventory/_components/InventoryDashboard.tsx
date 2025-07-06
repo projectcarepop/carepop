@@ -27,15 +27,6 @@ interface StatCardProps {
   iconColor?: string;
 }
 
-const brandColors = {
-  primary: '#4F46E5', // Indigo
-  secondary: '#10B981', // Emerald
-  accent: '#F59E0B', // Amber
-  danger: '#EF4444', // Red
-  info: '#3B82F6',  // Blue
-  neutral: '#6B7280' // Gray
-};
-
 const StatCard = ({ title, value, icon: Icon, description, isLoading, iconColor }: StatCardProps) => {
   if (isLoading) {
     return (
@@ -56,7 +47,7 @@ const StatCard = ({ title, value, icon: Icon, description, isLoading, iconColor 
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" style={{ color: iconColor }} />
+        <Icon className="h-4 w-4" style={{ color: iconColor }} />
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">{value}</div>
@@ -74,12 +65,12 @@ export function InventoryDashboard({ stats, isLoading }: InventoryDashboardProps
   };
 
   const dashboardStats: Omit<StatCardProps, 'isLoading'>[] = [
-    { title: "Total Products", value: stats?.totalProducts ?? 0, icon: Package, description: "Number of unique items", iconColor: brandColors.primary },
-    { title: "Total Units", value: stats?.totalQuantity ?? 0, icon: Archive, description: "Total quantity of all items", iconColor: brandColors.secondary },
-    { title: "Low Stock Items", value: stats?.lowStockCount ?? 0, icon: TrendingDown, description: "Items at or below reorder level", iconColor: brandColors.accent },
-    { title: "Expiring Soon", value: stats?.expiringSoonCount ?? 0, icon: AlertTriangle, description: "Items expiring in next 30 days", iconColor: brandColors.danger },
-    { title: "Total Purchase Value", value: formatCurrency(stats?.totalPurchaseValue), icon: DollarSign, description: "Based on purchase price", iconColor: brandColors.info },
-    { title: "Total Selling Value", value: formatCurrency(stats?.totalSellingValue), icon: DollarSign, description: "Potential revenue", iconColor: brandColors.neutral },
+    { title: "Total Products", value: stats?.totalProducts ?? 0, icon: Package, description: "Number of unique items", iconColor: "hsl(var(--primary))" },
+    { title: "Total Units", value: stats?.totalQuantity ?? 0, icon: Archive, description: "Total quantity of all items", iconColor: "hsl(var(--secondary))" },
+    { title: "Low Stock Items", value: stats?.lowStockCount ?? 0, icon: TrendingDown, description: "Items at or below reorder level", iconColor: "hsl(var(--warning))" },
+    { title: "Expiring Soon", value: stats?.expiringSoonCount ?? 0, icon: AlertTriangle, description: "Items expiring in next 30 days", iconColor: "hsl(var(--destructive))" },
+    { title: "Total Purchase Value", value: formatCurrency(stats?.totalPurchaseValue), icon: DollarSign, description: "Based on purchase price", iconColor: "hsl(var(--info))" },
+    { title: "Total Selling Value", value: formatCurrency(stats?.totalSellingValue), icon: DollarSign, description: "Potential revenue", iconColor: "hsl(var(--success))" },
   ];
 
   const valueDistributionData = [
@@ -87,7 +78,7 @@ export function InventoryDashboard({ stats, isLoading }: InventoryDashboardProps
     { name: 'Total Selling Value', value: stats?.totalSellingValue ?? 0 },
   ];
   
-  const valueChartColors = [brandColors.info, brandColors.secondary];
+  const valueChartColors = ["hsl(var(--info))", "hsl(var(--success))"];
 
   const overviewChartData = [
     { name: 'Products vs Units', "Products": stats?.totalProducts ?? 0, "Units": stats?.totalQuantity ?? 0 },
@@ -126,10 +117,10 @@ export function InventoryDashboard({ stats, isLoading }: InventoryDashboardProps
                     <YAxis />
                     <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))' }}/>
                     <Legend />
-                    <Bar dataKey="Products" fill={brandColors.primary} />
-                    <Bar dataKey="Units" fill={brandColors.secondary} />
-                    <Bar dataKey="Low Stock" fill={brandColors.accent} />
-                    <Bar dataKey="Expiring Soon" fill={brandColors.danger} />
+                    <Bar dataKey="Products" fill="hsl(var(--primary))" />
+                    <Bar dataKey="Units" fill="hsl(var(--secondary))" />
+                    <Bar dataKey="Low Stock" fill="hsl(var(--warning))" />
+                    <Bar dataKey="Expiring Soon" fill="hsl(var(--destructive))" />
                 </BarChart>
             </ResponsiveContainer>
           </CardContent>

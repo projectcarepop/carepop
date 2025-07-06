@@ -7,7 +7,17 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { DataTable } from '@/components/ui/data-table';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { getProductCategories, upsertProductCategory, deleteProductCategory } from '@/services/api';
@@ -25,9 +35,11 @@ export default function CategoryClient({ initialCategories }: CategoryClientProp
     const accessToken = session?.access_token;
 
     const [globalFilter, setGlobalFilter] = React.useState('');
-    const [isSheetOpen, setIsSheetOpen] = React.useState(false);
-    const [sheetMode, setSheetMode] = React.useState<'addCategory' | 'editCategory' | null>(null);
+    const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+    const [isDeleteAlertOpen, setIsDeleteAlertOpen] = React.useState(false);
+    const [dialogMode, setDialogMode] = React.useState<'addCategory' | 'editCategory' | null>(null);
     const [selectedItem, setSelectedItem] = React.useState<ProductCategory | null>(null);
+    const [deleteError, setDeleteError] = React.useState<string | null>(null);
 
     const queryClient = useQueryClient();
 
@@ -41,8 +53,9 @@ export default function CategoryClient({ initialCategories }: CategoryClientProp
 
     const handleMutationSuccess = () => {
         toast({ title: `Category saved successfully.` });
-        setIsSheetOpen(false);
+        setIsDialogOpen(false);
         queryClient.invalidateQueries({ queryKey: ['admin-product-categories'] });
+        queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
     };
 
     const handleMutationError = (error: Error) => {
@@ -60,31 +73,40 @@ export default function CategoryClient({ initialCategories }: CategoryClientProp
         onSuccess: () => {
             toast({ title: 'Category deleted successfully.' });
             queryClient.invalidateQueries({ queryKey: ['admin-product-categories'] });
+            queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
+            setIsDeleteAlertOpen(false);
+            setSelectedItem(null);
         },
-        onError: (error: Error) => {
-            toast({ title: 'Error deleting category', description: error.message, variant: 'destructive' });
+        onError: (error: any) => {
+            if (error.response?.status === 409) {
+                setDeleteError(error.response.data.message);
+            } else {
+                toast({ title: 'Error deleting category', description: error.message, variant: 'destructive' });
+                setIsDeleteAlertOpen(false);
+            }
+            setSelectedItem(null);
         }
     });
 
-    const handleOpenSheet = React.useCallback((
+    const handleOpenDialog = React.useCallback((
         mode: 'addCategory' | 'editCategory',
         item?: ProductCategory
     ) => {
-        setSheetMode(mode);
+        setDialogMode(mode);
         setSelectedItem(item || null);
-        setIsSheetOpen(true);
+        setIsDialogOpen(true);
     }, []);
 
     const handleDeleteCategory = (category: ProductCategory) => {
-        if (window.confirm(`Are you sure you want to delete the category "${category.name}"? This action cannot be undone.`)) {
-            deleteCategoryMutation.mutate(category.id);
-        }
+        setSelectedItem(category);
+        setDeleteError(null); // Clear previous errors
+        setIsDeleteAlertOpen(true);
     };
 
     const categoryCols = React.useMemo(() => categoryColumns({
-        openSheet: (mode, category) => handleOpenSheet(mode, category),
+        openSheet: (mode, category) => handleOpenDialog(mode, category),
         onDelete: handleDeleteCategory,
-    }), [handleOpenSheet, handleDeleteCategory]);
+    }), [handleOpenDialog, handleDeleteCategory]);
 
     return (
         <>
@@ -102,7 +124,7 @@ export default function CategoryClient({ initialCategories }: CategoryClientProp
                         onChange={(e) => setGlobalFilter(e.target.value)}
                         className="w-full md:w-64"
                     />
-                    <Button onClick={() => handleOpenSheet('addCategory')}>
+                    <Button onClick={() => handleOpenDialog('addCategory')}>
                         <PlusCircle className="mr-2 h-4 w-4" />
                         Add Category
                     </Button>
@@ -123,16 +145,16 @@ export default function CategoryClient({ initialCategories }: CategoryClientProp
                     />
                 </CardContent>
             </Card>
-            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                <SheetContent>
-                    <SheetHeader>
-                        <SheetTitle>
-                            {`${sheetMode?.includes('edit') ? 'Edit' : 'Add'} Category`}
-                        </SheetTitle>
-                        <SheetDescription>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>
+                            {`${dialogMode?.includes('edit') ? 'Edit' : 'Add'} Category`}
+                        </DialogTitle>
+                        <DialogDescription>
                             Fill in the details for the category.
-                        </SheetDescription>
-                    </SheetHeader>
+                        </DialogDescription>
+                    </DialogHeader>
                     <div className="py-4">
                         <CategoryForm
                             onSubmit={(values) => categoryMutation.mutate({ item: values, id: (selectedItem as ProductCategory)?.id })}
@@ -140,8 +162,30 @@ export default function CategoryClient({ initialCategories }: CategoryClientProp
                             isPending={categoryMutation.isPending}
                         />
                     </div>
-                </SheetContent>
-            </Sheet>
+                </DialogContent>
+            </Dialog>
+
+            <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {deleteError
+                                ? deleteError
+                                : `This will permanently delete the category "${selectedItem?.name}". This action cannot be undone.`
+                            }
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setDeleteError(null)}>Cancel</AlertDialogCancel>
+                        {!deleteError && (
+                             <AlertDialogAction onClick={() => deleteCategoryMutation.mutate(selectedItem!.id)}>
+                                Delete
+                            </AlertDialogAction>
+                        )}
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     );
 } 

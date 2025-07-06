@@ -29,6 +29,8 @@ import { CalendarIcon } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 
 
 // This schema defines the form's structure and validation.
@@ -55,9 +57,18 @@ interface ProductFormProps {
   onSubmit: (values: ProductFormValues) => void;
   isPending: boolean;
   categories: ProductCategory[];
+  serverError: string | null;
+  setServerError: (error: string | null) => void;
 }
 
-export function ProductForm({ initialData, onSubmit, isPending, categories }: ProductFormProps) {
+export function ProductForm({ 
+  initialData, 
+  onSubmit, 
+  isPending, 
+  categories,
+  serverError,
+  setServerError
+}: ProductFormProps) {
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -90,9 +101,28 @@ export function ProductForm({ initialData, onSubmit, isPending, categories }: Pr
     }
   }, [initialData, form]);
 
+  const handleFormChange = () => {
+    if (serverError) {
+      setServerError(null);
+    }
+  };
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form 
+        onSubmit={form.handleSubmit(onSubmit)} 
+        onChange={handleFormChange}
+        className="space-y-6"
+      >
+        {serverError && (
+            <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Save Failed</AlertTitle>
+                <AlertDescription>
+                    {serverError}
+                </AlertDescription>
+            </Alert>
+        )}
         {/* Existing Fields Go Here */}
         <FormField
           control={form.control}

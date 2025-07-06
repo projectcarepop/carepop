@@ -450,17 +450,14 @@ export async function upsertProductCategory(categoryData: NewProductCategoryPayl
 export async function getInventoryForClinic(
   clinicId: string, 
   accessToken: string,
-  filters?: { lowStock?: boolean; expiringSoon?: boolean }
+  filters?: { lowStock?: boolean; expiringSoon?: boolean; q?: string }
 ): Promise<{data: InventoryItem[]}> {
     const headers = await getAuthHeaders(accessToken);
     
     const params = new URLSearchParams();
-    if (filters?.lowStock) {
-      params.append('lowStock', 'true');
-    }
-    if (filters?.expiringSoon) {
-      params.append('expiringSoon', 'true');
-    }
+    if (filters?.lowStock) params.append('lowStock', 'true');
+    if (filters?.expiringSoon) params.append('expiringSoon', 'true');
+    if (filters?.q) params.append('q', filters.q);
     
     const queryString = params.toString();
     const url = `${API_BASE_URL}/api/admin/clinics/${clinicId}/inventory${queryString ? `?${queryString}` : ''}`;

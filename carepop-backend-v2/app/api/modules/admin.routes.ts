@@ -378,12 +378,13 @@ adminRoutes
 const inventoryFilterSchema = z.object({
   lowStock: z.enum(['true', 'false']).optional().transform(v => v === 'true'),
   expiringSoon: z.enum(['true', 'false']).optional().transform(v => v === 'true'),
+  q: z.string().optional(),
 });
 
 adminRoutes
   .get('/clinics/:clinicId/inventory', zValidator('query', inventoryFilterSchema), async (c) => {
     const { clinicId } = c.req.param();
-    const { lowStock, expiringSoon } = c.req.valid('query');
+    const { lowStock, expiringSoon, q } = c.req.valid('query');
 
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
@@ -399,6 +400,11 @@ adminRoutes
     if (expiringSoon) {
         conditions.push(sql`${inventory_items.expiryDate} IS NOT NULL`);
         conditions.push(lt(inventory_items.expiryDate, thirtyDaysFromNow.toISOString()));
+    }
+
+    if (q) {
+        // Use ilike for case-insensitive search on itemName
+        conditions.push(sql`inventory_items.item_name ilike ${'%' + q + '%'}`);
     }
     
     const items = await db.select({
@@ -490,7 +496,14 @@ adminRoutes
         return c.json(newInventoryItem, 201);
     } catch (error: any) {
         console.error("Error creating inventory item:", error);
-        return c.json({ error: "Failed to create inventory item.", message: error.message }, 500);
+        // Check for unique constraint violation (e.g., duplicate SKU)
+        if (error.code === '23505') {
+            return c.json({ 
+                error: "Conflict",
+                message: "An item with a similar unique identifier (like SKU) already exists." 
+            }, 409);
+        }
+        return c.json({ error: "Failed to create inventory item.", message: "An unexpected error occurred." }, 500);
     }
   })
   .put('/clinics/:clinicId/inventory/:itemId', zValidator('json', updateInventoryItemSchema), async (c) => {
@@ -553,7 +566,14 @@ adminRoutes
         return c.json(updatedInventoryItem);
     } catch (error: any) {
         console.error("Error updating inventory item:", error);
-        return c.json({ error: "Failed to update inventory item.", message: error.message }, 500);
+        // Check for unique constraint violation
+        if (error.code === '23505') {
+            return c.json({ 
+                error: "Conflict", 
+                message: "An item with a similar unique identifier (like SKU) already exists."
+            }, 409);
+        }
+        return c.json({ error: "Failed to update inventory item.", message: "An unexpected error occurred." }, 500);
     }
   })
   .delete('/clinics/:clinicId/inventory/:itemId', async (c) => {

@@ -18,9 +18,10 @@ interface ProductColumnsProps {
   onDelete: (item: InventoryItem) => void;
   onUpdateStock: (item: InventoryItem) => void;
   onViewDetails: (item: InventoryItem) => void;
+  onManageBatches: (item: InventoryItem) => void;
 }
 
-export const productColumns = ({ onEdit, onDelete, onUpdateStock, onViewDetails }: ProductColumnsProps): ColumnDef<InventoryItem>[] => [
+export const productColumns = ({ onEdit, onDelete, onUpdateStock, onViewDetails, onManageBatches }: ProductColumnsProps): ColumnDef<InventoryItem>[] => [
   {
     accessorKey: 'itemName',
     header: 'Name',
@@ -82,6 +83,9 @@ export const productColumns = ({ onEdit, onDelete, onUpdateStock, onViewDetails 
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onUpdateStock(item)}>
                 Update Stock
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onManageBatches(item)}>
+                Manage Batches
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

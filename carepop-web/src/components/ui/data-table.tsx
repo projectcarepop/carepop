@@ -27,25 +27,22 @@ import { Loader2 } from 'lucide-react';
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
-  isLoading?: boolean;
+  filterColumn?: string;
   globalFilter?: string;
-  setGlobalFilter?: React.Dispatch<React.SetStateAction<string>>;
-  filterColumn: string;
+  setGlobalFilter?: (value: string) => void;
+  isLoading?: boolean;
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
-  isLoading,
-  globalFilter = '',
   filterColumn,
+  globalFilter,
+  setGlobalFilter,
+  isLoading,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
-
-  React.useEffect(() => {
-    setColumnFilters([{ id: filterColumn, value: globalFilter }]);
-  }, [globalFilter, filterColumn]);
 
   const table = useReactTable({
     data,
@@ -66,6 +63,18 @@ export function DataTable<TData, TValue>({
         },
     },
   });
+
+  React.useEffect(() => {
+    if (globalFilter !== undefined && setGlobalFilter !== undefined) {
+      table.setGlobalFilter(globalFilter);
+    }
+  }, [globalFilter, setGlobalFilter, table]);
+  
+  React.useEffect(() => {
+    if (filterColumn) {
+      table.getColumn(filterColumn)?.setFilterValue(globalFilter);
+    }
+  }, [globalFilter, filterColumn, table]);
 
   return (
     <div className="space-y-4">

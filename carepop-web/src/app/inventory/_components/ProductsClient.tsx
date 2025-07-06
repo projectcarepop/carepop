@@ -8,6 +8,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { DataTable } from '@/components/ui/data-table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { 
@@ -25,6 +35,8 @@ import { Label } from '@/components/ui/label';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { ClinicSelector } from './ClinicSelector';
 import { getAdminClinics } from '@/services/api';
+import { ManageItemBatchesModal } from './ManageItemBatchesModal';
+import { useDebounce } from '@/hooks/useDebounce';
 
 
 export default function ProductsClient() {
@@ -38,12 +50,16 @@ export default function ProductsClient() {
   const selectedClinicId = searchParams.get('clinicId');
 
   const [globalFilter, setGlobalFilter] = React.useState('');
+  const debouncedFilter = useDebounce(globalFilter, 300);
   const [showLowStockOnly, setShowLowStockOnly] = React.useState(false);
   const [showExpiringSoon, setShowExpiringSoon] = React.useState(false);
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = React.useState(false);
+  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = React.useState(false);
+  const [isBatchModalOpen, setIsBatchModalOpen] = React.useState(false);
   const [sheetMode, setSheetMode] = React.useState<'addProduct' | 'editProduct' | 'updateStock' | null>(null);
   const [selectedItem, setSelectedItem] = React.useState<InventoryItem | null>(null);
+  const [serverError, setServerError] = React.useState<string | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -54,12 +70,13 @@ export default function ProductsClient() {
     });
 
   const { data: products, isLoading: isLoadingProducts } = useQuery({
-    queryKey: ['inventory-items', selectedClinicId, { lowStock: showLowStockOnly, expiringSoon: showExpiringSoon }],
+    queryKey: ['inventory-items', selectedClinicId, { lowStock: showLowStockOnly, expiringSoon: showExpiringSoon, q: debouncedFilter }],
     queryFn: () => {
         if (!selectedClinicId || !accessToken) return Promise.resolve({ data: [] });
         return getInventoryForClinic(selectedClinicId, accessToken, {
             lowStock: showLowStockOnly,
             expiringSoon: showExpiringSoon,
+            q: debouncedFilter
         });
     },
     enabled: !!accessToken && !!selectedClinicId,
@@ -77,10 +94,15 @@ export default function ProductsClient() {
     toast({ title: `${entity} saved successfully.` });
     setIsSheetOpen(false);
     queryClient.invalidateQueries({ queryKey: ['inventory-items', selectedClinicId] });
+    queryClient.invalidateQueries({ queryKey: ['inventory-stats', selectedClinicId] });
   };
 
-  const handleMutationError = (error: Error, entity: string) => {
-    toast({ title: `Error saving ${entity}`, description: error.message, variant: 'destructive' });
+  const handleMutationError = (error: any, entity: string) => {
+    if (error.response?.status === 409) {
+        setServerError(error.response.data.message);
+    } else {
+        toast({ title: `Error saving ${entity}`, description: error.message, variant: 'destructive' });
+    }
   };
 
   const productMutation = useMutation({
@@ -115,6 +137,7 @@ export default function ProductsClient() {
     onSuccess: () => {
         toast({ title: 'Product deleted successfully.' });
         queryClient.invalidateQueries({ queryKey: ['inventory-items', selectedClinicId] });
+        queryClient.invalidateQueries({ queryKey: ['inventory-stats', selectedClinicId] });
     },
     onError: (error) => handleMutationError(error, 'Product deletion'),
   });
@@ -132,13 +155,26 @@ export default function ProductsClient() {
   ) => {
     setSheetMode(mode);
     setSelectedItem(item || null);
+    setServerError(null);
     setIsSheetOpen(true);
   }, []);
   
+  const handleManageBatches = React.useCallback((item: InventoryItem) => {
+    setSelectedItem(item);
+    setIsBatchModalOpen(true);
+  }, []);
+
   const handleDeleteProduct = (item: InventoryItem) => {
-    if (window.confirm(`Are you sure you want to delete "${item.itemName}"? This action cannot be undone.`)) {
-      deleteProductMutation.mutate(item);
+    setSelectedItem(item);
+    setIsDeleteAlertOpen(true);
+  }
+  
+  const handleConfirmDelete = () => {
+    if (selectedItem) {
+      deleteProductMutation.mutate(selectedItem);
     }
+    setIsDeleteAlertOpen(false);
+    setSelectedItem(null);
   }
   
   const handleClinicSelect = (clinicId: string | null) => {
@@ -155,8 +191,9 @@ export default function ProductsClient() {
     onEdit: (item) => handleOpenSheet('editProduct', item),
     onDelete: handleDeleteProduct,
     onUpdateStock: (item) => handleOpenSheet('updateStock', item),
-    onViewDetails: handleViewDetails
-  }), [handleOpenSheet, handleViewDetails]);
+    onViewDetails: handleViewDetails,
+    onManageBatches: handleManageBatches,
+  }), [handleOpenSheet, handleViewDetails, handleManageBatches]);
 
   return (
     <div className="space-y-4">
@@ -221,8 +258,6 @@ export default function ProductsClient() {
             <DataTable
                 columns={columns}
                 data={products || []}
-                filterColumn="itemName"
-                globalFilter={globalFilter}
                 isLoading={isLoadingProducts}
             />
             </CardContent>
@@ -250,6 +285,8 @@ export default function ProductsClient() {
                 initialData={selectedItem as InventoryItem | undefined}
                 isPending={productMutation.isPending}
                 categories={categories || []}
+                serverError={serverError}
+                setServerError={setServerError}
               />
             }
             { sheetMode === 'updateStock' &&
@@ -279,6 +316,25 @@ export default function ProductsClient() {
 
                         <p className="text-sm font-medium text-muted-foreground">Generic Name</p>
                         <p>{selectedItem.genericName ?? 'N/A'}</p>
+                        
+                        <p className="text-sm font-medium text-muted-foreground">Category</p>
+                        <p>{selectedItem.categoryName ?? 'N/A'}</p>
+                        
+                        <p className="text-sm font-medium text-muted-foreground">Brand</p>
+                        <p>{selectedItem.brandName ?? 'N/A'}</p>
+                   </div>
+                   <div className="grid grid-cols-2 gap-2">
+                        <p className="text-sm font-medium text-muted-foreground">Strength</p>
+                        <p>{selectedItem.strength ?? 'N/A'}</p>
+
+                        <p className="text-sm font-medium text-muted-foreground">Form</p>
+                        <p>{selectedItem.dosageForm ?? 'N/A'}</p>
+
+                        <p className="text-sm font-medium text-muted-foreground">Quantity on Hand</p>
+                        <p>{selectedItem.quantityOnHand}</p>
+                        
+                        <p className="text-sm font-medium text-muted-foreground">Reorder Level</p>
+                        <p>{selectedItem.reorderLevel}</p>
                    </div>
                    <div className="grid grid-cols-2 gap-2">
                         <p className="text-sm font-medium text-muted-foreground">Selling Price</p>
@@ -288,8 +344,11 @@ export default function ProductsClient() {
                         <p>{selectedItem.purchasePrice ? `₱${Number(selectedItem.purchasePrice).toFixed(2)}` : 'N/A'}</p>
                    </div>
                     <div className="grid grid-cols-2 gap-2">
-                        <p className="text-sm font-medium text-muted-foreground">Reorder Level</p>
-                        <p>{selectedItem.reorderLevel}</p>
+                        <p className="text-sm font-medium text-muted-foreground">Batch Number</p>
+                        <p>{selectedItem.batchNumber ?? 'N/A'}</p>
+                        
+                        <p className="text-sm font-medium text-muted-foreground">Expiry Date</p>
+                        <p>{selectedItem.expiryDate ? new Date(selectedItem.expiryDate).toLocaleDateString() : 'N/A'}</p>
 
                         <p className="text-sm font-medium text-muted-foreground">Location</p>
                         <p>{selectedItem.location ?? 'N/A'}</p>
@@ -302,6 +361,33 @@ export default function ProductsClient() {
             </DialogContent>
         </Dialog>
       )}
+
+      <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the product
+              &apos;{selectedItem?.itemName}&apos; from the inventory.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setSelectedItem(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete}>
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <ManageItemBatchesModal 
+        item={selectedItem}
+        isOpen={isBatchModalOpen}
+        onClose={() => {
+            setIsBatchModalOpen(false);
+            setSelectedItem(null);
+        }}
+      />
     </div>
   );
 } 
