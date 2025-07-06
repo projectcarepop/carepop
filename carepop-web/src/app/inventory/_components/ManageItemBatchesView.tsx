@@ -35,9 +35,10 @@ type BatchFormValues = z.infer<typeof batchFormSchema>;
 interface ManageItemBatchesViewProps {
   item: InventoryItem;
   onDeleteBatch: (batch: InventoryItemBatch) => void;
+  onMutationSuccess: () => void;
 }
 
-export function ManageItemBatchesView({ item, onDeleteBatch }: ManageItemBatchesViewProps) {
+export function ManageItemBatchesView({ item, onDeleteBatch, onMutationSuccess }: ManageItemBatchesViewProps) {
   const { session } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -55,10 +56,15 @@ export function ManageItemBatchesView({ item, onDeleteBatch }: ManageItemBatches
 
   const addMutation = useMutation({
     mutationFn: (values: BatchFormValues) => addBatchToItem(item!.id, values, session!.access_token!),
-    onSuccess: () => {
+    onSuccess: (newItem) => {
       toast({ title: "Success", description: "Batch added." });
-      queryClient.invalidateQueries({ queryKey: ['itemBatches', item?.id] });
+      
+      queryClient.setQueryData(['itemBatches', item?.id], (oldData: any) => {
+          return oldData ? [...oldData, newItem.data] : [newItem.data];
+      });
+
       form.reset();
+      onMutationSuccess();
     },
     onError: (error: any) => {
       toast({ variant: 'destructive', title: 'Error', description: error.message });

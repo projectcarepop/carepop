@@ -150,6 +150,7 @@ export default function ProductsClient() {
     onSuccess: () => {
       toast({ title: 'Success', description: 'Batch deleted.' });
       queryClient.invalidateQueries({ queryKey: ['itemBatches', selectedItem?.id] });
+      handleMutationSuccess('Batch');
     },
     onError: (error: any) => handleMutationError(error, 'Batch deletion'),
     onSettled: () => setBatchToDelete(null),
@@ -345,6 +346,7 @@ export default function ProductsClient() {
                   <ManageItemBatchesView
                       item={selectedItem}
                       onDeleteBatch={handleDeleteBatch}
+                      onMutationSuccess={() => handleMutationSuccess('Batch')}
                   />
               )}
           </DialogContent>

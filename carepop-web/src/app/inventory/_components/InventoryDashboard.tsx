@@ -1,8 +1,12 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { type LucideIcon, DollarSign, Package, Archive, TrendingDown, AlertTriangle } from "lucide-react";
+import { Package, Archive, TrendingDown, AlertTriangle } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import React from 'react';
+
+// Custom Peso Icon Component
+const PesoSign = () => <span className="font-bold">₱</span>;
 
 export type InventoryStats = {
   totalProducts: number;
@@ -21,7 +25,7 @@ interface InventoryDashboardProps {
 interface StatCardProps {
   title: string;
   value: string | number;
-  icon: LucideIcon;
+  icon: React.ElementType;
   description?: string;
   isLoading: boolean;
   iconColor?: string;
@@ -69,8 +73,8 @@ export function InventoryDashboard({ stats, isLoading }: InventoryDashboardProps
     { title: "Total Units", value: stats?.totalQuantity ?? 0, icon: Archive, description: "Total quantity of all items", iconColor: "hsl(var(--secondary))" },
     { title: "Low Stock Items", value: stats?.lowStockCount ?? 0, icon: TrendingDown, description: "Items at or below reorder level", iconColor: "hsl(var(--warning))" },
     { title: "Expiring Soon", value: stats?.expiringSoonCount ?? 0, icon: AlertTriangle, description: "Items expiring in next 30 days", iconColor: "hsl(var(--destructive))" },
-    { title: "Total Purchase Value", value: formatCurrency(stats?.totalPurchaseValue), icon: DollarSign, description: "Based on purchase price", iconColor: "hsl(var(--info))" },
-    { title: "Total Selling Value", value: formatCurrency(stats?.totalSellingValue), icon: DollarSign, description: "Potential revenue", iconColor: "hsl(var(--success))" },
+    { title: "Total Purchase Value", value: formatCurrency(stats?.totalPurchaseValue), icon: PesoSign, description: "Based on purchase price", iconColor: "hsl(var(--info))" },
+    { title: "Total Selling Value", value: formatCurrency(stats?.totalSellingValue), icon: PesoSign, description: "Potential revenue", iconColor: "hsl(var(--success))" },
   ];
 
   const valueDistributionData = [
