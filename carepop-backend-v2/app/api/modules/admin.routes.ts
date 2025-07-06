@@ -473,6 +473,8 @@ adminRoutes
         const newInventoryItem = await db.transaction(async (tx) => {
             const dbPayload = {
                 ...itemData,
+                // Ensure empty string SKU is converted to null to respect unique constraint
+                sku: itemData.sku || null,
                 purchasePrice: itemData.purchasePrice?.toString(),
                 sellingPrice: itemData.sellingPrice?.toString(),
             };
@@ -583,7 +585,9 @@ adminRoutes
     try {
       const deletedItems = await db.transaction(async (tx) => {
         const [currentItem] = await tx.select({
-            quantityOnHand: inventory_items.quantityOnHand
+            id: inventory_items.id, // We need the ID for the audit log
+            quantityOnHand: inventory_items.quantityOnHand,
+            clinicId: inventory_items.clinicId // And the clinicId
         }).from(inventory_items).where(and(eq(inventory_items.id, itemId), eq(inventory_items.clinicId, clinicId)));
 
         if (!currentItem) {
@@ -591,23 +595,22 @@ adminRoutes
             throw new Error('Item not found in this clinic.');
         }
 
+        // FIX: Log the deletion *before* the item is deleted to maintain foreign key constraint.
+        await tx.insert(inventoryAuditLog).values({
+            itemId: currentItem.id,
+            clinicId: currentItem.clinicId,
+            userId: user.id,
+            changeType: 'deletion',
+            quantityChange: -currentItem.quantityOnHand,
+            oldQuantity: currentItem.quantityOnHand,
+            newQuantity: 0,
+            reason: 'Item deleted from inventory.',
+        });
+        
         const [deleted] = await tx.delete(inventory_items)
             .where(and(eq(inventory_items.id, itemId), eq(inventory_items.clinicId, clinicId)))
             .returning({ id: inventory_items.id });
         
-        // Only log if deletion was successful
-        if (deleted) {
-            await tx.insert(inventoryAuditLog).values({
-                itemId: itemId,
-                clinicId: clinicId,
-                userId: user.id,
-                changeType: 'deletion',
-                quantityChange: -currentItem.quantityOnHand,
-                oldQuantity: currentItem.quantityOnHand,
-                newQuantity: 0,
-                reason: 'Item deleted from inventory.',
-            });
-        }
         return deleted;
       });
       

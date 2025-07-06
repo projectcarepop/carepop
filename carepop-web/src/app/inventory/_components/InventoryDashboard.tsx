@@ -78,7 +78,7 @@ export function InventoryDashboard({ stats, isLoading }: InventoryDashboardProps
     { name: 'Total Selling Value', value: stats?.totalSellingValue ?? 0 },
   ];
   
-  const valueChartColors = ["hsl(var(--info))", "hsl(var(--success))"];
+  const valueChartColors = ["hsl(var(--primary))", "hsl(var(--secondary))"];
 
   const overviewChartData = [
     { name: 'Products vs Units', "Products": stats?.totalProducts ?? 0, "Units": stats?.totalQuantity ?? 0 },

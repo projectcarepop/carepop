@@ -32,14 +32,6 @@ export const categoryColumns = ({ openSheet, onDelete }: CategoryColumnsProps): 
     },
   },
   {
-    accessorKey: 'updatedAt',
-    header: 'Last Updated',
-    cell: ({ row }) => {
-      const date = new Date(row.getValue('updatedAt'));
-      return date.toLocaleDateString();
-    },
-  },
-  {
     id: 'actions',
     cell: ({ row }) => {
       const category = row.original;
