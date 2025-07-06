@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -25,9 +25,9 @@ import {
   getProductCategories,
   upsertInventoryItem,
   deleteInventoryItem,
-  // deleteItemBatch,
+  deleteItemBatch,
 } from '@/services/api';
-import { type InventoryItem, /* type InventoryItemBatch */ } from '@/lib/types/inventory';
+import { type InventoryItem, type InventoryItemBatch } from '@/lib/types/inventory';
 import { productColumns } from './columns';
 import { ProductForm, type ProductFormValues } from './ProductForm';
 import { UpdateStockForm, type UpdateStockFormValues } from './UpdateStockForm';
@@ -36,7 +36,7 @@ import { Label } from '@/components/ui/label';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { ClinicSelector } from './ClinicSelector';
 import { getAdminClinics } from '@/services/api';
-// import { ManageItemBatchesView } from './ManageItemBatchesView';
+import { ManageItemBatchesView } from './ManageItemBatchesView';
 import { useDebounce } from '@/hooks/useDebounce';
 
 
@@ -62,7 +62,7 @@ export default function ProductsClient() {
   const [selectedItem, setSelectedItem] = React.useState<InventoryItem | null>(null);
   const [serverError, setServerError] = React.useState<string | null>(null);
   const [duplicateWarning, setDuplicateWarning] = React.useState<ProductFormValues | null>(null);
-  // const [batchToDelete, setBatchToDelete] = React.useState<InventoryItemBatch | null>(null);
+  const [batchToDelete, setBatchToDelete] = React.useState<InventoryItemBatch | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -145,6 +145,16 @@ export default function ProductsClient() {
     onError: (error) => handleMutationError(error, 'Product deletion'),
   });
 
+  const deleteBatchMutation = useMutation({
+    mutationFn: (batchId: string) => deleteItemBatch(batchId, accessToken!),
+    onSuccess: () => {
+      toast({ title: 'Success', description: 'Batch deleted.' });
+      queryClient.invalidateQueries({ queryKey: ['itemBatches', selectedItem?.id] });
+    },
+    onError: (error: any) => handleMutationError(error, 'Batch deletion'),
+    onSettled: () => setBatchToDelete(null),
+  });
+
   const handleSubmitProduct = (values: ProductFormValues) => {
     const isEditing = sheetMode === 'editProduct';
     
@@ -182,6 +192,10 @@ export default function ProductsClient() {
     setSelectedItem(item);
     setIsBatchModalOpen(true);
   }, []);
+
+  const handleDeleteBatch = (batch: InventoryItemBatch) => {
+    setBatchToDelete(batch);
+  };
 
   const handleDeleteProduct = (item: InventoryItem) => {
     setSelectedItem(item);
@@ -271,18 +285,6 @@ export default function ProductsClient() {
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Add Product
                 </Button>
-                {/* --- DEBUG BUTTON --- */}
-                {products && products.length > 0 && (
-                    <Button
-                        variant="outline"
-                        onClick={() => {
-                            setSelectedItem(products[0]);
-                            setIsBatchModalOpen(true);
-                        }}
-                    >
-                        Debug Batches
-                    </Button>
-                )}
             </div>
             </CardHeader>
             <CardContent>
@@ -335,8 +337,16 @@ export default function ProductsClient() {
           <DialogContent className="sm:max-w-4xl">
               <DialogHeader>
                   <DialogTitle>Manage Batches for: {selectedItem?.itemName}</DialogTitle>
+                  <DialogDescription>
+                    Add new stock or remove existing batches for this item.
+                  </DialogDescription>
               </DialogHeader>
-              {/* Content removed for debugging */}
+              {selectedItem && (
+                  <ManageItemBatchesView
+                      item={selectedItem}
+                      onDeleteBatch={handleDeleteBatch}
+                  />
+              )}
           </DialogContent>
       </Dialog>
 
@@ -415,6 +425,28 @@ export default function ProductsClient() {
             <AlertDialogCancel onClick={() => setSelectedItem(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmDelete}>
               Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!batchToDelete} onOpenChange={() => setBatchToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Batch?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete batch &apos;{batchToDelete?.batchNumber || 'N/A'}&apos;
+              with {batchToDelete?.quantity} units. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => deleteBatchMutation.mutate(batchToDelete!.id)}
+              disabled={deleteBatchMutation.isPending}
+            >
+              {deleteBatchMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Confirm Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
