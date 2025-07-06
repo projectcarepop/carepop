@@ -1,8 +1,8 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import BookingWizard from '@/components/booking/BookingWizard';
 import { Container } from "@/components/layout/Container";
+import { BookingFlowManager } from './components/BookingFlowManager';
 
 /**
  * The server component for the Appointment Booking page.
@@ -19,8 +19,6 @@ export default async function BookAppointmentPage() {
     return redirect('/sign-in?redirect_to=/book-appointment');
   }
 
-  // The BookingWizard component will handle its own data fetching on the client side.
-  // This page is now just a protected shell.
   return (
     <Container>
       <div className="py-10 justify-center">
@@ -28,7 +26,7 @@ export default async function BookAppointmentPage() {
         <p className="text-muted-foreground mb-8 text-center">
           Follow the steps below to find a service, clinic, and time that works for you.
         </p>
-        <BookingWizard />
+        <BookingFlowManager />
       </div>
     </Container>
   );

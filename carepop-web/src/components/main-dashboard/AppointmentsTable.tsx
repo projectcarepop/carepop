@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
-import { format } from 'date-fns';
+import { format, differenceInHours } from 'date-fns';
 
 import {
   AlertDialog,
@@ -128,7 +128,10 @@ export function AppointmentsTable({ appointments }: AppointmentsTableProps) {
                     variant="destructive"
                     size="sm"
                     onClick={() => openConfirmationDialog(appointment.id)}
-                    disabled={isPending && selectedAppointmentId === appointment.id}
+                    disabled={
+                      (isPending && selectedAppointmentId === appointment.id) ||
+                      differenceInHours(new Date(appointment.appointmentTime), new Date()) < 36
+                    }
                   >
                     {isPending && selectedAppointmentId === appointment.id ? '...' : 'Cancel'}
                   </Button>
@@ -144,7 +147,10 @@ export function AppointmentsTable({ appointments }: AppointmentsTableProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently cancel your appointment.
+              <p>This action cannot be undone. This will permanently cancel your appointment.</p>
+              <p className="font-bold text-destructive mt-2">
+                Please note: Appointments can only be cancelled up to 36 hours in advance.
+              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

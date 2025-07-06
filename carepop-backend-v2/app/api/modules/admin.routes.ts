@@ -2,11 +2,74 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { db } from '../lib/db';
-import { clinics, profiles, doctors, services, productCategories, inventory_items, serviceCategories, appointments, medicalRecords, recordDoctorNotes, recordPrescriptions, recordDocuments, clinicServices, inventoryAuditLog, inventoryItemBatches } from '../../../drizzle/schema';
+import { 
+    clinics, 
+    doctors, 
+    services, 
+    serviceCategories, 
+    profiles,
+    inventory_items,
+    productCategories,
+    inventoryAuditLog,
+    inventoryItemBatches,
+    appointments,
+    clinicOverrides,
+    doctorSchedules,
+    doctorAvailabilityOverrides,
+    clinicServices,
+    recordDoctorNotes,
+    recordPrescriptions,
+    recordDocuments,
+    medicalRecords
+} from '../../../drizzle/schema';
 import { eq, sql, count, asc, and, gte, lt, getTableColumns, desc, inArray, SQL, sum, isNotNull } from 'drizzle-orm';
 import { authMiddleware, adminOrManagerMiddleware, AuthEnv } from '../middleware/auth';
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
+
+// =================================================================
+// Zod Validation Schemas
+// =================================================================
+
+export const createClinicOverrideSchema = z.object({
+    startDateTime: z.string().datetime(),
+    endDateTime: z.string().datetime(),
+    reason: z.string().optional(),
+    isAvailable: z.boolean().optional().default(false),
+});
+
+export const updateClinicOverrideSchema = z.object({
+    startDateTime: z.string().datetime().optional(),
+    endDateTime: z.string().datetime().optional(),
+    reason: z.string().optional(),
+    isAvailable: z.boolean().optional(),
+});
+
+export const createDoctorScheduleSchema = z.object({
+    dayOfWeek: z.number().int().min(0).max(6),
+    startTime: z.string().regex(/^\d{2}:\d{2}:\d{2}$/), // "HH:MM:SS"
+    endTime: z.string().regex(/^\d{2}:\d{2}:\d{2}$/),
+});
+
+export const updateDoctorScheduleSchema = z.object({
+    dayOfWeek: z.number().int().min(0).max(6).optional(),
+    startTime: z.string().regex(/^\d{2}:\d{2}:\d{2}$/).optional(),
+    endTime: z.string().regex(/^\d{2}:\d{2}:\d{2}$/).optional(),
+});
+
+export const createDoctorOverrideSchema = z.object({
+    startDateTime: z.string().datetime(),
+    endDateTime: z.string().datetime(),
+    isAvailable: z.boolean(),
+});
+
+export const updateDoctorOverrideSchema = z.object({
+    startDateTime: z.string().datetime().optional(),
+    endDateTime: z.string().datetime().optional(),
+    isAvailable: z.boolean().optional(),
+});
+
+// Other schemas can be added here as needed...
 
 const adminRoutes = new Hono<AuthEnv>();
 
@@ -1264,6 +1327,277 @@ adminRoutes.delete('/appointments/:id', async (c) => {
     }
 });
 
+// =================================================================
+// Clinic Availability Routes
+// =================================================================
+
+/**
+ * POST /admin/clinics/:clinicId/overrides
+ * Creates a new clinic-wide availability override (e.g., for a holiday).
+ */
+adminRoutes.post(
+    '/clinics/:clinicId/overrides',
+    zValidator('param', z.object({ clinicId: z.string().uuid() })),
+    zValidator('json', createClinicOverrideSchema),
+    async (c) => {
+        const { clinicId } = c.req.param();
+        const overrideData = c.req.valid('json');
+
+        try {
+            const [newOverride] = await db
+                .insert(clinicOverrides)
+                .values({ clinicId, ...overrideData })
+                .returning();
+            return c.json(newOverride, 201);
+        } catch (error) {
+            console.error('Error creating clinic override:', error);
+            return c.json({ error: 'Internal Server Error' }, 500);
+        }
+    }
+);
+
+/**
+ * GET /admin/clinics/:clinicId/overrides
+ * Retrieves all availability overrides for a specific clinic.
+ */
+adminRoutes.get('/clinics/:clinicId/overrides', zValidator('param', z.object({ clinicId: z.string().uuid() })), async (c) => {
+    const { clinicId } = c.req.param();
+    try {
+        const overrides = await db.select().from(clinicOverrides).where(eq(clinicOverrides.clinicId, clinicId));
+        return c.json(overrides);
+    } catch (error) {
+        console.error('Error fetching clinic overrides:', error);
+        return c.json({ error: 'Internal Server Error' }, 500);
+    }
+});
+
+/**
+ * PUT /admin/overrides/:overrideId
+ * Updates an existing clinic-wide availability override.
+ */
+adminRoutes.put(
+    '/overrides/:overrideId',
+    zValidator('param', z.object({ overrideId: z.string().uuid() })),
+    zValidator('json', updateClinicOverrideSchema),
+    async (c) => {
+        const { overrideId } = c.req.param();
+        const updatedData = c.req.valid('json');
+
+        try {
+            const [updatedOverride] = await db
+                .update(clinicOverrides)
+                .set(updatedData)
+                .where(eq(clinicOverrides.id, overrideId))
+                .returning();
+
+            if (!updatedOverride) {
+                return c.json({ error: 'Override not found' }, 404);
+            }
+            return c.json(updatedOverride);
+        } catch (error) {
+            console.error('Error updating clinic override:', error);
+            return c.json({ error: 'Internal Server Error' }, 500);
+        }
+    }
+);
+
+/**
+ * DELETE /admin/overrides/:overrideId
+ * Deletes a clinic-wide availability override.
+ */
+adminRoutes.delete('/overrides/:overrideId', zValidator('param', z.object({ overrideId: z.string().uuid() })), async (c) => {
+    const { overrideId } = c.req.param();
+    try {
+        const [deletedOverride] = await db.delete(clinicOverrides).where(eq(clinicOverrides.id, overrideId)).returning();
+        if (!deletedOverride) {
+            return c.json({ error: 'Override not found' }, 404);
+        }
+        return c.json({ message: 'Override deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting clinic override:', error);
+        return c.json({ error: 'Internal Server Error' }, 500);
+    }
+});
+
+// =================================================================
+// Doctor Schedule & Availability Routes
+// =================================================================
+
+/**
+ * POST /admin/doctors/:doctorId/schedules
+ * Creates a new recurring schedule for a doctor.
+ */
+adminRoutes.post(
+    '/doctors/:doctorId/schedules',
+    zValidator('param', z.object({ doctorId: z.string().uuid() })),
+    zValidator('json', createDoctorScheduleSchema),
+    async (c) => {
+        const { doctorId } = c.req.param();
+        const scheduleData = c.req.valid('json');
+        
+        try {
+            // Here you might have more complex logic, like ensuring no overlapping schedules
+            const [newSchedule] = await db
+                .insert(doctorSchedules)
+                .values({ doctorId, ...scheduleData })
+                .returning();
+            return c.json(newSchedule, 201);
+        } catch (error) {
+            console.error('Error creating doctor schedule:', error);
+            return c.json({ error: 'Internal Server Error' }, 500);
+        }
+    }
+);
+
+/**
+ * POST /admin/doctors/:doctorId/overrides
+ * Creates a new one-off availability override for a doctor.
+ */
+adminRoutes.post(
+    '/doctors/:doctorId/overrides',
+    zValidator('param', z.object({ doctorId: z.string().uuid() })),
+    zValidator('json', createDoctorOverrideSchema),
+    async (c) => {
+        const { doctorId } = c.req.param();
+        const overrideData = c.req.valid('json');
+
+        try {
+            const [newOverride] = await db
+                .insert(doctorAvailabilityOverrides)
+                .values({ doctorId, ...overrideData })
+                .returning();
+            return c.json(newOverride, 201);
+        } catch (error) {
+            console.error('Error creating doctor override:', error);
+            return c.json({ error: 'Internal Server Error' }, 500);
+        }
+    }
+);
+
+/**
+ * GET /admin/doctors/:doctorId/availability
+ * Retrieves all availability info (schedules and overrides) for a doctor.
+ */
+adminRoutes.get('/doctors/:doctorId/availability', zValidator('param', z.object({ doctorId: z.string().uuid() })), async (c) => {
+    const { doctorId } = c.req.param();
+    try {
+        const schedules = await db.select().from(doctorSchedules).where(eq(doctorSchedules.doctorId, doctorId));
+        const overrides = await db.select().from(doctorAvailabilityOverrides).where(eq(doctorAvailabilityOverrides.doctorId, doctorId));
+        return c.json({ schedules, overrides });
+    } catch (error) {
+        console.error('Error fetching doctor availability:', error);
+        return c.json({ error: 'Internal Server Error' }, 500);
+    }
+});
+
+/**
+ * PUT /admin/doctor-overrides/:overrideId
+ * Updates a doctor's one-off availability override.
+ */
+adminRoutes.put(
+    '/doctor-overrides/:overrideId',
+    zValidator('param', z.object({ overrideId: z.string().uuid() })),
+    zValidator('json', updateDoctorOverrideSchema),
+    async (c) => {
+        const { overrideId } = c.req.param();
+        const updatedData = c.req.valid('json');
+        try {
+            const [updated] = await db.update(doctorAvailabilityOverrides).set(updatedData).where(eq(doctorAvailabilityOverrides.id, overrideId)).returning();
+            return updated ? c.json(updated) : c.json({ error: 'Not found' }, 404);
+        } catch (error) {
+            return c.json({ error: 'Internal Server Error' }, 500);
+        }
+    }
+);
+
+/**
+ * DELETE /admin/doctor-schedules/:scheduleId
+ * Deletes a doctor's recurring schedule record.
+ */
+adminRoutes.delete('/doctor-schedules/:scheduleId', zValidator('param', z.object({ scheduleId: z.string().uuid() })), async (c) => {
+    const { scheduleId } = c.req.param();
+    try {
+        await db.delete(doctorSchedules).where(eq(doctorSchedules.id, scheduleId));
+        return c.json({ message: 'Schedule deleted' });
+    } catch (error) {
+        return c.json({ error: 'Internal Server Error' }, 500);
+    }
+});
+
+/**
+ * DELETE /admin/doctor-overrides/:overrideId
+ * Deletes a doctor's one-off override.
+ */
+adminRoutes.delete('/doctor-overrides/:overrideId', zValidator('param', z.object({ overrideId: z.string().uuid() })), async (c) => {
+    const { overrideId } = c.req.param();
+    try {
+        await db.delete(doctorAvailabilityOverrides).where(eq(doctorAvailabilityOverrides.id, overrideId));
+        return c.json({ message: 'Override deleted' });
+    } catch (error) {
+        return c.json({ error: 'Internal Server Error' }, 500);
+    }
+});
+
+/**
+ * PUT /admin/schedules/:scheduleId
+ * Updates a specific recurring schedule entry for a doctor.
+ */
+adminRoutes.put(
+    '/schedules/:scheduleId',
+    zValidator('param', z.object({ scheduleId: z.string().uuid() })),
+    zValidator('json', updateDoctorScheduleSchema),
+    async (c) => {
+        const { scheduleId } = c.req.valid('param');
+        const scheduleData = c.req.valid('json');
+
+        if (Object.keys(scheduleData).length === 0) {
+            return c.json({ error: 'No update data provided.' }, 400);
+        }
+
+        try {
+            const [updatedSchedule] = await db
+                .update(doctorSchedules)
+                .set({ ...scheduleData, updatedAt: new Date().toISOString() })
+                .where(eq(doctorSchedules.id, scheduleId))
+                .returning();
+
+            if (!updatedSchedule) {
+                return c.json({ error: 'Schedule not found' }, 404);
+            }
+            return c.json({ data: updatedSchedule });
+        } catch (error) {
+            console.error(`Failed to update schedule ${scheduleId}:`, error);
+            return c.json({ error: 'Internal Server Error' }, 500);
+        }
+    }
+);
+
+/**
+ * DELETE /admin/schedules/:scheduleId
+ * Deletes a specific recurring schedule entry for a doctor.
+ */
+adminRoutes.delete(
+    '/schedules/:scheduleId',
+    zValidator('param', z.object({ scheduleId: z.string().uuid() })),
+    async (c) => {
+        const { scheduleId } = c.req.valid('param');
+
+        try {
+            const [deletedSchedule] = await db
+                .delete(doctorSchedules)
+                .where(eq(doctorSchedules.id, scheduleId))
+                .returning();
+
+            if (!deletedSchedule) {
+                return c.json({ error: 'Schedule not found' }, 404);
+            }
+            return c.json({ message: 'Schedule deleted successfully' });
+        } catch (error) {
+            console.error(`Failed to delete schedule ${scheduleId}:`, error);
+            return c.json({ error: 'Internal Server Error' }, 500);
+        }
+    }
+);
 
 // Add other admin routes here in the future...
 

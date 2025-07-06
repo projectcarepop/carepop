@@ -1,13 +1,95 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { sql, desc } from 'drizzle-orm';
+import { sql, desc, getTableColumns } from 'drizzle-orm';
 import { db } from '../lib/db';
-import { appointments, doctors, clinics, services, medicalRecords, recordDoctorNotes, recordPrescriptions, recordDocuments, profiles, healthLogs, menstrualLogs } from '../../../drizzle/schema';
-import { and, eq, gte } from 'drizzle-orm';
+import { appointments, doctors, clinics, services, medicalRecords, recordDoctorNotes, recordPrescriptions, recordDocuments, profiles, healthLogs, menstrualLogs, doctorSchedules, clinicOverrides, doctorAvailabilityOverrides } from '../../../drizzle/schema';
+import { and, eq, gte, lte, or, isNull, not, asc, notInArray } from 'drizzle-orm';
 import { authMiddleware, AuthEnv } from '../middleware/auth';
 import { generativeModel } from '../../../src/services/vertex-ai';
 import type { InferInsertModel } from 'drizzle-orm';
+import { differenceInHours } from 'date-fns';
+
+// Helper function to calculate available slots - REPLICATED from public.routes.ts
+// In a future refactor, this should be moved to a shared service.
+async function calculateAvailableSlots(
+    tx: any, // Transaction object
+    doctorId: string, 
+    serviceId: string, 
+    startDate: Date, 
+    endDate: Date
+) {
+    // 1. Fetch the service to get its duration
+    const [service] = await tx.select({ durationMinutes: services.durationMinutes }).from(services).where(eq(services.id, serviceId));
+    if (!service) throw new Error('Service not found');
+    const slotDuration = service.durationMinutes;
+
+    // 2. Fetch all necessary data in parallel
+    const [
+        schedules,
+        doctorOverrides,
+        clinicOverride, // Assuming one clinic for the doctor for now
+        bookedAppointments
+    ] = await Promise.all([
+        tx.query.doctorSchedules.findMany({ where: eq(doctorSchedules.doctorId, doctorId) }),
+        tx.query.doctorAvailabilityOverrides.findMany({ where: and(
+            eq(doctorAvailabilityOverrides.doctorId, doctorId), 
+            gte(doctorAvailabilityOverrides.endDateTime, startDate.toISOString()), 
+            lte(doctorAvailabilityOverrides.startDateTime, endDate.toISOString())
+        ) }),
+        tx.query.clinics.findFirst({
+            with: {
+                overrides: {
+                    where: and(
+                        gte(clinicOverrides.endDateTime, startDate.toISOString()), 
+                        lte(clinicOverrides.startDateTime, endDate.toISOString())
+                    )
+                }
+            },
+            // This needs to be improved to get the right clinic for the doctor
+            where: sql`id IN (SELECT clinic_id FROM doctor_clinics WHERE doctor_id = ${doctorId})`
+        }).then((c: any) => c?.overrides || []),
+        tx.query.appointments.findMany({ where: and(
+            eq(appointments.doctorId, doctorId), 
+            notInArray(appointments.status, ['canceled_by_patient', 'canceled_by_admin']),
+            gte(appointments.appointmentTime, startDate.toISOString()), 
+            lte(appointments.appointmentTime, endDate.toISOString())
+        ) })
+    ]);
+    
+    const bookedSlots = new Set(bookedAppointments.map((a: { appointmentTime: string | number | Date; }) => new Date(a.appointmentTime).getTime()));
+    const availableSlots: Date[] = [];
+
+    // 3. Iterate through each day in the requested range
+    for (let day = new Date(startDate); day <= endDate; day.setDate(day.getDate() + 1)) {
+        const dayOfWeek = day.getDay();
+        const yyyy_mm_dd = day.toISOString().split('T')[0];
+
+        // Check for clinic-wide non-availability
+        const clinicHoliday = clinicOverride.find((co: any) => new Date(co.startDateTime).toISOString().startsWith(yyyy_mm_dd) && !co.isAvailable);
+        if (clinicHoliday) continue; // Skip this day
+
+        // Check for doctor-specific non-availability override
+        const doctorHoliday = doctorOverrides.find((o: { startDateTime: string | number | Date; isAvailable: any; }) => new Date(o.startDateTime).toISOString().startsWith(yyyy_mm_dd) && !o.isAvailable);
+        if (doctorHoliday) continue;
+
+        const dailySchedule = schedules.find((s: { dayOfWeek: number; }) => s.dayOfWeek === dayOfWeek);
+        if (!dailySchedule) continue;
+
+        // Generate potential slots based on recurring schedule
+        let currentTime = new Date(`${yyyy_mm_dd}T${dailySchedule.startTime}Z`);
+        const endTime = new Date(`${yyyy_mm_dd}T${dailySchedule.endTime}Z`);
+
+        while (currentTime < endTime) {
+            if (!bookedSlots.has(currentTime.getTime())) {
+                availableSlots.push(new Date(currentTime));
+            }
+            currentTime.setMinutes(currentTime.getMinutes() + slotDuration);
+        }
+    }
+    
+    return availableSlots;
+}
 
 const meRoutes = new Hono<AuthEnv>();
 
@@ -209,19 +291,62 @@ const createAppointmentSchema = z.object({
 /**
  * POST /me/appointments
  * Creates a new appointment for the authenticated user.
+ * This endpoint is now secure and performs a server-side availability check.
  */
 meRoutes.post('/appointments', zValidator('json', createAppointmentSchema), async (c) => {
   const user = c.get('user');
-  const newAppointmentData = c.req.valid('json');
+  const { doctorId, serviceId, clinicId, appointmentTime } = c.req.valid('json');
+  const requestedTime = new Date(appointmentTime);
+
+  // --- POLICY ENFORCEMENT ---
+  // Rule: No same-day bookings.
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Normalize to the beginning of the day
+
+  if (requestedTime < today) {
+    // This also implicitly handles past days
+    return c.json({ error: 'Bookings must be for a future date.' }, 400);
+  }
+  if (requestedTime.toISOString().split('T')[0] === new Date().toISOString().split('T')[0]) {
+      return c.json({ error: 'Same-day booking is not permitted. Please select a future date.' }, 400);
+  }
 
   try {
-    const [createdAppointment] = await db.insert(appointments).values({
-      patientId: user.id,
-      ...newAppointmentData
-    }).returning();
+    const result = await db.transaction(async (tx) => {
+        // 1. Calculate available slots within the transaction
+        const dayStart = new Date(requestedTime);
+        dayStart.setUTCHours(0, 0, 0, 0);
+        const dayEnd = new Date(requestedTime);
+        dayEnd.setUTCHours(23, 59, 59, 999);
+
+        const availableSlots = await calculateAvailableSlots(tx, doctorId, serviceId, dayStart, dayEnd);
+        
+        // 2. Verify the requested slot is actually available
+        const isSlotAvailable = availableSlots.some(slot => slot.getTime() === requestedTime.getTime());
+
+        if (!isSlotAvailable) {
+            // By throwing an error, we automatically roll back the transaction.
+            throw new Error("Conflict");
+        }
+
+        // 3. If available, create the appointment
+        const [createdAppointment] = await tx.insert(appointments).values({
+            patientId: user.id,
+            doctorId,
+            serviceId,
+            clinicId,
+            appointmentTime: appointmentTime, // Use the original string
+        }).returning();
+        
+        return createdAppointment;
+    });
     
-    return c.json(createdAppointment, 201);
-  } catch (error) {
+    return c.json(result, 201);
+
+  } catch (error: any) {
+    if (error.message === 'Conflict') {
+        return c.json({ error: 'This time slot is no longer available. Please select another time.' }, 409);
+    }
     console.error('Error creating appointment:', error);
     return c.json({ error: 'Internal Server Error', message: 'Failed to create appointment' }, 500);
   }
@@ -246,6 +371,15 @@ meRoutes.patch('/appointments/:id/cancel', async (c) => {
 
     if (!appointment) {
       return c.json({ error: 'Appointment not found or you do not have permission to cancel it.' }, 404);
+    }
+
+    // --- POLICY ENFORCEMENT: 36-Hour Cancellation Window ---
+    const now = new Date();
+    const appointmentTime = new Date(appointment.appointmentTime);
+    const hoursUntilAppointment = differenceInHours(appointmentTime, now);
+
+    if (hoursUntilAppointment < 36) {
+        return c.json({ error: 'Cancellation failed. Appointments can only be cancelled up to 36 hours in advance.' }, 400);
     }
     
     if (appointment.status !== 'scheduled') {

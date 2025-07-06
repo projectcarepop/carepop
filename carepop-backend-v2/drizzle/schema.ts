@@ -1,4 +1,4 @@
-import { pgTable, index, uuid, text, jsonb, boolean, timestamp, check, numeric, integer, date, pgEnum, customType, primaryKey } from "drizzle-orm/pg-core"
+import { pgTable, index, uuid, text, jsonb, boolean, timestamp, check, numeric, integer, date, pgEnum, customType, primaryKey, time } from "drizzle-orm/pg-core"
 import { sql, relations } from "drizzle-orm"
 
 // Placeholder for auth.users table
@@ -92,12 +92,31 @@ export const doctorServices = pgTable("doctor_services", {
 	compoundKey: primaryKey({ columns: [table.doctorId, table.serviceId] }),
 }));
 
-export const providerAvailability = pgTable("provider_availability", {
+export const doctorSchedules = pgTable("doctor_schedules", {
     id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
     doctorId: uuid("doctor_id").notNull().references(() => doctors.id, { onDelete: 'cascade' }),
-    dayOfWeek: dayOfWeekEnum("day_of_week").notNull(),
-    startTime: text("start_time").notNull(), // "HH:MM:SS"
-    endTime: text("end_time").notNull(),   // "HH:MM:SS"
+    dayOfWeek: integer("day_of_week").notNull(), // 0 = Sunday, 1 = Monday, etc.
+    startTime: time("start_time").notNull(),
+    endTime: time("end_time").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+});
+
+export const clinicOverrides = pgTable("clinic_overrides", {
+    id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+    clinicId: uuid("clinic_id").notNull().references(() => clinics.id, { onDelete: 'cascade' }),
+    startDateTime: timestamp("start_date_time", { withTimezone: true, mode: 'string' }).notNull(),
+    endDateTime: timestamp("end_date_time", { withTimezone: true, mode: 'string' }).notNull(),
+    reason: text("reason"),
+    isAvailable: boolean("is_available").default(false).notNull(),
+});
+
+export const doctorAvailabilityOverrides = pgTable("doctor_availability_overrides", {
+    id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+    doctorId: uuid("doctor_id").notNull().references(() => doctors.id, { onDelete: 'cascade' }),
+    startDateTime: timestamp("start_date_time", { withTimezone: true, mode: 'string' }).notNull(),
+    endDateTime: timestamp("end_date_time", { withTimezone: true, mode: 'string' }).notNull(),
+    isAvailable: boolean("is_available").notNull(),
 });
 
 export const profiles = pgTable("profiles", {
@@ -128,7 +147,7 @@ export const profiles = pgTable("profiles", {
 export const appointments = pgTable("appointments", {
 	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
 	patientId: uuid("patient_id").notNull().references(() => profiles.id, { onDelete: 'cascade' }),
-	doctorId: uuid("doctor_id").notNull().references(() => doctors.id, { onDelete: 'restrict' }),
+	doctorId: uuid("doctor_id").references(() => doctors.id, { onDelete: 'restrict' }),
 	serviceId: uuid("service_id").notNull().references(() => services.id, { onDelete: 'restrict' }),
 	clinicId: uuid("clinic_id").notNull().references(() => clinics.id, { onDelete: 'restrict' }),
 	appointmentTime: timestamp("appointment_time", { withTimezone: true, mode: 'string' }).notNull(),
@@ -289,14 +308,16 @@ export const clinicsRelations = relations(clinics, ({ many }) => ({
 	inventoryItems: many(inventory_items),
 	clinicServices: many(clinicServices),
 	doctorClinics: many(doctorClinics),
+    clinicOverrides: many(clinicOverrides),
 }));
 
 export const doctorsRelations = relations(doctors, ({ many }) => ({
-	appointments: many(appointments),
-	reviews: many(reviews),
 	doctorClinics: many(doctorClinics),
 	doctorServices: many(doctorServices),
-    providerAvailability: many(providerAvailability),
+    doctorSchedules: many(doctorSchedules),
+    doctorAvailabilityOverrides: many(doctorAvailabilityOverrides),
+	appointments: many(appointments),
+	reviews: many(reviews),
 }));
 
 export const servicesRelations = relations(services, ({ one, many }) => ({
@@ -479,4 +500,30 @@ export const userProfilesRelations = relations(profiles, ({ many, one }) => ({
         fields: [profiles.id],
         references: [usersInAuth.id]
     })
+}));
+
+export const doctorClinicsRelations = relations(doctorClinics, ({ one }) => ({
+	doctor: one(doctors, { fields: [doctorClinics.doctorId], references: [doctors.id] }),
+	clinic: one(clinics, { fields: [doctorClinics.clinicId], references: [clinics.id] }),
+}));
+
+export const doctorServicesRelations = relations(doctorServices, ({ one }) => ({
+	doctor: one(doctors, { fields: [doctorServices.doctorId], references: [doctors.id] }),
+	service: one(services, { fields: [doctorServices.serviceId], references: [services.id] }),
+}));
+
+export const doctorSchedulesRelations = relations(doctorSchedules, ({ one }) => ({
+    doctor: one(doctors, { fields: [doctorSchedules.doctorId], references: [doctors.id] }),
+}));
+
+export const serviceCategoriesRelations = relations(serviceCategories, ({ one, many }) => ({
+	services: many(services),
+}));
+
+export const clinicOverridesRelations = relations(clinicOverrides, ({ one }) => ({
+    clinic: one(clinics, { fields: [clinicOverrides.clinicId], references: [clinics.id] }),
+}));
+
+export const doctorAvailabilityOverridesRelations = relations(doctorAvailabilityOverrides, ({ one }) => ({
+    doctor: one(doctors, { fields: [doctorAvailabilityOverrides.doctorId], references: [doctors.id] }),
 }));

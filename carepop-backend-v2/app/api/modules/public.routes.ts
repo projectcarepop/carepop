@@ -11,9 +11,8 @@ import {
     serviceCategories, 
     doctorServices, 
     doctorClinics, 
-    providerAvailability 
 } from '../../../drizzle/schema';
-import { and, eq, sql, inArray, SQL, asc, getTableColumns, type AnyColumn, ne, gte, lt } from 'drizzle-orm';
+import { and, eq, sql, inArray, SQL, asc, getTableColumns, type AnyColumn, ne, gte, lt, notInArray } from 'drizzle-orm';
 import { getDay, parseISO, format, startOfDay, endOfDay, setHours, setMinutes, setSeconds, isBefore, addMinutes, isEqual } from 'date-fns';
 import { zonedTimeToUtc } from 'date-fns-tz';
 import fs from 'fs/promises';
@@ -444,6 +443,49 @@ publicRoutes.get('/search/clinics', zValidator('query', universalSearchSchema), 
     }
 });
 
+/**
+ * GET /public/services/:serviceId/doctors
+ * Fetches all doctors who provide a specific service.
+ * Can be filtered by clinicId.
+ */
+publicRoutes.get(
+    '/services/:serviceId/doctors',
+    zValidator('param', z.object({ serviceId: z.string().uuid() })),
+    zValidator('query', z.object({ clinicId: z.string().uuid().optional() })),
+    async (c) => {
+        const { serviceId } = c.req.valid('param');
+        const { clinicId } = c.req.valid('query');
+
+        try {
+            const conditions = [eq(doctorServices.serviceId, serviceId)];
+            if (clinicId) {
+                conditions.push(eq(doctorClinics.clinicId, clinicId));
+            }
+
+            let query = db
+                .selectDistinct({
+                    id: doctors.id,
+                    fullName: doctors.fullName,
+                    specialtyText: doctors.specialtyText,
+                    avatarUrl: doctors.avatarUrl,
+                })
+                .from(doctors)
+                .innerJoin(doctorServices, eq(doctors.id, doctorServices.doctorId));
+            
+            if (clinicId) {
+                query = query.innerJoin(doctorClinics, eq(doctors.id, doctorClinics.doctorId));
+            }
+
+            const serviceDoctors = await query.where(and(...conditions));
+
+            return c.json({ data: serviceDoctors });
+        } catch (error) {
+            console.error(`Failed to fetch doctors for service ${serviceId}:`, error);
+            return c.json({ error: 'Internal Server Error' }, 500);
+        }
+    }
+);
+
 // Helper function to convert "HH:MM:SS" to a Date object for a specific date
 function timeToDate(timeStr: string, date: Date): Date {
     const [hours, minutes, seconds] = timeStr.split(':').map(Number);
@@ -452,5 +494,116 @@ function timeToDate(timeStr: string, date: Date): Date {
     return newDate;
 }
 
-export default publicRoutes;
+function addDays(date: Date, days: number) {
+    const newDate = new Date(date);
+    newDate.setDate(date.getDate() + days);
+    return newDate;
+}
 
+const availabilityQuerySchema = z.object({
+    startDate: z.string().datetime({ message: "Start date must be a valid ISO 8601 string." }),
+    endDate: z.string().datetime({ message: "End date must be a valid ISO 8601 string." }),
+    serviceId: z.string().uuid({ message: "A valid service ID is required." }),
+    clinicId: z.string().uuid({ message: "A valid clinic ID is required." }),
+});
+
+publicRoutes.get(
+    '/doctors/:id/available-slots',
+    zValidator('param', z.object({ id: z.string().uuid() })),
+    zValidator('query', availabilityQuerySchema),
+    async (c) => {
+        const { id: doctorId } = c.req.valid('param');
+        const { startDate: startDateStr, endDate: endDateStr, serviceId, clinicId } = c.req.valid('query');
+
+        const timezone = 'Asia/Manila'; 
+        const startDate = zonedTimeToUtc(startDateStr, timezone);
+        const endDate = zonedTimeToUtc(endDateStr, timezone);
+
+        try {
+            // 1. Get service details (especially duration)
+            const service = await db.query.services.findFirst({ where: eq(services.id, serviceId) });
+            if (!service || !service.durationMinutes) {
+                return c.json({ error: "Service not found or has no duration." }, 404);
+            }
+            const serviceDuration = service.durationMinutes;
+
+            // 2. Fetch all necessary data in parallel
+            const [
+                doctorSchedules,
+                doctorOverrides,
+                clinicOverridesData,
+                existingAppointments
+            ] = await Promise.all([
+                db.query.doctorSchedules.findMany({ where: eq(doctors.id, doctorId) }),
+                db.query.doctorAvailabilityOverrides.findMany({ where: eq(doctors.id, doctorId) }),
+                db.query.clinicOverrides.findMany({ where: eq(clinics.id, clinicId) }),
+                db.query.appointments.findMany({
+                    where: and(
+                        eq(appointments.doctorId, doctorId),
+                        // Use notInArray to exclude all types of cancelled appointments
+                        notInArray(appointments.status, ['canceled_by_patient', 'canceled_by_admin']),
+                        gte(appointments.appointmentTime, startDate.toISOString()),
+                        lt(appointments.appointmentTime, endDate.toISOString())
+                    )
+                })
+            ]);
+
+            const availableSlots: Date[] = [];
+            
+            // 3. Iterate through each day in the requested range
+            for (let day = startOfDay(startDate); day <= endDate; day = addDays(day, 1)) {
+                const dayOfWeek = getDay(day); // 0=Sun, 1=Mon...
+                const dateStr = format(day, 'yyyy-MM-dd');
+
+                // Check for clinic-wide closures first
+                const isClinicClosed = clinicOverridesData.some(override => {
+                    const overrideStart = startOfDay(zonedTimeToUtc(override.startDateTime, timezone));
+                    const overrideEnd = endOfDay(zonedTimeToUtc(override.endDateTime, timezone));
+                    return !override.isAvailable && day >= overrideStart && day <= overrideEnd;
+                });
+                if (isClinicClosed) continue;
+
+                // Find recurring schedule for the current day of the week
+                const dailySchedule = doctorSchedules.find(s => s.dayOfWeek === dayOfWeek);
+                if (!dailySchedule) continue;
+
+                // 4. Generate potential slots based on the schedule for that day
+                let currentTime = timeToDate(dailySchedule.startTime, day);
+                const endTime = timeToDate(dailySchedule.endTime, day);
+
+                while (isBefore(addMinutes(currentTime, serviceDuration), addMinutes(endTime, 1))) {
+                    const slotStart = new Date(currentTime);
+                    const slotEnd = addMinutes(slotStart, serviceDuration);
+
+                    // 5. Filter slots based on overrides and appointments
+                    const isOverridden = doctorOverrides.some(override => {
+                        const overrideStart = zonedTimeToUtc(override.startDateTime, timezone);
+                        const overrideEnd = zonedTimeToUtc(override.endDateTime, timezone);
+                        // Slot is invalid if it overlaps with a non-available override
+                        return !override.isAvailable && slotStart < overrideEnd && slotEnd > overrideStart;
+                    });
+
+                    const isBooked = existingAppointments.some(appt => {
+                        const apptStart = zonedTimeToUtc(appt.appointmentTime, timezone);
+                        const apptEnd = addMinutes(apptStart, serviceDuration); // Assuming all appts for this doc/service have same duration
+                        // Slot is invalid if it overlaps with an existing appointment
+                        return slotStart < apptEnd && slotEnd > apptStart;
+                    });
+                    
+                    if (!isOverridden && !isBooked) {
+                        availableSlots.push(slotStart);
+                    }
+
+                    currentTime = addMinutes(currentTime, 15); // Check for a new slot every 15 minutes
+                }
+            }
+
+            return c.json({ data: availableSlots });
+        } catch (error) {
+            console.error(`Error calculating available slots for doctor ${doctorId}:`, error);
+            return c.json({ error: 'Internal Server Error' }, 500);
+        }
+    }
+);
+
+export default publicRoutes;

@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 const navItems = [
     { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/admin/booking-management", label: "Booking Management", icon: CalendarCheck },
     { href: "/admin/appointments", label: "Appointments", icon: CalendarCheck },
     { href: "/admin/users", label: "Users", icon: Users },
     { href: "/admin/clinics", label: "Clinics", icon: Hospital },
