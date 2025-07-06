@@ -347,18 +347,7 @@ export default function ProductsClient() {
 
       <Dialog open={isBatchModalOpen} onOpenChange={setIsBatchModalOpen}>
           <DialogContent className="sm:max-w-4xl">
-              <DialogHeader>
-                  <DialogTitle>Manage Batches for: {selectedItem?.itemName}</DialogTitle>
-                  <DialogDescription>
-                    Add new stock or remove existing batches for this item.
-                  </DialogDescription>
-              </DialogHeader>
-              {selectedItem && (
-                  <ManageItemBatchesView
-                      item={selectedItem}
-                      onDeleteBatch={handleDeleteBatch}
-                  />
-              )}
+              <p>Debug Test: If you see this, the Dialog itself is working.</p>
           </DialogContent>
       </Dialog>
 
