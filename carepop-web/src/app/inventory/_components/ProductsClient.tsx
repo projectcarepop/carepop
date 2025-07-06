@@ -285,6 +285,18 @@ export default function ProductsClient() {
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Add Product
                 </Button>
+                {/* --- DEBUG BUTTON --- */}
+                {products && products.length > 0 && (
+                    <Button
+                        variant="outline"
+                        onClick={() => {
+                            setSelectedItem(products[0]);
+                            setIsBatchModalOpen(true);
+                        }}
+                    >
+                        Debug Batches
+                    </Button>
+                )}
             </div>
             </CardHeader>
             <CardContent>
