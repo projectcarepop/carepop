@@ -16,20 +16,13 @@ export interface InventoryItem {
   sellingPrice: number | null;
   location: string | null;
   updatedAt: string;
-  // New fields from migrations
-  batchNumber: string | null;
-  expiryDate: string | null; // Keep as string to match form input
-  // Relation-like fields
-  categoryName?: string;
   // This is the shape of the joined data from the backend
-  productCategory?: {
-    name: string;
-  } | null;
+  categoryName?: string;
 }
 
 export type InventoryItemBatch = {
   id: string;
-  inventoryItemId: string;
+  itemId: string;
   batchNumber?: string | null;
   quantity: number;
   expiryDate: string; // ISO String

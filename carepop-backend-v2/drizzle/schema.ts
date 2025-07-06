@@ -210,8 +210,6 @@ export const inventory_items = pgTable("inventory_items", {
 	sellingPrice: numeric("selling_price", { precision: 10, scale:  2 }),
 	location: text("location"),
 	quantityOnHand: integer("quantity_on_hand").default(0).notNull(),
-	batchNumber: text("batch_number"),
-	expiryDate: date("expiry_date"),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => ({
 	clinicIdx: index("inventory_clinic_id_idx").on(table.clinicId),

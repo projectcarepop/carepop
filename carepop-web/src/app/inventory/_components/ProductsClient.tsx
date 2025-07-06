@@ -1,13 +1,22 @@
 'use client';
-
 import * as React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlusCircle, Loader2 } from 'lucide-react';
+import { PlusCircle, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { DataTable } from '@/components/ui/data-table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,468 +26,270 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/lib/contexts/auth-context';
-import { 
-  getInventoryForClinic, 
-  getProductCategories,
-  upsertInventoryItem,
-  deleteInventoryItem,
-  deleteItemBatch,
-} from '@/services/api';
-import { type InventoryItem, type InventoryItemBatch } from '@/lib/types/inventory';
-import { productColumns } from './columns';
+} from '@/components/ui/alert-dialog';
+import { DataTable } from '@/components/ui/data-table';
 import { ProductForm, type ProductFormValues } from './ProductForm';
-import { UpdateStockForm, type UpdateStockFormValues } from './UpdateStockForm';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { columns } from './columns';
+import * as api from '@/services/api';
+import { useToast } from '@/hooks/use-toast';
+import { type InventoryItem } from '@/lib/types/inventory';
 import { ClinicSelector } from './ClinicSelector';
-import { getAdminClinics } from '@/services/api';
-import { ManageItemBatchesView } from './ManageItemBatchesView';
+import { Input } from '@/components/ui/input';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useAuth } from '@/lib/contexts/auth-context';
 
+type ModalState =
+  | { type: 'NONE' }
+  | { type: 'ADD_PRODUCT' }
+  | { type: 'EDIT_PRODUCT'; item: InventoryItem }
+  | { type: 'DELETE_PRODUCT'; item: InventoryItem };
 
 export default function ProductsClient() {
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const { session } = useAuth();
   const accessToken = session?.access_token;
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
 
-  const selectedClinicId = searchParams.get('clinicId');
-
-  const [globalFilter, setGlobalFilter] = React.useState('');
-  const debouncedFilter = useDebounce(globalFilter, 300);
-  const [showLowStockOnly, setShowLowStockOnly] = React.useState(false);
-  const [showExpiringSoon, setShowExpiringSoon] = React.useState(false);
-  const [isSheetOpen, setIsSheetOpen] = React.useState(false);
-  const [isDetailsModalOpen, setIsDetailsModalOpen] = React.useState(false);
-  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = React.useState(false);
-  const [isBatchModalOpen, setIsBatchModalOpen] = React.useState(false);
-  const [sheetMode, setSheetMode] = React.useState<'addProduct' | 'editProduct' | 'updateStock' | null>(null);
-  const [selectedItem, setSelectedItem] = React.useState<InventoryItem | null>(null);
+  const [selectedClinicId, setSelectedClinicId] = React.useState<string | null>(null);
+  const [modalState, setModalState] = React.useState<ModalState>({ type: 'NONE' });
   const [serverError, setServerError] = React.useState<string | null>(null);
-  const [duplicateWarning, setDuplicateWarning] = React.useState<ProductFormValues | null>(null);
-  const [batchToDelete, setBatchToDelete] = React.useState<InventoryItemBatch | null>(null);
+  const [searchTerm, setSearchTerm] = React.useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
-  const queryClient = useQueryClient();
-
-    const { data: clinics, isLoading: isLoadingClinics } = useQuery({
-        queryKey: ['admin-clinics'],
-        queryFn: () => getAdminClinics(accessToken!),
-        enabled: !!accessToken,
-    });
-
-  const { data: products, isLoading: isLoadingProducts } = useQuery({
-    queryKey: ['inventory-items', selectedClinicId, { lowStock: showLowStockOnly, expiringSoon: showExpiringSoon, q: debouncedFilter }],
-    queryFn: () => {
-        if (!selectedClinicId || !accessToken) return Promise.resolve({ data: [] });
-        return getInventoryForClinic(selectedClinicId, accessToken, {
-            lowStock: showLowStockOnly,
-            expiringSoon: showExpiringSoon,
-            q: debouncedFilter
-        });
-    },
-    enabled: !!accessToken && !!selectedClinicId,
-    select: (data) => data.data,
-  });
-
-  const { data: categories } = useQuery({
-    queryKey: ['admin-product-categories'],
-    queryFn: () => getProductCategories(accessToken!),
+  // Queries
+  const { data: clinics, isLoading: isLoadingClinics } = useQuery({
+    queryKey: ['admin-clinics'],
+    queryFn: () => api.getAdminClinics(accessToken!),
     enabled: !!accessToken,
     select: (data) => data.data,
   });
 
-  const handleMutationSuccess = (entity: string) => {
-    toast({ title: `${entity} saved successfully.` });
-    setIsSheetOpen(false);
-    queryClient.invalidateQueries({ queryKey: ['inventory-items', selectedClinicId] });
-    queryClient.invalidateQueries({ queryKey: ['inventory-stats', selectedClinicId] });
-  };
-
-  const handleMutationError = (error: any, entity: string) => {
-    if (error.response?.status === 409) {
-        setServerError(error.response.data.message);
-    } else {
-        toast({ title: `Error saving ${entity}`, description: error.message, variant: 'destructive' });
+  React.useEffect(() => {
+    if (clinics && clinics.length > 0 && !selectedClinicId) {
+      setSelectedClinicId(clinics[0].id);
     }
-  };
+  }, [clinics, selectedClinicId]);
 
-  const productMutation = useMutation({
-    mutationFn: (data: { item: ProductFormValues; id?: string }) => {
-        const { sellingPrice, purchasePrice, expiryDate, ...rest } = data.item;
-        
-        const payload = {
-            ...rest,
-            sellingPrice: sellingPrice ? parseFloat(sellingPrice) : undefined,
-            purchasePrice: purchasePrice ? parseFloat(purchasePrice) : undefined,
-            expiryDate: expiryDate ? new Date(expiryDate).toISOString() : undefined,
-        };
-        return upsertInventoryItem(selectedClinicId!, payload, accessToken!, data.id);
-    },
-    onSuccess: () => handleMutationSuccess('Product'),
-    onError: (error) => handleMutationError(error, 'Product'),
+  const { data: products = [], isLoading: isLoadingProducts } = useQuery({
+    queryKey: ['inventory-items', selectedClinicId, { q: debouncedSearchTerm }],
+    queryFn: () => api.getInventoryForClinic(selectedClinicId!, accessToken!, { q: debouncedSearchTerm }),
+    enabled: !!selectedClinicId && !!accessToken,
+    select: (data) => data.data,
   });
 
-  const stockUpdateMutation = useMutation({
-    mutationFn: (data: { values: UpdateStockFormValues, id: string }) => {
-      const payload = {
-        quantityOnHand: data.values.quantityOnHand,
-      };
-      return upsertInventoryItem(selectedClinicId!, payload, accessToken!, data.id);
+  const { data: categories = [], isLoading: isLoadingCategories } = useQuery({
+    queryKey: ['product-categories'],
+    queryFn: () => api.getProductCategories(accessToken!),
+    enabled: !!accessToken,
+    select: (data) => data.data,
+  });
+
+  // Mutations
+  const mutationOptions = {
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
+      setModalState({ type: 'NONE' });
     },
-    onSuccess: () => handleMutationSuccess('Stock'),
-    onError: (error) => handleMutationError(error, 'Stock'),
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.message || 'An unexpected error occurred.';
+      setServerError(errorMessage);
+    },
+  };
+
+  const upsertMutation = useMutation({
+    mutationFn: (data: { values: api.UpsertInventoryItemPayload; itemId?: string }) =>
+      api.upsertInventoryItem(selectedClinicId!, data.values, accessToken!, data.itemId),
+    ...mutationOptions,
+    onSuccess: (_, variables) => {
+        const action = variables.itemId ? 'updated' : 'added';
+        toast({ title: 'Success', description: `Product ${action} successfully.` });
+        mutationOptions.onSuccess();
+      },
   });
 
   const deleteProductMutation = useMutation({
-    mutationFn: (item: InventoryItem) => deleteInventoryItem(selectedClinicId!, item.id, accessToken!),
+    mutationFn: (itemId: string) => api.deleteInventoryItem(selectedClinicId!, itemId, accessToken!),
+    ...mutationOptions,
     onSuccess: () => {
-        toast({ title: 'Product deleted successfully.' });
-        queryClient.invalidateQueries({ queryKey: ['inventory-items', selectedClinicId] });
-        queryClient.invalidateQueries({ queryKey: ['inventory-stats', selectedClinicId] });
+      toast({ title: 'Success', description: 'Product deleted successfully.' });
+      mutationOptions.onSuccess();
     },
-    onError: (error) => handleMutationError(error, 'Product deletion'),
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.message || 'An unexpected error occurred.';
+      toast({ variant: 'destructive', title: 'Error', description: errorMessage });
+      setModalState({ type: 'NONE' });
+    },
   });
 
-  const deleteBatchMutation = useMutation({
-    mutationFn: (batchId: string) => deleteItemBatch(batchId, accessToken!),
-    onSuccess: () => {
-      toast({ title: 'Success', description: 'Batch deleted.' });
-      queryClient.invalidateQueries({ queryKey: ['itemBatches', selectedItem?.id] });
-      handleMutationSuccess('Batch');
-    },
-    onError: (error: any) => handleMutationError(error, 'Batch deletion'),
-    onSettled: () => setBatchToDelete(null),
-  });
-
-  const handleSubmitProduct = (values: ProductFormValues) => {
-    const isEditing = sheetMode === 'editProduct';
-    
-    // Check for duplicate name only when adding a new product
-    if (!isEditing) {
-      const duplicate = products?.find(p => p.itemName.toLowerCase() === values.itemName.toLowerCase());
-      if (duplicate) {
-        setDuplicateWarning(values);
-        return; // Stop the submission and show the warning
-      }
-    }
-    
-    // If no duplicate or if editing, proceed with mutation
-    productMutation.mutate({ item: values, id: isEditing ? selectedItem?.id : undefined });
+  // Handlers
+  const handleSelectClinic = (clinicId: string) => {
+    setSelectedClinicId(clinicId);
   };
 
-  const handleViewDetails = React.useCallback((item: InventoryItem | null) => {
-    if (item) {
-      setSelectedItem(item);
-    }
-    setIsDetailsModalOpen(true);
-  }, []);
-
-  const handleOpenSheet = React.useCallback((
-    mode: 'addProduct' | 'editProduct' | 'updateStock', 
-    item?: InventoryItem
-  ) => {
-    setSheetMode(mode);
-    setSelectedItem(item || null);
+  const handleOpenSheet = (type: 'ADD' | 'EDIT', item?: InventoryItem) => {
     setServerError(null);
-    setIsSheetOpen(true);
-  }, []);
-  
-  const handleManageBatches = React.useCallback((item: InventoryItem) => {
-    setSelectedItem(item);
-    setIsBatchModalOpen(true);
-  }, []);
-
-  const handleDeleteBatch = (batch: InventoryItemBatch) => {
-    setBatchToDelete(batch);
+    if (type === 'ADD') {
+      setModalState({ type: 'ADD_PRODUCT' });
+    } else if (item) {
+      setModalState({ type: 'EDIT_PRODUCT', item });
+    }
   };
 
-  const handleDeleteProduct = (item: InventoryItem) => {
-    setSelectedItem(item);
-    setIsDeleteAlertOpen(true);
-  }
-  
-  const handleConfirmDelete = () => {
-    if (selectedItem) {
-      deleteProductMutation.mutate(selectedItem);
-    }
-    setIsDeleteAlertOpen(false);
-    setSelectedItem(null);
-  }
-  
-  const handleClinicSelect = (clinicId: string | null) => {
-      const params = new URLSearchParams(searchParams);
-      if (clinicId) {
-          params.set('clinicId', clinicId);
-      } else {
-          params.delete('clinicId');
-      }
-      router.push(`${pathname}?${params.toString()}`);
-  }
+  const handleOpenDeleteDialog = (item: InventoryItem) => {
+    setModalState({ type: 'DELETE_PRODUCT', item });
+  };
 
-  const columns = React.useMemo(() => productColumns({
-    onEdit: (item) => handleOpenSheet('editProduct', item),
-    onDelete: handleDeleteProduct,
-    onUpdateStock: (item) => handleOpenSheet('updateStock', item),
-    onViewDetails: handleViewDetails,
-    onManageBatches: handleManageBatches,
-  }), [handleOpenSheet, handleViewDetails, handleManageBatches]);
+  const handleSubmit = (values: ProductFormValues) => {
+    const numericValues: api.UpsertInventoryItemPayload = {
+      itemName: values.itemName,
+      productCategoryId: values.productCategoryId || null,
+      sellingPrice: values.sellingPrice ? parseFloat(values.sellingPrice) : null,
+      purchasePrice: values.purchasePrice ? parseFloat(values.purchasePrice) : null,
+      reorderLevel: values.reorderLevel ? parseInt(values.reorderLevel, 10) : 10,
+      sku: values.sku,
+      genericName: values.genericName,
+      brandName: values.brandName,
+      dosageForm: values.dosageForm,
+      strength: values.strength,
+      location: values.location,
+    };
+
+    if (modalState.type === 'EDIT_PRODUCT') {
+      upsertMutation.mutate({ values: numericValues, itemId: modalState.item.id });
+    } else {
+      upsertMutation.mutate({ values: numericValues });
+    }
+  };
+
+  const tableColumns = React.useMemo(
+    () => [
+      ...columns,
+      {
+        id: 'actions',
+        cell: ({ row }: { row: { original: InventoryItem } }) => {
+          const item = row.original;
+          return (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Open menu</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleOpenSheet('EDIT', item)}>
+                  Edit Details
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleOpenDeleteDialog(item)}>
+                  Delete Product
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          );
+        },
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
 
   return (
-    <div className="space-y-4">
-        <div className="flex items-center justify-between">
-            <div>
-                <h1 className="text-2xl font-bold">Products</h1>
-                <p className="text-muted-foreground">
-                    View, add, and manage product inventory for a selected clinic.
-                </p>
-            </div>
-            <ClinicSelector
-                clinics={clinics || []}
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Products</CardTitle>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-4">
+            <div className='flex gap-2 w-full sm:w-auto'>
+              <ClinicSelector
+                clinics={clinics ?? []}
                 selectedClinicId={selectedClinicId}
-                onClinicSelect={handleClinicSelect}
-                isLoading={isLoadingClinics || !accessToken}
-            />
-        </div>
-        
-      {!selectedClinicId ? (
-        <Card className="flex items-center justify-center h-48">
-            <CardContent className="pt-6">
-                <p className="text-muted-foreground">Please select a clinic to view products.</p>
-            </CardContent>
-        </Card>
-      ) : (
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-                <CardTitle>Manage Products</CardTitle>
-                <CardDescription>Add, edit, and manage your product inventory.</CardDescription>
+                onClinicSelect={handleSelectClinic}
+                isLoading={isLoadingClinics}
+              />
             </div>
-            <div className="flex items-center gap-4">
-                <div className="flex items-center space-x-2">
-                <Checkbox
-                    id="low-stock"
-                    checked={showLowStockOnly}
-                    onCheckedChange={(checked) => setShowLowStockOnly(!!checked)}
-                />
-                <Label htmlFor="low-stock" className="whitespace-nowrap">Low Stock</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                <Checkbox
-                    id="expiring-soon"
-                    checked={showExpiringSoon}
-                    onCheckedChange={(checked) => setShowExpiringSoon(!!checked)}
-                />
-                <Label htmlFor="expiring-soon" className="whitespace-nowrap">Expiring Soon</Label>
-                </div>
-                <Input
-                placeholder="Filter by product name..."
-                value={globalFilter}
-                onChange={(e) => setGlobalFilter(e.target.value)}
-                className="w-full md:w-64"
-                />
-                <Button onClick={() => handleOpenSheet('addProduct')}>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Add Product
-                </Button>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Input
+                placeholder="Filter products by name..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full sm:w-[250px] lg:w-[300px]"
+              />
+              <Button onClick={() => handleOpenSheet('ADD')} disabled={!selectedClinicId}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+              </Button>
             </div>
-            </CardHeader>
-            <CardContent>
-            <DataTable
-                columns={columns}
-                data={products || []}
-                isLoading={isLoadingProducts}
-            />
-            </CardContent>
-        </Card>
-      )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <DataTable
+            columns={tableColumns}
+            data={products}
+            isLoading={isLoadingProducts || (!!accessToken && !clinics)}
+          />
+        </CardContent>
+      </Card>
 
-      <Dialog open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {sheetMode === 'updateStock' && 'Update Stock'}
-              {sheetMode !== 'updateStock' && `${sheetMode?.includes('edit') ? 'Edit' : 'Add'} Product`}
-            </DialogTitle>
-            <DialogDescription>
-              {sheetMode === 'updateStock' 
-                ? 'Enter the new total quantity for this item.' 
-                : `Fill in the details for the product.`
-              }
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            { (sheetMode === 'addProduct' || sheetMode === 'editProduct') && 
-              <ProductForm 
-                onSubmit={handleSubmitProduct} 
-                initialData={selectedItem as InventoryItem | undefined}
-                isPending={productMutation.isPending}
-                categories={categories || []}
+      {/* Sheet for Add/Edit Product */}
+      <Sheet
+        open={modalState.type === 'ADD_PRODUCT' || modalState.type === 'EDIT_PRODUCT'}
+        onOpenChange={(isOpen) => !isOpen && setModalState({ type: 'NONE' })}
+      >
+        <SheetContent className="sm:max-w-xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>
+              {modalState.type === 'EDIT_PRODUCT' ? 'Edit Product' : 'Add New Product'}
+            </SheetTitle>
+            <SheetDescription>
+              {modalState.type === 'EDIT_PRODUCT'
+                ? 'Update the details of the existing product.'
+                : 'Fill in the form to add a new product to the inventory.'}
+            </SheetDescription>
+          </SheetHeader>
+          {modalState.type === 'ADD_PRODUCT' || modalState.type === 'EDIT_PRODUCT' ? (
+            <div className="py-4">
+              <ProductForm
+                initialData={modalState.type === 'EDIT_PRODUCT' ? modalState.item : null}
+                onSubmit={handleSubmit}
+                isPending={upsertMutation.isPending}
+                categories={categories}
+                isLoadingCategories={isLoadingCategories}
                 serverError={serverError}
                 setServerError={setServerError}
               />
-            }
-            { sheetMode === 'updateStock' &&
-              <UpdateStockForm
-                onSubmit={(values) => stockUpdateMutation.mutate({ values, id: (selectedItem as InventoryItem).id })}
-                initialData={selectedItem as InventoryItem}
-                isPending={stockUpdateMutation.isPending}
-              />
-            }
-          </div>
-        </DialogContent>
-      </Dialog>
+            </div>
+          ) : null}
+        </SheetContent>
+      </Sheet>
 
-      <Dialog open={isBatchModalOpen} onOpenChange={setIsBatchModalOpen}>
-          <DialogContent className="sm:max-w-4xl">
-              <DialogHeader>
-                  <DialogTitle>Manage Batches for: {selectedItem?.itemName}</DialogTitle>
-                  <DialogDescription>
-                    Add new stock or remove existing batches for this item.
-                  </DialogDescription>
-              </DialogHeader>
-              {selectedItem && (
-                  <ManageItemBatchesView
-                      item={selectedItem}
-                      onDeleteBatch={handleDeleteBatch}
-                      onMutationSuccess={() => handleMutationSuccess('Batch')}
-                  />
-              )}
-          </DialogContent>
-      </Dialog>
-
-      {selectedItem && (
-        <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
-            <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                    <DialogTitle>{selectedItem.itemName}</DialogTitle>
-                    <DialogDescription>
-                        Detailed information for {selectedItem.brandName || 'this product'}.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                   <div className="grid grid-cols-2 gap-2">
-                        <p className="text-sm font-medium text-muted-foreground">SKU</p>
-                        <p>{selectedItem.sku ?? 'N/A'}</p>
-
-                        <p className="text-sm font-medium text-muted-foreground">Generic Name</p>
-                        <p>{selectedItem.genericName ?? 'N/A'}</p>
-                        
-                        <p className="text-sm font-medium text-muted-foreground">Category</p>
-                        <p>{selectedItem.categoryName ?? 'N/A'}</p>
-                        
-                        <p className="text-sm font-medium text-muted-foreground">Brand</p>
-                        <p>{selectedItem.brandName ?? 'N/A'}</p>
-                   </div>
-                   <div className="grid grid-cols-2 gap-2">
-                        <p className="text-sm font-medium text-muted-foreground">Strength</p>
-                        <p>{selectedItem.strength ?? 'N/A'}</p>
-
-                        <p className="text-sm font-medium text-muted-foreground">Form</p>
-                        <p>{selectedItem.dosageForm ?? 'N/A'}</p>
-
-                        <p className="text-sm font-medium text-muted-foreground">Quantity on Hand</p>
-                        <p>{selectedItem.quantityOnHand}</p>
-                        
-                        <p className="text-sm font-medium text-muted-foreground">Reorder Level</p>
-                        <p>{selectedItem.reorderLevel}</p>
-                   </div>
-                   <div className="grid grid-cols-2 gap-2">
-                        <p className="text-sm font-medium text-muted-foreground">Selling Price</p>
-                        <p>{selectedItem.sellingPrice ? `₱${Number(selectedItem.sellingPrice).toFixed(2)}` : 'N/A'}</p>
-                        
-                        <p className="text-sm font-medium text-muted-foreground">Purchase Price</p>
-                        <p>{selectedItem.purchasePrice ? `₱${Number(selectedItem.purchasePrice).toFixed(2)}` : 'N/A'}</p>
-                   </div>
-                    <div className="grid grid-cols-2 gap-2">
-                        <p className="text-sm font-medium text-muted-foreground">Batch Number</p>
-                        <p>{selectedItem.batchNumber ?? 'N/A'}</p>
-                        
-                        <p className="text-sm font-medium text-muted-foreground">Expiry Date</p>
-                        <p>{selectedItem.expiryDate ? new Date(selectedItem.expiryDate).toLocaleDateString() : 'N/A'}</p>
-
-                        <p className="text-sm font-medium text-muted-foreground">Location</p>
-                        <p>{selectedItem.location ?? 'N/A'}</p>
-                    </div>
-                     <div className="grid grid-cols-2 gap-2">
-                        <p className="text-sm font-medium text-muted-foreground">Last Updated</p>
-                        <p>{new Date(selectedItem.updatedAt).toLocaleString()}</p>
-                    </div>
-                </div>
-            </DialogContent>
-        </Dialog>
-      )}
-
-      <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+      {/* Alert Dialog for Delete Product */}
+      <AlertDialog
+        open={modalState.type === 'DELETE_PRODUCT'}
+        onOpenChange={(isOpen) => !isOpen && setModalState({ type: 'NONE' })}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete the product
-              &apos;{selectedItem?.itemName}&apos; from the inventory.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setSelectedItem(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDelete}>
-              Confirm
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={!!batchToDelete} onOpenChange={() => setBatchToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Batch?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete batch &apos;{batchToDelete?.batchNumber || 'N/A'}&apos;
-              with {batchToDelete?.quantity} units. This action cannot be undone.
+              &quot;{modalState.type === 'DELETE_PRODUCT' && modalState.item.itemName}&quot;.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={() => deleteBatchMutation.mutate(batchToDelete!.id)}
-              disabled={deleteBatchMutation.isPending}
+            <AlertDialogAction
+              onClick={() => {
+                if (modalState.type === 'DELETE_PRODUCT') {
+                  deleteProductMutation.mutate(modalState.item.id);
+                }
+              }}
+              disabled={deleteProductMutation.isPending}
             >
-              {deleteBatchMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Confirm Delete
+              {deleteProductMutation.isPending ? 'Deleting...' : 'Continue'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <AlertDialog open={!!duplicateWarning} onOpenChange={() => setDuplicateWarning(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Duplicate Product Name</AlertDialogTitle>
-            <AlertDialogDescription>
-              A product named &apos;{duplicateWarning?.itemName}&apos; already exists. 
-              It is recommended to manage stock for the existing item instead of creating a duplicate.
-              <br/><br/>
-              Are you sure you want to create a new product with this name?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => {
-              if (duplicateWarning) {
-                productMutation.mutate({ item: duplicateWarning, id: undefined });
-              }
-              setDuplicateWarning(null);
-            }}>
-              Create Anyway
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-    </div>
+    </>
   );
 } 

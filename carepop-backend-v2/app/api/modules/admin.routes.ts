@@ -393,39 +393,34 @@ adminRoutes
   .get('/clinics/:clinicId/inventory', zValidator('query', inventoryFilterSchema), async (c) => {
     const { clinicId } = c.req.param();
     const { lowStock, expiringSoon, q } = c.req.valid('query');
-
-    const thirtyDaysFromNow = new Date();
-    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-
-    const conditions: (SQL | undefined)[] = [
+    
+    const conditions = [
         eq(inventory_items.clinicId, clinicId)
     ];
 
     if (lowStock) {
         conditions.push(sql`${inventory_items.quantityOnHand} <= ${inventory_items.reorderLevel}`);
     }
-
-    if (expiringSoon) {
-        conditions.push(sql`${inventory_items.expiryDate} IS NOT NULL`);
-        conditions.push(lt(inventory_items.expiryDate, thirtyDaysFromNow.toISOString()));
-    }
+    // The 'expiringSoon' filter is temporarily removed as 'expiryDate' is no longer on this table.
+    // This can be re-implemented later by querying the batches table.
+    // if (expiringSoon) {
+    //     const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    //     conditions.push(sql`inventory_items.expiry_date IS NOT NULL`);
+    //     conditions.push(lt(inventory_items.expiry_date, thirtyDaysFromNow.toISOString()));
+    // }
 
     if (q) {
-        // Use ilike for case-insensitive search on itemName
         conditions.push(sql`inventory_items.item_name ilike ${'%' + q + '%'}`);
     }
-    
+
     const items = await db.select({
-      // Select all columns from inventory_items
-      ...getTableColumns(inventory_items),
-      // And explicitly select the category name
-      categoryName: productCategories.name,
-    })
-    .from(inventory_items)
+        ...getTableColumns(inventory_items),
+        categoryName: productCategories.name,
+    }).from(inventory_items)
     .leftJoin(productCategories, eq(inventory_items.productCategoryId, productCategories.id))
     .where(and(...conditions.filter((c): c is SQL => !!c)))
     .orderBy(desc(inventory_items.updatedAt));
-
+    
     return c.json({ data: items });
   })
   .get('/clinics/:clinicId/inventory/stats', async (c) => {
