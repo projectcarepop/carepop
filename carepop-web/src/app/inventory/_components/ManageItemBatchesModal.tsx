@@ -22,21 +22,11 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
-import { getItemBatches, addBatchToItem, deleteItemBatch } from '@/services/api';
+import { getItemBatches, addBatchToItem } from '@/services/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { Trash2, Loader2 } from 'lucide-react';
 import { InventoryItem, InventoryItemBatch } from '@/lib/types/inventory';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { 
-  AlertDialog, 
-  AlertDialogAction, 
-  AlertDialogCancel, 
-  AlertDialogContent, 
-  AlertDialogDescription, 
-  AlertDialogFooter, 
-  AlertDialogHeader, 
-  AlertDialogTitle 
-} from '@/components/ui/alert-dialog';
 
 
 const batchFormSchema = z.object({
@@ -53,13 +43,13 @@ interface ManageItemBatchesModalProps {
   item: InventoryItem | null;
   isOpen: boolean;
   onClose: () => void;
+  onDeleteBatch: (batch: InventoryItemBatch) => void;
 }
 
-export function ManageItemBatchesModal({ item, isOpen, onClose }: ManageItemBatchesModalProps) {
+export function ManageItemBatchesModal({ item, isOpen, onClose, onDeleteBatch }: ManageItemBatchesModalProps) {
   const { session } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [batchToDelete, setBatchToDelete] = React.useState<InventoryItemBatch | null>(null);
 
   const { data: batches = [], isLoading } = useQuery({
     queryKey: ['itemBatches', item?.id],
@@ -81,19 +71,6 @@ export function ManageItemBatchesModal({ item, isOpen, onClose }: ManageItemBatc
     },
     onError: (error: any) => {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (batchId: string) => deleteItemBatch(batchId, session!.access_token!),
-    onSuccess: () => {
-      toast({ title: 'Success', description: 'Batch deleted.' });
-      queryClient.invalidateQueries({ queryKey: ['itemBatches', item?.id] });
-      setBatchToDelete(null);
-    },
-    onError: (error: any) => {
-      toast({ variant: 'destructive', title: 'Error', description: error.message });
-      setBatchToDelete(null);
     },
   });
 
@@ -150,7 +127,7 @@ export function ManageItemBatchesModal({ item, isOpen, onClose }: ManageItemBatc
                                   <TableCell>{batch.batchNumber || 'N/A'}</TableCell>
                                   <TableCell>{new Date(batch.expiryDate).toLocaleDateString()}</TableCell>
                                   <TableCell className="text-right">
-                                      <Button variant="ghost" size="icon" onClick={() => setBatchToDelete(batch)} disabled={deleteMutation.isPending}>
+                                      <Button variant="ghost" size="icon" onClick={() => onDeleteBatch(batch)}>
                                           <Trash2 className="h-4 w-4 text-red-500" />
                                       </Button>
                                   </TableCell>
@@ -162,23 +139,6 @@ export function ManageItemBatchesModal({ item, isOpen, onClose }: ManageItemBatc
                    </div>
               </div>
           </div>
-          <AlertDialog open={!!batchToDelete} onOpenChange={(open) => !open && setBatchToDelete(null)}>
-              <AlertDialogContent>
-                  <AlertDialogHeader>
-                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                          This will permanently delete batch number &apos;{batchToDelete?.batchNumber || 'N/A'}&apos;
-                          with {batchToDelete?.quantity} units. This action cannot be undone.
-                      </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => deleteMutation.mutate(batchToDelete!.id)}>
-                          {deleteMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Confirm'}
-                      </AlertDialogAction>
-                  </AlertDialogFooter>
-              </AlertDialogContent>
-          </AlertDialog>
         </DialogContent>
       </Dialog>
     </>

@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -25,8 +25,9 @@ import {
   getProductCategories,
   upsertInventoryItem,
   deleteInventoryItem,
+  deleteItemBatch,
 } from '@/services/api';
-import { type InventoryItem } from '@/lib/types/inventory';
+import { type InventoryItem, type InventoryItemBatch } from '@/lib/types/inventory';
 import { productColumns } from './columns';
 import { ProductForm, type ProductFormValues } from './ProductForm';
 import { UpdateStockForm, type UpdateStockFormValues } from './UpdateStockForm';
@@ -60,6 +61,8 @@ export default function ProductsClient() {
   const [sheetMode, setSheetMode] = React.useState<'addProduct' | 'editProduct' | 'updateStock' | null>(null);
   const [selectedItem, setSelectedItem] = React.useState<InventoryItem | null>(null);
   const [serverError, setServerError] = React.useState<string | null>(null);
+  const [duplicateWarning, setDuplicateWarning] = React.useState<ProductFormValues | null>(null);
+  const [batchToDelete, setBatchToDelete] = React.useState<InventoryItemBatch | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -142,6 +145,32 @@ export default function ProductsClient() {
     onError: (error) => handleMutationError(error, 'Product deletion'),
   });
 
+  const deleteBatchMutation = useMutation({
+    mutationFn: (batchId: string) => deleteItemBatch(batchId, accessToken!),
+    onSuccess: () => {
+      toast({ title: 'Success', description: 'Batch deleted.' });
+      queryClient.invalidateQueries({ queryKey: ['itemBatches', selectedItem?.id] });
+    },
+    onError: (error: any) => handleMutationError(error, 'Batch deletion'),
+    onSettled: () => setBatchToDelete(null),
+  });
+
+  const handleSubmitProduct = (values: ProductFormValues) => {
+    const isEditing = sheetMode === 'editProduct';
+    
+    // Check for duplicate name only when adding a new product
+    if (!isEditing) {
+      const duplicate = products?.find(p => p.itemName.toLowerCase() === values.itemName.toLowerCase());
+      if (duplicate) {
+        setDuplicateWarning(values);
+        return; // Stop the submission and show the warning
+      }
+    }
+    
+    // If no duplicate or if editing, proceed with mutation
+    productMutation.mutate({ item: values, id: isEditing ? selectedItem?.id : undefined });
+  };
+
   const handleViewDetails = React.useCallback((item: InventoryItem | null) => {
     if (item) {
       setSelectedItem(item);
@@ -163,6 +192,10 @@ export default function ProductsClient() {
     setSelectedItem(item);
     setIsBatchModalOpen(true);
   }, []);
+
+  const handleDeleteBatch = (batch: InventoryItemBatch) => {
+    setBatchToDelete(batch);
+  };
 
   const handleDeleteProduct = (item: InventoryItem) => {
     setSelectedItem(item);
@@ -281,7 +314,7 @@ export default function ProductsClient() {
           <div className="py-4">
             { (sheetMode === 'addProduct' || sheetMode === 'editProduct') && 
               <ProductForm 
-                onSubmit={(values) => productMutation.mutate({ item: values, id: (selectedItem as InventoryItem)?.id })} 
+                onSubmit={handleSubmitProduct} 
                 initialData={selectedItem as InventoryItem | undefined}
                 isPending={productMutation.isPending}
                 categories={categories || []}
@@ -380,6 +413,53 @@ export default function ProductsClient() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog open={!!duplicateWarning} onOpenChange={() => setDuplicateWarning(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Duplicate Product Name</AlertDialogTitle>
+            <AlertDialogDescription>
+              A product named &apos;{duplicateWarning?.itemName}&apos; already exists. 
+              It is recommended to manage stock for the existing item instead of creating a duplicate.
+              <br/><br/>
+              Are you sure you want to create a new product with this name?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (duplicateWarning) {
+                productMutation.mutate({ item: duplicateWarning, id: undefined });
+              }
+              setDuplicateWarning(null);
+            }}>
+              Create Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!batchToDelete} onOpenChange={() => setBatchToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Batch?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete batch &apos;{batchToDelete?.batchNumber || 'N/A'}&apos;
+              with {batchToDelete?.quantity} units. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => deleteBatchMutation.mutate(batchToDelete!.id)}
+              disabled={deleteBatchMutation.isPending}
+            >
+              {deleteBatchMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Confirm Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <ManageItemBatchesModal 
         item={selectedItem}
         isOpen={isBatchModalOpen}
@@ -387,6 +467,7 @@ export default function ProductsClient() {
             setIsBatchModalOpen(false);
             setSelectedItem(null);
         }}
+        onDeleteBatch={handleDeleteBatch}
       />
     </div>
   );
