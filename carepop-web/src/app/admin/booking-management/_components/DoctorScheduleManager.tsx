@@ -54,12 +54,13 @@ export const DoctorScheduleManager: React.FC<DoctorScheduleManagerProps> = ({ cl
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: doctors, isLoading: isLoadingDoctors, error: doctorsError } = useQuery<Doctor[]>({
+  const { data: doctors, isLoading: isLoadingDoctors, error: doctorsError } = useQuery({
       queryKey: ['doctorsByClinic', clinicId],
       queryFn: () => {
           if (!accessToken) throw new Error("Not authorized");
           return getDoctorsByClinic(clinicId, accessToken);
       },
+      select: (response: { data: Doctor[] }) => response.data,
       enabled: !!accessToken && !!clinicId,
   });
 

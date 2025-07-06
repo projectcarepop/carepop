@@ -1424,6 +1424,25 @@ adminRoutes.delete('/overrides/:overrideId', zValidator('param', z.object({ over
 // =================================================================
 
 /**
+ * GET /admin/doctors/:doctorId/schedules
+ * Retrieves all recurring schedules for a specific doctor.
+ */
+adminRoutes.get('/doctors/:doctorId/schedules', zValidator('param', z.object({ doctorId: z.string().uuid() })), async (c) => {
+    const { doctorId } = c.req.param();
+    try {
+        const schedules = await db.select()
+            .from(doctorSchedules)
+            .where(eq(doctorSchedules.doctorId, doctorId))
+            .orderBy(asc(doctorSchedules.dayOfWeek), asc(doctorSchedules.startTime));
+            
+        return c.json({ data: schedules });
+    } catch (error) {
+        console.error(`Error fetching schedules for doctor ${doctorId}:`, error);
+        return c.json({ error: 'Internal Server Error' }, 500);
+    }
+});
+
+/**
  * POST /admin/doctors/:doctorId/schedules
  * Creates a new recurring schedule for a doctor.
  */
