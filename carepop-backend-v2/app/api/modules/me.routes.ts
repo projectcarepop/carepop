@@ -8,88 +8,15 @@ import { and, eq, gte, lte, or, isNull, not, asc, notInArray } from 'drizzle-orm
 import { authMiddleware, AuthEnv } from '../middleware/auth';
 import { generativeModel } from '../../../src/services/vertex-ai';
 import type { InferInsertModel } from 'drizzle-orm';
-import { differenceInHours } from 'date-fns';
+import { differenceInHours, isSameDay } from 'date-fns';
 
-// Helper function to calculate available slots - REPLICATED from public.routes.ts
-// In a future refactor, this should be moved to a shared service.
-async function calculateAvailableSlots(
-    tx: any, // Transaction object
-    doctorId: string, 
-    serviceId: string, 
-    startDate: Date, 
-    endDate: Date
-) {
-    // 1. Fetch the service to get its duration
-    const [service] = await tx.select({ durationMinutes: services.durationMinutes }).from(services).where(eq(services.id, serviceId));
-    if (!service) throw new Error('Service not found');
-    const slotDuration = service.durationMinutes;
-
-    // 2. Fetch all necessary data in parallel
-    const [
-        schedules,
-        doctorOverrides,
-        clinicOverride, // Assuming one clinic for the doctor for now
-        bookedAppointments
-    ] = await Promise.all([
-        tx.query.doctorSchedules.findMany({ where: eq(doctorSchedules.doctorId, doctorId) }),
-        tx.query.doctorAvailabilityOverrides.findMany({ where: and(
-            eq(doctorAvailabilityOverrides.doctorId, doctorId), 
-            gte(doctorAvailabilityOverrides.endDateTime, startDate.toISOString()), 
-            lte(doctorAvailabilityOverrides.startDateTime, endDate.toISOString())
-        ) }),
-        tx.query.clinics.findFirst({
-            with: {
-                overrides: {
-                    where: and(
-                        gte(clinicOverrides.endDateTime, startDate.toISOString()), 
-                        lte(clinicOverrides.startDateTime, endDate.toISOString())
-                    )
-                }
-            },
-            // This needs to be improved to get the right clinic for the doctor
-            where: sql`id IN (SELECT clinic_id FROM doctor_clinics WHERE doctor_id = ${doctorId})`
-        }).then((c: any) => c?.overrides || []),
-        tx.query.appointments.findMany({ where: and(
-            eq(appointments.doctorId, doctorId), 
-            notInArray(appointments.status, ['canceled_by_patient', 'canceled_by_admin']),
-            gte(appointments.appointmentTime, startDate.toISOString()), 
-            lte(appointments.appointmentTime, endDate.toISOString())
-        ) })
-    ]);
-    
-    const bookedSlots = new Set(bookedAppointments.map((a: { appointmentTime: string | number | Date; }) => new Date(a.appointmentTime).getTime()));
-    const availableSlots: Date[] = [];
-
-    // 3. Iterate through each day in the requested range
-    for (let day = new Date(startDate); day <= endDate; day.setDate(day.getDate() + 1)) {
-        const dayOfWeek = day.getDay();
-        const yyyy_mm_dd = day.toISOString().split('T')[0];
-
-        // Check for clinic-wide non-availability
-        const clinicHoliday = clinicOverride.find((co: any) => new Date(co.startDateTime).toISOString().startsWith(yyyy_mm_dd) && !co.isAvailable);
-        if (clinicHoliday) continue; // Skip this day
-
-        // Check for doctor-specific non-availability override
-        const doctorHoliday = doctorOverrides.find((o: { startDateTime: string | number | Date; isAvailable: any; }) => new Date(o.startDateTime).toISOString().startsWith(yyyy_mm_dd) && !o.isAvailable);
-        if (doctorHoliday) continue;
-
-        const dailySchedule = schedules.find((s: { dayOfWeek: number; }) => s.dayOfWeek === dayOfWeek);
-        if (!dailySchedule) continue;
-
-        // Generate potential slots based on recurring schedule
-        let currentTime = new Date(`${yyyy_mm_dd}T${dailySchedule.startTime}Z`);
-        const endTime = new Date(`${yyyy_mm_dd}T${dailySchedule.endTime}Z`);
-
-        while (currentTime < endTime) {
-            if (!bookedSlots.has(currentTime.getTime())) {
-                availableSlots.push(new Date(currentTime));
-            }
-            currentTime.setMinutes(currentTime.getMinutes() + slotDuration);
-        }
-    }
-    
-    return availableSlots;
-}
+const createAppointmentSchema = z.object({
+  clinic_id: z.string().uuid(),
+  service_id: z.string().uuid(),
+  doctor_id: z.string().uuid(),
+  appointment_time: z.string().datetime(),
+  reason_for_visit: z.string().optional(),
+});
 
 const meRoutes = new Hono<AuthEnv>();
 
@@ -278,125 +205,6 @@ meRoutes.get('/records/:recordId', async (c) => {
         console.error(`Error fetching single medical record ${recordId}:`, error);
         return c.json({ error: "Internal Server Error" }, 500);
     }
-});
-
-// Zod schema for creating a new appointment
-const createAppointmentSchema = z.object({
-  doctorId: z.string().uuid(),
-  serviceId: z.string().uuid(),
-  clinicId: z.string().uuid(),
-  appointmentTime: z.string().datetime(),
-});
-
-/**
- * POST /me/appointments
- * Creates a new appointment for the authenticated user.
- * This endpoint is now secure and performs a server-side availability check.
- */
-meRoutes.post('/appointments', zValidator('json', createAppointmentSchema), async (c) => {
-  const user = c.get('user');
-  const { doctorId, serviceId, clinicId, appointmentTime } = c.req.valid('json');
-  const requestedTime = new Date(appointmentTime);
-
-  // --- POLICY ENFORCEMENT ---
-  // Rule: No same-day bookings.
-  const today = new Date();
-  today.setHours(0, 0, 0, 0); // Normalize to the beginning of the day
-
-  if (requestedTime < today) {
-    // This also implicitly handles past days
-    return c.json({ error: 'Bookings must be for a future date.' }, 400);
-  }
-  if (requestedTime.toISOString().split('T')[0] === new Date().toISOString().split('T')[0]) {
-      return c.json({ error: 'Same-day booking is not permitted. Please select a future date.' }, 400);
-  }
-
-  try {
-    const result = await db.transaction(async (tx) => {
-        // 1. Calculate available slots within the transaction
-        const dayStart = new Date(requestedTime);
-        dayStart.setUTCHours(0, 0, 0, 0);
-        const dayEnd = new Date(requestedTime);
-        dayEnd.setUTCHours(23, 59, 59, 999);
-
-        const availableSlots = await calculateAvailableSlots(tx, doctorId, serviceId, dayStart, dayEnd);
-        
-        // 2. Verify the requested slot is actually available
-        const isSlotAvailable = availableSlots.some(slot => slot.getTime() === requestedTime.getTime());
-
-        if (!isSlotAvailable) {
-            // By throwing an error, we automatically roll back the transaction.
-            throw new Error("Conflict");
-        }
-
-        // 3. If available, create the appointment
-        const [createdAppointment] = await tx.insert(appointments).values({
-            patientId: user.id,
-            doctorId,
-            serviceId,
-            clinicId,
-            appointmentTime: appointmentTime, // Use the original string
-        }).returning();
-        
-        return createdAppointment;
-    });
-    
-    return c.json(result, 201);
-
-  } catch (error: any) {
-    if (error.message === 'Conflict') {
-        return c.json({ error: 'This time slot is no longer available. Please select another time.' }, 409);
-    }
-    console.error('Error creating appointment:', error);
-    return c.json({ error: 'Internal Server Error', message: 'Failed to create appointment' }, 500);
-  }
-});
-
-/**
- * PATCH /me/appointments/:id/cancel
- * Cancels a specific appointment for the authenticated user.
- */
-meRoutes.patch('/appointments/:id/cancel', async (c) => {
-  const user = c.get('user');
-  const appointmentId = c.req.param('id');
-
-  try {
-    // First, verify the appointment exists and belongs to the user
-    const [appointment] = await db.select().from(appointments).where(
-      and(
-        eq(appointments.id, appointmentId),
-        eq(appointments.patientId, user.id)
-      )
-    );
-
-    if (!appointment) {
-      return c.json({ error: 'Appointment not found or you do not have permission to cancel it.' }, 404);
-    }
-
-    // --- POLICY ENFORCEMENT: 36-Hour Cancellation Window ---
-    const now = new Date();
-    const appointmentTime = new Date(appointment.appointmentTime);
-    const hoursUntilAppointment = differenceInHours(appointmentTime, now);
-
-    if (hoursUntilAppointment < 36) {
-        return c.json({ error: 'Cancellation failed. Appointments can only be cancelled up to 36 hours in advance.' }, 400);
-    }
-    
-    if (appointment.status !== 'scheduled') {
-        return c.json({ error: 'Only scheduled appointments can be canceled.' }, 400);
-    }
-
-    // Update the appointment status
-    const [updatedAppointment] = await db.update(appointments)
-      .set({ status: 'canceled_by_patient' })
-      .where(eq(appointments.id, appointmentId))
-      .returning();
-
-    return c.json({ message: 'Appointment canceled successfully.' });
-  } catch (error) {
-    console.error(`Error canceling appointment ${appointmentId}:`, error);
-    return c.json({ error: 'Internal Server Error' }, 500);
-  }
 });
 
 const updateProfileSchema = z.object({
@@ -635,6 +443,114 @@ meRoutes.post('/menstrual-logs', zValidator('json', menstrualLogSchema), async (
       console.error('Error in menstrual log creation:', error);
       return c.json({ error: 'Failed to save menstrual log', message: error.message }, 500);
   }
+});
+
+/**
+ * POST /me/appointments
+ * Creates a new appointment after a final server-side availability check.
+ */
+meRoutes.post('/appointments', zValidator('json', createAppointmentSchema), async (c) => {
+    const user = c.get('user');
+    const { 
+        clinic_id, 
+        service_id, 
+        doctor_id, 
+        appointment_time,
+        reason_for_visit 
+    } = c.req.valid('json');
+
+    const appointmentTimeDate = new Date(appointment_time);
+
+    // --- Business Rule Check 1: No Same-Day Booking ---
+    if (isSameDay(appointmentTimeDate, new Date())) {
+        return c.json({ error: "Same-day booking is not permitted." }, 400);
+    }
+    
+    try {
+        const newAppointment = await db.transaction(async (tx) => {
+            // --- Final Availability Check (Inside Transaction) ---
+            const existingAppointment = await tx.query.appointments.findFirst({
+                where: and(
+                    eq(appointments.doctorId, doctor_id),
+                    eq(appointments.appointmentTime, appointment_time),
+                    notInArray(appointments.status, ['canceled_by_patient', 'canceled_by_admin', 'no_show'])
+                )
+            });
+
+            if (existingAppointment) {
+                // The slot was taken while the user was on the confirmation screen.
+                throw new Error("This appointment slot is no longer available. Please select another time.");
+            }
+
+            // If the slot is free, create the new appointment
+            const [created] = await tx.insert(appointments).values({
+                patientId: user.id,
+                clinicId: clinic_id,
+                serviceId: service_id,
+                doctorId: doctor_id,
+                appointmentTime: appointment_time,
+                reasonForVisit: reason_for_visit,
+                status: 'scheduled'
+            }).returning();
+            
+            return created;
+        });
+
+        return c.json({ data: newAppointment }, 201);
+
+    } catch (error: any) {
+        // Specifically check for our thrown error
+        if (error.message.includes("no longer available")) {
+            return c.json({ error: error.message }, 409); // 409 Conflict
+        }
+        console.error("Failed to create appointment:", error);
+        return c.json({ error: "Internal Server Error", message: "Failed to book appointment." }, 500);
+    }
+});
+
+/**
+ * PATCH /me/appointments/:id/cancel
+ * Cancels an appointment for the authenticated user, respecting the cancellation policy.
+ */
+meRoutes.patch('/appointments/:id/cancel', async (c) => {
+    const user = c.get('user');
+    const { id: appointmentId } = c.req.param();
+
+    try {
+        const [appointmentToCancel] = await db.select()
+            .from(appointments)
+            .where(and(
+                eq(appointments.id, appointmentId), 
+                eq(appointments.patientId, user.id)
+            ));
+
+        if (!appointmentToCancel) {
+            return c.json({ error: 'Appointment not found or you do not have permission to cancel it.' }, 404);
+        }
+
+        if (appointmentToCancel.status !== 'scheduled') {
+            return c.json({ error: 'This appointment cannot be canceled as it is not in "scheduled" status.' }, 400);
+        }
+
+        // --- Business Rule Check 2: 36-Hour Cancellation Policy ---
+        const hoursUntilAppointment = differenceInHours(new Date(appointmentToCancel.appointmentTime), new Date());
+        
+        if (hoursUntilAppointment < 36) {
+            return c.json({ error: `Appointments cannot be canceled within 36 hours of the scheduled time.` }, 400);
+        }
+
+        // Proceed with cancellation
+        const [updatedAppointment] = await db.update(appointments)
+            .set({ status: 'canceled_by_patient' })
+            .where(eq(appointments.id, appointmentId))
+            .returning();
+        
+        return c.json({ data: updatedAppointment });
+
+    } catch (error) {
+        console.error(`Error canceling appointment ${appointmentId}:`, error);
+        return c.json({ error: 'Internal Server Error' }, 500);
+    }
 });
 
 export default meRoutes;

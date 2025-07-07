@@ -624,8 +624,8 @@ export async function getPublicClinicDetails(clinicId: string) {
     const url = `${API_BASE_URL}/api/public/clinics/${clinicId}`;
     const response = await fetch(url, { cache: 'no-store' });
     if (!response.ok) {
-        if (response.status === 404) return null;
-        throw new Error('Failed to fetch clinic details');
+        const error = await response.json().catch(() => ({ message: "Failed to fetch clinic details."}));
+        throw new Error(error.message);
     }
     return response.json();
 }
@@ -678,11 +678,8 @@ export async function getClinicDetails(clinicId: string) {
 }
 
 export async function getProvidersForService(serviceId: string) {
-    const response = await fetch(`${API_BASE_URL}/api/public/services/${serviceId}/providers`);
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: `Failed to fetch providers for service ${serviceId}` }));
-        throw new Error(error.message);
-    }
+    const response = await fetch(`${API_BASE_URL}/api/public/services/${serviceId}/doctors`);
+    if (!response.ok) throw new Error("Failed to fetch providers.");
     return response.json();
 }
 
@@ -693,15 +690,47 @@ export async function createAppointment(payload: AppointmentBookingPayload, acce
   const response = await fetch(`${API_BASE_URL}/api/me/appointments`, {
     method: 'POST',
     headers,
-    body: JSON.stringify(payload),
+    body: JSON.stringify(payload)
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: "An unknown error occurred while booking." }));
-    throw new Error(error.message || "Failed to create appointment.");
+    const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.status} ${response.statusText}`}));
+    // Re-throw the server's error message
+    throw new Error(error.error || "Failed to create appointment.");
   }
-
   return response.json();
+}
+
+export async function cancelAppointment(appointmentId: string, accessToken: string) {
+  const headers = await getAuthHeaders(accessToken);
+  const response = await fetch(`${API_BASE_URL}/api/me/appointments/${appointmentId}/cancel`, {
+    method: 'PATCH',
+    headers,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.status} ${response.statusText}`}));
+    throw new Error(error.error || "Failed to cancel appointment.");
+  }
+  return response.json();
+}
+
+export async function getAvailableSlots(doctorId: string, serviceId: string, startDate: string, endDate: string) {
+    const params = new URLSearchParams({ serviceId, startDate, endDate });
+    const url = `${API_BASE_URL}/api/public/doctors/${doctorId}/available-slots?${params.toString()}`;
+    
+    try {
+        const response = await fetch(url, { cache: 'no-store' });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.status}`}));
+            throw new Error(error.message || `Failed to fetch available slots.`);
+        }
+        const result = await response.json();
+        return result.data || [];
+    } catch(error: any) {
+        console.error("Network or parsing error in getAvailableSlots:", error);
+        throw new Error(error.message || "A network error occurred while fetching slots.");
+    }
 }
 
 export async function getAdminStats(cookieStore: ReturnType<typeof cookies>) {
@@ -992,21 +1021,15 @@ export async function getMyMedicalRecordsOnServer(accessToken: string) {
 }
 
 export async function getClinicOverrides(clinicId: string, accessToken: string): Promise<ClinicOverride[]> {
-  const headers = await getAuthHeaders(accessToken);
-  const url = `${API_BASE_URL}/api/admin/clinics/${clinicId}/overrides`;
-  
-  try {
+    const headers = await getAuthHeaders(accessToken);
+    const url = `${API_BASE_URL}/api/admin/clinics/${clinicId}/overrides`;
     const response = await fetch(url, { headers, cache: 'no-store' });
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.status}`}));
-        throw new Error(error.message || `Failed to fetch clinic overrides.`);
+        const error = await response.json().catch(() => ({ message: "Failed to fetch clinic overrides." }));
+        throw new Error(error.message);
     }
     const result = await response.json();
-    return result.data || [];
-  } catch(error) {
-    console.error("Network or parsing error in getClinicOverrides:", error);
-    throw new Error("A network error occurred while fetching clinic overrides.");
-  }
+    return result.data;
 }
 
 export async function upsertClinicOverride(
@@ -1017,7 +1040,7 @@ export async function upsertClinicOverride(
 ) {
     const headers = await getAuthHeaders(accessToken);
     const url = overrideId 
-        ? `${API_BASE_URL}/api/admin/overrides/${overrideId}` 
+        ? `${API_BASE_URL}/api/admin/overrides/${overrideId}`
         : `${API_BASE_URL}/api/admin/clinics/${clinicId}/overrides`;
     
     const method = overrideId ? 'PUT' : 'POST';
@@ -1029,8 +1052,8 @@ export async function upsertClinicOverride(
     });
 
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.status}`}));
-        throw new Error(error.message || `Failed to save override.`);
+        const error = await response.json().catch(() => ({ message: `Failed to ${method === 'POST' ? 'create' : 'update'} override.` }));
+        throw new Error(error.message);
     }
     return response.json();
 }
@@ -1038,18 +1061,13 @@ export async function upsertClinicOverride(
 export async function deleteClinicOverride(overrideId: string, accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
     const url = `${API_BASE_URL}/api/admin/overrides/${overrideId}`;
-    
     const response = await fetch(url, {
         method: 'DELETE',
         headers,
     });
-
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.status}`}));
-        throw new Error(error.message || `Failed to delete override.`);
-    }
-    if (response.status === 204) {
-        return { success: true };
+        const error = await response.json().catch(() => ({ message: 'Failed to delete override.' }));
+        throw new Error(error.message);
     }
     return response.json();
 }
@@ -1058,42 +1076,27 @@ export async function getDoctorsByClinic(clinicId: string, accessToken: string) 
     const headers = await getAuthHeaders(accessToken);
     const url = `${API_BASE_URL}/api/admin/clinics/${clinicId}/doctors`;
     
-    try {
-        const response = await fetch(url, { headers, cache: 'no-store' });
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.status}`}));
-            throw new Error(error.message || `Failed to fetch doctors for clinic.`);
-        }
-        const result = await response.json();
-        return result.data || [];
-    } catch(error) {
-        console.error("Network or parsing error in getDoctorsByClinic:", error);
-        throw new Error("A network error occurred while fetching doctors.");
+    const response = await fetch(url, { headers, cache: 'no-store' });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Failed to fetch doctors.' }));
+        throw new Error(error.message);
     }
+    return response.json();
 }
 
 export async function getDoctorSchedules(doctorId: string, accessToken: string): Promise<DoctorSchedule[]> {
     const headers = await getAuthHeaders(accessToken);
     const url = `${API_BASE_URL}/api/admin/doctors/${doctorId}/schedules`;
-
-    try {
-        const response = await fetch(url, { headers, cache: 'no-store' });
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.status}`}));
-            throw new Error(error.message || `Failed to fetch doctor schedules.`);
-        }
-        const result = await response.json();
-        return result.data || [];
-    } catch(error) {
-        console.error("Network or parsing error in getDoctorSchedules:", error);
-        throw new Error("A network error occurred while fetching doctor schedules.");
+    
+    const response = await fetch(url, { headers, cache: 'no-store' });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Failed to fetch schedules.' }));
+        throw new Error(error.message);
     }
+    const result = await response.json();
+    return result.data;
 }
 
-/**
- * Creates a new recurring schedule for a doctor.
- * POST /admin/doctors/:doctorId/schedules
- */
 export async function createDoctorSchedule(
     doctorId: string,
     scheduleData: UpsertDoctorSchedulePayload,
@@ -1101,24 +1104,18 @@ export async function createDoctorSchedule(
 ) {
     const headers = await getAuthHeaders(accessToken);
     const url = `${API_BASE_URL}/api/admin/doctors/${doctorId}/schedules`;
-    
     const response = await fetch(url, {
         method: 'POST',
         headers,
         body: JSON.stringify(scheduleData),
     });
-
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Failed to create schedule' }));
+        const error = await response.json().catch(() => ({ message: 'Failed to create schedule.' }));
         throw new Error(error.message);
     }
     return response.json();
 }
 
-/**
- * Updates an existing recurring schedule for a doctor.
- * PUT /admin/schedules/:scheduleId
- */
 export async function updateDoctorSchedule(
     scheduleId: string,
     scheduleData: Partial<UpsertDoctorSchedulePayload>,
@@ -1126,53 +1123,42 @@ export async function updateDoctorSchedule(
 ) {
     const headers = await getAuthHeaders(accessToken);
     const url = `${API_BASE_URL}/api/admin/schedules/${scheduleId}`;
-    
     const response = await fetch(url, {
         method: 'PUT',
         headers,
         body: JSON.stringify(scheduleData),
     });
-
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Failed to update schedule' }));
+        const error = await response.json().catch(() => ({ message: 'Failed to update schedule.' }));
         throw new Error(error.message);
     }
     return response.json();
 }
 
-/**
- * Deletes a recurring schedule for a doctor.
- * DELETE /admin/schedules/:scheduleId
- */
 export async function deleteDoctorSchedule(scheduleId: string, accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
     const url = `${API_BASE_URL}/api/admin/schedules/${scheduleId}`;
-    
     const response = await fetch(url, {
         method: 'DELETE',
         headers,
     });
-
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Failed to delete schedule' }));
+        const error = await response.json().catch(() => ({ message: 'Failed to delete schedule.' }));
         throw new Error(error.message);
-    }
-    // DELETE requests might not return a body, so we check for a 204 or 200 status.
-    if (response.status === 204) {
-        return { message: "Schedule deleted successfully" };
     }
     return response.json();
 }
 
 export async function getDoctorOverrides(doctorId: string, accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
-    const response = await fetch(`${API_BASE_URL}/api/admin/doctors/${doctorId}/overrides`, {
-        headers,
-    });
+    const url = `${API_BASE_URL}/api/admin/doctors/${doctorId}/overrides`;
+    const response = await fetch(url, { headers, cache: 'no-store' });
     if (!response.ok) {
-        throw new Error("Failed to fetch doctor overrides");
+        const error = await response.json().catch(() => ({ message: 'Failed to fetch doctor overrides.' }));
+        throw new Error(error.message);
     }
-    return response.json();
+    const result = await response.json();
+    return result.data;
 }
 
 export async function upsertDoctorOverride(
@@ -1182,55 +1168,52 @@ export async function upsertDoctorOverride(
     overrideId?: string,
 ) {
     const headers = await getAuthHeaders(accessToken);
-    const url = overrideId 
-        ? `${API_BASE_URL}/api/admin/overrides/${overrideId}`
+    const url = overrideId
+        ? `${API_BASE_URL}/api/admin/doctor-overrides/${overrideId}`
         : `${API_BASE_URL}/api/admin/doctors/${doctorId}/overrides`;
-    
+
     const method = overrideId ? 'PUT' : 'POST';
-    
+
     const response = await fetch(url, {
         method,
         headers,
         body: JSON.stringify(overrideData),
     });
-
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.status}`}));
-        throw new Error(error.message || `Failed to save override.`);
+        const error = await response.json().catch(() => ({ message: 'Failed to save doctor override.' }));
+        throw new Error(error.message);
     }
     return response.json();
 }
 
 export async function deleteDoctorOverride(overrideId: string, accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
-    const url = `${API_BASE_URL}/api/admin/overrides/${overrideId}`;
-
+    const url = `${API_BASE_URL}/api/admin/doctor-overrides/${overrideId}`;
     const response = await fetch(url, {
         method: 'DELETE',
         headers,
     });
-    
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.status}`}));
-        throw new Error(error.message || `Failed to delete override.`);
-    }
-    if (response.status === 204) {
-        return { success: true };
+        const error = await response.json().catch(() => ({ message: 'Failed to delete doctor override.' }));
+        throw new Error(error.message);
     }
     return response.json();
 }
 
 export async function getAvailableSlots(doctorId: string, serviceId: string, startDate: string, endDate: string) {
-    const params = new URLSearchParams({
-        serviceId,
-        startDate,
-        endDate,
-    });
-    const response = await fetch(`${API_BASE_URL}/api/public/doctors/${doctorId}/available-slots?${params.toString()}`);
-
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.status}`}));
-        throw new Error(error.message || `Failed to fetch available slots.`);
+    const params = new URLSearchParams({ serviceId, startDate, endDate });
+    const url = `${API_BASE_URL}/api/public/doctors/${doctorId}/available-slots?${params.toString()}`;
+    
+    try {
+        const response = await fetch(url, { cache: 'no-store' });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.status}`}));
+            throw new Error(error.message || `Failed to fetch available slots.`);
+        }
+        const result = await response.json();
+        return result.data || [];
+    } catch(error: any) {
+        console.error("Network or parsing error in getAvailableSlots:", error);
+        throw new Error(error.message || "A network error occurred while fetching slots.");
     }
-    return response.json();
 }

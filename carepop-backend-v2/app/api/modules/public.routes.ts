@@ -12,9 +12,12 @@ import {
     doctorServices, 
     doctorClinics, 
     profiles,
+    doctorSchedules,
+    doctorAvailabilityOverrides,
+    clinicOverrides,
 } from '../../../drizzle/schema';
 import { and, eq, sql, inArray, SQL, asc, getTableColumns, type AnyColumn, ne, gte, lt, notInArray } from 'drizzle-orm';
-import { getDay, parseISO, format, startOfDay, endOfDay, setHours, setMinutes, setSeconds, isBefore, addMinutes, isEqual } from 'date-fns';
+import { getDay, parseISO, format, startOfDay, endOfDay, setHours, setMinutes, setSeconds, isBefore, addMinutes, isEqual, eachDayOfInterval } from 'date-fns';
 import { zonedTimeToUtc } from 'date-fns-tz';
 import fs from 'fs/promises';
 import path from 'path';
@@ -52,6 +55,12 @@ const universalSearchSchema = z.object({
     lat: z.coerce.number().min(-90).max(90).optional(),
     lon: z.coerce.number().min(-180).max(180).optional(),
     radius: z.coerce.number().positive().optional(), // In meters
+});
+
+const availableSlotsSchema = z.object({
+  serviceId: z.string().uuid(),
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime(),
 });
 
 // Helper function to read PSGC data
@@ -641,5 +650,112 @@ publicRoutes.get('/services/:serviceId/providers', async (c) => {
         return c.json({ error: 'Internal Server Error', message: error.message }, 500);
     }
 });
+
+/**
+ * GET /public/doctors/:doctorId/available-slots
+ * Calculates all available appointment slots for a given doctor, service, and date range.
+ * This is the core server-authoritative endpoint for the new booking system.
+ */
+publicRoutes.get('/doctors/:doctorId/available-slots',
+    zValidator('param', z.object({ doctorId: z.string().uuid() })),
+    zValidator('query', availableSlotsSchema),
+    async (c) => {
+        const { doctorId } = c.req.valid('param');
+        const { serviceId, startDate, endDate } = c.req.valid('query');
+
+        try {
+            const slots = await calculateAvailableSlots(db, doctorId, serviceId, new Date(startDate), new Date(endDate));
+            return c.json({ data: slots });
+        } catch (error: any) {
+            console.error(`Failed to get available slots for doctor ${doctorId}:`, error);
+            return c.json({ error: 'Failed to calculate availability', message: error.message }, 500);
+        }
+    }
+);
+
+async function calculateAvailableSlots(
+    db: any,
+    doctorId: string, 
+    serviceId: string, 
+    startDate: Date, 
+    endDate: Date
+) {
+    // 1. Fetch service duration and doctor's clinic in parallel
+    const [service, docClinic] = await Promise.all([
+        db.query.services.findFirst({ where: eq(services.id, serviceId), columns: { durationMinutes: true } }),
+        db.query.doctorClinics.findFirst({ where: eq(doctorClinics.doctorId, doctorId), columns: { clinicId: true } })
+    ]);
+
+    if (!service) throw new Error('Service not found');
+    if (!docClinic) throw new Error('Doctor is not associated with any clinic');
+    
+    const slotDuration = service.durationMinutes;
+    const clinicId = docClinic.clinicId;
+
+    // 2. Fetch all necessary availability data in parallel
+    const [
+        schedules,
+        doctorOverrides,
+        clinicHolidays,
+        bookedAppointments
+    ] = await Promise.all([
+        db.query.doctorSchedules.findMany({ where: eq(doctorSchedules.doctorId, doctorId) }),
+        db.query.doctorAvailabilityOverrides.findMany({ where: and(
+            eq(doctorAvailabilityOverrides.doctorId, doctorId), 
+            gte(doctorAvailabilityOverrides.endDateTime, startDate.toISOString()), 
+            lt(doctorAvailabilityOverrides.startDateTime, endDate.toISOString())
+        ) }),
+        db.query.clinicOverrides.findMany({ where: and(
+            eq(clinicOverrides.clinicId, clinicId),
+            eq(clinicOverrides.isAvailable, false), // Only fetch holidays/closures
+            gte(clinicOverrides.endDateTime, startDate.toISOString()),
+            lt(clinicOverrides.startDateTime, endDate.toISOString())
+        )}),
+        db.query.appointments.findMany({ where: and(
+            eq(appointments.doctorId, doctorId), 
+            notInArray(appointments.status, ['canceled_by_patient', 'canceled_by_admin', 'no_show']),
+            gte(appointments.appointmentTime, startDate.toISOString()), 
+            lt(appointments.appointmentTime, endDate.toISOString())
+        ), columns: { appointmentTime: true } })
+    ]);
+    
+    const bookedSlots = new Set(bookedAppointments.map((a: { appointmentTime: string }) => new Date(a.appointmentTime).getTime()));
+    const availableSlots: Date[] = [];
+    const interval = { start: startOfDay(startDate), end: endOfDay(endDate) };
+
+    // 3. Iterate through each day in the requested range
+    for (const day of eachDayOfInterval(interval)) {
+        const dayOfWeek = day.getDay(); // 0 = Sunday, 6 = Saturday
+        const yyyy_mm_dd = format(day, 'yyyy-MM-dd');
+
+        // CHECK 1: Is the entire day a clinic holiday?
+        const isClinicHoliday = clinicHolidays.some((h: { startDateTime: string | number | Date; endDateTime: string | number | Date; }) => day >= startOfDay(new Date(h.startDateTime)) && day < endOfDay(new Date(h.endDateTime)));
+        if (isClinicHoliday) continue;
+
+        // CHECK 2: Does the doctor have a non-availability override for this day?
+        const doctorDayOff = doctorOverrides.find((o: { isAvailable: any; startDateTime: string | number | Date; endDateTime: string | number | Date; }) => !o.isAvailable && day >= startOfDay(new Date(o.startDateTime)) && day < endOfDay(new Date(o.endDateTime)));
+        if (doctorDayOff) continue;
+        
+        // CHECK 3: Find the recurring schedule for this day of the week
+        const dailySchedule = schedules.find((s: { dayOfWeek: number; }) => s.dayOfWeek === dayOfWeek);
+        if (!dailySchedule) continue;
+
+        // Generate potential slots based on the recurring schedule
+        let currentTime = zonedTimeToUtc(`${yyyy_mm_dd}T${dailySchedule.startTime}`, 'UTC');
+        const endTime = zonedTimeToUtc(`${yyyy_mm_dd}T${dailySchedule.endTime}`, 'UTC');
+
+        while (currentTime < endTime) {
+            // Ensure slot is not in the past and not already booked
+            if (currentTime > new Date() && !bookedSlots.has(currentTime.getTime())) {
+                availableSlots.push(new Date(currentTime));
+            }
+            currentTime = addMinutes(currentTime, slotDuration);
+        }
+    }
+    
+    // TODO: Handle doctor's 'isAvailable' overrides to add MORE slots. For now, we only handle non-availability.
+    
+    return availableSlots;
+}
 
 export default publicRoutes;
