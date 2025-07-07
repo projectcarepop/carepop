@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Step1_ClinicSelection } from './Step1_ClinicSelection';
 import { Step2_ServiceAndDoctorSelection } from './Step2_ServiceAndDoctorSelection';
@@ -12,9 +12,14 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { type Clinic, type Service, type Doctor } from '@/lib/types/bookings';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { ProgressStepper } from "./ProgressStepper";
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+
+// The steps of our new booking flow
+const STEPS = {
+  SELECT_CLINIC: 'SELECT_CLINIC',
+  SELECT_SERVICE_AND_DOCTOR: 'SELECT_SERVICE_AND_DOCTOR',
+  SELECT_DATE_TIME: 'SELECT_DATE_TIME',
+  CONFIRMATION: 'CONFIRMATION',
+};
 
 // This will hold all the data collected during the booking process
 export interface BookingData {
@@ -24,20 +29,30 @@ export interface BookingData {
   slot?: Date;
 }
 
-const steps = [
-    { id: 'Step 1', name: 'Select Clinic' },
-    { id: 'Step 2', name: 'Select Service & Doctor' },
-    { id: 'Step 3', name: 'Select Date & Time' },
-    { id: 'Step 4', name: 'Confirm Details' },
+const stepsOrder = [
+    STEPS.SELECT_CLINIC,
+    STEPS.SELECT_SERVICE_AND_DOCTOR,
+    STEPS.SELECT_DATE_TIME,
+    STEPS.CONFIRMATION,
 ];
 
 export function BookingFlowManager() {
-  const [currentStep, setCurrentStep] = useState(0); // Use index for simplicity
-  const [bookingData, setBookingData] = useState<BookingData>({});
+  const [currentStep, setCurrentStep] = useState(STEPS.SELECT_CLINIC);
+  const [bookingData, setBookingData] = useState<BookingData>({
+    clinic: undefined,
+    service: undefined,
+    doctor: undefined,
+    slot: undefined,
+  });
 
   const resetFlow = () => {
-    setBookingData({});
-    setCurrentStep(0);
+    setBookingData({
+        clinic: undefined,
+        service: undefined,
+        doctor: undefined,
+        slot: undefined,
+    });
+    setCurrentStep(STEPS.SELECT_CLINIC);
   }
 
   const updateBookingData = (data: Partial<BookingData>) => {
@@ -45,40 +60,27 @@ export function BookingFlowManager() {
   };
 
   const goToNextStep = () => {
-    if (currentStep < steps.length - 1) {
-      setCurrentStep(prev => prev + 1);
+    const currentIndex = stepsOrder.indexOf(currentStep);
+    if (currentIndex < stepsOrder.length - 1) {
+      setCurrentStep(stepsOrder[currentIndex + 1]);
     }
   };
 
   const goToPreviousStep = () => {
-    if (currentStep > 0) {
+    const currentIndex = stepsOrder.indexOf(currentStep);
+    if (currentIndex > 0) {
       // When going back, clear the state of the steps ahead
-      if (currentStep === 3) { // From Confirmation to DateTime
+      if (currentStep === STEPS.CONFIRMATION) {
         updateBookingData({ slot: undefined });
-      } else if (currentStep === 2) { // From DateTime to Service/Doctor
+      } else if (currentStep === STEPS.SELECT_DATE_TIME) {
         updateBookingData({ doctor: undefined, slot: undefined });
-      } else if (currentStep === 1) { // From Service/Doctor to Clinic
+      } else if (currentStep === STEPS.SELECT_SERVICE_AND_DOCTOR) {
         updateBookingData({ service: undefined, doctor: undefined, slot: undefined });
       }
-      setCurrentStep(prev => prev - 1);
+
+      setCurrentStep(stepsOrder[currentIndex - 1]);
     }
   };
-
-  const isStepComplete = useMemo(() => {
-    switch (currentStep) {
-      case 0:
-        return !!bookingData.clinic;
-      case 1:
-        return !!bookingData.service && !!bookingData.doctor;
-      case 2:
-        return !!bookingData.slot;
-      case 3:
-        return true;
-      default:
-        return false;
-    }
-  }, [currentStep, bookingData]);
-
 
   const { session } = useAuth();
   const accessToken = session?.access_token;
@@ -123,69 +125,50 @@ export function BookingFlowManager() {
   };
 
   const renderCurrentStep = () => {
-    switch (currentStep) {
-      case 0:
-        return <Step1_ClinicSelection 
-          updateBookingData={updateBookingData} 
-          goToNextStep={goToNextStep} 
-        />;
-      case 1:
-        return <Step2_ServiceAndDoctorSelection 
-          bookingData={bookingData}
-          updateBookingData={updateBookingData}
-          goToNextStep={goToNextStep}
-        />;
-      case 2:
-        return <Step3_DateTimeSelection
-          bookingData={bookingData}
-          updateBookingData={updateBookingData}
-          goToNextStep={goToNextStep}
-        />;
-      case 3:
-        return <Step4_Confirmation
-          bookingData={bookingData}
-          confirmBooking={confirmBooking}
-          isBooking={bookingMutation.isPending}
-        />;
-      default:
-        return <div>Invalid Step</div>;
+    if (currentStep === STEPS.SELECT_CLINIC) {
+      return <Step1_ClinicSelection 
+        updateBookingData={updateBookingData} 
+        goToNextStep={goToNextStep} 
+      />;
     }
+    if (currentStep === STEPS.SELECT_SERVICE_AND_DOCTOR) {
+      return <Step2_ServiceAndDoctorSelection 
+        bookingData={bookingData}
+        updateBookingData={updateBookingData}
+        goToNextStep={goToNextStep}
+        goToPreviousStep={goToPreviousStep}
+      />;
+    }
+    if (currentStep === STEPS.SELECT_DATE_TIME) {
+      return <Step3_DateTimeSelection
+        bookingData={bookingData}
+        updateBookingData={updateBookingData}
+        goToNextStep={goToNextStep}
+        goToPreviousStep={goToPreviousStep}
+      />;
+    }
+    if (currentStep === STEPS.CONFIRMATION) {
+      return <Step4_Confirmation
+        bookingData={bookingData}
+        goToPreviousStep={goToPreviousStep}
+        confirmBooking={confirmBooking}
+        isBooking={bookingMutation.isPending}
+      />;
+    }
+    return <div>Invalid Step</div>;
   };
 
   return (
-    <Card className="w-full max-w-4xl mx-auto">
-        <CardHeader>
-            <ProgressStepper steps={steps} currentStep={currentStep} />
-        </CardHeader>
-        <CardContent className="min-h-[400px]">
-            {renderCurrentStep()}
-        </CardContent>
-        <CardFooter className="flex justify-between">
-            <Button
-              variant="outline"
-              onClick={goToPreviousStep}
-              disabled={currentStep === 0}
-            >
-              <ChevronLeft className="mr-2 h-4 w-4" /> Back
-            </Button>
-
-            <div className="flex items-center space-x-2">
-                <Button variant="ghost" onClick={resetFlow}>
-                    Start Over
-                </Button>
-                {currentStep < steps.length - 1 && (
-                    <Button onClick={goToNextStep} disabled={!isStepComplete}>
-                        Next <ChevronRight className="ml-2 h-4 w-4" />
-                    </Button>
-                )}
-                {currentStep === steps.length - 1 && (
-                    <Button onClick={confirmBooking} disabled={bookingMutation.isPending}>
-                        {bookingMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Confirm Booking
-                    </Button>
-                )}
-            </div>
-        </CardFooter>
-    </Card>
+    <div className="relative">
+      {currentStep !== STEPS.SELECT_CLINIC && (
+          <Button variant="link" className="absolute top-0 right-0" onClick={resetFlow}>
+              Start Over
+          </Button>
+      )}
+      {/* We can add a progress bar here later */}
+      <div className="mt-8">
+        {renderCurrentStep()}
+      </div>
+    </div>
   );
 } 
