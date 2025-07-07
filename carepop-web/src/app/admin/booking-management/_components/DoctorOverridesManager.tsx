@@ -123,8 +123,8 @@ export const DoctorOverridesManager: React.FC<DoctorOverridesManagerProps> = ({ 
                                 <TableRow><TableCell colSpan={4}><Skeleton className="h-5 w-full" /></TableCell></TableRow>
                             ) : overridesError ? (
                                 <TableRow><TableCell colSpan={4} className="text-destructive text-center">{overridesError.message}</TableCell></TableRow>
-                            ) : overrides && overrides.data.length > 0 ? (
-                                overrides.data.map((override: DoctorOverride) => (
+                            ) : overrides?.data?.length > 0 ? (
+                                (overrides.data || []).map((override: DoctorOverride) => (
                                     <TableRow key={override.id}>
                                         <TableCell>{format(new Date(override.startTime), "PPP p")}</TableCell>
                                         <TableCell>{format(new Date(override.endTime), "PPP p")}</TableCell>

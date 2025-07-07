@@ -6,7 +6,6 @@ import { getAdminClinics } from '@/services/api';
 import { ClinicSelector } from './_components/ClinicSelector';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { BookingManagementClient } from './_components/BookingManagementClient';
-import { ClinicOverridesManager } from './_components/ClinicOverridesManager';
 
 const BookingManagementPage = () => {
   const [selectedClinicId, setSelectedClinicId] = useState<string | null>(null);
@@ -47,7 +46,6 @@ const BookingManagementPage = () => {
 
       {selectedClinicId ? (
         <div className="space-y-8 mt-6">
-          <ClinicOverridesManager clinicId={selectedClinicId} />
           <BookingManagementClient clinicId={selectedClinicId} />
         </div>
       ) : (

@@ -15,7 +15,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ClinicOverride } from "@/services/api";
 
-export const columns: ColumnDef<ClinicOverride>[] = [
+type GetColumnsOptions = {
+    onEdit: (override: ClinicOverride) => void;
+    onDelete: (overrideId: string) => void;
+}
+
+export const columns = ({ onEdit, onDelete }: GetColumnsOptions): ColumnDef<ClinicOverride>[] => [
     {
         accessorKey: "reason",
         header: ({ column }) => {
@@ -62,12 +67,15 @@ export const columns: ColumnDef<ClinicOverride>[] = [
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem
-                            onClick={() => navigator.clipboard.writeText(override.id)}
-                        >
-                            Copy Override ID
+                        <DropdownMenuItem onClick={() => onEdit(override)}>
+                            Edit
                         </DropdownMenuItem>
-                        {/* TODO: Add Edit and Delete functionality */}
+                        <DropdownMenuItem
+                            onClick={() => onDelete(override.id)}
+                            className="text-destructive"
+                        >
+                            Delete
+                        </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             );
