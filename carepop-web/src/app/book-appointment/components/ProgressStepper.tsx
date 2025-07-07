@@ -1,5 +1,3 @@
-import { cn } from "@/lib/utils";
-
 interface Step {
   id: string;
   name: string;
