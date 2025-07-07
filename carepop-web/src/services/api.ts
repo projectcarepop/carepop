@@ -686,51 +686,46 @@ export async function getProvidersForService(serviceId: string) {
 // --- Authenticated Booking Endpoints ---
 
 export async function createAppointment(payload: AppointmentBookingPayload, accessToken: string) {
-  const headers = await getAuthHeaders(accessToken);
-  const response = await fetch(`${API_BASE_URL}/api/me/appointments`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload)
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.status} ${response.statusText}`}));
-    // Re-throw the server's error message
-    throw new Error(error.error || "Failed to create appointment.");
-  }
-  return response.json();
+    const headers = await getAuthHeaders(accessToken);
+    const response = await fetch(`${API_BASE_URL}/api/me/appointments`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Failed to create appointment.' }));
+        throw new Error(error.message);
+    }
+    return response.json();
 }
 
-export async function cancelAppointment(appointmentId: string, accessToken: string) {
-  const headers = await getAuthHeaders(accessToken);
-  const response = await fetch(`${API_BASE_URL}/api/me/appointments/${appointmentId}/cancel`, {
-    method: 'PATCH',
-    headers,
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.status} ${response.statusText}`}));
-    throw new Error(error.error || "Failed to cancel appointment.");
-  }
-  return response.json();
+export async function cancelMyAppointment(appointmentId: string, accessToken: string) {
+    const headers = await getAuthHeaders(accessToken);
+    const url = `${API_BASE_URL}/api/me/appointments/${appointmentId}/cancel`;
+    const response = await fetch(url, {
+        method: 'PATCH',
+        headers,
+    });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Failed to cancel appointment.' }));
+        throw new Error(error.message);
+    }
+    return response.json();
 }
 
 export async function getAvailableSlots(doctorId: string, serviceId: string, startDate: string, endDate: string) {
-    const params = new URLSearchParams({ serviceId, startDate, endDate });
-    const url = `${API_BASE_URL}/api/public/doctors/${doctorId}/available-slots?${params.toString()}`;
-    
-    try {
-        const response = await fetch(url, { cache: 'no-store' });
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.status}`}));
-            throw new Error(error.message || `Failed to fetch available slots.`);
-        }
-        const result = await response.json();
-        return result.data || [];
-    } catch(error: any) {
-        console.error("Network or parsing error in getAvailableSlots:", error);
-        throw new Error(error.message || "A network error occurred while fetching slots.");
+    // Note: This endpoint is public and does not require authentication
+    const url = new URL(`${API_BASE_URL}/api/public/doctors/${doctorId}/available-slots`);
+    url.searchParams.set('serviceId', serviceId);
+    url.searchParams.set('startDate', startDate);
+    url.searchParams.set('endDate', endDate);
+
+    const response = await fetch(url.toString(), { cache: 'no-store' });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Could not fetch available slots' }));
+        throw new Error(error.message);
     }
+    return response.json();
 }
 
 export async function getAdminStats(cookieStore: ReturnType<typeof cookies>) {
@@ -830,29 +825,6 @@ export async function getAdminUsersByRole(role: 'doctor' | 'patient', accessToke
     const headers = await getAuthHeaders(accessToken);
     const response = await fetch(`${API_BASE_URL}/api/admin/users?role=${role}`, { headers });
     if (!response.ok) throw new Error(`Failed to fetch users with role: ${role}.`);
-    return response.json();
-}
-
-/**
- * Cancels an appointment. Throws an error on failure to properly integrate with tanstack-query.
- * This function is intended to be called with a valid access token.
- */
-export async function cancelAppointment(appointmentId: string, accessToken: string) {
-    const headers = await getAuthHeaders(accessToken);
-    const url = `${API_BASE_URL}/api/me/appointments/${appointmentId}/cancel`;
-    
-    const response = await fetch(url, {
-        method: 'PATCH',
-        headers,
-    });
-
-    if (!response.ok) {
-        // This is the key change. By throwing an error, we allow useMutation's onError to catch it.
-        const error = await response.json().catch(() => ({ message: "An unknown error occurred." }));
-        throw new Error(error.message || "Failed to cancel appointment.");
-    }
-
-    // On success, we just return the JSON data.
     return response.json();
 }
 
@@ -1060,33 +1032,34 @@ export async function upsertClinicOverride(
 
 export async function deleteClinicOverride(overrideId: string, accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
-    const url = `${API_BASE_URL}/api/admin/overrides/${overrideId}`;
-    const response = await fetch(url, {
-        method: 'DELETE',
-        headers,
-    });
+    const url = `${API_BASE_URL}/api/admin/overrides/clinic/${overrideId}`;
+    const response = await fetch(url, { method: 'DELETE', headers });
     if (!response.ok) {
         const error = await response.json().catch(() => ({ message: 'Failed to delete override.' }));
         throw new Error(error.message);
     }
-    return response.json();
+    return { success: true };
 }
 
 export async function getDoctorsByClinic(clinicId: string, accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
     const url = `${API_BASE_URL}/api/admin/clinics/${clinicId}/doctors`;
-    
-    const response = await fetch(url, { headers, cache: 'no-store' });
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Failed to fetch doctors.' }));
-        throw new Error(error.message);
+    try {
+        const response = await fetch(url, { headers });
+        if (!response.ok) {
+            const errorBody = await response.json().catch(() => ({ message: `HTTP Error: ${response.status}` }));
+            throw new Error(errorBody.message || "Failed to fetch doctors");
+        }
+        return await response.json();
+    } catch (error) {
+        console.error("Network or parsing error in getDoctorsByClinic:", error);
+        throw error;
     }
-    return response.json();
 }
 
 export async function getDoctorSchedules(doctorId: string, accessToken: string): Promise<DoctorSchedule[]> {
     const headers = await getAuthHeaders(accessToken);
-    const url = `${API_BASE_URL}/api/admin/doctors/${doctorId}/schedules`;
+    const url = `${API_BASE_URL}/api/admin/schedules/doctor/${doctorId}`;
     
     const response = await fetch(url, { headers, cache: 'no-store' });
     if (!response.ok) {
@@ -1198,22 +1171,4 @@ export async function deleteDoctorOverride(overrideId: string, accessToken: stri
         throw new Error(error.message);
     }
     return response.json();
-}
-
-export async function getAvailableSlots(doctorId: string, serviceId: string, startDate: string, endDate: string) {
-    const params = new URLSearchParams({ serviceId, startDate, endDate });
-    const url = `${API_BASE_URL}/api/public/doctors/${doctorId}/available-slots?${params.toString()}`;
-    
-    try {
-        const response = await fetch(url, { cache: 'no-store' });
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.status}`}));
-            throw new Error(error.message || `Failed to fetch available slots.`);
-        }
-        const result = await response.json();
-        return result.data || [];
-    } catch(error: any) {
-        console.error("Network or parsing error in getAvailableSlots:", error);
-        throw new Error(error.message || "A network error occurred while fetching slots.");
-    }
 }
