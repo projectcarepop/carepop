@@ -129,9 +129,10 @@ export const DoctorOverridesManager: React.FC<DoctorOverridesManagerProps> = ({ 
                                         <TableCell>{format(new Date(override.startDateTime), "PPP p")}</TableCell>
                                         <TableCell>{format(new Date(override.endDateTime), "PPP p")}</TableCell>
                                         <TableCell>
-                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${override.isAvailable ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                            <div className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${override.isAvailable ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                                <div className={`mr-2 h-2 w-2 rounded-full ${override.isAvailable ? 'bg-green-500' : 'bg-gray-500'}`}></div>
                                                 {override.isAvailable ? 'Available' : 'Unavailable'}
-                                            </span>
+                                            </div>
                                         </TableCell>
                                         <TableCell>
                                             <DropdownMenu>

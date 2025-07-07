@@ -1032,7 +1032,7 @@ export async function upsertClinicOverride(
 
 export async function deleteClinicOverride(overrideId: string, accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
-    const url = `${API_BASE_URL}/api/admin/overrides/clinic/${overrideId}`;
+    const url = `${API_BASE_URL}/api/admin/overrides/${overrideId}`;
     const response = await fetch(url, { method: 'DELETE', headers });
     if (!response.ok) {
         const error = await response.json().catch(() => ({ message: 'Failed to delete override.' }));
