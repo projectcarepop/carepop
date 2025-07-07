@@ -1854,6 +1854,107 @@ adminRoutes.get('/clinics/:clinicId/doctors', async (c) => {
     }
 });
 
+// =================================================================
+// Clinic-Wide Master Schedule
+// =================================================================
+adminRoutes.get(
+  '/clinics/:clinicId/master-schedule',
+  zValidator('query', z.object({
+    start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Start date must be in YYYY-MM-DD format"),
+    end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "End date must be in YYYY-MM-DD format"),
+  })),
+  async (c) => {
+    const { clinicId } = c.req.param();
+    const { start_date, end_date } = c.req.valid('query');
+
+    try {
+      // 1. Fetch Clinic Overrides
+      const clinicOverridesPromise = db.query.clinicOverrides.findMany({
+        where: and(
+          eq(clinicOverrides.clinicId, clinicId),
+          gte(clinicOverrides.endDateTime, start_date),
+          lt(clinicOverrides.startDateTime, end_date)
+        )
+      });
+
+      // 2. Fetch all doctors associated with the clinic
+      const doctorsInClinic = await db.query.doctorClinics.findMany({
+          where: eq(doctorClinics.clinicId, clinicId),
+          columns: {
+              doctorId: true
+          }
+      });
+
+      const doctorIds = doctorsInClinic.map(dc => dc.doctorId);
+
+      if (doctorIds.length === 0) {
+        // No doctors in the clinic, just return clinic-level events
+        const clinic_overrides = await clinicOverridesPromise;
+        return c.json({
+          clinic_overrides,
+          doctor_schedules: [],
+          doctor_overrides: [],
+          booked_appointments: [],
+        });
+      }
+      
+      // 3. Fetch Doctor Schedules (for all doctors in the clinic)
+      const doctorSchedulesPromise = db.query.doctorSchedules.findMany({
+        where: inArray(doctorSchedules.doctorId, doctorIds)
+      });
+
+      // 4. Fetch Doctor Overrides (for all doctors in the clinic)
+      const doctorOverridesPromise = db.query.doctorAvailabilityOverrides.findMany({
+        where: and(
+          inArray(doctorAvailabilityOverrides.doctorId, doctorIds),
+          gte(doctorAvailabilityOverrides.endDateTime, start_date),
+          lt(doctorAvailabilityOverrides.startDateTime, end_date)
+        )
+      });
+
+      // 5. Fetch Booked Appointments (for all doctors in the clinic)
+      const bookedAppointmentsPromise = db.query.appointments.findMany({
+        where: and(
+          eq(appointments.clinicId, clinicId),
+          inArray(appointments.doctorId, doctorIds),
+          gte(appointments.appointmentTime, start_date),
+          lt(appointments.appointmentTime, end_date),
+          eq(appointments.status, 'scheduled')
+        ),
+        with: {
+            patient: { columns: { firstName: true, lastName: true } },
+            doctor: { columns: { fullName: true } },
+            service: { columns: { name: true, durationMinutes: true } }
+        }
+      });
+      
+      // Await all promises
+      const [
+        clinic_overrides, 
+        doctor_schedules, 
+        doctor_overrides, 
+        booked_appointments
+      ] = await Promise.all([
+        clinicOverridesPromise,
+        doctorSchedulesPromise,
+        doctorOverridesPromise,
+        bookedAppointmentsPromise
+      ]);
+
+      return c.json({
+        clinic_overrides,
+        doctor_schedules,
+        doctor_overrides,
+        booked_appointments,
+      });
+
+    } catch (error) {
+      console.error("Failed to fetch master schedule:", error);
+      return c.json({ error: "Failed to fetch master schedule data" }, 500);
+    }
+  }
+);
+
 // Add other admin routes here in the future...
 
 export default adminRoutes;

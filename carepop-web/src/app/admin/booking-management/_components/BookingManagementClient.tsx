@@ -14,8 +14,9 @@ import { getDoctorsByClinic } from "@/services/api";
 
 import { DoctorScheduleManager } from "./DoctorScheduleManager";
 import { DoctorOverridesManager } from './DoctorOverridesManager';
-import { DoctorAvailabilityCalendar } from "./DoctorAvailabilityCalendar";
-
+import { ClinicMasterCalendar } from "./ClinicMasterCalendar";
+// TODO: Create and import ClinicOverridesManager
+// import { ClinicOverridesManager } from "./ClinicOverridesManager";
 
 interface BookingManagementClientProps {
     clinicId: string;
@@ -26,7 +27,7 @@ type Doctor = {
     fullName: string;
 }
 
-export const BookingManagementClient: React.FC<BookingManagementClientProps> = ({ clinicId }) => {
+const DoctorSchedulesTab = ({ clinicId }: { clinicId: string }) => {
     const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
     const { session } = useAuth();
     const accessToken = session?.access_token;
@@ -48,7 +49,7 @@ export const BookingManagementClient: React.FC<BookingManagementClientProps> = (
             <Card>
                 <CardHeader>
                     <CardTitle>Doctor Selection</CardTitle>
-                    <CardDescription>Select a doctor to manage their schedules, overrides, or view their calendar.</CardDescription>
+                    <CardDescription>Select a doctor to manage their schedules and specific overrides.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="w-full max-w-sm">
@@ -73,12 +74,11 @@ export const BookingManagementClient: React.FC<BookingManagementClientProps> = (
                 </CardContent>
             </Card>
 
-            {selectedDoctorId ? (
-                 <Tabs defaultValue="schedules">
-                    <TabsList className="grid w-full grid-cols-3">
-                        <TabsTrigger value="schedules">Schedules</TabsTrigger>
-                        <TabsTrigger value="overrides">Overrides</TabsTrigger>
-                        <TabsTrigger value="calendar">Calendar View</TabsTrigger>
+            {selectedDoctorId && (
+                <Tabs defaultValue="schedules" className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="schedules">Recurring Schedules</TabsTrigger>
+                        <TabsTrigger value="overrides">One-off Overrides</TabsTrigger>
                     </TabsList>
                     <TabsContent value="schedules">
                         <DoctorScheduleManager doctorId={selectedDoctorId} />
@@ -86,15 +86,46 @@ export const BookingManagementClient: React.FC<BookingManagementClientProps> = (
                     <TabsContent value="overrides">
                         <DoctorOverridesManager doctorId={selectedDoctorId} />
                     </TabsContent>
-                    <TabsContent value="calendar">
-                        <DoctorAvailabilityCalendar doctorId={selectedDoctorId} />
-                    </TabsContent>
                 </Tabs>
-            ) : (
-                <div className="text-center p-8 border-2 border-dashed rounded-lg">
-                    <p className="text-muted-foreground">Please select a doctor to continue.</p>
-                </div>
             )}
         </div>
+    );
+};
+
+export const BookingManagementClient: React.FC<BookingManagementClientProps> = ({ clinicId }) => {
+    return (
+        <Tabs defaultValue="master-calendar" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="master-calendar">Master Calendar</TabsTrigger>
+                <TabsTrigger value="doctor-schedules">Doctor Schedules</TabsTrigger>
+                <TabsTrigger value="clinic-overrides">Clinic-Wide Overrides</TabsTrigger>
+            </TabsList>
+            <TabsContent value="master-calendar">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Clinic Master Calendar</CardTitle>
+                        <CardDescription>A comprehensive, read-only view of all appointments, schedules, and clinic-wide events.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ClinicMasterCalendar clinicId={clinicId} />
+                    </CardContent>
+                </Card>
+            </TabsContent>
+            <TabsContent value="doctor-schedules">
+                <DoctorSchedulesTab clinicId={clinicId} />
+            </TabsContent>
+            <TabsContent value="clinic-overrides">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Clinic-Wide Overrides</CardTitle>
+                        <CardDescription>Manage holidays, closures, and other special events that affect the entire clinic.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {/* <ClinicOverridesManager clinicId={clinicId} /> */}
+                        <p>Clinic-Wide Overrides Manager will go here.</p>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+        </Tabs>
     )
 } 

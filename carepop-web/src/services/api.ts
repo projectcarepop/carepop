@@ -1161,13 +1161,12 @@ export async function upsertDoctorOverride(
 
 export async function deleteDoctorOverride(overrideId: string, accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
-    const url = `${API_BASE_URL}/api/admin/doctor-overrides/${overrideId}`;
-    const response = await fetch(url, {
+    const response = await fetch(`${API_BASE_URL}/api/admin/overrides/${overrideId}`, {
         method: 'DELETE',
-        headers,
+        headers
     });
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Failed to delete doctor override.' }));
+        const error = await response.json().catch(() => ({ message: 'Failed to delete doctor override' }));
         throw new Error(error.message);
     }
     return response.json();
@@ -1196,4 +1195,43 @@ export async function getCalculatedAvailability(
         console.error("Network or parsing error in getCalculatedAvailability:", error);
         throw error;
     }
+}
+
+// Type definitions for the master schedule endpoint response
+export type MasterScheduleAppointment = {
+    id: string;
+    appointmentTime: string;
+    patient: { firstName: string | null; lastName: string | null };
+    doctor: { fullName: string | null };
+    service: { name: string; durationMinutes: number };
+};
+
+export type MasterScheduleData = {
+    clinic_overrides: ClinicOverride[];
+    doctor_schedules: DoctorSchedule[];
+    doctor_overrides: DoctorOverride[];
+    booked_appointments: MasterScheduleAppointment[];
+};
+
+export async function getClinicMasterSchedule(
+    clinicId: string,
+    startDate: string, // YYYY-MM-DD
+    endDate: string,   // YYYY-MM-DD
+    accessToken: string
+): Promise<MasterScheduleData> {
+    const headers = await getAuthHeaders(accessToken);
+    const params = new URLSearchParams({
+        start_date: startDate,
+        end_date: endDate,
+    });
+    const url = `${API_BASE_URL}/api/admin/clinics/${clinicId}/master-schedule?${params.toString()}`;
+
+    const response = await fetch(url, { headers, cache: 'no-store' });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Failed to fetch master schedule' }));
+        throw new Error(error.message);
+    }
+
+    return response.json();
 }
