@@ -645,15 +645,48 @@ async function calculateAvailableSlots(
         if (!dailySchedule) continue;
 
         // Generate potential slots based on the recurring schedule
-        let currentTime = zonedTimeToUtc(`${yyyy_mm_dd}T${dailySchedule.startTime}`, 'UTC');
-        const endTime = zonedTimeToUtc(`${yyyy_mm_dd}T${dailySchedule.endTime}`, 'UTC');
+        let potentialSlotStart = zonedTimeToUtc(`${yyyy_mm_dd}T${dailySchedule.startTime}`, 'UTC');
+        const scheduleEnd = zonedTimeToUtc(`${yyyy_mm_dd}T${dailySchedule.endTime}`, 'UTC');
 
-        while (currentTime < endTime) {
-            // Ensure slot is not in the past and not already booked
-            if (currentTime > new Date() && !bookedSlots.has(currentTime.getTime())) {
-                availableSlots.push(new Date(currentTime));
+        while (potentialSlotStart < scheduleEnd) {
+            const potentialSlotEnd = addMinutes(potentialSlotStart, slotDuration);
+
+            if (potentialSlotEnd > scheduleEnd) {
+                break; // Don't create a slot that exceeds the doctor's schedule
             }
-            currentTime = addMinutes(currentTime, slotDuration);
+
+            // CHECK 4: Is the slot in the past?
+            if (potentialSlotStart < new Date()) {
+                potentialSlotStart = addMinutes(potentialSlotStart, 15); // Or slotDuration
+                continue;
+            }
+
+            // CHECK 5: Does the slot overlap with a booked appointment?
+            const isBooked = bookedAppointments.some((appt: { appointmentTime: string | number | Date; }) => {
+                const apptStart = new Date(appt.appointmentTime);
+                const apptEnd = addMinutes(apptStart, slotDuration);
+                // Check for overlap: (StartA < EndB) and (EndA > StartB)
+                return potentialSlotStart < apptEnd && potentialSlotEnd > apptStart;
+            });
+            if (isBooked) {
+                potentialSlotStart = addMinutes(potentialSlotStart, 15); // Move to the next potential start time
+                continue;
+            }
+
+            // CHECK 6: Does the slot overlap with a doctor's non-availability override?
+            const isDoctorOverride = doctorOverrides.some((o: { isAvailable: any; startDateTime: string | number | Date; endDateTime: string | number | Date; }) => 
+                !o.isAvailable && potentialSlotStart < new Date(o.endDateTime) && potentialSlotEnd > new Date(o.startDateTime)
+            );
+            if (isDoctorOverride) {
+                potentialSlotStart = addMinutes(potentialSlotStart, 15);
+                continue;
+            }
+
+            // If all checks pass, it's a valid slot
+            availableSlots.push(new Date(potentialSlotStart));
+            
+            // Move to the next slot
+            potentialSlotStart = addMinutes(potentialSlotStart, slotDuration);
         }
     }
     
