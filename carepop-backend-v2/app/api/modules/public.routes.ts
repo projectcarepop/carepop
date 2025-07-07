@@ -644,8 +644,9 @@ async function calculateAvailableSlots(
         if (!dailySchedule) continue;
 
         // Generate potential slots based on the recurring schedule
-        let potentialSlotStart = zonedTimeToUtc(`${yyyy_mm_dd}T${dailySchedule.startTime}`, 'UTC');
-        const scheduleEnd = zonedTimeToUtc(`${yyyy_mm_dd}T${dailySchedule.endTime}`, 'UTC');
+        const timeZone = 'Asia/Manila';
+        let potentialSlotStart = zonedTimeToUtc(`${yyyy_mm_dd}T${dailySchedule.startTime}`, timeZone);
+        const scheduleEnd = zonedTimeToUtc(`${yyyy_mm_dd}T${dailySchedule.endTime}`, timeZone);
 
         while (potentialSlotStart < scheduleEnd) {
             const potentialSlotEnd = addMinutes(potentialSlotStart, slotDuration);

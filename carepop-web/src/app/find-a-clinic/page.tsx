@@ -4,10 +4,11 @@ import React, { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF, DirectionsRenderer } from '@react-google-maps/api';
-import { searchClinics } from '@/services/api';
+import { searchClinics, getPublicClinicDetails } from '@/services/api';
 import { type Clinic } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useSearchParams } from 'next/navigation';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -49,6 +50,8 @@ function FindAClinicClient() {
   const [isLocating, setIsLocating] = useState(false);
   const { toast } = useToast();
   const mapRef = React.useRef<google.maps.Map | null>(null);
+  const searchParams = useSearchParams();
+  const preselectedClinicId = searchParams.get('clinicId');
 
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
@@ -60,6 +63,20 @@ function FindAClinicClient() {
     queryFn: () => searchClinics(filters),
     enabled: isLoaded,
   });
+
+  const { data: preselectedClinic } = useQuery<Clinic | null, Error>({
+    queryKey: ['clinicDetails', preselectedClinicId],
+    queryFn: () => preselectedClinicId ? getPublicClinicDetails(preselectedClinicId) : null,
+    enabled: !!preselectedClinicId && isLoaded,
+    select: (data: any) => data?.data ?? null,
+  });
+
+  // --- Logic to handle pre-selected clinic from URL ---
+  useEffect(() => {
+    if (preselectedClinic) {
+      handleListSelect(preselectedClinic);
+    }
+  }, [preselectedClinic]);
 
   // --- Radius Filter Logic ---
   useEffect(() => {
