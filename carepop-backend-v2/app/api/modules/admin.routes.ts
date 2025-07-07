@@ -17,6 +17,7 @@ import {
     doctorSchedules,
     doctorAvailabilityOverrides,
     clinicServices,
+    doctorClinics,
     recordDoctorNotes,
     recordPrescriptions,
     recordDocuments,
@@ -317,10 +318,18 @@ adminRoutes
     }
   })
   .delete('/clinics/:id', async (c) => {
+    // This endpoint should probably have more checks, like if the clinic has active appointments.
+    // For now, it's a direct deletion.
     const { id } = c.req.param();
-    const [deletedClinic] = await db.delete(clinics).where(eq(clinics.id, id)).returning();
-    if (!deletedClinic) return c.json({ error: 'Not Found' }, 404);
-    return c.json({ success: true });
+    if (!id) {
+      return c.json({ error: 'ID is required' }, 400);
+    }
+
+    const deletedClinic = await db.delete(clinics).where(eq(clinics.id, id)).returning();
+    if (deletedClinic.length === 0) {
+      return c.json({ error: 'Clinic not found' }, 404);
+    }
+    return c.json({ data: deletedClinic[0], message: 'Clinic deleted successfully' });
   });
 
 // --- Clinic-Service Linking Endpoints ---
@@ -1601,6 +1610,37 @@ adminRoutes
     if (!deletedClinic) return c.json({ error: 'Not Found' }, 404);
     return c.json({ success: true });
   });
+
+// --- CORRECTED NEW ENDPOINT to get doctors by clinic ---
+adminRoutes.get('/clinics/:clinicId/doctors', async (c) => {
+    const { clinicId } = c.req.param();
+    
+    if (!clinicId) {
+        return c.json({ error: 'Clinic ID is required' }, 400);
+    }
+
+    try {
+        const doctorList = await db
+            .select({
+                id: doctors.id,
+                fullName: doctors.fullName,
+                specialtyText: doctors.specialtyText,
+                bio: doctors.bio,
+                avatarUrl: doctors.avatarUrl,
+                isActive: doctors.isActive,
+            })
+            .from(doctors)
+            .innerJoin(doctorClinics, eq(doctors.id, doctorClinics.doctorId))
+            .where(eq(doctorClinics.clinicId, clinicId));
+
+        // It's better to return an empty array if no doctors are found,
+        // as this is not an error condition. The frontend can handle an empty list.
+        return c.json({ data: doctorList });
+    } catch (error) {
+        console.error('Error fetching doctors for clinic:', error);
+        return c.json({ error: 'Internal server error' }, 500);
+    }
+});
 
 // Add other admin routes here in the future...
 
