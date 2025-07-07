@@ -15,8 +15,7 @@ import { getDoctorsByClinic } from "@/services/api";
 import { DoctorScheduleManager } from "./DoctorScheduleManager";
 import { DoctorOverridesManager } from './DoctorOverridesManager';
 import { ClinicMasterCalendar } from "./ClinicMasterCalendar";
-// TODO: Create and import ClinicOverridesManager
-// import { ClinicOverridesManager } from "./ClinicOverridesManager";
+import { ClinicOverridesManager } from "./ClinicOverridesManager";
 
 interface BookingManagementClientProps {
     clinicId: string;
@@ -27,12 +26,12 @@ type Doctor = {
     fullName: string;
 }
 
-const DoctorSchedulesTab = ({ clinicId }: { clinicId: string }) => {
+const DoctorManagementTab = ({ clinicId }: { clinicId: string }) => {
     const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
     const { session } = useAuth();
     const accessToken = session?.access_token;
 
-    const { data: doctorsResponse, isLoading: isLoadingDoctors } = useQuery({
+    const { data: doctors, isLoading: isLoadingDoctors } = useQuery({
         queryKey: ['doctorsByClinic', clinicId],
         queryFn: () => {
             if (!accessToken) throw new Error("Not authorized");
@@ -41,15 +40,13 @@ const DoctorSchedulesTab = ({ clinicId }: { clinicId: string }) => {
         select: (response: { data: Doctor[] }) => response.data,
         enabled: !!accessToken && !!clinicId,
     });
-    
-    const doctors = doctorsResponse || [];
 
     return (
         <div className="space-y-6">
             <Card>
                 <CardHeader>
                     <CardTitle>Doctor Selection</CardTitle>
-                    <CardDescription>Select a doctor to manage their schedules and specific overrides.</CardDescription>
+                    <CardDescription>Select a doctor to manage their recurring schedules and one-off overrides.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="w-full max-w-sm">
@@ -59,14 +56,14 @@ const DoctorSchedulesTab = ({ clinicId }: { clinicId: string }) => {
                         ) : (
                             <Select onValueChange={setSelectedDoctorId} value={selectedDoctorId ?? undefined}>
                                 <SelectTrigger id="doctor-selector">
-                                <SelectValue placeholder="Select a doctor..." />
+                                    <SelectValue placeholder="Select a doctor..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                {doctors.map(doctor => (
-                                    <SelectItem key={doctor.id} value={doctor.id}>
-                                        {doctor.fullName}
-                                    </SelectItem>
-                                ))}
+                                    {(doctors || []).map(doctor => (
+                                        <SelectItem key={doctor.id} value={doctor.id}>
+                                            {doctor.fullName}
+                                        </SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         )}
@@ -94,13 +91,13 @@ const DoctorSchedulesTab = ({ clinicId }: { clinicId: string }) => {
 
 export const BookingManagementClient: React.FC<BookingManagementClientProps> = ({ clinicId }) => {
     return (
-        <Tabs defaultValue="master-calendar" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="master-calendar">Master Calendar</TabsTrigger>
-                <TabsTrigger value="doctor-schedules">Doctor Schedules</TabsTrigger>
-                <TabsTrigger value="clinic-overrides">Clinic-Wide Overrides</TabsTrigger>
+        <Tabs defaultValue="clinic-schedule" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="clinic-schedule">Clinic Schedule</TabsTrigger>
+                <TabsTrigger value="doctor-schedule">Doctor Schedule</TabsTrigger>
             </TabsList>
-            <TabsContent value="master-calendar">
+            <TabsContent value="clinic-schedule" className="space-y-6">
+                <ClinicOverridesManager clinicId={clinicId} />
                 <Card>
                     <CardHeader>
                         <CardTitle>Clinic Master Calendar</CardTitle>
@@ -111,20 +108,8 @@ export const BookingManagementClient: React.FC<BookingManagementClientProps> = (
                     </CardContent>
                 </Card>
             </TabsContent>
-            <TabsContent value="doctor-schedules">
-                <DoctorSchedulesTab clinicId={clinicId} />
-            </TabsContent>
-            <TabsContent value="clinic-overrides">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Clinic-Wide Overrides</CardTitle>
-                        <CardDescription>Manage holidays, closures, and other special events that affect the entire clinic.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {/* <ClinicOverridesManager clinicId={clinicId} /> */}
-                        <p>Clinic-Wide Overrides Manager will go here.</p>
-                    </CardContent>
-                </Card>
+            <TabsContent value="doctor-schedule">
+                <DoctorManagementTab clinicId={clinicId} />
             </TabsContent>
         </Tabs>
     )
