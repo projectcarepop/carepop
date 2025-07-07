@@ -1,84 +1,81 @@
 'use client';
 
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getPublicClinics } from '@/services/api';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Loader2, AlertCircle, MapPin } from 'lucide-react';
-import type { Clinic } from '@/lib/types';
-import { useRouter } from 'next/navigation';
+import { getPublicClinics } from '../../../services/api';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-
-const formatAddress = (address: Clinic['address']) => {
-    if (!address) return 'No address provided';
-    const parts = [
-        address.street,
-        address.barangay,
-        address.city,
-        address.province,
-        address.postal_code,
-    ];
-    return parts.filter(Boolean).join(', ');
-};
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2 } from 'lucide-react';
+import type { BookingData } from './BookingFlowManager';
+import { type Clinic } from '@/lib/types/bookings';
 
 interface Step1_ClinicSelectionProps {
-    onClinicSelect: (clinic: Clinic) => void;
+  updateBookingData: (data: Partial<BookingData>) => void;
+  goToNextStep: () => void;
 }
 
-export function Step1_ClinicSelection({ onClinicSelect }: Step1_ClinicSelectionProps) {
-    const router = useRouter();
-    const { data: clinics, isLoading, isError } = useQuery<Clinic[], Error>({
-        queryKey: ['publicClinics'],
-        queryFn: () => getPublicClinics(),
-        select: (data: any) => data.data, // The API wraps the array in a data property
-    });
+export const Step1_ClinicSelection: React.FC<Step1_ClinicSelectionProps> = ({ updateBookingData, goToNextStep }) => {
+  const { data: clinics, isLoading, isError, error } = useQuery({
+    queryKey: ['clinics'],
+    queryFn: () => getPublicClinics(),
+    select: (data) => data.data,
+  });
 
-    const handleViewOnMap = (clinicId: string) => {
-        router.push(`/find-a-clinic?clinicId=${clinicId}`);
-    };
+  const handleSelect = (clinic: Clinic) => {
+    updateBookingData({ clinic });
+    goToNextStep();
+  };
 
-    if (isLoading) {
-        return <div className="flex justify-center items-center h-48"><Loader2 className="h-8 w-8 animate-spin" /></div>;
-    }
-
-    if (isError) {
-        return (
-            <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription>Could not fetch clinics. Please try again later.</AlertDescription>
-            </Alert>
-        );
-    }
-
+  if (isLoading) {
     return (
-        <div className="space-y-4">
-            <div className="text-center">
-                <h2 className="text-2xl font-bold">Select a Clinic</h2>
-                <p className="text-muted-foreground">Choose where you&apos;d like to set your appointment.</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {clinics?.map((clinic: Clinic) => (
-                    <Card key={clinic.id} className="flex flex-col justify-between">
-                        <CardHeader>
-                            <CardTitle>{clinic.name}</CardTitle>
-                            <CardDescription>{formatAddress(clinic.address)}</CardDescription>
-                        </CardHeader>
-                        <CardContent className="flex flex-col sm:flex-row gap-2">
-                             <Button className="w-full" onClick={() => onClinicSelect(clinic)}>
-                                Select
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="w-full"
-                                onClick={() => handleViewOnMap(clinic.id)}
-                            >
-                                <MapPin className="mr-2 h-4 w-4" /> View on Map
-                            </Button>
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
-        </div>
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="mr-2 h-8 w-8 animate-spin" />
+        <span>Loading Clinics...</span>
+      </div>
     );
-} 
+  }
+
+  if (isError) {
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>Error</AlertTitle>
+        <AlertDescription>
+          There was a problem fetching clinics. Please try again later.
+          {error && <pre className="mt-2 whitespace-pre-wrap">{error.message}</pre>}
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Step 1: Find a Clinic Near You</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {clinics && clinics.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {clinics.map((clinic: Clinic) => (
+                <Card 
+                key={clinic.id} 
+                className="cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => handleSelect(clinic)}
+                >
+                <CardHeader>
+                    <CardTitle>{clinic.name}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-muted-foreground">{typeof clinic.address === 'string' ? clinic.address : 'Address not available'}</p>
+                </CardContent>
+                </Card>
+            ))}
+            </div>
+        ) : (
+            <div className="text-center text-muted-foreground py-8">
+                <p>No clinics are available at this time. Please check back later.</p>
+            </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}; 
