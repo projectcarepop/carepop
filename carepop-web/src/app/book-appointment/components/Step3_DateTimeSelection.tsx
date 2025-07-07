@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getAvailableSlots } from '../../../services/api';
+import { getAvailableSlots } from '@/services/api';
 import { format, startOfMonth, endOfMonth, startOfDay, addDays } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
@@ -61,6 +61,10 @@ export const Step3_DateTimeSelection: React.FC<Step3_DateTimeSelectionProps> = (
     goToNextStep();
   };
 
+  if (!bookingData.clinic || !bookingData.service || !bookingData.doctor) {
+    return <div className="text-center text-red-500">Please go back and select a clinic, service, and doctor first.</div>
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -69,35 +73,48 @@ export const Step3_DateTimeSelection: React.FC<Step3_DateTimeSelectionProps> = (
             <Button variant="ghost" onClick={goToPreviousStep}>Back</Button>
         </div>
       </CardHeader>
-      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div>
-          <Calendar
-            mode="single"
-            selected={selectedDate}
-            onSelect={setSelectedDate}
-            disabled={(date) => date <= new Date()}
-            className="rounded-md border"
-          />
+      <CardContent className="space-y-6">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold">Select a Date and Time</h2>
+          <div className="text-muted-foreground">
+            <p>
+              Booking for <span className="font-semibold text-primary">{bookingData.service.name}</span> with <span className="font-semibold text-primary">{bookingData.doctor.fullName}</span>
+            </p>
+            <p>
+              at <span className="font-semibold text-primary">{bookingData.clinic.name}</span>.
+            </p>
+          </div>
         </div>
-        <div className="relative">
-          {isLoading && (
-            <div className="absolute inset-0 bg-white/80 flex items-center justify-center rounded-lg">
-              <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
-          )}
-          {isError && <p className="text-destructive">Could not load slots. Please try another month.</p>}
-          <div className="grid grid-cols-3 gap-2 max-h-96 overflow-y-auto">
-            {slotsForSelectedDay.length > 0 ? (
-              slotsForSelectedDay.map((slot: Date) => (
-                <Button key={slot.toISOString()} onClick={() => handleSelectSlot(slot)}>
-                  {format(slot, 'h:mm a')}
-                </Button>
-              ))
-            ) : (
-              <p className="col-span-3 text-center text-muted-foreground pt-8">
-                {selectedDate ? "No available slots for this day." : "Please select a date."}
-              </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div>
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={setSelectedDate}
+              disabled={(date) => date <= new Date()}
+              className="rounded-md border"
+            />
+          </div>
+          <div className="relative">
+            {isLoading && (
+              <div className="absolute inset-0 bg-white/80 flex items-center justify-center rounded-lg">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
             )}
+            {isError && <p className="text-destructive">Could not load slots. Please try another month.</p>}
+            <div className="grid grid-cols-3 gap-2 max-h-96 overflow-y-auto">
+              {slotsForSelectedDay.length > 0 ? (
+                slotsForSelectedDay.map((slot: Date) => (
+                  <Button key={slot.toISOString()} onClick={() => handleSelectSlot(slot)}>
+                    {format(slot, 'h:mm a')}
+                  </Button>
+                ))
+              ) : (
+                <p className="col-span-3 text-center text-muted-foreground pt-8">
+                  {selectedDate ? "No available slots for this day." : "Please select a date."}
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </CardContent>
