@@ -1059,7 +1059,7 @@ export async function getDoctorsByClinic(clinicId: string, accessToken: string) 
 
 export async function getDoctorSchedules(doctorId: string, accessToken: string): Promise<DoctorSchedule[]> {
     const headers = await getAuthHeaders(accessToken);
-    const url = `${API_BASE_URL}/api/admin/schedules/doctor/${doctorId}`;
+    const url = `${API_BASE_URL}/api/admin/doctors/${doctorId}/schedules`;
     
     const response = await fetch(url, { headers, cache: 'no-store' });
     if (!response.ok) {
