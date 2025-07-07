@@ -29,6 +29,77 @@ import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 
 // =================================================================
+// Helper Functions for Availability Calculation
+// =================================================================
+
+type TimeSlot = [Date, Date];
+
+// Merges overlapping or adjacent time slots.
+function mergeSlots(slots: TimeSlot[]): TimeSlot[] {
+    if (slots.length <= 1) return slots;
+    slots.sort((a, b) => a[0].getTime() - b[0].getTime());
+
+    const merged: TimeSlot[] = [slots[0]];
+    for (let i = 1; i < slots.length; i++) {
+        const last = merged[merged.length - 1];
+        const current = slots[i];
+        if (current[0].getTime() <= last[1].getTime()) {
+            last[1] = new Date(Math.max(last[1].getTime(), current[1].getTime()));
+        } else {
+            merged.push(current);
+        }
+    }
+    return merged;
+}
+
+// Adds a new slot and merges the result.
+function addSlot(slots: TimeSlot[], newSlot: TimeSlot): TimeSlot[] {
+    slots.push(newSlot);
+    return mergeSlots(slots);
+}
+
+// Subtracts a slot from a list of slots, handling splits and truncations.
+function subtractSlot(slots: TimeSlot[], slotToSubtract: TimeSlot): TimeSlot[] {
+    const [subStart, subEnd] = slotToSubtract;
+    let newSlots: TimeSlot[] = [];
+
+    for (const slot of slots) {
+        const [start, end] = slot;
+
+        // No overlap: The current slot is entirely before or after the subtraction slot.
+        if (end <= subStart || start >= subEnd) {
+            newSlots.push(slot);
+            continue;
+        }
+
+        // The slot is completely contained within the subtraction slot (it gets removed).
+        if (start >= subStart && end <= subEnd) {
+            continue;
+        }
+
+        // The subtraction slot is contained entirely within the current slot (split).
+        if (start < subStart && end > subEnd) {
+            newSlots.push([start, subStart]);
+            newSlots.push([subEnd, end]);
+            continue;
+        }
+
+        // The subtraction slot overlaps the beginning of the current slot.
+        if (start < subStart && end > subStart) {
+            newSlots.push([start, subStart]);
+            continue;
+        }
+
+        // The subtraction slot overlaps the end of the current slot.
+        if (start < subEnd && end > subEnd) {
+            newSlots.push([subEnd, end]);
+            continue;
+        }
+    }
+    return newSlots;
+}
+
+// =================================================================
 // Zod Validation Schemas
 // =================================================================
 
@@ -1549,6 +1620,147 @@ adminRoutes
       return c.json({ error: 'Internal Server Error' }, 500);
     }
   });
+
+// --- Availability Calculation Endpoint ---
+adminRoutes.get('/doctors/:doctorId/calculated-availability',
+  zValidator('param', z.object({ doctorId: z.string().uuid() })),
+  zValidator('query', z.object({
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Invalid startDate format, expected YYYY-MM-DD" }),
+    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Invalid endDate format, expected YYYY-MM-DD" }),
+  })),
+  async (c) => {
+    const { doctorId } = c.req.valid('param');
+    const { startDate, endDate } = c.req.valid('query');
+
+    try {
+      const queryEndDate = new Date(endDate);
+      queryEndDate.setDate(queryEndDate.getDate() + 1);
+
+      // 1. Fetch all data in parallel
+      const [schedules, doctorOverrides, doctorClinicLinks] = await Promise.all([
+        db.query.doctorSchedules.findMany({ where: eq(doctorSchedules.doctorId, doctorId) }),
+        db.query.doctorAvailabilityOverrides.findMany({
+          where: and(
+            eq(doctorAvailabilityOverrides.doctorId, doctorId),
+            gte(doctorAvailabilityOverrides.endDateTime, startDate),
+            lt(doctorAvailabilityOverrides.startDateTime, queryEndDate.toISOString())
+          )
+        }),
+        db.query.doctorClinics.findMany({ where: eq(doctorClinics.doctorId, doctorId) })
+      ]);
+
+      const clinicIds = doctorClinicLinks.map(link => link.clinicId);
+      
+      // Define the type explicitly to avoid circular reference
+      type ClinicOverride = typeof import('../../../drizzle/schema').clinicOverrides.$inferSelect;
+      let clinicOverridesList: ClinicOverride[] = [];
+
+      if (clinicIds.length > 0) {
+        clinicOverridesList = await db.query.clinicOverrides.findMany({
+          where: and(
+            inArray(clinicOverrides.clinicId, clinicIds),
+            gte(clinicOverrides.endDateTime, startDate),
+            lt(clinicOverrides.startDateTime, queryEndDate.toISOString())
+          )
+        });
+      }
+
+      // 2. Structure data for fast lookups
+      const scheduleMap = new Map(schedules.map(s => [s.dayOfWeek, { startTime: s.startTime, endTime: s.endTime }]));
+      
+      const buildOverrideMap = (overrides: any[]) => {
+        const map = new Map<string, any[]>();
+        for (const override of overrides) {
+            let cursor = new Date(override.startDateTime);
+            let endDate = new Date(override.endDateTime);
+            while(cursor < endDate) {
+                const dateKey = cursor.toISOString().split('T')[0];
+                if (!map.has(dateKey)) map.set(dateKey, []);
+                map.get(dateKey)!.push(override);
+                cursor.setDate(cursor.getDate() + 1);
+            }
+        }
+        return map;
+      };
+      const doctorOverrideMap = buildOverrideMap(doctorOverrides);
+      const clinicOverrideMap = buildOverrideMap(clinicOverridesList);
+      
+      // 3. Loop through each day and calculate availability
+      const availabilityResult: Record<string, { status: string; slots: string[]; reason?: string }> = {};
+      const currentDate = new Date(`${startDate}T00:00:00Z`);
+      const finalDate = new Date(`${endDate}T00:00:00Z`);
+
+      const timeToDate = (timeStr: string, date: Date): Date => {
+        const [hours, minutes, seconds] = timeStr.split(':').map(Number);
+        const newDate = new Date(date);
+        newDate.setUTCHours(hours, minutes, seconds, 0);
+        return newDate;
+      };
+
+      while (currentDate <= finalDate) {
+        const dateKey = currentDate.toISOString().split('T')[0];
+        let availableSlots: TimeSlot[] = [];
+
+        // A. Start with base recurring schedule
+        const dayOfWeek = currentDate.getUTCDay();
+        const baseSchedule = scheduleMap.get(dayOfWeek);
+        if (baseSchedule) {
+          availableSlots.push([
+            timeToDate(baseSchedule.startTime, currentDate),
+            timeToDate(baseSchedule.endTime, currentDate)
+          ]);
+        }
+
+        // B. Apply clinic-wide overrides
+        const dailyClinicOverrides = clinicOverrideMap.get(dateKey) || [];
+        for (const override of dailyClinicOverrides) {
+          const overrideSlot: TimeSlot = [new Date(override.startDateTime), new Date(override.endDateTime)];
+          if (override.isAvailable) {
+            availableSlots = addSlot(availableSlots, overrideSlot);
+          } else {
+            availableSlots = subtractSlot(availableSlots, overrideSlot);
+          }
+        }
+
+        // C. Apply doctor-specific overrides
+        const dailyDoctorOverrides = doctorOverrideMap.get(dateKey) || [];
+        for (const override of dailyDoctorOverrides) {
+          const overrideSlot: TimeSlot = [new Date(override.startDateTime), new Date(override.endDateTime)];
+          if (override.isAvailable) {
+            availableSlots = addSlot(availableSlots, overrideSlot);
+          } else {
+            availableSlots = subtractSlot(availableSlots, overrideSlot);
+          }
+        }
+        
+        // D. Determine final status and format slots
+        if (availableSlots.length > 0) {
+          const formattedSlots = availableSlots.map(([start, end]) => 
+            `${start.getUTCHours().toString().padStart(2, '0')}:${start.getUTCMinutes().toString().padStart(2, '0')}-` +
+            `${end.getUTCHours().toString().padStart(2, '0')}:${end.getUTCMinutes().toString().padStart(2, '0')}`
+          );
+          
+          let status = 'available';
+          if (dailyDoctorOverrides.length > 0 || dailyClinicOverrides.length > 0) {
+              status = 'partial'; // Or some other logic to determine if it's truly "partial"
+          }
+
+          availabilityResult[dateKey] = { status, slots: formattedSlots };
+        } else {
+          availabilityResult[dateKey] = { status: 'unavailable', slots: [] };
+        }
+
+        currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+      }
+
+      return c.json({ data: availabilityResult });
+
+    } catch (error: any) {
+      console.error(`Failed to calculate availability for doctor ${doctorId}:`, error);
+      return c.json({ error: 'Internal Server Error', message: error.message }, 500);
+    }
+  }
+);
 
 // --- Clinic Details ---
 adminRoutes

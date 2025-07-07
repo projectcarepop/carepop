@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
-    getDoctorsByClinic, 
     getDoctorSchedules, 
     createDoctorSchedule,
     updateDoctorSchedule,
@@ -23,11 +22,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogC
 import { Input } from '@/components/ui/input';
 import { PlusCircle, MoreHorizontal } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-
-type Doctor = {
-    id: string;
-    fullName: string;
-}
 
 const WEEK_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -97,11 +91,10 @@ const AddEditScheduleModal: React.FC<AddEditScheduleModalProps> = ({ isOpen, onC
 
 
 interface DoctorScheduleManagerProps {
-  clinicId: string;
+  doctorId: string;
 }
 
-export const DoctorScheduleManager: React.FC<DoctorScheduleManagerProps> = ({ clinicId }) => {
-  const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
+export const DoctorScheduleManager: React.FC<DoctorScheduleManagerProps> = ({ doctorId }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<DoctorSchedule | null>(null);
 
@@ -110,39 +103,29 @@ export const DoctorScheduleManager: React.FC<DoctorScheduleManagerProps> = ({ cl
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: doctors, isLoading: isLoadingDoctors } = useQuery({
-      queryKey: ['doctorsByClinic', clinicId],
-      queryFn: () => {
-          if (!accessToken) throw new Error("Not authorized");
-          return getDoctorsByClinic(clinicId, accessToken);
-      },
-      select: (response: { data: Doctor[] }) => response.data,
-      enabled: !!accessToken && !!clinicId,
-  });
-
   const { data: schedules, isLoading: isLoadingSchedules } = useQuery({
-      queryKey: ['doctorSchedules', selectedDoctorId],
+      queryKey: ['doctorSchedules', doctorId],
       queryFn: () => {
-          if (!accessToken || !selectedDoctorId) return [];
-          return getDoctorSchedules(selectedDoctorId, accessToken);
+          if (!accessToken || !doctorId) return [];
+          return getDoctorSchedules(doctorId, accessToken);
       },
-      enabled: !!accessToken && !!selectedDoctorId,
+      enabled: !!accessToken && !!doctorId,
   });
 
   const upsertMutation = useMutation({
       mutationFn: (scheduleData: UpsertDoctorSchedulePayload & { scheduleId?: string }) => {
-          if (!accessToken || !selectedDoctorId) throw new Error("Not authorized");
+          if (!accessToken || !doctorId) throw new Error("Not authorized");
           
           if (scheduleData.scheduleId) {
               const { scheduleId, ...payload } = scheduleData;
               return updateDoctorSchedule(scheduleId, payload, accessToken);
           } else {
-              return createDoctorSchedule(selectedDoctorId, scheduleData, accessToken);
+              return createDoctorSchedule(doctorId, scheduleData, accessToken);
           }
       },
       onSuccess: (data, variables) => {
           toast({ title: "Success", description: `Schedule ${variables.scheduleId ? 'updated' : 'created'} successfully.` });
-          queryClient.invalidateQueries({ queryKey: ['doctorSchedules', selectedDoctorId] });
+          queryClient.invalidateQueries({ queryKey: ['doctorSchedules', doctorId] });
           setIsModalOpen(false);
       },
       onError: (error: Error) => {
@@ -157,7 +140,7 @@ export const DoctorScheduleManager: React.FC<DoctorScheduleManagerProps> = ({ cl
       },
       onSuccess: () => {
           toast({ title: "Success", description: "Schedule deleted successfully." });
-          queryClient.invalidateQueries({ queryKey: ['doctorSchedules', selectedDoctorId] });
+          queryClient.invalidateQueries({ queryKey: ['doctorSchedules', doctorId] });
       },
       onError: (error: Error) => {
           toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -194,81 +177,59 @@ export const DoctorScheduleManager: React.FC<DoctorScheduleManagerProps> = ({ cl
     />
     <Card>
       <CardHeader>
-        <CardTitle>Doctor Schedules</CardTitle>
+        <CardTitle>Doctor Schedules & Overrides</CardTitle>
         <CardDescription>
-          Manage recurring weekly schedules for each doctor at this clinic.
+          Manage recurring weekly schedules and individual overrides for each doctor at this clinic.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="w-full max-w-sm">
-          <Label htmlFor="doctor-selector">Select a Doctor</Label>
-          {isLoadingDoctors ? (
-              <Skeleton className="h-10 w-full" />
-          ) : (
-            <Select onValueChange={setSelectedDoctorId} value={selectedDoctorId ?? undefined}>
-                <SelectTrigger id="doctor-selector">
-                <SelectValue placeholder="Select a doctor..." />
-                </SelectTrigger>
-                <SelectContent>
-                {doctors && doctors.map(doctor => (
-                    <SelectItem key={doctor.id} value={doctor.id}>
-                        {doctor.fullName}
-                    </SelectItem>
-                ))}
-                </SelectContent>
-            </Select>
-          )}
-        </div>
-        
-        {selectedDoctorId && (
-            <div>
-                <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-lg font-semibold">Recurring Weekly Schedule</h3>
-                    <Button onClick={handleAddClick} size="sm">
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Add Schedule
-                    </Button>
-                </div>
-                <div className="rounded-md border">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Day of Week</TableHead>
-                                <TableHead>Start Time</TableHead>
-                                <TableHead>End Time</TableHead>
-                                <TableHead><span className="sr-only">Actions</span></TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {isLoadingSchedules ? (
-                                <TableRow><TableCell colSpan={4}><Skeleton className="h-5 w-full my-2" /></TableCell></TableRow>
-                            ) : schedules && schedules.length > 0 ? (
-                                schedules.map(schedule => (
-                                    <TableRow key={schedule.id}>
-                                        <TableCell>{WEEK_DAYS[schedule.dayOfWeek]}</TableCell>
-                                        <TableCell>{schedule.startTime}</TableCell>
-                                        <TableCell>{schedule.endTime}</TableCell>
-                                        <TableCell>
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                                <DropdownMenuContent>
-                                                    <DropdownMenuItem onClick={() => handleEditClick(schedule)}>Edit</DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleDeleteConfirmation(schedule.id)} className="text-destructive">Delete</DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            ) : (
-                                <TableRow>
-                                    <TableCell colSpan={4} className="text-center h-24 text-muted-foreground">No recurring schedule found.</TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </div>
+        <div>
+            <div className="flex justify-between items-center mb-2">
+                <h3 className="text-lg font-semibold">Recurring Weekly Schedule</h3>
+                <Button onClick={handleAddClick} size="sm">
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Add Schedule
+                </Button>
             </div>
-        )}
+            <div className="rounded-md border">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Day of Week</TableHead>
+                            <TableHead>Start Time</TableHead>
+                            <TableHead>End Time</TableHead>
+                            <TableHead><span className="sr-only">Actions</span></TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {isLoadingSchedules ? (
+                            <TableRow><TableCell colSpan={4}><Skeleton className="h-5 w-full my-2" /></TableCell></TableRow>
+                        ) : schedules && schedules.length > 0 ? (
+                            schedules.map(schedule => (
+                                <TableRow key={schedule.id}>
+                                    <TableCell>{WEEK_DAYS[schedule.dayOfWeek]}</TableCell>
+                                    <TableCell>{schedule.startTime}</TableCell>
+                                    <TableCell>{schedule.endTime}</TableCell>
+                                    <TableCell>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                            <DropdownMenuContent>
+                                                <DropdownMenuItem onClick={() => handleEditClick(schedule)}>Edit</DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleDeleteConfirmation(schedule.id)} className="text-destructive">Delete</DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={4} className="text-center text-muted-foreground">No recurring schedules found for this doctor.</TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </div>
+        </div>
       </CardContent>
     </Card>
     </>

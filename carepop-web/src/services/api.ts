@@ -1172,3 +1172,28 @@ export async function deleteDoctorOverride(overrideId: string, accessToken: stri
     }
     return response.json();
 }
+
+// --- NEW Availability Calculation Function ---
+export async function getCalculatedAvailability(
+    doctorId: string, 
+    startDate: string, 
+    endDate: string, 
+    accessToken: string
+) {
+    const headers = await getAuthHeaders(accessToken);
+    const url = new URL(`${API_BASE_URL}/api/admin/doctors/${doctorId}/calculated-availability`);
+    url.searchParams.set('startDate', startDate);
+    url.searchParams.set('endDate', endDate);
+
+    try {
+        const response = await fetch(url.toString(), { headers });
+        if (!response.ok) {
+            const errorBody = await response.json().catch(() => ({ message: `HTTP Error: ${response.status}` }));
+            throw new Error(errorBody.message || "Failed to fetch calculated availability");
+        }
+        return await response.json();
+    } catch (error) {
+        console.error("Network or parsing error in getCalculatedAvailability:", error);
+        throw error;
+    }
+}

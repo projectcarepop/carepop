@@ -4,8 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getDoctorsByClinic, getDoctorOverrides, upsertDoctorOverride, deleteDoctorOverride, DoctorOverride, UpsertDoctorOverridePayload } from '@/services/api';
+import { getDoctorOverrides, upsertDoctorOverride, deleteDoctorOverride, DoctorOverride, UpsertDoctorOverridePayload } from '@/services/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -19,19 +18,11 @@ import { format } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 
-type Doctor = {
-    id: string;
-    profile: {
-        fullName: string;
-    }
-}
-
 interface DoctorOverridesManagerProps {
-  clinicId: string;
+  doctorId: string;
 }
 
-export const DoctorOverridesManager: React.FC<DoctorOverridesManagerProps> = ({ clinicId }) => {
-    const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
+export const DoctorOverridesManager: React.FC<DoctorOverridesManagerProps> = ({ doctorId }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedOverride, setSelectedOverride] = useState<DoctorOverride | null>(null);
 
@@ -40,32 +31,23 @@ export const DoctorOverridesManager: React.FC<DoctorOverridesManagerProps> = ({ 
     const { toast } = useToast();
     const queryClient = useQueryClient();
 
-    const { data: doctors, isLoading: isLoadingDoctors } = useQuery<Doctor[]>({
-        queryKey: ['doctorsByClinic', clinicId],
+    const { data: overrides, isLoading: isLoadingOverrides, error: overridesError } = useQuery({
+        queryKey: ['doctorOverrides', doctorId],
         queryFn: () => {
-            if (!accessToken) throw new Error("Not authorized");
-            return getDoctorsByClinic(clinicId, accessToken);
+            if (!accessToken || !doctorId) throw new Error("No doctor selected");
+            return getDoctorOverrides(doctorId, accessToken);
         },
-        enabled: !!accessToken && !!clinicId,
-    });
-
-    const { data: overrides, isLoading: isLoadingOverrides, error: overridesError } = useQuery<DoctorOverride[]>({
-        queryKey: ['doctorOverrides', selectedDoctorId],
-        queryFn: () => {
-            if (!accessToken || !selectedDoctorId) throw new Error("No doctor selected");
-            return getDoctorOverrides(selectedDoctorId, accessToken);
-        },
-        enabled: !!accessToken && !!selectedDoctorId,
+        enabled: !!accessToken && !!doctorId,
     });
     
     const upsertMutation = useMutation({
         mutationFn: (overrideData: UpsertDoctorOverridePayload) => {
-            if (!accessToken || !selectedDoctorId) throw new Error("Not authorized");
-            return upsertDoctorOverride(selectedDoctorId, overrideData, accessToken, selectedOverride?.id);
+            if (!accessToken || !doctorId) throw new Error("Not authorized");
+            return upsertDoctorOverride(doctorId, overrideData, accessToken, selectedOverride?.id);
         },
         onSuccess: () => {
             toast({ title: "Success", description: "Override saved successfully." });
-            queryClient.invalidateQueries({ queryKey: ['doctorOverrides', selectedDoctorId] });
+            queryClient.invalidateQueries({ queryKey: ['doctorOverrides', doctorId] });
             setIsModalOpen(false);
         },
         onError: (error) => {
@@ -80,7 +62,7 @@ export const DoctorOverridesManager: React.FC<DoctorOverridesManagerProps> = ({ 
         },
         onSuccess: () => {
             toast({ title: "Success", description: "Override deleted successfully." });
-            queryClient.invalidateQueries({ queryKey: ['doctorOverrides', selectedDoctorId] });
+            queryClient.invalidateQueries({ queryKey: ['doctorOverrides', doctorId] });
         },
         onError: (error) => {
             toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -118,87 +100,59 @@ export const DoctorOverridesManager: React.FC<DoctorOverridesManagerProps> = ({ 
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="w-full max-w-sm">
-              <Label htmlFor="doctor-selector-overrides">Select a Doctor</Label>
-              {isLoadingDoctors ? (
-                  <Skeleton className="h-10 w-full" />
-              ) : (
-                <Select onValueChange={setSelectedDoctorId} value={selectedDoctorId ?? undefined}>
-                    <SelectTrigger id="doctor-selector-overrides">
-                    <SelectValue placeholder="Select a doctor..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                    {doctors && doctors.map(doctor => (
-                        <SelectItem key={doctor.id} value={doctor.id}>
-                            {doctor.profile.fullName}
-                        </SelectItem>
-                    ))}
-                    </SelectContent>
-                </Select>
-              )}
-            </div>
-            
-            {selectedDoctorId && (
-                <div>
-                    <div className="flex justify-between items-center mb-2">
-                        <h3 className="text-lg font-semibold">One-off Schedule Overrides</h3>
-                        <Button size="sm" onClick={handleAddClick}>
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Add Override
-                        </Button>
-                    </div>
-                    <div className="rounded-md border">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Start Time</TableHead>
-                                    <TableHead>End Time</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead><span className="sr-only">Actions</span></TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {isLoadingOverrides ? (
-                                    <TableRow><TableCell colSpan={4}><Skeleton className="h-5 w-full" /></TableCell></TableRow>
-                                ) : overridesError ? (
-                                    <TableRow><TableCell colSpan={4} className="text-destructive text-center">{overridesError.message}</TableCell></TableRow>
-                                ) : overrides && overrides.length > 0 ? (
-                                    overrides.map(override => (
-                                        <TableRow key={override.id}>
-                                            <TableCell>{format(new Date(override.startTime), "PPP p")}</TableCell>
-                                            <TableCell>{format(new Date(override.endTime), "PPP p")}</TableCell>
-                                            <TableCell>
-                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${override.isAvailable ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                                    {override.isAvailable ? 'Available' : 'Unavailable'}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell>
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                                    <DropdownMenuContent>
-                                                        <DropdownMenuItem onClick={() => handleEditClick(override)}>Edit</DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => handleDeleteClick(override.id)} className="text-destructive">Delete</DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                ) : (
-                                    <TableRow>
-                                        <TableCell colSpan={4} className="text-center text-muted-foreground">No overrides found for this doctor.</TableCell>
+            <div>
+                <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-lg font-semibold">One-off Schedule Overrides</h3>
+                    <Button size="sm" onClick={handleAddClick}>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Add Override
+                    </Button>
+                </div>
+                <div className="rounded-md border">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Start Time</TableHead>
+                                <TableHead>End Time</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead><span className="sr-only">Actions</span></TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {isLoadingOverrides ? (
+                                <TableRow><TableCell colSpan={4}><Skeleton className="h-5 w-full" /></TableCell></TableRow>
+                            ) : overridesError ? (
+                                <TableRow><TableCell colSpan={4} className="text-destructive text-center">{overridesError.message}</TableCell></TableRow>
+                            ) : overrides && overrides.data.length > 0 ? (
+                                overrides.data.map((override: DoctorOverride) => (
+                                    <TableRow key={override.id}>
+                                        <TableCell>{format(new Date(override.startTime), "PPP p")}</TableCell>
+                                        <TableCell>{format(new Date(override.endTime), "PPP p")}</TableCell>
+                                        <TableCell>
+                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${override.isAvailable ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                {override.isAvailable ? 'Available' : 'Unavailable'}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                <DropdownMenuContent>
+                                                    <DropdownMenuItem onClick={() => handleEditClick(override)}>Edit</DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleDeleteClick(override.id)} className="text-destructive">Delete</DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </TableCell>
                                     </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </div>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="text-center text-muted-foreground">No overrides found for this doctor.</TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
                 </div>
-            )}
-
-            {!selectedDoctorId && (
-                <div className="text-center p-8 border-2 border-dashed rounded-lg">
-                    <p className="text-muted-foreground">Select a doctor to manage their availability overrides.</p>
-                </div>
-            )}
+            </div>
           </CardContent>
         </Card>
     </>
