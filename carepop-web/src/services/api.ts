@@ -324,18 +324,19 @@ export async function getAdminClinicsList(accessToken: string) {
     return result.data || [];
 }
 
-export async function getAdminDoctors(accessToken: string) {
-    const headers = {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    };
-    const response = await fetch(`${API_BASE_URL}/api/admin/doctors`, { headers, cache: 'no-store' });
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-        throw new Error(error.message || 'Failed to fetch doctors.');
+export async function getAdminDoctors(accessToken: string, clinicId?: string) {
+    const headers = await getAuthHeaders(accessToken);
+    const url = new URL(`${API_BASE_URL}/api/admin/doctors`);
+    if (clinicId && clinicId !== 'all') {
+        url.searchParams.set('clinicId', clinicId);
     }
-    const result = await response.json();
-    return result.data || [];
+    const response = await fetch(url.toString(), { headers, cache: 'no-store' });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Failed to fetch doctors.' }));
+        throw new Error(error.message);
+    }
+    return response.json();
 }
 
 export async function getAdminServiceCategories(accessToken: string) {
@@ -350,10 +351,7 @@ export async function getAdminServiceCategories(accessToken: string) {
 }
 
 export async function getAdminServices(accessToken: string) {
-    const headers = {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    };
+    const headers = await getAuthHeaders(accessToken);
     const response = await fetch(`${API_BASE_URL}/api/admin/services`, { headers, cache: 'no-store' });
     if (!response.ok) {
         const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));

@@ -41,12 +41,14 @@ type DoctorFormValues = z.infer<typeof formSchema>;
 
 interface DoctorFormProps {
   initialData?: Doctor & { clinics?: { clinicId: string }[] };
+  defaultClinicId?: string;
   onSubmit: (values: DoctorFormValues) => void;
   isPending: boolean;
 }
 
 export function DoctorForm({
   initialData,
+  defaultClinicId,
   onSubmit,
   isPending,
 }: DoctorFormProps) {
@@ -66,7 +68,7 @@ export function DoctorForm({
         specialtyText: initialData?.specialtyText || '',
         bio: initialData?.bio || '',
         isActive: initialData?.isActive ?? true,
-        clinicIds: initialData?.clinics?.map(c => c.clinicId) || [],
+        clinicIds: initialData?.clinics?.map(c => c.clinicId) || (defaultClinicId ? [defaultClinicId] : []),
     },
   });
 

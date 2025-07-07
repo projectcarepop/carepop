@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { PlusCircle } from 'lucide-react';
 
-import { getAdminDoctors, upsertDoctor, deleteDoctor } from '@/services/api';
+import { getAdminDoctors, upsertDoctor, deleteDoctor, getAdminClinicsList } from '@/services/api';
 import { DataTable } from '@/components/ui/data-table';
 import { type Doctor } from '@/lib/types';
 import { columns } from './columns';
@@ -31,6 +31,8 @@ import { DoctorForm } from './DoctorForm';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Clinic } from '@/lib/types/bookings';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface DoctorsClientProps {
   initialDoctors: (Doctor & { doctorClinics?: { clinicId: string }[] })[];
@@ -46,26 +48,27 @@ export default function DoctorsClient({ initialDoctors }: DoctorsClientProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [doctorToDelete, setDoctorToDelete] = React.useState<Doctor | undefined>(undefined);
   const [globalFilter, setGlobalFilter] = React.useState('');
+  const [selectedClinic, setSelectedClinic] = React.useState('all');
 
-  const transformedInitialData = React.useMemo(() => {
-    return initialDoctors.map(doc => ({
-      ...doc,
-      clinics: doc.doctorClinics,
-      doctorClinics: doc.doctorClinics || []
-    }));
-  }, [initialDoctors]);
+  const { data: clinicsList } = useQuery({
+    queryKey: ['adminClinicsList'],
+    queryFn: () => getAdminClinicsList(session!.access_token),
+    enabled: !!session,
+  });
 
   const {
-    data: doctors,
+    data: doctorsResponse,
     isLoading,
     isError,
     error,
   } = useQuery({
-    queryKey: ['adminDoctors'],
-    queryFn: () => getAdminDoctors(session!.access_token),
-    initialData: transformedInitialData,
+    queryKey: ['adminDoctors', selectedClinic],
+    queryFn: () => getAdminDoctors(session!.access_token, selectedClinic),
+    initialData: { data: initialDoctors },
     enabled: !!session,
   });
+
+  const doctors = doctorsResponse?.data || [];
 
   const upsertMutation = useMutation({
     mutationFn: (doctorData: Partial<Doctor & { clinicIds?: string[] }>) => {
@@ -141,22 +144,37 @@ export default function DoctorsClient({ initialDoctors }: DoctorsClientProps) {
           </CardDescription>
       </CardHeader>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <Input
             placeholder="Filter by name..."
             value={globalFilter}
             onChange={(event) => setGlobalFilter(event.target.value)}
             className="max-w-sm"
         />
-        <Button onClick={handleCreateNew}>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Create Doctor
-        </Button>
+        <div className="flex items-center gap-2">
+            <Select value={selectedClinic} onValueChange={setSelectedClinic}>
+                <SelectTrigger className="w-[280px]">
+                    <SelectValue placeholder="Filter by clinic..." />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Clinics</SelectItem>
+                    {(clinicsList || []).map((clinic: Clinic) => (
+                        <SelectItem key={clinic.id} value={clinic.id}>
+                            {clinic.name}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+            <Button onClick={handleCreateNew}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Create Doctor
+            </Button>
+        </div>
       </div>
       
       <DataTable
         columns={dynamicColumns}
-        data={doctors || []}
+        data={doctors}
         filterColumn="fullName"
         globalFilter={globalFilter}
         setGlobalFilter={setGlobalFilter}
@@ -175,6 +193,7 @@ export default function DoctorsClient({ initialDoctors }: DoctorsClientProps) {
           </DialogHeader>
           <DoctorForm
             initialData={selectedDoctor ? { ...selectedDoctor, clinics: (selectedDoctor as any).doctorClinics } : undefined}
+            defaultClinicId={selectedClinic !== 'all' ? selectedClinic : undefined}
             onSubmit={(values) => {
               const payload = { ...values, id: selectedDoctor?.id };
               upsertMutation.mutate(payload);
