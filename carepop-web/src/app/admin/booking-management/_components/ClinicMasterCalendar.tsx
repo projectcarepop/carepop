@@ -9,6 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { useAuth } from '@/lib/contexts/auth-context';
 import { getClinicMasterSchedule, MasterScheduleAppointment, ClinicOverride, DoctorOverride } from '@/services/api';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -85,6 +86,22 @@ const transformDataToEvents = (data: any): CalendarEvent[] => {
     return events;
 };
 
+// Custom Event component with Tooltip
+const CustomEvent = ({ event }: { event: CalendarEvent }) => {
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <div className="h-full w-full truncate">
+                    {event.title}
+                </div>
+            </TooltipTrigger>
+            <TooltipContent>
+                <p className="font-bold">{event.title}</p>
+                {event.description && <p>{event.description}</p>}
+            </TooltipContent>
+        </Tooltip>
+    );
+};
 
 export const ClinicMasterCalendar: React.FC<ClinicMasterCalendarProps> = ({ clinicId }) => {
     const { session } = useAuth();
@@ -142,19 +159,24 @@ export const ClinicMasterCalendar: React.FC<ClinicMasterCalendarProps> = ({ clin
     }
     
     return (
-        <div style={{ height: '80vh' }}>
-            <Calendar
-                localizer={localizer}
-                events={events}
-                startAccessor="start"
-                endAccessor="end"
-                style={{ height: '100%' }}
-                view={view}
-                date={date}
-                onView={setView}
-                onNavigate={setDate}
-                eventPropGetter={eventPropGetter}
-            />
-        </div>
+        <TooltipProvider>
+            <div style={{ height: '80vh' }}>
+                <Calendar
+                    localizer={localizer}
+                    events={events}
+                    startAccessor="start"
+                    endAccessor="end"
+                    style={{ height: '100%' }}
+                    view={view}
+                    date={date}
+                    onView={setView}
+                    onNavigate={setDate}
+                    eventPropGetter={eventPropGetter}
+                    components={{
+                        event: CustomEvent,
+                    }}
+                />
+            </div>
+        </TooltipProvider>
     );
 }; 
