@@ -26,8 +26,8 @@ export type UpsertDoctorSchedulePayload = Omit<DoctorSchedule, 'id'>;
 
 export type DoctorOverride = {
     id: string;
-    startTime: string; // ISO String
-    endTime: string; // ISO String
+    startDateTime: string; // ISO String
+    endDateTime: string; // ISO String
     isAvailable: boolean;
 };
 export type UpsertDoctorOverridePayload = Omit<DoctorOverride, 'id'>;
@@ -1131,7 +1131,7 @@ export async function getDoctorOverrides(doctorId: string, accessToken: string) 
         throw new Error(error.message);
     }
     const result = await response.json();
-    return result.data;
+    return result;
 }
 
 export async function upsertDoctorOverride(

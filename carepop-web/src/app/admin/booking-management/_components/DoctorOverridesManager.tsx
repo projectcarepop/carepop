@@ -126,8 +126,8 @@ export const DoctorOverridesManager: React.FC<DoctorOverridesManagerProps> = ({ 
                             ) : overrides?.data?.length > 0 ? (
                                 (overrides.data || []).map((override: DoctorOverride) => (
                                     <TableRow key={override.id}>
-                                        <TableCell>{format(new Date(override.startTime), "PPP p")}</TableCell>
-                                        <TableCell>{format(new Date(override.endTime), "PPP p")}</TableCell>
+                                        <TableCell>{format(new Date(override.startDateTime), "PPP p")}</TableCell>
+                                        <TableCell>{format(new Date(override.endDateTime), "PPP p")}</TableCell>
                                         <TableCell>
                                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${override.isAvailable ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                                 {override.isAvailable ? 'Available' : 'Unavailable'}
@@ -184,8 +184,8 @@ const AddEditOverrideModal: React.FC<AddEditOverrideModalProps> = ({ isOpen, onC
             const defaultStartTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0, 0); // 9 AM today
             const defaultEndTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 17, 0, 0); // 5 PM today
 
-            const start = initialData ? toZonedTime(new Date(initialData.startTime), timeZone) : defaultStartTime;
-            const end = initialData ? toZonedTime(new Date(initialData.endTime), timeZone) : defaultEndTime;
+            const start = initialData ? toZonedTime(new Date(initialData.startDateTime), timeZone) : defaultStartTime;
+            const end = initialData ? toZonedTime(new Date(initialData.endDateTime), timeZone) : defaultEndTime;
 
             setStartDate(format(start, 'yyyy-MM-dd'));
             setStartTime(format(start, 'HH:mm:ss'));
@@ -202,8 +202,8 @@ const AddEditOverrideModal: React.FC<AddEditOverrideModalProps> = ({ isOpen, onC
         const endDateTime = fromZonedTime(`${endDate}T${endTime}`, timeZone);
 
         onSubmit({ 
-            startTime: startDateTime.toISOString(), 
-            endTime: endDateTime.toISOString(), 
+            startDateTime: startDateTime.toISOString(), 
+            endDateTime: endDateTime.toISOString(), 
             isAvailable 
         });
     };
