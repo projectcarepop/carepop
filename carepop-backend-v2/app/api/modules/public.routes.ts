@@ -617,39 +617,45 @@ publicRoutes.get(
 );
 
 /**
- * NEW: GET /public/services/:serviceId/providers
- * Returns a list of all active doctors (providers) who offer a specific service.
+ * GET /public/services/:serviceId/providers
+ * Fetches all doctors (providers) for a specific service, with an optional filter by clinic.
  */
-publicRoutes.get('/services/:serviceId/providers', async (c) => {
-    const { serviceId } = c.req.param();
+publicRoutes.get('/services/:serviceId/providers', 
+    zValidator('param', z.object({ serviceId: z.string().uuid() })),
+    zValidator('query', z.object({ clinicId: z.string().uuid().optional() })),
+    async (c) => {
+        const { serviceId } = c.req.valid('param');
+        const { clinicId } = c.req.valid('query');
 
-    if (!serviceId) {
-        return c.json({ error: 'Service ID is required' }, 400);
+        try {
+            const conditions = [
+                eq(doctors.isActive, true),
+                eq(doctorServices.serviceId, serviceId)
+            ];
+
+            let query = db.selectDistinct({
+                id: doctors.id,
+                fullName: doctors.fullName,
+                avatarUrl: doctors.avatarUrl,
+                specialtyText: doctors.specialtyText
+            })
+            .from(doctors)
+            .innerJoin(doctorServices, eq(doctors.id, doctorServices.doctorId));
+
+            if (clinicId) {
+                // If a clinicId is provided, further join to ensure the doctor works at that clinic.
+                query = query.innerJoin(doctorClinics, eq(doctors.id, doctorClinics.doctorId));
+                conditions.push(eq(doctorClinics.clinicId, clinicId));
+            }
+            
+            const providers = await query.where(and(...conditions));
+            return c.json({ data: providers });
+        } catch (error) {
+            console.error(`Failed to fetch providers for service ${serviceId}:`, error);
+            return c.json({ error: "Internal Server Error" }, 500);
+        }
     }
-
-    try {
-        // CORRECTED QUERY: Selects directly from `doctors` and filters by the `doctor_services` link table.
-        const providers = await db.selectDistinct({
-            id: doctors.id,
-            fullName: doctors.fullName,
-            specialtyText: doctors.specialtyText,
-            avatarUrl: doctors.avatarUrl,
-            bio: doctors.bio,
-        })
-        .from(doctors)
-        .innerJoin(doctorServices, eq(doctors.id, doctorServices.doctorId))
-        .where(and(
-            eq(doctors.isActive, true),
-            eq(doctorServices.serviceId, serviceId)
-        ));
-
-        return c.json({ data: providers });
-
-    } catch (error: any) {
-        console.error(`Error fetching providers for service ${serviceId}:`, error);
-        return c.json({ error: 'Internal Server Error', message: error.message }, 500);
-    }
-});
+);
 
 /**
  * GET /public/doctors/:doctorId/available-slots

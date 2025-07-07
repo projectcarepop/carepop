@@ -39,9 +39,9 @@ export const Step2_ServiceAndDoctorSelection: React.FC<Step2_ServiceAndDoctorSel
     data: doctors,
     isLoading: isLoadingDoctors,
   } = useQuery({
-    queryKey: ['providersForService', selectedServiceId],
-    queryFn: () => getProvidersForService(selectedServiceId!),
-    enabled: !!selectedServiceId,
+    queryKey: ['providersForService', selectedServiceId, bookingData.clinic?.id],
+    queryFn: () => getProvidersForService(selectedServiceId!, bookingData.clinic!.id),
+    enabled: !!selectedServiceId && !!bookingData.clinic?.id,
     select: (data) => data.data,
   });
 

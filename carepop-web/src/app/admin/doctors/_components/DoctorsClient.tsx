@@ -33,7 +33,7 @@ import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 
 interface DoctorsClientProps {
-  initialDoctors: Doctor[];
+  initialDoctors: (Doctor & { doctorClinics?: { clinicId: string }[] })[];
 }
 
 export default function DoctorsClient({ initialDoctors }: DoctorsClientProps) {
@@ -47,6 +47,14 @@ export default function DoctorsClient({ initialDoctors }: DoctorsClientProps) {
   const [doctorToDelete, setDoctorToDelete] = React.useState<Doctor | undefined>(undefined);
   const [globalFilter, setGlobalFilter] = React.useState('');
 
+  const transformedInitialData = React.useMemo(() => {
+    return initialDoctors.map(doc => ({
+      ...doc,
+      clinics: doc.doctorClinics,
+      doctorClinics: doc.doctorClinics || []
+    }));
+  }, [initialDoctors]);
+
   const {
     data: doctors,
     isLoading,
@@ -55,13 +63,13 @@ export default function DoctorsClient({ initialDoctors }: DoctorsClientProps) {
   } = useQuery({
     queryKey: ['adminDoctors'],
     queryFn: () => getAdminDoctors(session!.access_token),
-    initialData: initialDoctors,
+    initialData: transformedInitialData,
     enabled: !!session,
   });
 
   const upsertMutation = useMutation({
-    mutationFn: (doctorData: Partial<Doctor>) => {
-      return upsertDoctor(doctorData as any, session!.access_token, doctorData.id);
+    mutationFn: (doctorData: Partial<Doctor & { clinicIds?: string[] }>) => {
+      return upsertDoctor(doctorData, session!.access_token, doctorData.id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminDoctors'] });
@@ -166,7 +174,7 @@ export default function DoctorsClient({ initialDoctors }: DoctorsClientProps) {
             </DialogDescription>
           </DialogHeader>
           <DoctorForm
-            initialData={selectedDoctor}
+            initialData={selectedDoctor ? { ...selectedDoctor, clinics: (selectedDoctor as any).doctorClinics } : undefined}
             onSubmit={(values) => {
               const payload = { ...values, id: selectedDoctor?.id };
               upsertMutation.mutate(payload);

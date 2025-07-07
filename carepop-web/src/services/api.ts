@@ -3,6 +3,7 @@ import { type ProfileFormData } from '@/lib/validation/profile-schema';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { type InventoryItem, type ProductCategory } from '@/lib/types/inventory';
+import type { Doctor } from "@/lib/types";
 
 // Temporary Type Definitions - TODO: Move to a dedicated types/bookings.ts file
 export type ClinicOverride = {
@@ -312,6 +313,17 @@ export async function getAdminClinics(accessToken: string) {
   return result;
 }
 
+export async function getAdminClinicsList(accessToken: string) {
+    const headers = await getAuthHeaders(accessToken);
+    const response = await fetch(`${API_BASE_URL}/api/admin/clinics`, { headers, cache: 'no-store' });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Failed to fetch clinics list.' }));
+        throw new Error(error.message);
+    }
+    const result = await response.json();
+    return result.data || [];
+}
+
 export async function getAdminDoctors(accessToken: string) {
     const headers = {
       'Authorization': `Bearer ${accessToken}`,
@@ -402,24 +414,27 @@ export async function upsertServiceCategory(categoryData: any, accessToken: stri
     return response.json();
 }
 
-export async function upsertDoctor(data: { userId: string; serviceCategoryId: string; clinicIds: string[]; serviceIds: string[]; }, accessToken: string, doctorId?: string) {
-    const headers = {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    };
-    const method = doctorId ? 'PUT' : 'POST';
-    const url = doctorId ? `${API_BASE_URL}/api/admin/doctors/${doctorId}` : `${API_BASE_URL}/api/admin/doctors`;
-    const response = await fetch(url, { 
-       method, 
-       headers, 
-       body: JSON.stringify(data) 
-    });
+export async function upsertDoctor(
+  doctorData: Partial<Doctor & { clinicIds?: string[] }>,
+  accessToken: string,
+  id?: string
+) {
+  const url = id ? `${API_BASE_URL}/api/admin/doctors/${id}` : `${API_BASE_URL}/api/admin/doctors`;
+  const method = id ? 'PUT' : 'POST';
+  
+  const headers = await getAuthHeaders(accessToken);
 
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: "Failed to save doctor." }));
-        throw new Error(error.message);
-    }
-    return response.json();
+  const response = await fetch(url, {
+    method,
+    headers,
+    body: JSON.stringify(doctorData),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Failed to save doctor.' }));
+    throw new Error(error.message);
+  }
+  return response.json();
 }
 
 export async function upsertClinic(clinicData: any, accessToken: string, clinicId?: string) {
@@ -677,9 +692,19 @@ export async function getClinicDetails(clinicId: string) {
    return response.json();
 }
 
-export async function getProvidersForService(serviceId: string) {
+export async function getProvidersByService(serviceId: string) {
     const response = await fetch(`${API_BASE_URL}/api/public/services/${serviceId}/doctors`);
     if (!response.ok) throw new Error("Failed to fetch providers.");
+    return response.json();
+}
+
+export async function getProvidersForService(serviceId: string, clinicId?: string) {
+    const url = new URL(`${API_BASE_URL}/api/public/services/${serviceId}/providers`);
+    if (clinicId) {
+        url.searchParams.set('clinicId', clinicId);
+    }
+    const response = await fetch(url.toString());
+    if (!response.ok) throw new Error("Failed to fetch providers for service.");
     return response.json();
 }
 

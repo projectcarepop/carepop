@@ -3,6 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
+import React from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -19,18 +20,27 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Doctor } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
+import { useAuth } from '@/lib/contexts/auth-context';
+import { useQuery } from '@tanstack/react-query';
+import { getAdminClinicsList } from '@/services/api';
+import { Clinic } from '@/lib/types/bookings';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Check, ChevronsUpDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const formSchema = z.object({
   fullName: z.string().min(2, 'Full name must be at least 2 characters.'),
   specialtyText: z.string().optional(),
   bio: z.string().optional(),
   isActive: z.boolean(),
+  clinicIds: z.array(z.string()).optional(),
 });
 
 type DoctorFormValues = z.infer<typeof formSchema>;
 
 interface DoctorFormProps {
-  initialData?: Doctor;
+  initialData?: Doctor & { clinics?: { clinicId: string }[] };
   onSubmit: (values: DoctorFormValues) => void;
   isPending: boolean;
 }
@@ -40,16 +50,24 @@ export function DoctorForm({
   onSubmit,
   isPending,
 }: DoctorFormProps) {
+  const { session } = useAuth();
+  const [open, setOpen] = React.useState(false);
+
+  const { data: clinics, isLoading: isLoadingClinics } = useQuery({
+      queryKey: ['adminClinicsList'],
+      queryFn: () => getAdminClinicsList(session!.access_token),
+      enabled: !!session,
+  });
+
   const form = useForm<DoctorFormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: initialData
-      ? { ...initialData }
-      : {
-          fullName: '',
-          specialtyText: '',
-          bio: '',
-          isActive: true,
-        },
+    defaultValues: {
+        fullName: initialData?.fullName || '',
+        specialtyText: initialData?.specialtyText || '',
+        bio: initialData?.bio || '',
+        isActive: initialData?.isActive ?? true,
+        clinicIds: initialData?.clinics?.map(c => c.clinicId) || [],
+    },
   });
 
   return (
@@ -106,6 +124,66 @@ export function DoctorForm({
                   disabled={isPending}
                 />
               </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="clinicIds"
+          render={({ field }) => (
+            <FormItem className="flex flex-col">
+              <FormLabel>Assigned Clinics</FormLabel>
+              <Popover open={open} onOpenChange={setOpen}>
+                <PopoverTrigger asChild>
+                  <FormControl>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={open}
+                      className={cn("w-full justify-between", !field.value && "text-muted-foreground")}
+                      disabled={isLoadingClinics}
+                    >
+                      {field.value && field.value.length > 0
+                        ? `${field.value.length} clinic(s) selected`
+                        : "Select clinics..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </FormControl>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0">
+                  <Command>
+                    <CommandInput placeholder="Search clinics..." />
+                    <CommandEmpty>No clinics found.</CommandEmpty>
+                    <CommandGroup>
+                      {(clinics || []).map((clinic: Clinic) => (
+                        <CommandItem
+                          value={clinic.name}
+                          key={clinic.id}
+                          onSelect={() => {
+                            const currentIds = field.value || [];
+                            const newIds = currentIds.includes(clinic.id)
+                              ? currentIds.filter((id) => id !== clinic.id)
+                              : [...currentIds, clinic.id];
+                            field.onChange(newIds);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              (field.value || []).includes(clinic.id) ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {clinic.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              <FormDescription>
+                Select the clinics where this doctor will be available.
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}

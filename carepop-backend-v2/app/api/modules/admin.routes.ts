@@ -840,44 +840,122 @@ adminRoutes
 // --- Doctor Management Endpoints ---
 
 adminRoutes.get('/doctors', async (c) => {
-    // TODO: This query needs to be fleshed out with joins for services, clinics etc.
-    // For now, fetching the basic doctor profiles.
-    const allDoctors = await db.select().from(doctors);
-    return c.json({ data: allDoctors });
+    const doctorList = await db.query.doctors.findMany({
+        orderBy: [asc(doctors.fullName)],
+        with: {
+            doctorClinics: {
+                columns: {
+                    clinicId: true
+                }
+            }
+        }
+    });
+    return c.json(doctorList);
 });
 
-adminRoutes.post('/doctors', zValidator('json', createDoctorSchema), async (c) => {
-  const newDoctorData = c.req.valid('json');
-  
-  try {
-    const [createdDoctor] = await db.insert(doctors).values(newDoctorData).returning();
-    return c.json(createdDoctor, 201);
-  } catch (error) {
-    console.error('Error creating doctor:', error);
-    return c.json({ error: 'Internal Server Error' }, 500);
+// NEW: Centralized schema for upserting doctors
+const upsertDoctorSchema = z.object({
+  fullName: z.string().min(1, { message: "Full name is required" }),
+  specialtyText: z.string().optional(),
+  bio: z.string().optional(),
+  isActive: z.boolean().optional().default(true),
+  clinicIds: z.array(z.string().uuid()).optional().default([]),
+});
+
+// /api/admin/doctors (CREATE)
+adminRoutes.post(
+  '/doctors',
+  zValidator('json', upsertDoctorSchema),
+  async (c) => {
+    const doctorData = c.req.valid('json');
+    
+    try {
+      const newDoctor = await db.transaction(async (tx) => {
+        const [createdDoctor] = await tx.insert(doctors).values({
+          fullName: doctorData.fullName,
+          specialtyText: doctorData.specialtyText,
+          bio: doctorData.bio,
+          isActive: doctorData.isActive,
+        }).returning();
+
+        if (doctorData.clinicIds && doctorData.clinicIds.length > 0) {
+          const clinicAssignments = doctorData.clinicIds.map(clinicId => ({
+            doctorId: createdDoctor.id,
+            clinicId: clinicId
+          }));
+          await tx.insert(doctorClinics).values(clinicAssignments);
+        }
+        
+        return createdDoctor;
+      });
+
+      return c.json(newDoctor, 201);
+    } catch (error) {
+      console.error('Failed to create doctor:', error);
+      return c.json({ error: 'Failed to create doctor' }, 500);
+    }
   }
-});
+);
 
-adminRoutes
-  .get('/doctors/:id', async (c) => {
-    const { id } = c.req.param();
-    const [doctor] = await db.select().from(doctors).where(eq(doctors.id, id));
-    if (!doctor) return c.json({ error: 'Not Found' }, 404);
-    return c.json(doctor);
-  })
-  .put('/doctors/:id', zValidator('json', createDoctorSchema.partial()), async (c) => {
-    const { id } = c.req.param();
-    const values = c.req.valid('json');
-    const [updatedDoctor] = await db.update(doctors).set(values).where(eq(doctors.id, id)).returning();
-    if (!updatedDoctor) return c.json({ error: 'Not Found' }, 404);
-    return c.json(updatedDoctor);
-  })
-  .delete('/doctors/:id', async (c) => {
-    const { id } = c.req.param();
+
+// /api/admin/doctors/:id (UPDATE)
+adminRoutes.put(
+  '/doctors/:id',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  zValidator('json', upsertDoctorSchema),
+  async (c) => {
+    const { id } = c.req.valid('param');
+    const doctorData = c.req.valid('json');
+
+    try {
+      const updatedDoctor = await db.transaction(async (tx) => {
+        // Step 1: Update the doctor's core details
+        const [result] = await tx.update(doctors).set({
+          fullName: doctorData.fullName,
+          specialtyText: doctorData.specialtyText,
+          bio: doctorData.bio,
+          isActive: doctorData.isActive,
+        }).where(eq(doctors.id, id)).returning();
+
+        if (!result) {
+          // This will abort the transaction
+          throw new Error("Doctor not found");
+        }
+        
+        // Step 2: Clear existing clinic associations for this doctor
+        await tx.delete(doctorClinics).where(eq(doctorClinics.doctorId, id));
+
+        // Step 3: Insert the new clinic associations
+        if (doctorData.clinicIds && doctorData.clinicIds.length > 0) {
+          const newAssignments = doctorData.clinicIds.map((clinicId) => ({
+            doctorId: id,
+            clinicId: clinicId,
+          }));
+          await tx.insert(doctorClinics).values(newAssignments);
+        }
+
+        return result;
+      });
+
+      return c.json(updatedDoctor);
+    } catch (error: any) {
+        console.error('Failed to update doctor:', error);
+        if (error.message === "Doctor not found") {
+            return c.json({ error: 'Doctor not found' }, 404);
+        }
+        return c.json({ error: 'Failed to update doctor' }, 500);
+    }
+  }
+);
+
+
+// /api/admin/doctors/:id (DELETE)
+adminRoutes.delete('/doctors/:id', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
+    const { id } = c.req.valid('param');
     const [deleted] = await db.delete(doctors).where(eq(doctors.id, id)).returning();
     if (!deleted) return c.json({ error: 'Not Found' }, 404);
     return c.json({ success: true });
-  });
+});
 
 // --- Service Management Endpoints ---
 adminRoutes.get('/services', async (c) => {
