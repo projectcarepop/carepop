@@ -839,10 +839,13 @@ adminRoutes
 
 // --- Doctor Management Endpoints ---
 
-adminRoutes.get('/doctors', async (c) => {
+adminRoutes.get(
+  '/doctors',
+  zValidator('query', z.object({ clinicId: z.string().uuid().optional() })),
+  async (c) => {
     const { clinicId } = c.req.valid('query');
 
-    const doctorList = await db.query.doctors.findMany({
+    const allDoctors = await db.query.doctors.findMany({
       orderBy: [asc(doctors.fullName)],
       with: {
         doctorClinics: {
@@ -851,49 +854,18 @@ adminRoutes.get('/doctors', async (c) => {
           },
         },
       },
-      where: clinicId ? eq(doctorClinics.doctorId, doctors.id) : undefined, // This is incorrect, needs join
     });
 
-    // A more correct query would involve a subquery or an explicit join
-    // For now, this is a placeholder to show intent
     if (clinicId) {
-        const filteredDoctorList = await db
-            .selectDistinct({ ...getTableColumns(doctors) })
-            .from(doctors)
-            .leftJoin(doctorClinics, eq(doctors.id, doctorClinics.doctorId))
-            .where(eq(doctorClinics.clinicId, clinicId))
-            .orderBy(asc(doctors.fullName));
-
-        // This doesn't easily bring the 'with' data, would need another query or aggregation.
-        // For simplicity, let's fetch the full list and filter in memory, which is inefficient but works for now.
-        // A proper implementation would use SQL aggregation.
-        
-        const allDoctors = await db.query.doctors.findMany({
-            orderBy: [asc(doctors.fullName)],
-            with: {
-                doctorClinics: { columns: { clinicId: true } }
-            }
-        });
-        
-        const filtered = allDoctors.filter(d => 
-            d.doctorClinics.some(dc => dc.clinicId === clinicId)
-        );
-        return c.json({ data: filtered });
+      const filtered = allDoctors.filter(d =>
+        d.doctorClinics.some(dc => dc.clinicId === clinicId)
+      );
+      return c.json({ data: filtered });
     }
 
-
-    const allDoctors = await db.query.doctors.findMany({
-        orderBy: [asc(doctors.fullName)],
-        with: {
-            doctorClinics: {
-                columns: {
-                    clinicId: true
-                }
-            }
-        }
-    });
     return c.json({ data: allDoctors });
-  });
+  }
+);
 
 // NEW: Centralized schema for upserting doctors
 const upsertDoctorSchema = z.object({
