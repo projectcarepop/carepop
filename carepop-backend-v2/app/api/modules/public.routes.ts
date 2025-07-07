@@ -523,95 +523,15 @@ publicRoutes.get(
     zValidator('query', availabilityQuerySchema),
     async (c) => {
         const { id: doctorId } = c.req.valid('param');
-        const { startDate: startDateStr, endDate: endDateStr, serviceId, clinicId } = c.req.valid('query');
-
-        const timezone = 'Asia/Manila'; 
-        const startDate = zonedTimeToUtc(startDateStr, timezone);
-        const endDate = zonedTimeToUtc(endDateStr, timezone);
+        const { startDate, endDate, serviceId } = c.req.valid('query');
 
         try {
-            // 1. Get service details (especially duration)
-            const service = await db.query.services.findFirst({ where: eq(services.id, serviceId) });
-            if (!service || !service.durationMinutes) {
-                return c.json({ error: "Service not found or has no duration." }, 404);
-            }
-            const serviceDuration = service.durationMinutes;
-
-            // 2. Fetch all necessary data in parallel
-            const [
-                doctorSchedules,
-                doctorOverrides,
-                clinicOverridesData,
-                existingAppointments
-            ] = await Promise.all([
-                db.query.doctorSchedules.findMany({ where: eq(doctors.id, doctorId) }),
-                db.query.doctorAvailabilityOverrides.findMany({ where: eq(doctors.id, doctorId) }),
-                db.query.clinicOverrides.findMany({ where: eq(clinics.id, clinicId) }),
-                db.query.appointments.findMany({
-                    where: and(
-                        eq(appointments.doctorId, doctorId),
-                        // Use notInArray to exclude all types of cancelled appointments
-                        notInArray(appointments.status, ['canceled_by_patient', 'canceled_by_admin']),
-                        gte(appointments.appointmentTime, startDate.toISOString()),
-                        lt(appointments.appointmentTime, endDate.toISOString())
-                    )
-                })
-            ]);
-
-            const availableSlots: Date[] = [];
-            
-            // 3. Iterate through each day in the requested range
-            for (let day = startOfDay(startDate); day <= endDate; day = addDays(day, 1)) {
-                const dayOfWeek = getDay(day); // 0=Sun, 1=Mon...
-                const dateStr = format(day, 'yyyy-MM-dd');
-
-                // Check for clinic-wide closures first
-                const isClinicClosed = clinicOverridesData.some(override => {
-                    const overrideStart = startOfDay(zonedTimeToUtc(override.startDateTime, timezone));
-                    const overrideEnd = endOfDay(zonedTimeToUtc(override.endDateTime, timezone));
-                    return !override.isAvailable && day >= overrideStart && day <= overrideEnd;
-                });
-                if (isClinicClosed) continue;
-
-                // Find recurring schedule for the current day of the week
-                const dailySchedule = doctorSchedules.find(s => s.dayOfWeek === dayOfWeek);
-                if (!dailySchedule) continue;
-
-                // 4. Generate potential slots based on the schedule for that day
-                let currentTime = timeToDate(dailySchedule.startTime, day);
-                const endTime = timeToDate(dailySchedule.endTime, day);
-
-                while (isBefore(addMinutes(currentTime, serviceDuration), addMinutes(endTime, 1))) {
-                    const slotStart = new Date(currentTime);
-                    const slotEnd = addMinutes(slotStart, serviceDuration);
-
-                    // 5. Filter slots based on overrides and appointments
-                    const isOverridden = doctorOverrides.some(override => {
-                        const overrideStart = zonedTimeToUtc(override.startDateTime, timezone);
-                        const overrideEnd = zonedTimeToUtc(override.endDateTime, timezone);
-                        // Slot is invalid if it overlaps with a non-available override
-                        return !override.isAvailable && slotStart < overrideEnd && slotEnd > overrideStart;
-                    });
-
-                    const isBooked = existingAppointments.some(appt => {
-                        const apptStart = zonedTimeToUtc(appt.appointmentTime, timezone);
-                        const apptEnd = addMinutes(apptStart, serviceDuration); // Assuming all appts for this doc/service have same duration
-                        // Slot is invalid if it overlaps with an existing appointment
-                        return slotStart < apptEnd && slotEnd > apptStart;
-                    });
-                    
-                    if (!isOverridden && !isBooked) {
-                        availableSlots.push(slotStart);
-                    }
-
-                    currentTime = addMinutes(currentTime, 15); // Check for a new slot every 15 minutes
-                }
-            }
-
-            return c.json({ data: availableSlots });
-        } catch (error) {
-            console.error(`Error calculating available slots for doctor ${doctorId}:`, error);
-            return c.json({ error: 'Internal Server Error' }, 500);
+            // Use the centralized, correct calculation logic
+            const slots = await calculateAvailableSlots(db, doctorId, serviceId, new Date(startDate), new Date(endDate));
+            return c.json({ data: slots });
+        } catch (error: any) {
+            console.error(`Failed to get available slots for doctor ${doctorId}:`, error);
+            return c.json({ error: 'Failed to calculate availability', message: error.message }, 500);
         }
     }
 );
@@ -653,28 +573,6 @@ publicRoutes.get('/services/:serviceId/providers',
         } catch (error) {
             console.error(`Failed to fetch providers for service ${serviceId}:`, error);
             return c.json({ error: "Internal Server Error" }, 500);
-        }
-    }
-);
-
-/**
- * GET /public/doctors/:doctorId/available-slots
- * Calculates all available appointment slots for a given doctor, service, and date range.
- * This is the core server-authoritative endpoint for the new booking system.
- */
-publicRoutes.get('/doctors/:doctorId/available-slots',
-    zValidator('param', z.object({ doctorId: z.string().uuid() })),
-    zValidator('query', availableSlotsSchema),
-    async (c) => {
-        const { doctorId } = c.req.valid('param');
-        const { serviceId, startDate, endDate } = c.req.valid('query');
-
-        try {
-            const slots = await calculateAvailableSlots(db, doctorId, serviceId, new Date(startDate), new Date(endDate));
-            return c.json({ data: slots });
-        } catch (error: any) {
-            console.error(`Failed to get available slots for doctor ${doctorId}:`, error);
-            return c.json({ error: 'Failed to calculate availability', message: error.message }, 500);
         }
     }
 );
