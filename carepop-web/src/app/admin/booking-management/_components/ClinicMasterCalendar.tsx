@@ -98,6 +98,11 @@ const CustomEvent = ({ event }: { event: CalendarEvent }) => {
             <TooltipContent>
                 <p className="font-bold">{event.title}</p>
                 {event.description && <p>{event.description}</p>}
+                {!event.allDay && event.start && event.end && (
+                    <p className="text-sm text-muted-foreground">
+                        {format(event.start, 'p')} - {format(event.end, 'p')}
+                    </p>
+                )}
             </TooltipContent>
         </Tooltip>
     );
