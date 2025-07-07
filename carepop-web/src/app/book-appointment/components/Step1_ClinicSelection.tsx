@@ -7,7 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import type { BookingData } from './BookingFlowManager';
-import { type Clinic } from '@/lib/types';
+import { type Clinic } from '@/lib/types/bookings';
 
 interface Step1_ClinicSelectionProps {
   updateBookingData: (data: Partial<BookingData>) => void;
@@ -21,8 +21,8 @@ export const Step1_ClinicSelection: React.FC<Step1_ClinicSelectionProps> = ({ up
     select: (data) => data.data,
   });
 
-  const handleSelect = (clinicId: string) => {
-    updateBookingData({ clinicId });
+  const handleSelect = (clinic: Clinic) => {
+    updateBookingData({ clinic });
     goToNextStep();
   };
 
@@ -53,22 +53,28 @@ export const Step1_ClinicSelection: React.FC<Step1_ClinicSelectionProps> = ({ up
         <CardTitle>Step 1: Find a Clinic Near You</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {clinics?.map((clinic: Clinic) => (
-            <Card 
-              key={clinic.id} 
-              className="cursor-pointer hover:shadow-lg transition-shadow"
-              onClick={() => handleSelect(clinic.id)}
-            >
-              <CardHeader>
-                <CardTitle>{clinic.name}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">{typeof clinic.address === 'string' ? clinic.address : 'Address not available'}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {clinics && clinics.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {clinics.map((clinic: Clinic) => (
+                <Card 
+                key={clinic.id} 
+                className="cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => handleSelect(clinic)}
+                >
+                <CardHeader>
+                    <CardTitle>{clinic.name}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-muted-foreground">{typeof clinic.address === 'string' ? clinic.address : 'Address not available'}</p>
+                </CardContent>
+                </Card>
+            ))}
+            </div>
+        ) : (
+            <div className="text-center text-muted-foreground py-8">
+                <p>No clinics are available at this time. Please check back later.</p>
+            </div>
+        )}
       </CardContent>
     </Card>
   );

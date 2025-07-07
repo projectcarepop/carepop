@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import type { BookingData } from './BookingFlowManager';
+import { type Service, type Doctor } from '@/lib/types/bookings';
 
 interface Step2_ServiceAndDoctorSelectionProps {
   bookingData: BookingData;
@@ -29,9 +30,9 @@ export const Step2_ServiceAndDoctorSelection: React.FC<Step2_ServiceAndDoctorSel
     isError, 
     error 
   } = useQuery({
-    queryKey: ['clinicDetails', bookingData.clinicId],
-    queryFn: () => getClinicDetails(bookingData.clinicId!),
-    enabled: !!bookingData.clinicId,
+    queryKey: ['clinicDetails', bookingData.clinic?.id],
+    queryFn: () => getClinicDetails(bookingData.clinic!.id),
+    enabled: !!bookingData.clinic?.id,
   });
 
   const {
@@ -45,14 +46,16 @@ export const Step2_ServiceAndDoctorSelection: React.FC<Step2_ServiceAndDoctorSel
   });
 
   const services = clinicDetails?.services || [];
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
 
-  const handleSelectService = (serviceId: string) => {
-    setSelectedServiceId(serviceId);
+  const handleSelectService = (service: Service) => {
+    setSelectedService(service);
+    setSelectedServiceId(service.id);
   };
 
-  const handleSelectDoctor = (doctorId: string) => {
-    if (!selectedServiceId) return;
-    updateBookingData({ serviceId: selectedServiceId, doctorId });
+  const handleSelectDoctor = (doctor: Doctor) => {
+    if (!selectedService) return;
+    updateBookingData({ service: selectedService, doctor });
     goToNextStep();
   };
 
@@ -97,11 +100,11 @@ export const Step2_ServiceAndDoctorSelection: React.FC<Step2_ServiceAndDoctorSel
         {!selectedServiceId ? (
           <div className="flex flex-col gap-3">
             {services.length > 0 ? (
-              services.map((service: any) => (
+              services.map((service: Service) => (
                 <div
                   key={service.id}
                   className="p-4 border rounded-md cursor-pointer hover:bg-accent"
-                  onClick={() => handleSelectService(service.id)}
+                  onClick={() => handleSelectService(service)}
                 >
                   <h3 className="font-semibold">{service.name}</h3>
                   <p className="text-sm text-muted-foreground">{service.description}</p>
@@ -123,19 +126,25 @@ export const Step2_ServiceAndDoctorSelection: React.FC<Step2_ServiceAndDoctorSel
               </div>
             ) : (
               <div className="flex flex-col gap-3">
-                {doctors?.map((doctor: any) => (
-                   <div
-                    key={doctor.id}
-                    className="p-4 border rounded-md cursor-pointer hover:bg-accent flex items-center gap-4"
-                    onClick={() => handleSelectDoctor(doctor.id)}
-                  >
-                    <img src={doctor.avatarUrl || '/avatar-placeholder.png'} alt={doctor.fullName} className="w-16 h-16 rounded-full bg-muted" />
-                    <div>
-                      <h3 className="font-semibold">{doctor.fullName}</h3>
-                      <p className="text-sm text-muted-foreground">{doctor.specialtyText}</p>
+                {doctors && doctors.length > 0 ? (
+                    doctors.map((doctor: Doctor) => (
+                    <div
+                        key={doctor.id}
+                        className="p-4 border rounded-md cursor-pointer hover:bg-accent flex items-center gap-4"
+                        onClick={() => handleSelectDoctor(doctor)}
+                    >
+                        <img src={doctor.avatarUrl || '/avatar-placeholder.png'} alt={doctor.fullName} className="w-16 h-16 rounded-full bg-muted" />
+                        <div>
+                        <h3 className="font-semibold">{doctor.fullName}</h3>
+                        <p className="text-sm text-muted-foreground">{doctor.specialtyText}</p>
+                        </div>
                     </div>
-                  </div>
-                ))}
+                    ))
+                ) : (
+                    <div className="text-center text-muted-foreground py-8">
+                        <p>No doctors are available for this service. Please select another service or go back.</p>
+                    </div>
+                )}
               </div>
             )}
           </div>

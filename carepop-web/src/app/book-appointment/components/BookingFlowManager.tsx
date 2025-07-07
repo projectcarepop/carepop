@@ -10,6 +10,8 @@ import { createAppointment } from '@/services/api';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { type Clinic, type Service, type Doctor } from '@/lib/types/bookings';
+import { Button } from '@/components/ui/button';
 
 // The steps of our new booking flow
 const STEPS = {
@@ -21,9 +23,9 @@ const STEPS = {
 
 // This will hold all the data collected during the booking process
 export interface BookingData {
-  clinicId?: string;
-  serviceId?: string;
-  doctorId?: string;
+  clinic?: Clinic;
+  service?: Service;
+  doctor?: Doctor;
   slot?: Date;
 }
 
@@ -37,11 +39,21 @@ const stepsOrder = [
 export function BookingFlowManager() {
   const [currentStep, setCurrentStep] = useState(STEPS.SELECT_CLINIC);
   const [bookingData, setBookingData] = useState<BookingData>({
-    clinicId: undefined,
-    serviceId: undefined,
-    doctorId: undefined,
+    clinic: undefined,
+    service: undefined,
+    doctor: undefined,
     slot: undefined,
   });
+
+  const resetFlow = () => {
+    setBookingData({
+        clinic: undefined,
+        service: undefined,
+        doctor: undefined,
+        slot: undefined,
+    });
+    setCurrentStep(STEPS.SELECT_CLINIC);
+  }
 
   const updateBookingData = (data: Partial<BookingData>) => {
     setBookingData(prev => ({ ...prev, ...data }));
@@ -57,6 +69,15 @@ export function BookingFlowManager() {
   const goToPreviousStep = () => {
     const currentIndex = stepsOrder.indexOf(currentStep);
     if (currentIndex > 0) {
+      // When going back, clear the state of the steps ahead
+      if (currentStep === STEPS.CONFIRMATION) {
+        updateBookingData({ slot: undefined });
+      } else if (currentStep === STEPS.SELECT_DATE_TIME) {
+        updateBookingData({ doctor: undefined, slot: undefined });
+      } else if (currentStep === STEPS.SELECT_SERVICE_AND_DOCTOR) {
+        updateBookingData({ service: undefined, doctor: undefined, slot: undefined });
+      }
+
       setCurrentStep(stepsOrder[currentIndex - 1]);
     }
   };
@@ -90,15 +111,15 @@ export function BookingFlowManager() {
   });
 
   const confirmBooking = () => {
-    if (!bookingData.clinicId || !bookingData.serviceId || !bookingData.doctorId || !bookingData.slot) {
+    if (!bookingData.clinic || !bookingData.service || !bookingData.doctor || !bookingData.slot) {
         toast({ title: "Error", description: "Incomplete booking details.", variant: "destructive" });
         return;
     }
 
     bookingMutation.mutate({
-        clinic_id: bookingData.clinicId,
-        service_id: bookingData.serviceId,
-        doctor_id: bookingData.doctorId,
+        clinic_id: bookingData.clinic.id,
+        service_id: bookingData.service.id,
+        doctor_id: bookingData.doctor.id,
         appointment_time: bookingData.slot.toISOString(),
     });
   };
@@ -138,7 +159,12 @@ export function BookingFlowManager() {
   };
 
   return (
-    <div>
+    <div className="relative">
+      {currentStep !== STEPS.SELECT_CLINIC && (
+          <Button variant="link" className="absolute top-0 right-0" onClick={resetFlow}>
+              Start Over
+          </Button>
+      )}
       {/* We can add a progress bar here later */}
       <div className="mt-8">
         {renderCurrentStep()}
