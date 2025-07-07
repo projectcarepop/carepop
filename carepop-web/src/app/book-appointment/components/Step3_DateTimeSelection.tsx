@@ -37,14 +37,15 @@ export const Step3_DateTimeSelection: React.FC<Step3_DateTimeSelectionProps> = (
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ['availableSlots', bookingData.doctor?.id, queryRange.start, queryRange.end],
+    queryKey: ['availableSlots', bookingData.doctor?.id, bookingData.clinic?.id, queryRange.start, queryRange.end],
     queryFn: () => getAvailableSlots(
       bookingData.doctor!.id,
       bookingData.service!.id,
+      bookingData.clinic!.id,
       queryRange.start!.toISOString(),
       queryRange.end!.toISOString()
     ),
-    enabled: !!bookingData.doctor?.id && !!bookingData.service?.id && !!queryRange.start,
+    enabled: !!bookingData.doctor?.id && !!bookingData.service?.id && !!bookingData.clinic?.id && !!queryRange.start,
   });
 
   const slotsForSelectedDay = useMemo(() => {

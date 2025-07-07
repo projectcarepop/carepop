@@ -523,11 +523,11 @@ publicRoutes.get(
     zValidator('query', availabilityQuerySchema),
     async (c) => {
         const { id: doctorId } = c.req.valid('param');
-        const { startDate, endDate, serviceId } = c.req.valid('query');
+        const { startDate, endDate, serviceId, clinicId } = c.req.valid('query');
 
         try {
             // Use the centralized, correct calculation logic
-            const slots = await calculateAvailableSlots(db, doctorId, serviceId, new Date(startDate), new Date(endDate));
+            const slots = await calculateAvailableSlots(db, doctorId, serviceId, clinicId, new Date(startDate), new Date(endDate));
             return c.json({ data: slots });
         } catch (error: any) {
             console.error(`Failed to get available slots for doctor ${doctorId}:`, error);
@@ -581,20 +581,19 @@ async function calculateAvailableSlots(
     db: any,
     doctorId: string, 
     serviceId: string, 
+    clinicId: string,
     startDate: Date, 
     endDate: Date
 ) {
-    // 1. Fetch service duration and doctor's clinic in parallel
-    const [service, docClinic] = await Promise.all([
-        db.query.services.findFirst({ where: eq(services.id, serviceId), columns: { durationMinutes: true } }),
-        db.query.doctorClinics.findFirst({ where: eq(doctorClinics.doctorId, doctorId), columns: { clinicId: true } })
-    ]);
+    // 1. Fetch service duration. The clinic is now provided directly.
+    const service = await db.query.services.findFirst({ 
+        where: eq(services.id, serviceId), 
+        columns: { durationMinutes: true } 
+    });
 
     if (!service) throw new Error('Service not found');
-    if (!docClinic) throw new Error('Doctor is not associated with any clinic');
     
     const slotDuration = service.durationMinutes;
-    const clinicId = docClinic.clinicId;
 
     // 2. Fetch all necessary availability data in parallel
     const [
@@ -657,28 +656,31 @@ async function calculateAvailableSlots(
 
             // CHECK 4: Is the slot in the past?
             if (potentialSlotStart < new Date()) {
-                potentialSlotStart = addMinutes(potentialSlotStart, 15); // Or slotDuration
+                potentialSlotStart = addMinutes(potentialSlotStart, slotDuration);
                 continue;
             }
 
             // CHECK 5: Does the slot overlap with a booked appointment?
-            const isBooked = bookedAppointments.some((appt: { appointmentTime: string | number | Date; }) => {
+            const conflictingAppointment = bookedAppointments.find((appt: { appointmentTime: string | number | Date; }) => {
                 const apptStart = new Date(appt.appointmentTime);
                 const apptEnd = addMinutes(apptStart, slotDuration);
                 // Check for overlap: (StartA < EndB) and (EndA > StartB)
                 return potentialSlotStart < apptEnd && potentialSlotEnd > apptStart;
             });
-            if (isBooked) {
-                potentialSlotStart = addMinutes(potentialSlotStart, 15); // Move to the next potential start time
+
+            if (conflictingAppointment) {
+                const conflictEnd = addMinutes(new Date(conflictingAppointment.appointmentTime), slotDuration);
+                potentialSlotStart = new Date(conflictEnd.getTime()); // Jump to the end of the conflicting appointment
                 continue;
             }
 
             // CHECK 6: Does the slot overlap with a doctor's non-availability override?
-            const isDoctorOverride = doctorOverrides.some((o: { isAvailable: any; startDateTime: string | number | Date; endDateTime: string | number | Date; }) => 
+            const conflictingOverride = doctorOverrides.find((o: { isAvailable: any; startDateTime: string | number | Date; endDateTime: string | number | Date; }) => 
                 !o.isAvailable && potentialSlotStart < new Date(o.endDateTime) && potentialSlotEnd > new Date(o.startDateTime)
             );
-            if (isDoctorOverride) {
-                potentialSlotStart = addMinutes(potentialSlotStart, 15);
+
+            if (conflictingOverride) {
+                potentialSlotStart = new Date(conflictingOverride.endDateTime); // Jump to the end of the override period
                 continue;
             }
 

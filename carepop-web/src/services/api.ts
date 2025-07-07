@@ -736,10 +736,16 @@ export async function cancelMyAppointment(appointmentId: string, accessToken: st
     return response.json();
 }
 
-export async function getAvailableSlots(doctorId: string, serviceId: string, startDate: string, endDate: string) {
-    // Note: This endpoint is public and does not require authentication
+export async function getAvailableSlots(
+    doctorId: string, 
+    serviceId: string,
+    clinicId: string,
+    startDate: string, 
+    endDate: string
+): Promise<string[]> {
     const url = new URL(`${API_BASE_URL}/api/public/doctors/${doctorId}/available-slots`);
     url.searchParams.set('serviceId', serviceId);
+    url.searchParams.set('clinicId', clinicId);
     url.searchParams.set('startDate', startDate);
     url.searchParams.set('endDate', endDate);
 
@@ -748,7 +754,8 @@ export async function getAvailableSlots(doctorId: string, serviceId: string, sta
         const error = await response.json().catch(() => ({ message: 'Could not fetch available slots' }));
         throw new Error(error.message);
     }
-    return response.json();
+    const result = await response.json();
+    return result.data.data;
 }
 
 export async function getAdminStats(cookieStore: ReturnType<typeof cookies>) {

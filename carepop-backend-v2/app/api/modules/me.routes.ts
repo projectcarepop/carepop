@@ -4,11 +4,16 @@ import { z } from 'zod';
 import { sql, desc, getTableColumns } from 'drizzle-orm';
 import { db } from '../lib/db';
 import { appointments, doctors, clinics, services, medicalRecords, recordDoctorNotes, recordPrescriptions, recordDocuments, profiles, healthLogs, menstrualLogs, doctorSchedules, clinicOverrides, doctorAvailabilityOverrides } from '../../../drizzle/schema';
-import { and, eq, gte, lte, or, isNull, not, asc, notInArray } from 'drizzle-orm';
+import { and, eq, gte, lte, or, isNull, not, asc, notInArray, lt } from 'drizzle-orm';
 import { authMiddleware, AuthEnv } from '../middleware/auth';
 import { generativeModel } from '../../../src/services/vertex-ai';
-import type { InferInsertModel } from 'drizzle-orm';
-import { differenceInHours, isSameDay } from 'date-fns';
+import type { InferInsertModel, InferSelectModel } from 'drizzle-orm';
+import { differenceInHours, isSameDay, eachDayOfInterval, format, startOfDay, endOfDay, addMinutes } from 'date-fns';
+import { zonedTimeToUtc } from 'date-fns-tz';
+
+// Define types from schema for local use
+type Appointment = InferSelectModel<typeof appointments>;
+type MedicalRecord = InferSelectModel<typeof medicalRecords>;
 
 const createAppointmentSchema = z.object({
   clinic_id: z.string().uuid(),
@@ -22,6 +27,125 @@ const meRoutes = new Hono<AuthEnv>();
 
 // Apply auth middleware to all routes in this module
 meRoutes.use('*', authMiddleware);
+
+// Copied from public.routes.ts to be used for server-side validation.
+// A future refactor could move this to a shared /lib or /services directory.
+async function calculateAvailableSlots(
+    db: any,
+    doctorId: string, 
+    serviceId: string, 
+    clinicId: string,
+    startDate: Date, 
+    endDate: Date
+) {
+    // 1. Fetch service duration. The clinic is now provided directly.
+    const service = await db.query.services.findFirst({ 
+        where: eq(services.id, serviceId), 
+        columns: { durationMinutes: true } 
+    });
+
+    if (!service) throw new Error('Service not found');
+    
+    const slotDuration = service.durationMinutes;
+
+    // 2. Fetch all necessary availability data in parallel
+    const [
+        schedules,
+        doctorOverrides,
+        clinicHolidays,
+        bookedAppointments
+    ] = await Promise.all([
+        db.query.doctorSchedules.findMany({ where: eq(doctorSchedules.doctorId, doctorId) }),
+        db.query.doctorAvailabilityOverrides.findMany({ where: and(
+            eq(doctorAvailabilityOverrides.doctorId, doctorId), 
+            gte(doctorAvailabilityOverrides.endDateTime, startDate.toISOString()), 
+            lt(doctorAvailabilityOverrides.startDateTime, endDate.toISOString())
+        ) }),
+        db.query.clinicOverrides.findMany({ where: and(
+            eq(clinicOverrides.clinicId, clinicId),
+            eq(clinicOverrides.isAvailable, false), // Only fetch holidays/closures
+            gte(clinicOverrides.endDateTime, startDate.toISOString()),
+            lt(clinicOverrides.startDateTime, endDate.toISOString())
+        )}),
+        db.query.appointments.findMany({ where: and(
+            eq(appointments.doctorId, doctorId), 
+            notInArray(appointments.status, ['canceled_by_patient', 'canceled_by_admin', 'no_show']),
+            gte(appointments.appointmentTime, startDate.toISOString()), 
+            lt(appointments.appointmentTime, endDate.toISOString())
+        ), columns: { appointmentTime: true } })
+    ]);
+    
+    const availableSlots: Date[] = [];
+    const interval = { start: startOfDay(startDate), end: endOfDay(endDate) };
+
+    // 3. Iterate through each day in the requested range
+    for (const day of eachDayOfInterval(interval)) {
+        const dayOfWeek = day.getDay(); // 0 = Sunday, 6 = Saturday
+        const yyyy_mm_dd = format(day, 'yyyy-MM-dd');
+
+        // CHECK 1: Is the entire day a clinic holiday?
+        const isClinicHoliday = clinicHolidays.some((h: { startDateTime: string | number | Date; endDateTime: string | number | Date; }) => day >= startOfDay(new Date(h.startDateTime)) && day < endOfDay(new Date(h.endDateTime)));
+        if (isClinicHoliday) continue;
+
+        // CHECK 2: Does the doctor have a non-availability override for this day?
+        const doctorDayOff = doctorOverrides.find((o: { isAvailable: any; startDateTime: string | number | Date; endDateTime: string | number | Date; }) => !o.isAvailable && day >= startOfDay(new Date(o.startDateTime)) && day < endOfDay(new Date(o.endDateTime)));
+        if (doctorDayOff) continue;
+        
+        // CHECK 3: Find the recurring schedule for this day of the week
+        const dailySchedule = schedules.find((s: { dayOfWeek: number; }) => s.dayOfWeek === dayOfWeek);
+        if (!dailySchedule) continue;
+
+        // Generate potential slots based on the recurring schedule
+        let potentialSlotStart = zonedTimeToUtc(`${yyyy_mm_dd}T${dailySchedule.startTime}`, 'UTC');
+        const scheduleEnd = zonedTimeToUtc(`${yyyy_mm_dd}T${dailySchedule.endTime}`, 'UTC');
+
+        while (potentialSlotStart < scheduleEnd) {
+            const potentialSlotEnd = addMinutes(potentialSlotStart, slotDuration);
+
+            if (potentialSlotEnd > scheduleEnd) {
+                break; // Don't create a slot that exceeds the doctor's schedule
+            }
+
+            // CHECK 4: Is the slot in the past?
+            if (potentialSlotStart < new Date()) {
+                potentialSlotStart = addMinutes(potentialSlotStart, slotDuration);
+                continue;
+            }
+
+            // CHECK 5: Does the slot overlap with a booked appointment?
+            const conflictingAppointment = bookedAppointments.find((appt: { appointmentTime: string | number | Date; }) => {
+                const apptStart = new Date(appt.appointmentTime);
+                const apptEnd = addMinutes(apptStart, slotDuration);
+                // Check for overlap: (StartA < EndB) and (EndA > StartB)
+                return potentialSlotStart < apptEnd && potentialSlotEnd > apptStart;
+            });
+
+            if (conflictingAppointment) {
+                const conflictEnd = addMinutes(new Date(conflictingAppointment.appointmentTime), slotDuration);
+                potentialSlotStart = new Date(conflictEnd.getTime()); // Jump to the end of the conflicting appointment
+                continue;
+            }
+
+            // CHECK 6: Does the slot overlap with a doctor's non-availability override?
+            const conflictingOverride = doctorOverrides.find((o: { isAvailable: any; startDateTime: string | number | Date; endDateTime: string | number | Date; }) => 
+                !o.isAvailable && potentialSlotStart < new Date(o.endDateTime) && potentialSlotEnd > new Date(o.startDateTime)
+            );
+
+            if (conflictingOverride) {
+                potentialSlotStart = new Date(conflictingOverride.endDateTime); // Jump to the end of the override period
+                continue;
+            }
+
+            // If all checks pass, it's a valid slot
+            availableSlots.push(new Date(potentialSlotStart));
+            
+            // Move to the next slot
+            potentialSlotStart = addMinutes(potentialSlotStart, slotDuration);
+        }
+    }
+    
+    return availableSlots;
+}
 
 /**
  * GET /me/profile
@@ -96,11 +220,15 @@ meRoutes.get('/appointments', async (c) => {
  */
 meRoutes.get('/records', async (c) => {
   const user = c.get('user');
-  const { appointments: schemaAppointments } = await import('../../../drizzle/schema');
 
   try {
-    const userAppointmentsWithRecords = await db.query.appointments.findMany({
-        where: eq(schemaAppointments.patientId, user.id),
+    const userAppointmentsWithRecords: (Appointment & {
+        medicalRecords: MedicalRecord[];
+        doctor: { fullName: string | null; } | null;
+        clinic: { name: string; } | null;
+        service: { name: string; } | null;
+    })[] = await db.query.appointments.findMany({
+        where: eq(appointments.patientId, user.id),
         with: {
             medicalRecords: true, // Fetch all related medical records
             doctor: {
@@ -119,7 +247,7 @@ meRoutes.get('/records', async (c) => {
     // The frontend expects a flat list of records, not appointments.
     // We will transform the data to match the required `{ records: [...] }` shape.
     const records = userAppointmentsWithRecords.flatMap(appt => 
-        appt.medicalRecords.map(record => ({
+        appt.medicalRecords.map((record: MedicalRecord) => ({
             ...record,
             // Attach the appointment details to each record for context
             appointment: {
@@ -447,64 +575,57 @@ meRoutes.post('/menstrual-logs', zValidator('json', menstrualLogSchema), async (
 
 /**
  * POST /me/appointments
- * Creates a new appointment after a final server-side availability check.
+ * Creates a new appointment for the authenticated user after server-side validation.
  */
 meRoutes.post('/appointments', zValidator('json', createAppointmentSchema), async (c) => {
     const user = c.get('user');
-    const { 
-        clinic_id, 
-        service_id, 
-        doctor_id, 
-        appointment_time,
-        reason_for_visit 
-    } = c.req.valid('json');
+    const body = c.req.valid('json');
+    const requestedSlot = new Date(body.appointment_time);
 
-    const appointmentTimeDate = new Date(appointment_time);
-
-    // --- Business Rule Check 1: No Same-Day Booking ---
-    if (isSameDay(appointmentTimeDate, new Date())) {
-        return c.json({ error: "Same-day booking is not permitted." }, 400);
-    }
-    
     try {
         const newAppointment = await db.transaction(async (tx) => {
-            // --- Final Availability Check (Inside Transaction) ---
-            const existingAppointment = await tx.query.appointments.findFirst({
-                where: and(
-                    eq(appointments.doctorId, doctor_id),
-                    eq(appointments.appointmentTime, appointment_time),
-                    notInArray(appointments.status, ['canceled_by_patient', 'canceled_by_admin', 'no_show'])
-                )
-            });
+            // 1. Check for availability atomically inside the transaction.
+            const availableSlots = await calculateAvailableSlots(
+                tx,
+                body.doctor_id,
+                body.service_id,
+                body.clinic_id,
+                requestedSlot,
+                requestedSlot
+            );
+            
+            // Convert available slots (which are Date objects) to their millisecond representation for reliable comparison
+            const availableTimeStamps = new Set(availableSlots.map(slot => slot.getTime()));
 
-            if (existingAppointment) {
-                // The slot was taken while the user was on the confirmation screen.
-                throw new Error("This appointment slot is no longer available. Please select another time.");
+            // 2. If the requested slot is not in the set of available slots, throw an error to rollback the transaction.
+            if (!availableTimeStamps.has(requestedSlot.getTime())) {
+                throw new Error('This time slot is no longer available. Please select another time.');
             }
 
-            // If the slot is free, create the new appointment
-            const [created] = await tx.insert(appointments).values({
+            // 3. If the slot is available, create the appointment.
+            const [createdAppointment] = await tx.insert(appointments).values({
                 patientId: user.id,
-                clinicId: clinic_id,
-                serviceId: service_id,
-                doctorId: doctor_id,
-                appointmentTime: appointment_time,
-                reasonForVisit: reason_for_visit,
-                status: 'scheduled'
+                clinicId: body.clinic_id,
+                serviceId: body.service_id,
+                doctorId: body.doctor_id,
+                appointmentTime: body.appointment_time,
+                status: 'scheduled',
+                reasonForVisit: body.reason_for_visit,
             }).returning();
             
-            return created;
+            return createdAppointment;
         });
 
-        return c.json({ data: newAppointment }, 201);
+        return c.json(newAppointment, 201);
 
     } catch (error: any) {
-        // Specifically check for our thrown error
-        if (error.message.includes("no longer available")) {
-            return c.json({ error: error.message }, 409); // 409 Conflict
+        console.error('Failed to create appointment:', error);
+        // If it's our specific availability error, return a 409 Conflict.
+        if (error.message.includes('no longer available')) {
+            return c.json({ error: error.message }, 409);
         }
-        console.error("Failed to create appointment:", error);
-        return c.json({ error: "Internal Server Error", message: "Failed to book appointment." }, 500);
+        // Otherwise, it's a generic server error.
+        return c.json({ error: 'An unexpected error occurred while booking the appointment.' }, 500);
     }
 });
 
