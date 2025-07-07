@@ -755,7 +755,7 @@ export async function getAvailableSlots(
         throw new Error(error.message);
     }
     const result = await response.json();
-    return result.data.data;
+    return result.data;
 }
 
 export async function getAdminStats(cookieStore: ReturnType<typeof cookies>) {
