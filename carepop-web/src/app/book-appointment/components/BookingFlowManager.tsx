@@ -224,24 +224,32 @@ export function BookingFlowManager() {
                     )}
                 </div>
 
-                {/* --- Service & Doctor --- */}
+                {/* --- Service --- */}
                 {bookingData.service && (
                      <div className="border-t pt-3 flex justify-between items-center">
-                        <div className="flex flex-col gap-2">
-                            <div className="flex items-center gap-3">
-                                <Stethoscope className="w-5 h-5 text-muted-foreground" />
-                                <div>
-                                    <span className="font-semibold">{bookingData.service.name} </span>
-                                    <span className="text-xs text-muted-foreground">({bookingData.service.durationMinutes} min)</span>
-                                </div>
+                        <div className="flex items-center gap-3">
+                            <Stethoscope className="w-5 h-5 text-muted-foreground" />
+                            <div>
+                                <span className="font-semibold">{bookingData.service.name} </span>
+                                <span className="text-xs text-muted-foreground">({bookingData.service.durationMinutes} min)</span>
                             </div>
-                            {bookingData.doctor && (
-                                <div className="flex items-center gap-3 pl-1">
-                                    <User className="w-5 h-5 text-muted-foreground" />
-                                    <span className="font-semibold">{bookingData.doctor.fullName}</span>
-                                </div>
-                            )}
                         </div>
+                        {currentStepIndex > serviceStepIndex && (
+                            <Button variant="outline" size="sm" onClick={() => goToStep(STEPS.SELECT_SERVICE_AND_DOCTOR)}>
+                                <Edit2 className="w-3 h-3 mr-1.5" /> Change
+                            </Button>
+                        )}
+                    </div>
+                )}
+                
+                {/* --- Doctor --- */}
+                {bookingData.doctor && (
+                    <div className="border-t pt-3 flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                            <User className="w-5 h-5 text-muted-foreground" />
+                            <span className="font-semibold">{bookingData.doctor.fullName}</span>
+                        </div>
+                        {/* The change button for the doctor is the same as for the service */}
                         {currentStepIndex > serviceStepIndex && (
                             <Button variant="outline" size="sm" onClick={() => goToStep(STEPS.SELECT_SERVICE_AND_DOCTOR)}>
                                 <Edit2 className="w-3 h-3 mr-1.5" /> Change

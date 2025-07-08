@@ -111,9 +111,9 @@ export const Step3_DateTimeSelection: React.FC<Step3_DateTimeSelectionProps> = (
                   key={slot} 
                   variant={bookingData.slot?.toISOString() === slot ? 'default' : 'outline'}
                   onClick={() => handleSelectSlot(new Date(slot))}
-                  className="flex items-center justify-center gap-2"
+                  className="flex items-center justify-center gap-1 text-xs"
                 >
-                  <Clock className="w-4 h-4" />
+                  <Clock className="w-3 h-3" />
                   {formatInTimeZone(new Date(slot), 'Asia/Manila', 'h:mm a')}
                 </Button>
               ))
