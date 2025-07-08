@@ -73,7 +73,7 @@ export const Step3_DateTimeSelection: React.FC<Step3_DateTimeSelectionProps> = (
             <CardTitle>Select a Date & Time</CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-1">
         <div>
           <h3 className="font-semibold text-lg mb-3">Date</h3>
           <Calendar
