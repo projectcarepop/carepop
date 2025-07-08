@@ -7,6 +7,21 @@ import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { Loader2 } from 'lucide-react';
 
+// Helper to format the address
+function formatAddress(address: any): string {
+    if (!address) return '';
+    if (typeof address === 'string') return address;
+    
+    const parts = [
+        address.street,
+        address.city,
+        address.province,
+        address.zip,
+    ].filter(Boolean); // Filter out any null/undefined parts
+    
+    return parts.join(', ');
+}
+
 interface Step4_ConfirmationProps {
   bookingData: BookingData;
   confirmBooking: () => void; 
@@ -42,7 +57,7 @@ export const Step4_Confirmation: React.FC<Step4_ConfirmationProps> = ({
             <h3 className="font-semibold text-lg">Appointment Details</h3>
             <ul className="mt-2 space-y-2 text-sm">
                 <li><strong>Clinic:</strong> {bookingData.clinic?.name || 'Not Selected'}</li>
-                <li className="text-muted-foreground pl-6 text-xs">{bookingData.clinic?.address || ''}</li>
+                <li className="text-muted-foreground pl-6 text-xs">{formatAddress(bookingData.clinic?.address)}</li>
                 <li><strong>Service:</strong> {bookingData.service?.name || 'Not Selected'}</li>
                 <li><strong>Doctor:</strong> {bookingData.doctor?.fullName || 'Not Selected'}</li>
                 <li>

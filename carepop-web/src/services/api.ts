@@ -605,8 +605,8 @@ export async function getPublicServiceCategories() {
     if (!response.ok) {
         throw new Error('Failed to fetch service categories');
     }
-    const result = await response.json();
-    return result.records || [];
+    // The backend for this route returns the array directly.
+    return response.json();
 }
 
 export async function getPublicServices(filters: { clinicId?: string, categoryId?: string, q?: string } = {}) {

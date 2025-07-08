@@ -271,79 +271,93 @@ export function BookingFlowManager() {
 
   const currentStepIndex = stepsOrder.indexOf(currentStep);
 
-  return (
-    <div className="relative">
-      {currentStep !== STEPS.SELECT_CLINIC && (
-          <Button variant="link" className="absolute top-0 right-0 -mt-4" onClick={resetFlow}>
-              Start Over
-          </Button>
-      )}
+  const renderCurrentStepContent = () => {
+    return (
+      <div className="relative">
+        {/* --- Step Content --- */}
+        <div className="space-y-4">
+            <AnimatePresence mode="wait">
+                <motion.div
+                    key={currentStep}
+                    initial={{ opacity: 0, x: 50 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -50 }}
+                    transition={{ duration: 0.3 }}
+                >
+                    {renderStepContent(currentStep)}
+                </motion.div>
+            </AnimatePresence>
+        </div>
 
-      {renderConsolidatedSummary()}
+        {/* --- Centralized Navigation Footer --- */}
+        {currentStep !== STEPS.CONFIRMATION && (
+          <div className="mt-8 pt-4 border-t flex justify-between items-center">
+            <div>
+              {currentStepIndex > 0 && (
+                <Button variant="outline" onClick={goToPreviousStep}>
+                  Back
+                </Button>
+              )}
+            </div>
+            <Button onClick={goToNextStep} disabled={!isSelectionMade}>
+              Continue
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="container mx-auto px-4 py-8 relative max-w-4xl">
+       {currentStep !== STEPS.SELECT_CLINIC && (
+           <Button variant="link" className="absolute top-0 right-0" onClick={resetFlow}>
+               Start Over
+           </Button>
+       )}
       
       {/* --- Visual Progress Stepper --- */}
       <div className="flex items-start mb-12">
-        {stepsOrder.map((step, index) => {
-          const isCompleted = index < currentStepIndex;
-          const isCurrent = index === currentStepIndex;
-          
-          return (
-            <React.Fragment key={step}>
-              <div className="flex flex-col items-center">
-                <div
-                  className={cn(
-                    "w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg transition-all duration-300",
-                    isCompleted ? "bg-primary text-primary-foreground" :
-                    isCurrent ? "bg-primary/20 border-2 border-primary text-primary" :
-                    "bg-muted text-muted-foreground"
-                  )}
-                >
-                  {isCompleted ? <Check className="w-6 h-6" /> : index + 1}
+          {stepsOrder.map((step, index) => {
+            const isCompleted = index < currentStepIndex;
+            const isCurrent = index === currentStepIndex;
+            
+            return (
+              <React.Fragment key={step}>
+                <div className="flex flex-col items-center">
+                  <div
+                    className={cn(
+                      "w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg transition-all duration-300",
+                      isCompleted ? "bg-primary text-primary-foreground" :
+                      isCurrent ? "bg-primary/20 border-2 border-primary text-primary" :
+                      "bg-muted text-muted-foreground"
+                    )}
+                  >
+                    {isCompleted ? <Check className="w-6 h-6" /> : index + 1}
+                  </div>
+                  <p className={cn(
+                    "mt-2 text-sm text-center w-24 transition-all duration-300 hidden sm:block", 
+                    isCurrent ? "font-bold text-primary" : "text-muted-foreground"
+                  )}>
+                    {stepLabels[step]}
+                  </p>
                 </div>
-                <p className={cn(
-                  "mt-2 text-sm text-center w-24 transition-all duration-300 hidden sm:block", 
-                  isCurrent ? "font-bold text-primary" : "text-muted-foreground"
-                )}>
-                  {stepLabels[step]}
-                </p>
-              </div>
-              {index < stepsOrder.length - 1 && (
-                <div className={cn("flex-1 h-1 mt-5 mx-4", isCompleted ? "bg-primary" : "bg-muted")} />
-              )}
-            </React.Fragment>
-          );
-        })}
+                {index < stepsOrder.length - 1 && (
+                  <div className={cn("flex-1 h-1 mt-5 mx-4", isCompleted ? "bg-primary" : "bg-muted")} />
+                )}
+              </React.Fragment>
+            );
+          })}
       </div>
       
-      <div className="space-y-4">
-          <AnimatePresence mode="wait">
-              <motion.div
-                  key={currentStep}
-                  initial={{ opacity: 0, x: 50 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -50 }}
-                  transition={{ duration: 0.3 }}
-              >
-                  {renderStepContent(currentStep)}
-              </motion.div>
-          </AnimatePresence>
+      {/* Main Content Area */}
+      <div className="mb-12">
+        {renderCurrentStepContent()}
       </div>
 
-      {/* --- Centralized Navigation Footer --- */}
-      {currentStep !== STEPS.CONFIRMATION && (
-        <div className="mt-8 pt-4 border-t flex justify-between items-center">
-          <div>
-            {currentStepIndex > 0 && (
-              <Button variant="outline" onClick={goToPreviousStep}>
-                Back
-              </Button>
-            )}
-          </div>
-          <Button onClick={goToNextStep} disabled={!isSelectionMade}>
-            Continue
-          </Button>
-        </div>
-      )}
+      {/* Summary Section - now at the bottom */}
+      {renderConsolidatedSummary()}
+
     </div>
   );
 } 
