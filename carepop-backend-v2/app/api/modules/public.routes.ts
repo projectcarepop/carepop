@@ -39,6 +39,8 @@ const clinicsQuerySchema = z.object({
 // Validation schema for services query
 const servicesQuerySchema = z.object({
   clinicId: z.string().uuid().optional(),
+  categoryId: z.string().uuid().optional(),
+  q: z.string().optional(),
 });
 
 // --- NEW --- Schema for the universal clinic search
@@ -264,58 +266,52 @@ publicRoutes.get('/doctors', async (c) => {
      * Can be filtered by `clinicId` to find services offered at a specific clinic.
      */
     publicRoutes.get('/services', zValidator('query', servicesQuerySchema), async (c) => {
-        const { clinicId } = c.req.valid('query');
+        const { clinicId, categoryId, q } = c.req.valid('query');
         console.log(`--- Backend /api/public/services ---`);
-        console.log(`Received request with clinicId: ${clinicId}`);
+        console.log(`Received request with clinicId: ${clinicId}, categoryId: ${categoryId}, q: ${q}`);
 
         try {
+            const baseQuery = db.select({
+                id: services.id,
+                name: services.name,
+                description: services.description,
+                price: services.price,
+                durationMinutes: services.durationMinutes,
+                isActive: services.isActive,
+                serviceCategory: {
+                    id: serviceCategories.id,
+                    name: serviceCategories.name,
+                }
+            })
+            .from(services)
+            .leftJoin(serviceCategories, eq(services.categoryId, serviceCategories.id));
+
+            const conditions: (SQL | undefined)[] = [eq(services.isActive, true)];
+
             if (clinicId) {
-                // If a clinicId is provided, perform a single JOIN-based query
-                const servicesInClinic = await db.selectDistinct({
-                    id: services.id,
-                    name: services.name,
-                    description: services.description,
-                    price: services.price,
-                    durationMinutes: services.durationMinutes,
-                    isActive: services.isActive,
-                    serviceCategory: {
-                        id: serviceCategories.id,
-                        name: serviceCategories.name,
-                    }
-                })
-                .from(services)
-                .leftJoin(serviceCategories, eq(services.categoryId, serviceCategories.id))
-                .innerJoin(doctorServices, eq(services.id, doctorServices.serviceId))
-                .innerJoin(doctorClinics, eq(doctorServices.doctorId, doctorClinics.doctorId))
-                .where(and(
-                    eq(services.isActive, true),
-                    eq(doctorClinics.clinicId, clinicId)
-                ))
-                .orderBy(asc(services.name));
+                const clinicServiceIds = db.selectDistinct({ serviceId: doctorServices.serviceId })
+                    .from(doctorServices)
+                    .innerJoin(doctorClinics, eq(doctorServices.doctorId, doctorClinics.doctorId))
+                    .where(eq(doctorClinics.clinicId, clinicId));
 
-                console.log(`Found ${servicesInClinic.length} services for clinicId ${clinicId}.`);
-                console.log(`Returning services:`, JSON.stringify(servicesInClinic, null, 2));
-                console.log(`------------------------------------`);
-                return c.json({ data: servicesInClinic });
-
-            } else {
-                // --- CORRECTED LOGIC for fetching ALL services ---
-                // If no clinicId, return all active services, ensuring those without
-                // a category are included by using a LEFT JOIN.
-                const allServices = await db.select({
-                        ...getTableColumns(services),
-                        serviceCategory: {
-                            id: serviceCategories.id,
-                            name: serviceCategories.name,
-                        }
-                    })
-                    .from(services)
-                    .leftJoin(serviceCategories, eq(services.categoryId, serviceCategories.id))
-                    .where(eq(services.isActive, true))
-                    .orderBy(asc(services.name));
-
-                return c.json({ data: allServices });
+                conditions.push(inArray(services.id, clinicServiceIds));
             }
+
+            if (categoryId) {
+                conditions.push(eq(services.categoryId, categoryId));
+            }
+
+            if (q) {
+                conditions.push(ilike(services.name, `%${q}%`));
+            }
+            
+            const filteredServices = await baseQuery
+                .where(and(...conditions))
+                .orderBy(asc(services.name));
+            
+            console.log(`Found ${filteredServices.length} services matching criteria.`);
+            return c.json({ data: filteredServices });
+
         } catch (error) {
             console.error("Failed to fetch public services:", error);
             return c.json({ error: "Internal Server Error" }, 500);

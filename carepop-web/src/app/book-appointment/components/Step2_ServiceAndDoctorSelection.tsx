@@ -2,13 +2,16 @@
 
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getClinicDetails, getProvidersForService } from '@/services/api';
+import { getPublicServices, getProvidersForService, getPublicServiceCategories } from '@/services/api';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import type { BookingData } from './BookingFlowManager';
-import { type Service, type Doctor } from '@/lib/types/bookings';
+import { type Service, type Doctor, type ServiceCategory } from '@/lib/types/bookings';
 import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { useDebounce } from 'use-debounce';
+import { Button } from '@/components/ui/button';
 
 interface Step2_ServiceAndDoctorSelectionProps {
   bookingData: BookingData;
@@ -22,15 +25,27 @@ export const Step2_ServiceAndDoctorSelection: React.FC<Step2_ServiceAndDoctorSel
   setSelectionMade,
 }) => {
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
 
-  const { 
-    data: clinicDetails, 
-    isLoading: isLoadingClinic, 
-    isError, 
-    error 
+  const { data: categories, isLoading: isLoadingCategories } = useQuery({
+    queryKey: ['serviceCategories'],
+    queryFn: getPublicServiceCategories,
+  });
+
+  const {
+    data: services,
+    isLoading: isLoadingServices,
+    isError,
+    error,
   } = useQuery({
-    queryKey: ['clinicDetails', bookingData.clinic?.id],
-    queryFn: () => getClinicDetails(bookingData.clinic!.id),
+    queryKey: ['clinicServices', bookingData.clinic?.id, selectedCategoryId, debouncedSearchTerm],
+    queryFn: () => getPublicServices({
+      clinicId: bookingData.clinic!.id,
+      categoryId: selectedCategoryId ?? undefined,
+      q: debouncedSearchTerm,
+    }),
     enabled: !!bookingData.clinic?.id,
   });
 
@@ -44,23 +59,27 @@ export const Step2_ServiceAndDoctorSelection: React.FC<Step2_ServiceAndDoctorSel
     select: (data) => data.data,
   });
 
-  const services = clinicDetails?.services || [];
-  const [selectedService, setSelectedService] = useState<Service | null>(null);
-
   const handleSelectService = (service: Service) => {
-    setSelectedService(service);
     setSelectedServiceId(service.id);
     updateBookingData({ service, doctor: undefined });
     setSelectionMade(false);
   };
 
   const handleSelectDoctor = (doctor: Doctor) => {
-    if (!selectedService) return;
-    updateBookingData({ service: selectedService, doctor });
+    const service = services?.find((s: Service) => s.id === selectedServiceId);
+    if (!service) return;
+    updateBookingData({ service, doctor });
     setSelectionMade(true);
   };
 
-  if (isLoadingClinic) {
+  const clearFilters = () => {
+    setSearchTerm('');
+    setSelectedCategoryId(null);
+  }
+
+  const hasActiveFilters = searchTerm || selectedCategoryId;
+
+  if (isLoadingServices) {
     return (
       <div className="flex items-center justify-center p-8">
         <Loader2 className="mr-2 h-8 w-8 animate-spin" />
@@ -94,8 +113,37 @@ export const Step2_ServiceAndDoctorSelection: React.FC<Step2_ServiceAndDoctorSel
       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 min-h-[300px]">
         {/* --- Services Column --- */}
         <div className="flex flex-col gap-3 pr-4 border-r">
+            <div className="space-y-4">
+                <Input 
+                    placeholder="Search services..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                <div className="flex flex-wrap gap-2">
+                    {isLoadingCategories ? <Loader2 className="h-5 w-5 animate-spin" /> :
+                        categories?.map((cat: ServiceCategory) => (
+                            <Button 
+                                key={cat.id} 
+                                variant={selectedCategoryId === cat.id ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => setSelectedCategoryId(prev => prev === cat.id ? null : cat.id)}
+                            >
+                                {cat.name}
+                            </Button>
+                        ))
+                    }
+                </div>
+                {hasActiveFilters && (
+                    <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
+                        <X className="w-4 h-4 mr-2" />
+                        Clear Filters
+                    </Button>
+                )}
+            </div>
+            <div className="border-b my-4" />
+
             <h3 className="font-semibold mb-2">Services</h3>
-            {services.length > 0 ? (
+            {services && services.length > 0 ? (
             services.map((service: Service) => (
                 <div
                 key={service.id}

@@ -23,8 +23,14 @@ export interface Service {
   name: string;
   description: string;
   price: number; // Assuming price is a number
+  durationMinutes: number;
   // Add other service details as needed
 }
+
+export type ServiceCategory = {
+    id: string;
+    name: string;
+};
 
 export interface Doctor {
   id: string;

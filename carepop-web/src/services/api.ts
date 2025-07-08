@@ -609,11 +609,15 @@ export async function getPublicServiceCategories() {
     return result.records || [];
 }
 
-export async function getPublicServices(clinicId?: string) {
-    let url = `${API_BASE_URL}/api/public/services`;
-    if (clinicId) {
-        url += `?clinicId=${clinicId}`;
-    }
+export async function getPublicServices(filters: { clinicId?: string, categoryId?: string, q?: string } = {}) {
+    const params = new URLSearchParams();
+    if (filters.clinicId) params.append('clinicId', filters.clinicId);
+    if (filters.categoryId) params.append('categoryId', filters.categoryId);
+    if (filters.q) params.append('q', filters.q);
+
+    const queryString = params.toString();
+    const url = `${API_BASE_URL}/api/public/services${queryString ? `?${queryString}` : ''}`;
+    
     const response = await fetch(url);
     if (!response.ok) {
         throw new Error('Failed to fetch services');
@@ -664,7 +668,7 @@ export const getAvailableSlots = async (
     clinicId: string, 
     date: string
 ) => {
-    const response = await fetch(`${API_BASE_URL}/public/doctors/${doctorId}/available-slots?serviceId=${serviceId}&clinicId=${clinicId}&date=${date}`);
+    const response = await fetch(`${API_BASE_URL}/api/public/doctors/${doctorId}/available-slots?serviceId=${serviceId}&clinicId=${clinicId}&date=${date}`);
     if (!response.ok) {
         throw new Error('Failed to fetch available slots');
     }
