@@ -9,15 +9,12 @@ import { Loader2 } from 'lucide-react';
 
 interface Step4_ConfirmationProps {
   bookingData: BookingData;
-  goToPreviousStep: () => void;
-  // This function would eventually handle the mutation
   confirmBooking: () => void; 
   isBooking: boolean;
 }
 
 export const Step4_Confirmation: React.FC<Step4_ConfirmationProps> = ({
   bookingData,
-  goToPreviousStep,
   confirmBooking,
   isBooking,
 }) => {
@@ -35,7 +32,6 @@ export const Step4_Confirmation: React.FC<Step4_ConfirmationProps> = ({
       <CardHeader>
         <div className="flex justify-between items-center">
           <CardTitle>Confirm Your Appointment</CardTitle>
-          <Button variant="ghost" onClick={goToPreviousStep}>Back</Button>
         </div>
         <p className="text-muted-foreground text-sm pt-1">
           Please review the details of your appointment below before confirming.
@@ -46,6 +42,7 @@ export const Step4_Confirmation: React.FC<Step4_ConfirmationProps> = ({
             <h3 className="font-semibold text-lg">Appointment Details</h3>
             <ul className="mt-2 space-y-2 text-sm">
                 <li><strong>Clinic:</strong> {bookingData.clinic?.name || 'Not Selected'}</li>
+                <li className="text-muted-foreground pl-6 text-xs">{bookingData.clinic?.address || ''}</li>
                 <li><strong>Service:</strong> {bookingData.service?.name || 'Not Selected'}</li>
                 <li><strong>Doctor:</strong> {bookingData.doctor?.fullName || 'Not Selected'}</li>
                 <li>
@@ -53,6 +50,26 @@ export const Step4_Confirmation: React.FC<Step4_ConfirmationProps> = ({
                     {bookingData.slot ? format(bookingData.slot, "MMMM d, yyyy 'at' h:mm a") : 'Not Selected'}
                 </li>
             </ul>
+        </div>
+        <div className="p-4 border-t border-dashed">
+            <dl className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">Service Fee</dt>
+                <dd className="font-semibold">
+                  {bookingData.service ? 
+                    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'PHP' }).format(bookingData.service.price) 
+                    : 'N/A'}
+                </dd>
+              </div>
+              <div className="flex justify-between font-bold text-lg pt-2 border-t">
+                <dt>Total</dt>
+                <dd>
+                  {bookingData.service ? 
+                    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'PHP' }).format(bookingData.service.price) 
+                    : 'N/A'}
+                </dd>
+              </div>
+            </dl>
         </div>
       </CardContent>
       <CardFooter>

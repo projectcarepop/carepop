@@ -16,7 +16,7 @@ import {
     doctorAvailabilityOverrides,
     clinicOverrides,
 } from '../../../drizzle/schema';
-import { and, eq, sql, inArray, SQL, asc, getTableColumns, type AnyColumn, ne, gte, lt, notInArray } from 'drizzle-orm';
+import { and, eq, sql, inArray, SQL, asc, getTableColumns, type AnyColumn, ne, gte, lt, notInArray, ilike } from 'drizzle-orm';
 import { getDay, parseISO, format, startOfDay, endOfDay, setHours, setMinutes, setSeconds, isBefore, addMinutes, isEqual, eachDayOfInterval } from 'date-fns';
 import { zonedTimeToUtc } from 'date-fns-tz';
 import fs from 'fs/promises';
@@ -51,6 +51,7 @@ const searchClinicsSchema = z.object({
 
 // --- NEW --- Schema for the universal clinic search
 const universalSearchSchema = z.object({
+    q: z.string().optional(),
     serviceId: z.string().uuid().optional(),
     lat: z.coerce.number().min(-90).max(90).optional(),
     lon: z.coerce.number().min(-180).max(180).optional(),
@@ -59,8 +60,15 @@ const universalSearchSchema = z.object({
 
 const availableSlotsSchema = z.object({
   serviceId: z.string().uuid(),
-  startDate: z.string().datetime(),
-  endDate: z.string().datetime(),
+  clinicId: z.string().uuid(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Date must be in YYYY-MM-DD format" }),
+});
+
+const availableDaysSchema = z.object({
+  serviceId: z.string().uuid(),
+  clinicId: z.string().uuid(),
+  month: z.coerce.number().min(1).max(12),
+  year: z.coerce.number().min(new Date().getFullYear()),
 });
 
 // Helper function to read PSGC data
@@ -380,8 +388,8 @@ publicRoutes.get('/psgc/barangays/:cityMunicipalityCode', async (c) => {
  * Can filter by service and/or sort by distance from a point.
  */
 publicRoutes.get('/search/clinics', zValidator('query', universalSearchSchema), async (c) => {
-    const { serviceId, lat, lon, radius } = c.req.valid('query');
-    console.log(`[Clinic Search] Received params: serviceId=${serviceId}, lat=${lat}, lon=${lon}, radius=${radius}`);
+    const { q, serviceId, lat, lon, radius } = c.req.valid('query');
+    console.log(`[Clinic Search] Received params: q=${q}, serviceId=${serviceId}, lat=${lat}, lon=${lon}, radius=${radius}`);
 
     try {
         const hasLocation = lat !== undefined && lon !== undefined;
@@ -412,6 +420,11 @@ publicRoutes.get('/search/clinics', zValidator('query', universalSearchSchema), 
 
         const conditions: SQL[] = [eq(clinics.isActive, true)];
 
+        // Conditionally add filtering by clinic name
+        if (q) {
+            conditions.push(ilike(clinics.name, `%${q}%`));
+        }
+        
         // Conditionally add filtering by serviceId
         if (serviceId) {
             // --- CORRECTED LOGIC ---
@@ -517,23 +530,56 @@ const availabilityQuerySchema = z.object({
     clinicId: z.string().uuid({ message: "A valid clinic ID is required." }),
 });
 
-publicRoutes.get(
-    '/doctors/:id/available-slots',
-    zValidator('param', z.object({ id: z.string().uuid() })),
-    zValidator('query', availabilityQuerySchema),
-    async (c) => {
-        const { id: doctorId } = c.req.valid('param');
-        const { startDate, endDate, serviceId, clinicId } = c.req.valid('query');
+publicRoutes.get('/doctors/:id/available-days',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  zValidator('query', availableDaysSchema),
+  async (c) => {
+    const { id: doctorId } = c.req.valid('param');
+    const { serviceId, year, month, clinicId } = c.req.valid('query');
+    
+    // Determine start and end of the month
+    // Note: JS months are 0-indexed, so we subtract 1
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
 
-        try {
-            // Use the centralized, correct calculation logic
-            const slots = await calculateAvailableSlots(db, doctorId, serviceId, clinicId, new Date(startDate), new Date(endDate));
-            return c.json({ data: slots });
-        } catch (error: any) {
-            console.error(`Failed to get available slots for doctor ${doctorId}:`, error);
-            return c.json({ error: 'Failed to calculate availability', message: error.message }, 500);
-        }
+    try {
+        const allSlots = await calculateAvailableSlots(db, doctorId, serviceId, clinicId, startDate, endDate);
+        
+        const uniqueDays = [...new Set(allSlots.map(slot => format(slot, 'yyyy-MM-dd')))];
+
+        return c.json({ data: uniqueDays });
+
+    } catch (error: any) {
+        console.error(`Failed to fetch available days for doctor ${doctorId}:`, error);
+        return c.json({ error: "Internal Server Error", message: error.message }, 500);
     }
+  }
+);
+
+publicRoutes.get(
+  '/doctors/:id/available-slots',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  zValidator('query', availableSlotsSchema),
+  async (c) => {
+    const { id: doctorId } = c.req.valid('param');
+    const { serviceId, date, clinicId } = c.req.valid('query');
+    
+    try {
+      const day = parseISO(date);
+      const slots = await calculateAvailableSlots(
+        db,
+        doctorId,
+        serviceId,
+        clinicId,
+        startOfDay(day),
+        endOfDay(day)
+      );
+      return c.json({ data: slots });
+    } catch (error: any) {
+      console.error(`Error calculating slots for doctor ${doctorId}:`, error.message);
+      return c.json({ error: 'Failed to calculate available slots' }, 500);
+    }
+  }
 );
 
 /**

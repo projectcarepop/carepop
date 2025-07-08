@@ -134,6 +134,7 @@ export async function getBarangays(cityCode: string) {
 
 // --- NEW UNIFIED CLINIC SEARCH ---
 interface ClinicSearchFilters {
+  q?: string | null;
   serviceId?: string | null;
   userLocation?: {
     lat: number;
@@ -143,6 +144,9 @@ interface ClinicSearchFilters {
 
 export async function searchClinics(filters: ClinicSearchFilters) {
   const params = new URLSearchParams();
+  if (filters.q) {
+    params.append('q', filters.q);
+  }
   if (filters.serviceId) {
     params.append('serviceId', filters.serviceId);
   }
@@ -633,62 +637,64 @@ export async function getPublicClinics(serviceId?: string) {
     return result;
 }
 
-export async function getPublicClinicDetails(clinicId: string) {
-    const url = `${API_BASE_URL}/api/public/clinics/${clinicId}`;
-    const response = await fetch(url, { cache: 'no-store' });
+/**
+ * Gets the public details for a single clinic by its ID.
+ * @param clinicId The UUID of the clinic.
+ * @returns The detailed clinic object, including services offered.
+ */
+export const getClinicDetails = async (clinicId: string) => {
+    const response = await fetch(`${API_BASE_URL}/public/clinics/${clinicId}`);
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: "Failed to fetch clinic details."}));
-        throw new Error(error.message);
+        throw new Error('Failed to fetch clinic details');
     }
     return response.json();
 }
 
 /**
- * [NEW] Defines the shape of a booked appointment fetched for availability checking.
+ * Gets all available time slots for a given doctor and service on a specific date.
+ * @param doctorId The UUID of the doctor.
+ * @param serviceId The UUID of the service.
+ * @param clinicId The UUID of the clinic.
+ * @param date The specific date to fetch slots for (YYYY-MM-DD).
+ * @returns A list of available slot date-time strings.
  */
-export type BookedAppointment = {
-  id: string;
-  appointmentTime: string; // ISO string
-  serviceId: string;
-  doctorId: string;
+export const getAvailableSlots = async (
+    doctorId: string, 
+    serviceId: string, 
+    clinicId: string, 
+    date: string
+) => {
+    const response = await fetch(`${API_BASE_URL}/public/doctors/${doctorId}/available-slots?serviceId=${serviceId}&clinicId=${clinicId}&date=${date}`);
+    if (!response.ok) {
+        throw new Error('Failed to fetch available slots');
+    }
+    const data = await response.json();
+    return data.data; // The backend wraps the array in a 'data' property
 };
 
 /**
- * [NEW] Fetches all scheduled appointments for a given clinic within a date range.
- * This replaces the old slot-by-slot availability check.
+ * Gets all days with available slots for a given doctor/service in a specific month.
+ * @param doctorId The UUID of the doctor.
+ * @param serviceId The UUID of the service.
+ * @param clinicId The UUID of the clinic.
+ * @param month The month to check (1-12).
+ * @param year The year to check.
+ * @returns A list of dates (YYYY-MM-DD) that have availability.
  */
-export async function getClinicAppointments(params: {
-  clinicId: string;
-  startDate: string; // ISO String
-  endDate: string;   // ISO String
-}): Promise<BookedAppointment[]> {
-  const { clinicId, startDate, endDate } = params;
-  const queryParams = new URLSearchParams({ startDate, endDate });
-  const url = `${API_BASE_URL}/api/public/clinics/${clinicId}/appointments?${queryParams.toString()}`;
-  
-  try {
-    const response = await fetch(url, { cache: 'no-store' });
+export const getAvailableDays = async (
+    doctorId: string, 
+    serviceId: string, 
+    clinicId: string, 
+    month: number, 
+    year: number
+) => {
+    const response = await fetch(`${API_BASE_URL}/public/doctors/${doctorId}/available-days?serviceId=${serviceId}&clinicId=${clinicId}&month=${month}&year=${year}`);
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.status}` }));
-      throw new Error(error.message || `Failed to fetch appointments for clinic ${clinicId}.`);
+        throw new Error('Failed to fetch available days');
     }
-    const result = await response.json();
-    return result.data || [];
-  } catch (error) {
-    console.error(`Network or parsing error in getClinicAppointments for clinic ${clinicId}:`, error);
-    throw new Error("A network error occurred while fetching clinic appointments.");
-  }
-}
-
-export async function getClinicDetails(clinicId: string) {
-   const url = `${API_BASE_URL}/api/public/clinics/${clinicId}`;
-   const response = await fetch(url, { cache: 'no-store' });
-   if (!response.ok) {
-     const error = await response.json().catch(() => ({ message: `Clinic not found.` }));
-     throw new Error(error.message);
-   }
-   return response.json();
-}
+    const data = await response.json();
+    return data.data;
+};
 
 export async function getProvidersByService(serviceId: string) {
     const response = await fetch(`${API_BASE_URL}/api/public/services/${serviceId}/doctors`);
@@ -734,28 +740,6 @@ export async function cancelMyAppointment(appointmentId: string, accessToken: st
         throw new Error(error.message);
     }
     return response.json();
-}
-
-export async function getAvailableSlots(
-    doctorId: string, 
-    serviceId: string,
-    clinicId: string,
-    startDate: string, 
-    endDate: string
-): Promise<string[]> {
-    const url = new URL(`${API_BASE_URL}/api/public/doctors/${doctorId}/available-slots`);
-    url.searchParams.set('serviceId', serviceId);
-    url.searchParams.set('clinicId', clinicId);
-    url.searchParams.set('startDate', startDate);
-    url.searchParams.set('endDate', endDate);
-
-    const response = await fetch(url.toString(), { cache: 'no-store' });
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Could not fetch available slots' }));
-        throw new Error(error.message);
-    }
-    const result = await response.json();
-    return result.data;
 }
 
 export async function getAdminStats(cookieStore: ReturnType<typeof cookies>) {

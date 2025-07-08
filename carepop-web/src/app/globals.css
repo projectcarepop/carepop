@@ -28,7 +28,7 @@
     --info-foreground: 0 0% 100%;
     --border: 210 14% 89%;
     --input: 210 14% 89%;
-    --ring: 349 100% 65%;
+    --ring: 215 20.2% 65.1%;
     --radius: 0.5rem;
   }
 
@@ -83,3 +83,26 @@
 /* body {
   border: 10px solid red !important; // Temporary debug style
 } */
+
+/* Custom class for react-day-picker available days */
+.day-available {
+  position: relative;
+}
+
+.day-available::after {
+  content: '';
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background-color: hsl(var(--primary));
+}
+
+@layer base {
+  * {
+    /* ... existing code ... */
+  }
+}
