@@ -643,7 +643,7 @@ export async function getPublicClinics(serviceId?: string) {
  * @returns The detailed clinic object, including services offered.
  */
 export const getClinicDetails = async (clinicId: string) => {
-    const response = await fetch(`${API_BASE_URL}/public/clinics/${clinicId}`);
+    const response = await fetch(`${API_BASE_URL}/api/public/clinics/${clinicId}`);
     if (!response.ok) {
         throw new Error('Failed to fetch clinic details');
     }
