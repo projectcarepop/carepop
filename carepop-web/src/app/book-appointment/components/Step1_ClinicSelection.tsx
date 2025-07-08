@@ -99,7 +99,7 @@ export const Step1_ClinicSelection: React.FC<Step1_ClinicSelectionProps> = ({
                     {isSelected && (
                         <CheckCircle2 className="w-6 h-6 text-primary absolute top-2 right-2" />
                     )}
-                    <CardContent className="py-1 px-2">
+                    <CardContent className="py-3 px-5">
                         <p className="font-semibold text-base truncate">{clinic.name}</p>
                         <div className="flex items-start gap-2 text-muted-foreground mt-1.5">
                             <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />

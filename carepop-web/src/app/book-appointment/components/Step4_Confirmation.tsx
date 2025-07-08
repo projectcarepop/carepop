@@ -37,7 +37,7 @@ export const Step4_Confirmation: React.FC<Step4_ConfirmationProps> = ({
   // For now, we'll just display the IDs and the selected slot.
 
   return (
-    <Card className="max-w-2xl mx-auto relative">
+    <Card className="relative">
       {isBooking && (
         <div className="absolute inset-0 bg-white/80 flex flex-col items-center justify-center rounded-lg z-10">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -65,7 +65,14 @@ export const Step4_Confirmation: React.FC<Step4_ConfirmationProps> = ({
                 </li>
                 <li className="flex items-center gap-3">
                     <Stethoscope className="w-5 h-5 text-muted-foreground" />
-                    <span className="font-semibold">{bookingData.service?.name || 'Not Selected'}</span>
+                    <div>
+                        <span className="font-semibold">{bookingData.service?.name || 'Not Selected'}</span>
+                        {bookingData.service && (
+                            <span className="text-xs text-muted-foreground ml-1.5">
+                                ({bookingData.service.durationMinutes} minutes)
+                            </span>
+                        )}
+                    </div>
                 </li>
                 <li className="flex items-center gap-3">
                     <User className="w-5 h-5 text-muted-foreground" />

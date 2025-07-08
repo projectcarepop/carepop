@@ -104,7 +104,7 @@ export const Step3_DateTimeSelection: React.FC<Step3_DateTimeSelectionProps> = (
             </div>
           )}
           {isError && <p className="text-destructive">Could not load slots. Please try another day.</p>}
-          <div className="grid grid-cols-4 gap-2 max-h-96 overflow-y-auto pr-2">
+          <div className="grid grid-cols-3 md:grid-cols-4 gap-2 max-h-96 overflow-y-auto pr-2">
             {selectedDate && availableSlots && availableSlots.length > 0 ? (
               availableSlots.map((slot: string) => ( // Slots are now strings from API
                 <Button 
@@ -118,7 +118,7 @@ export const Step3_DateTimeSelection: React.FC<Step3_DateTimeSelectionProps> = (
                 </Button>
               ))
             ) : (
-              <p className="col-span-4 text-center text-muted-foreground pt-8">
+              <p className="col-span-3 md:col-span-4 text-center text-muted-foreground pt-8">
                 {isLoadingDays || isLoadingSlots ? 'Loading...' : (selectedDate ? "No available slots for this day." : "Please select an available date.")}
               </p>
             )}
