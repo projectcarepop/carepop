@@ -17,7 +17,7 @@ export default function ClinicList({ clinics, onViewDetails, onShowRoute, highli
   }
 
   return (
-    <div className="flex flex-col space-y-4">
+    <div className="flex flex-col space-y-2">
       {clinics.map(clinic => (
         <div 
           key={clinic.id}
