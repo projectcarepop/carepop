@@ -73,8 +73,8 @@ export const Step3_DateTimeSelection: React.FC<Step3_DateTimeSelectionProps> = (
             <CardTitle>Select a Date & Time</CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-1">
-        <div>
+      <CardContent className="flex flex-col md:flex-row gap-2">
+        <div className="w-auto">
           <h3 className="font-semibold text-lg mb-3">Date</h3>
           <Calendar
             mode="single"
@@ -96,7 +96,7 @@ export const Step3_DateTimeSelection: React.FC<Step3_DateTimeSelectionProps> = (
             className="rounded-md border"
           />
         </div>
-        <div className="relative">
+        <div className="relative flex-1">
           <h3 className="font-semibold text-lg mb-3">Time</h3>
           {(isLoadingSlots || isLoadingDays) && (
             <div className="absolute inset-0 bg-white/80 flex items-center justify-center rounded-lg">
