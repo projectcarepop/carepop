@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getPublicServices, getProvidersForService, getPublicServiceCategories } from '@/services/api';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, X, Clock } from 'lucide-react';
+import { Loader2, X, Clock, Stethoscope, CheckCircle2 } from 'lucide-react';
 import type { BookingData } from './BookingFlowManager';
 import { type Service, type Doctor, type ServiceCategory } from '@/lib/types/bookings';
 import { cn } from '@/lib/utils';
@@ -14,6 +14,7 @@ import { useDebounce } from 'use-debounce';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface Step2_ServiceAndDoctorSelectionProps {
   bookingData: BookingData;
@@ -148,28 +149,34 @@ export const Step2_ServiceAndDoctorSelection: React.FC<Step2_ServiceAndDoctorSel
             <ScrollArea className="h-96 pr-3">
                 <h3 className="font-semibold mb-2 text-lg">Services</h3>
                 {services && services.length > 0 ? (
-                services.map((service: Service) => (
-                    <div
-                    key={service.id}
-                    className={cn(
-                        "p-4 border rounded-md cursor-pointer hover:bg-accent mb-3",
-                        bookingData.service?.id === service.id && "ring-2 ring-primary"
-                    )}
-                    onClick={() => handleSelectService(service)}
-                    >
-                        <div className="flex justify-between items-start">
-                            <h4 className="font-semibold text-base">{service.name}</h4>
-                            <p className="text-base font-bold">
-                                {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'PHP' }).format(service.price)}
-                            </p>
+                services.map((service: Service) => {
+                    const isSelected = bookingData.service?.id === service.id;
+                    return (
+                        <div
+                        key={service.id}
+                        className={cn(
+                            "p-4 border rounded-lg cursor-pointer hover:bg-accent mb-3 relative",
+                            isSelected && "ring-2 ring-primary bg-primary/5"
+                        )}
+                        onClick={() => handleSelectService(service)}
+                        >
+                            {isSelected && (
+                                <CheckCircle2 className="w-5 h-5 text-primary absolute top-3 right-3" />
+                            )}
+                            <div className="flex justify-between items-start">
+                                <h4 className="font-semibold text-base pr-2">{service.name}</h4>
+                                <p className="text-base font-bold whitespace-nowrap">
+                                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'PHP' }).format(service.price)}
+                                </p>
+                            </div>
+                            <p className="text-sm text-muted-foreground line-clamp-2 my-2">{service.description}</p>
+                            <div className="flex items-center text-xs text-muted-foreground mt-2">
+                                <Clock className="w-3 h-3 mr-1.5" />
+                                <span>{service.durationMinutes} minutes</span>
+                            </div>
                         </div>
-                        <p className="text-sm text-muted-foreground line-clamp-2 my-2">{service.description}</p>
-                        <div className="flex items-center text-xs text-muted-foreground mt-2">
-                            <Clock className="w-3 h-3 mr-1.5" />
-                            <span>{service.durationMinutes} minutes</span>
-                        </div>
-                    </div>
-                ))
+                    )
+                })
                 ) : (
                 <p className="text-muted-foreground text-center text-sm pt-10">No services found for this clinic.</p>
                 )}
@@ -191,22 +198,34 @@ export const Step2_ServiceAndDoctorSelection: React.FC<Step2_ServiceAndDoctorSel
             ) : (
                 <>
                 {doctors && doctors.length > 0 ? (
-                    doctors.map((doctor: Doctor) => (
-                    <div
-                        key={doctor.id}
-                        className={cn(
-                            "p-3 border rounded-md cursor-pointer hover:bg-accent flex items-center gap-4",
-                            bookingData.doctor?.id === doctor.id && "ring-2 ring-primary"
-                        )}
-                        onClick={() => handleSelectDoctor(doctor)}
-                    >
-                        <img src={doctor.avatarUrl || '/avatar-placeholder.png'} alt={doctor.fullName} className="w-14 h-14 rounded-full bg-muted" />
-                        <div>
-                        <h4 className="font-semibold">{doctor.fullName}</h4>
-                        <p className="text-sm text-muted-foreground">{doctor.specialtyText}</p>
+                    doctors.map((doctor: Doctor) => {
+                        const isSelected = bookingData.doctor?.id === doctor.id;
+                        return (
+                        <div
+                            key={doctor.id}
+                            className={cn(
+                                "p-3 border rounded-lg cursor-pointer hover:bg-accent flex items-center gap-4 relative",
+                                isSelected && "ring-2 ring-primary bg-primary/5"
+                            )}
+                            onClick={() => handleSelectDoctor(doctor)}
+                        >
+                            {isSelected && (
+                                <CheckCircle2 className="w-5 h-5 text-primary absolute top-2 right-2" />
+                            )}
+                            <Avatar className="w-14 h-14">
+                                <AvatarImage src={doctor.avatarUrl || ''} alt={doctor.fullName} />
+                                <AvatarFallback>{doctor.fullName.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                                <h4 className="font-semibold text-base">{doctor.fullName}</h4>
+                                <div className="flex items-center text-sm text-muted-foreground mt-1">
+                                    <Stethoscope className="w-4 h-4 mr-1.5" />
+                                    <span>{doctor.specialtyText}</span>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    ))
+                        )
+                    })
                 ) : (
                     <div className="text-center text-muted-foreground py-8">
                         <p>No professionals are available for this service.</p>

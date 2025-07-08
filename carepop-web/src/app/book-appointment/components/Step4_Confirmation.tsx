@@ -5,7 +5,7 @@ import type { BookingData } from './BookingFlowManager';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Home, Stethoscope, User, CalendarDays } from 'lucide-react';
 
 // Helper to format the address
 function formatAddress(address: any): string {
@@ -55,14 +55,27 @@ export const Step4_Confirmation: React.FC<Step4_ConfirmationProps> = ({
       <CardContent className="space-y-4">
         <div className="p-4 bg-muted rounded-lg">
             <h3 className="font-semibold text-lg">Appointment Details</h3>
-            <ul className="mt-2 space-y-2 text-sm">
-                <li><strong>Clinic:</strong> {bookingData.clinic?.name || 'Not Selected'}</li>
-                <li className="text-muted-foreground pl-6 text-xs">{formatAddress(bookingData.clinic?.address)}</li>
-                <li><strong>Service:</strong> {bookingData.service?.name || 'Not Selected'}</li>
-                <li><strong>Doctor:</strong> {bookingData.doctor?.fullName || 'Not Selected'}</li>
-                <li>
-                    <strong>Time:</strong> 
-                    {bookingData.slot ? format(bookingData.slot, "MMMM d, yyyy 'at' h:mm a") : 'Not Selected'}
+            <ul className="mt-2 space-y-4 text-sm">
+                <li className="flex items-start gap-3">
+                    <Home className="w-5 h-5 text-muted-foreground mt-0.5" />
+                    <div>
+                        <span className="font-semibold">{bookingData.clinic?.name || 'Not Selected'}</span>
+                        <p className="text-muted-foreground text-xs">{formatAddress(bookingData.clinic?.address)}</p>
+                    </div>
+                </li>
+                <li className="flex items-center gap-3">
+                    <Stethoscope className="w-5 h-5 text-muted-foreground" />
+                    <span className="font-semibold">{bookingData.service?.name || 'Not Selected'}</span>
+                </li>
+                <li className="flex items-center gap-3">
+                    <User className="w-5 h-5 text-muted-foreground" />
+                    <span className="font-semibold">{bookingData.doctor?.fullName || 'Not Selected'}</span>
+                </li>
+                <li className="flex items-center gap-3">
+                    <CalendarDays className="w-5 h-5 text-muted-foreground" />
+                    <span className="font-semibold">
+                        {bookingData.slot ? format(bookingData.slot, "MMMM d, yyyy 'at' h:mm a") : 'Not Selected'}
+                    </span>
                 </li>
             </ul>
         </div>

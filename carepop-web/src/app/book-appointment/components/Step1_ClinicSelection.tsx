@@ -5,12 +5,27 @@ import { useQuery } from '@tanstack/react-query';
 import { searchClinics } from '../../../services/api';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
+import { Loader2, MapPin, CheckCircle2 } from 'lucide-react';
 import type { BookingData } from './BookingFlowManager';
 import { type Clinic } from '@/lib/types/bookings';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { useDebounce } from 'use-debounce';
+
+// Helper to format the address
+function formatAddress(address: any): string {
+    if (!address) return 'Address not available';
+    if (typeof address === 'string') return address;
+    
+    const parts = [
+        address.street,
+        address.city,
+        address.province,
+        address.zip,
+    ].filter(Boolean); // Filter out any null/undefined parts
+    
+    return parts.join(', ');
+}
 
 interface Step1_ClinicSelectionProps {
   bookingData: BookingData;
@@ -69,28 +84,33 @@ export const Step1_ClinicSelection: React.FC<Step1_ClinicSelectionProps> = ({
                 <span>Searching...</span>
             </div>
         ) : clinics && clinics.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[300px] overflow-y-auto pr-2">
-            {clinics.map((clinic: Clinic) => (
-                <Card 
-                key={clinic.id} 
-                className={cn(
-                    "cursor-pointer hover:shadow-lg transition-shadow",
-                    bookingData.clinic?.id === clinic.id && "ring-2 ring-primary"
-                )}
-                onClick={() => handleSelect(clinic)}
-                >
-                <CardHeader>
-                    <CardTitle>{clinic.name}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-sm text-muted-foreground line-clamp-2">{typeof clinic.address === 'string' ? clinic.address : 'Address not available'}</p>
-                    <div className="text-xs text-muted-foreground mt-3 pt-3 border-t">
-                      <p>Mon - Fri: 9am - 5pm</p>
-                      <p>Key Services: General Checkup, Therapy</p>
-                    </div>
-                </CardContent>
-                </Card>
-            ))}
+            <div className="grid grid-cols-1 gap-4 max-h-[400px] overflow-y-auto pr-2">
+            {clinics.map((clinic: Clinic) => {
+                const isSelected = bookingData.clinic?.id === clinic.id;
+                return (
+                    <Card 
+                    key={clinic.id} 
+                    className={cn(
+                        "cursor-pointer hover:shadow-lg transition-shadow relative",
+                        isSelected && "ring-2 ring-primary bg-primary/5"
+                    )}
+                    onClick={() => handleSelect(clinic)}
+                    >
+                    {isSelected && (
+                        <CheckCircle2 className="w-6 h-6 text-primary absolute top-2 right-2" />
+                    )}
+                    <CardHeader>
+                        <CardTitle className="text-lg">{clinic.name}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex items-start gap-2 text-muted-foreground">
+                            <MapPin className="w-4 h-4 mt-1 flex-shrink-0" />
+                            <p className="text-sm">{formatAddress(clinic.address)}</p>
+                        </div>
+                    </CardContent>
+                    </Card>
+                )
+            })}
             </div>
         ) : (
             <div className="text-center text-muted-foreground py-8">

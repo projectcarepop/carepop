@@ -8,7 +8,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Clock } from 'lucide-react';
 import type { BookingData } from './BookingFlowManager';
 
 interface Step3_DateTimeSelectionProps {
@@ -75,6 +75,7 @@ export const Step3_DateTimeSelection: React.FC<Step3_DateTimeSelectionProps> = (
       </CardHeader>
       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div>
+          <h3 className="font-semibold text-lg mb-3">Date</h3>
           <Calendar
             mode="single"
             selected={selectedDate}
@@ -87,7 +88,7 @@ export const Step3_DateTimeSelection: React.FC<Step3_DateTimeSelectionProps> = (
             formatters={{
               formatDay: (day) => {
                 const isAvailable = availableDaysAsDates.some(
-                  (d) => d.getDate() === day.getDate() && d.getMonth() === day.getMonth() && d.getFullYear() === day.getFullYear()
+                  (d: Date) => d.getDate() === day.getDate() && d.getMonth() === day.getMonth() && d.getFullYear() === day.getFullYear()
                 );
                 return `${day.getDate()}${isAvailable ? ', Available' : ''}`;
               }
@@ -96,20 +97,23 @@ export const Step3_DateTimeSelection: React.FC<Step3_DateTimeSelectionProps> = (
           />
         </div>
         <div className="relative">
+          <h3 className="font-semibold text-lg mb-3">Time</h3>
           {(isLoadingSlots || isLoadingDays) && (
             <div className="absolute inset-0 bg-white/80 flex items-center justify-center rounded-lg">
               <Loader2 className="h-8 w-8 animate-spin" />
             </div>
           )}
           {isError && <p className="text-destructive">Could not load slots. Please try another day.</p>}
-          <div className="grid grid-cols-3 gap-2 max-h-96 overflow-y-auto">
+          <div className="grid grid-cols-3 gap-2 max-h-96 overflow-y-auto pr-2">
             {selectedDate && availableSlots && availableSlots.length > 0 ? (
               availableSlots.map((slot: string) => ( // Slots are now strings from API
                 <Button 
                   key={slot} 
                   variant={bookingData.slot?.toISOString() === slot ? 'default' : 'outline'}
                   onClick={() => handleSelectSlot(new Date(slot))}
+                  className="flex items-center justify-center gap-2"
                 >
+                  <Clock className="w-4 h-4" />
                   {formatInTimeZone(new Date(slot), 'Asia/Manila', 'h:mm a')}
                 </Button>
               ))
