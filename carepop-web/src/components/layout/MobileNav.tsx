@@ -43,7 +43,7 @@ export default function MobileNav({ user }: { user: User | null }) {
           {user && (
             <>
               <DropdownMenuItem asChild className="hover:bg-transparent focus:bg-transparent hover:text-primary focus:text-primary font-medium">
-                <Link href="/dashboard">Dashboard</Link>
+                <Link href="/main-dashboard">Dashboard</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild className="hover:bg-transparent focus:bg-transparent hover:text-primary focus:text-primary font-medium">
                 <Link href="/appointments">My Appointments</Link>
