@@ -18,14 +18,17 @@ export interface Clinic {
   // Add other clinic details as needed
 }
 
-export interface Service {
-  id: string;
-  name: string;
-  description: string;
-  price: number; // Assuming price is a number
-  durationMinutes: number;
-  // Add other service details as needed
-}
+export type Service = {
+    id: string;
+    name: string;
+    description: string;
+    price: number;
+    durationMinutes: number;
+    serviceCategory?: {
+        id: string;
+        name: string;
+    };
+};
 
 export type ServiceCategory = {
     id: string;

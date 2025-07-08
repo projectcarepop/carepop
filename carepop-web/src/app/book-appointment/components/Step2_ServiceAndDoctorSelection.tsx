@@ -5,13 +5,15 @@ import { useQuery } from '@tanstack/react-query';
 import { getPublicServices, getProvidersForService, getPublicServiceCategories } from '@/services/api';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, X } from 'lucide-react';
+import { Loader2, X, Clock } from 'lucide-react';
 import type { BookingData } from './BookingFlowManager';
 import { type Service, type Doctor, type ServiceCategory } from '@/lib/types/bookings';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { useDebounce } from 'use-debounce';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface Step2_ServiceAndDoctorSelectionProps {
   bookingData: BookingData;
@@ -29,7 +31,7 @@ export const Step2_ServiceAndDoctorSelection: React.FC<Step2_ServiceAndDoctorSel
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
 
-  const { data: categories, isLoading: isLoadingCategories } = useQuery({
+  const { data: categories, isLoading: isLoadingCategories } = useQuery<ServiceCategory[]>({
     queryKey: ['serviceCategories'],
     queryFn: getPublicServiceCategories,
   });
@@ -113,61 +115,70 @@ export const Step2_ServiceAndDoctorSelection: React.FC<Step2_ServiceAndDoctorSel
       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 min-h-[300px]">
         {/* --- Services Column --- */}
         <div className="flex flex-col gap-3 pr-4 border-r">
-            <div className="space-y-4">
+            <div className="space-y-3">
                 <Input 
-                    placeholder="Search services..."
+                    placeholder="Search services by name..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
-                <div className="flex flex-wrap gap-2">
-                    {isLoadingCategories ? <Loader2 className="h-5 w-5 animate-spin" /> :
-                        categories?.map((cat: ServiceCategory) => (
-                            <Button 
-                                key={cat.id} 
-                                variant={selectedCategoryId === cat.id ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => setSelectedCategoryId(prev => prev === cat.id ? null : cat.id)}
-                            >
-                                {cat.name}
-                            </Button>
-                        ))
-                    }
-                </div>
+                <Select
+                    onValueChange={(value) => setSelectedCategoryId(value === 'all' ? null : value)}
+                    value={selectedCategoryId || 'all'}
+                >
+                    <SelectTrigger>
+                        <SelectValue placeholder="Filter by category..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Categories</SelectItem>
+                        {isLoadingCategories ? <Loader2 className="h-5 w-5 animate-spin mx-auto my-2" /> :
+                            categories?.map((cat) => (
+                                <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                            ))
+                        }
+                    </SelectContent>
+                </Select>
                 {hasActiveFilters && (
-                    <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
-                        <X className="w-4 h-4 mr-2" />
-                        Clear Filters
+                    <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground h-8 px-2">
+                        <X className="w-4 h-4 mr-1" />
+                        Clear
                     </Button>
                 )}
             </div>
-            <div className="border-b my-4" />
-
-            <h3 className="font-semibold mb-2">Services</h3>
-            {services && services.length > 0 ? (
-            services.map((service: Service) => (
-                <div
-                key={service.id}
-                className={cn(
-                    "p-3 border rounded-md cursor-pointer hover:bg-accent",
-                    bookingData.service?.id === service.id && "ring-2 ring-primary"
+            <div className="border-b my-2" />
+            <ScrollArea className="h-96 pr-3">
+                <h3 className="font-semibold mb-2 text-lg">Services</h3>
+                {services && services.length > 0 ? (
+                services.map((service: Service) => (
+                    <div
+                    key={service.id}
+                    className={cn(
+                        "p-4 border rounded-md cursor-pointer hover:bg-accent mb-3",
+                        bookingData.service?.id === service.id && "ring-2 ring-primary"
+                    )}
+                    onClick={() => handleSelectService(service)}
+                    >
+                        <div className="flex justify-between items-start">
+                            <h4 className="font-semibold text-base">{service.name}</h4>
+                            <p className="text-base font-bold">
+                                {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'PHP' }).format(service.price)}
+                            </p>
+                        </div>
+                        <p className="text-sm text-muted-foreground line-clamp-2 my-2">{service.description}</p>
+                        <div className="flex items-center text-xs text-muted-foreground mt-2">
+                            <Clock className="w-3 h-3 mr-1.5" />
+                            <span>{service.durationMinutes} minutes</span>
+                        </div>
+                    </div>
+                ))
+                ) : (
+                <p className="text-muted-foreground text-center text-sm pt-10">No services found for this clinic.</p>
                 )}
-                onClick={() => handleSelectService(service)}
-                >
-                <h4 className="font-semibold">{service.name}</h4>
-                <p className="text-sm text-muted-foreground line-clamp-2">{service.description}</p>
-                <p className="text-sm font-bold mt-2">
-                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'PHP' }).format(service.price)}
-                </p>
-                </div>
-            ))
-            ) : (
-            <p className="text-muted-foreground text-center text-sm">No services found for this clinic.</p>
-            )}
+            </ScrollArea>
         </div>
 
         {/* --- Doctors Column --- */}
         <div className="flex flex-col gap-3">
-            <h3 className="font-semibold mb-2">Professionals</h3>
+            <h3 className="font-semibold mb-2 text-lg">Professionals</h3>
             {!selectedServiceId ? (
                 <div className="text-center text-muted-foreground pt-10">
                     <p>Please select a service to see available professionals.</p>

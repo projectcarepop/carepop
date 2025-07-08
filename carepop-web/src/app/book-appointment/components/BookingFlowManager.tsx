@@ -12,11 +12,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { type Clinic, type Service, type Doctor } from '@/lib/types/bookings';
 import { Button } from '@/components/ui/button';
-import { Check, Edit2 } from 'lucide-react';
+import { Check, Edit2, Home, Stethoscope, User, CalendarDays } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Card } from '@/components/ui/card';
-import { format } from 'date-fns';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { motion, AnimatePresence } from 'framer-motion';
+import { format } from 'date-fns';
 
 // The steps of our new booking flow
 const STEPS = {
@@ -194,40 +194,79 @@ export function BookingFlowManager() {
     return <div>Invalid Step</div>;
   };
 
-  const renderStepSummary = (step: string) => {
-    let summaryText = '';
-    if (step === STEPS.SELECT_CLINIC && bookingData.clinic) {
-      summaryText = `Clinic: ${bookingData.clinic.name}`;
-    } else if (step === STEPS.SELECT_SERVICE_AND_DOCTOR && bookingData.service && bookingData.doctor) {
-      summaryText = `Service & Doctor: ${bookingData.service.name} with ${bookingData.doctor.fullName}`;
-    } else if (step === STEPS.SELECT_DATE_TIME && bookingData.slot) {
-      summaryText = `Date & Time: ${format(bookingData.slot, "MMMM d, yyyy 'at' h:mm a")}`;
-    } else {
+  const renderConsolidatedSummary = () => {
+    if (!bookingData.clinic) {
       return null;
     }
 
+    const clinicStepIndex = stepsOrder.indexOf(STEPS.SELECT_CLINIC);
+    const serviceStepIndex = stepsOrder.indexOf(STEPS.SELECT_SERVICE_AND_DOCTOR);
+    const dateStepIndex = stepsOrder.indexOf(STEPS.SELECT_DATE_TIME);
+    const currentStepIndex = stepsOrder.indexOf(currentStep);
+
     return (
-      <AnimatePresence>
-        <motion.div
-          key={step}
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.3 }}
-        >
-          <Card className="p-4 flex justify-between items-center">
-            <div className="flex items-center">
-              <Check className="w-5 h-5 mr-3 text-green-500" />
-              <p className="font-semibold">{summaryText}</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => goToStep(step)}>
-              <Edit2 className="w-4 h-4 mr-2" />
-              Change
-            </Button>
-          </Card>
-        </motion.div>
-      </AnimatePresence>
-    );
+        <Card className="mb-8 bg-muted/40">
+            <CardHeader>
+                <CardTitle>Your Booking Summary</CardTitle>
+                <CardDescription>Review your selections below.</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm space-y-3">
+                {/* --- Clinic --- */}
+                <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                        <Home className="w-5 h-5 text-muted-foreground" />
+                        <span className="font-semibold">{bookingData.clinic.name}</span>
+                    </div>
+                    {currentStepIndex > clinicStepIndex && (
+                        <Button variant="outline" size="sm" onClick={() => goToStep(STEPS.SELECT_CLINIC)}>
+                            <Edit2 className="w-3 h-3 mr-1.5" /> Change
+                        </Button>
+                    )}
+                </div>
+
+                {/* --- Service & Doctor --- */}
+                {bookingData.service && (
+                     <div className="border-t pt-3 flex justify-between items-center">
+                        <div className="flex flex-col gap-2">
+                            <div className="flex items-center gap-3">
+                                <Stethoscope className="w-5 h-5 text-muted-foreground" />
+                                <div>
+                                    <span className="font-semibold">{bookingData.service.name} </span>
+                                    <span className="text-xs text-muted-foreground">({bookingData.service.durationMinutes} min)</span>
+                                </div>
+                            </div>
+                            {bookingData.doctor && (
+                                <div className="flex items-center gap-3 pl-1">
+                                    <User className="w-5 h-5 text-muted-foreground" />
+                                    <span className="font-semibold">{bookingData.doctor.fullName}</span>
+                                </div>
+                            )}
+                        </div>
+                        {currentStepIndex > serviceStepIndex && (
+                            <Button variant="outline" size="sm" onClick={() => goToStep(STEPS.SELECT_SERVICE_AND_DOCTOR)}>
+                                <Edit2 className="w-3 h-3 mr-1.5" /> Change
+                            </Button>
+                        )}
+                    </div>
+                )}
+                
+                {/* --- Date & Time --- */}
+                {bookingData.slot && (
+                    <div className="border-t pt-3 flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                            <CalendarDays className="w-5 h-5 text-muted-foreground" />
+                            <span className="font-semibold">{format(bookingData.slot, "EEE, MMMM d, yyyy 'at' h:mm a")}</span>
+                        </div>
+                        {currentStepIndex > dateStepIndex && (
+                             <Button variant="outline" size="sm" onClick={() => goToStep(STEPS.SELECT_DATE_TIME)}>
+                                <Edit2 className="w-3 h-3 mr-1.5" /> Change
+                            </Button>
+                        )}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    )
   }
 
   const currentStepIndex = stepsOrder.indexOf(currentStep);
@@ -239,6 +278,8 @@ export function BookingFlowManager() {
               Start Over
           </Button>
       )}
+
+      {renderConsolidatedSummary()}
       
       {/* --- Visual Progress Stepper --- */}
       <div className="flex items-start mb-12">
@@ -275,21 +316,17 @@ export function BookingFlowManager() {
       </div>
       
       <div className="space-y-4">
-        {stepsOrder.map((step, index) => {
-          if (index < currentStepIndex) {
-            // Render summary for completed steps
-            return <div key={step}>{renderStepSummary(step)}</div>;
-          } else if (index === currentStepIndex) {
-            // Render the active step component
-            return (
-              <div key={step}>
-                {renderStepContent(step)}
-              </div>
-            );
-          }
-          // Do not render future steps
-          return null;
-        })}
+          <AnimatePresence mode="wait">
+              <motion.div
+                  key={currentStep}
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -50 }}
+                  transition={{ duration: 0.3 }}
+              >
+                  {renderStepContent(currentStep)}
+              </motion.div>
+          </AnimatePresence>
       </div>
 
       {/* --- Centralized Navigation Footer --- */}
