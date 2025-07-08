@@ -84,7 +84,7 @@ export const Step1_ClinicSelection: React.FC<Step1_ClinicSelectionProps> = ({
                 <span>Searching...</span>
             </div>
         ) : clinics && clinics.length > 0 ? (
-            <div className="grid grid-cols-1 gap-4 max-h-[400px] overflow-y-auto pr-2">
+            <div className="grid grid-cols-1 gap-4 max-h-[400px] overflow-y-auto p-4 bg-muted/20 rounded-lg">
             {clinics.map((clinic: Clinic) => {
                 const isSelected = bookingData.clinic?.id === clinic.id;
                 return (
@@ -99,10 +99,10 @@ export const Step1_ClinicSelection: React.FC<Step1_ClinicSelectionProps> = ({
                     {isSelected && (
                         <CheckCircle2 className="w-6 h-6 text-primary absolute top-2 right-2" />
                     )}
-                    <CardHeader>
-                        <CardTitle className="text-lg">{clinic.name}</CardTitle>
+                    <CardHeader className="p-4">
+                        <CardTitle className="text-base">{clinic.name}</CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-4 pt-0">
                         <div className="flex items-start gap-2 text-muted-foreground">
                             <MapPin className="w-4 h-4 mt-1 flex-shrink-0" />
                             <p className="text-sm">{formatAddress(clinic.address)}</p>

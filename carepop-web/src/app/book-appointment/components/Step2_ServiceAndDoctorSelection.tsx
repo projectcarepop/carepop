@@ -163,9 +163,9 @@ export const Step2_ServiceAndDoctorSelection: React.FC<Step2_ServiceAndDoctorSel
                             {isSelected && (
                                 <CheckCircle2 className="w-5 h-5 text-primary absolute top-3 right-3" />
                             )}
-                            <div className="flex justify-between items-start">
+                            <div className="space-y-1">
                                 <h4 className="font-semibold text-base pr-2">{service.name}</h4>
-                                <p className="text-base font-bold whitespace-nowrap">
+                                <p className="text-sm font-semibold text-primary">
                                     {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'PHP' }).format(service.price)}
                                 </p>
                             </div>
