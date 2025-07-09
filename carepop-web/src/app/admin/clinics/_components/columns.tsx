@@ -2,6 +2,7 @@
 
 import { ColumnDef } from '@tanstack/react-table';
 import { MoreHorizontal, ArrowUpDown } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -9,18 +10,55 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Clinic } from '@/lib/types';
 
-interface ColumnActions {
+interface ColumnActionsProps {
   onEdit: (clinic: Clinic) => void;
   onDelete: (clinic: Clinic) => void;
+  clinic: Clinic;
 }
 
+// Create a new component for the cell actions to use hooks
+const CellActions: React.FC<ColumnActionsProps> = ({ onEdit, onDelete, clinic }) => {
+  const router = useRouter();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="h-8 w-8 p-0">
+          <span className="sr-only">Open menu</span>
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => router.push(`/admin/clinics/${clinic.id}`)}>
+          View & Manage
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => onEdit(clinic)}>
+          Edit Details
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigator.clipboard.writeText(clinic.id)}>
+          Copy Clinic ID
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => onDelete(clinic)}
+          className="text-red-600"
+        >
+          Delete Clinic
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
+
 // The columns definition is now a function that accepts handlers for edit and delete
-export const columns = ({ onEdit, onDelete }: ColumnActions): ColumnDef<Clinic>[] => [
+export const columns = ({ onEdit, onDelete }: Omit<ColumnActionsProps, 'clinic'>): ColumnDef<Clinic>[] => [
   {
     accessorKey: 'name',
     header: ({ column }) => {
@@ -78,34 +116,7 @@ export const columns = ({ onEdit, onDelete }: ColumnActions): ColumnDef<Clinic>[
     id: 'actions',
     cell: ({ row }) => {
       const clinic = row.original;
-
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={() => navigator.clipboard.writeText(clinic.id)}
-            >
-              Copy Clinic ID
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onEdit(clinic)}>
-              Edit Clinic
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => onDelete(clinic)}
-              className="text-red-600"
-            >
-              Delete Clinic
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
+      return <CellActions clinic={clinic} onEdit={onEdit} onDelete={onDelete} />;
     },
   },
 ]; 

@@ -6,10 +6,12 @@ import { useAuth } from '@/lib/contexts/auth-context';
 import { toast } from '@/hooks/use-toast';
 import { Clinic, Doctor, Service } from '@/lib/types';
 import { ServiceDoctorAssignments, Assignments } from './ServiceDoctorAssignments';
-import { ClinicForm } from '../../_components/ClinicForm'; // Corrected path
+import { ClinicForm } from '../../_components/ClinicForm';
+import { ClinicDetailsCard } from './ClinicDetailsCard'; // Import the new component
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { updateClinicDoctorAssignments } from '@/services/api';
+import { Pencil } from 'lucide-react';
 
 // Define a more specific type for the context we expect
 type ManagementContext = {
@@ -30,6 +32,7 @@ export function ClinicManagementClient({ initialContext }: ClinicManagementClien
   const { session } = useAuth();
   const queryClient = useQueryClient();
   const [clinic] = useState(initialContext.clinic);
+  const [isEditing, setIsEditing] = useState(false); // State for edit mode
   const [assignments, setAssignments] = useState<Assignments>(() => {
     // Transform the initial flat array into a map of serviceId -> doctorId[]
     return initialContext.doctorServiceAssignments.reduce((acc, assignment) => {
@@ -76,6 +79,7 @@ export function ClinicManagementClient({ initialContext }: ClinicManagementClien
       // A more robust implementation would save both clinic details and assignments
       // and handle the combined loading/error states.
       saveAssignments(assignments);
+      setIsEditing(false); // Exit edit mode on save
   }
   
   const isLoading = isSavingAssignments;
@@ -90,13 +94,25 @@ export function ClinicManagementClient({ initialContext }: ClinicManagementClien
       <Separator />
 
       {/* Section 1: Clinic Details */}
-      <div>
-        <h2 className="text-2xl font-semibold mb-4">Clinic Details</h2>
-        <ClinicForm
-            initialData={clinic}
-            onSubmit={handleClinicSubmit}
-            isPending={false} // Will be wired up in the next step
-        />
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-semibold">Clinic Details</h2>
+          {!isEditing && (
+            <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit Details
+            </Button>
+          )}
+        </div>
+        {isEditing ? (
+          <ClinicForm
+              initialData={clinic}
+              onSubmit={handleClinicSubmit}
+              isPending={false} // Will be wired up in the next step
+          />
+        ) : (
+          <ClinicDetailsCard clinic={clinic} />
+        )}
       </div>
 
       <Separator />
@@ -115,7 +131,12 @@ export function ClinicManagementClient({ initialContext }: ClinicManagementClien
       
       <Separator />
 
-      <div className="flex justify-end">
+      <div className="flex justify-end space-x-2">
+          {isEditing && (
+            <Button variant="outline" onClick={() => setIsEditing(false)} disabled={isLoading}>
+              Cancel
+            </Button>
+          )}
           <Button onClick={handleSaveChanges} disabled={isLoading}>
               {isLoading ? "Saving..." : "Save Changes"}
           </Button>
