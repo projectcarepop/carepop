@@ -57,11 +57,15 @@ export const appointmentsRelations = relations(appointments, ({one, many}) => ({
 
 export const clinicsRelations = relations(clinics, ({many}) => ({
 	appointments: many(appointments),
+	clinicServices: many(clinicServices),
+    doctorClinics: many(doctorClinics),
 }));
 
 export const doctorsRelations = relations(doctors, ({many}) => ({
 	appointments: many(appointments),
 	reviews: many(reviews),
+	doctorClinics: many(doctorClinics),
+    doctorClinicServices: many(doctorClinicServices),
 }));
 
 export const medicalRecordsRelations = relations(medicalRecords, ({one, many}) => ({
