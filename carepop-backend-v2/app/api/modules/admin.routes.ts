@@ -261,7 +261,7 @@ const batchSchema = z.object({
 const serviceSchema = z.object({
   name: z.string().min(1, "Service name is required"),
   description: z.string().optional(),
-  price: z.string(),
+  price: z.coerce.number().min(0, "Price must be a non-negative number."),
   durationMinutes: z.number().int().positive("Duration must be a positive number"),
   categoryId: z.string().uuid("A valid category ID is required"),
   isActive: z.boolean().optional().default(true),
@@ -1182,14 +1182,24 @@ adminRoutes.get('/services', async (c) => {
 
 adminRoutes.post('/services', zValidator('json', serviceSchema), async (c) => {
     const newServiceData = c.req.valid('json');
-    const [createdService] = await db.insert(services).values(newServiceData).returning();
+    const [createdService] = await db.insert(services).values({
+        ...newServiceData,
+        price: newServiceData.price.toString(),
+    }).returning();
     return c.json(createdService, 201);
 });
 
 adminRoutes.put('/services/:id', zValidator('json', serviceSchema.partial()), async (c) => {
     const { id } = c.req.param();
     const values = c.req.valid('json');
-    const [updatedService] = await db.update(services).set(values).where(eq(services.id, id)).returning();
+
+    const payload: { [key: string]: any } = { ...values };
+
+    if (values.price !== undefined) {
+        payload.price = values.price.toString();
+    }
+
+    const [updatedService] = await db.update(services).set(payload).where(eq(services.id, id)).returning();
     if (!updatedService) return c.json({ error: 'Not Found' }, 404);
     return c.json(updatedService);
 });
@@ -1225,7 +1235,17 @@ adminRoutes
   })
   .delete('/service-categories/:id', async (c) => {
     const { id } = c.req.param();
-    // TODO: Add logic for services associated with this category
+    
+    // Check if any services are using this category
+    const servicesInCategory = await db.select({ id: services.id }).from(services).where(eq(services.categoryId, id)).limit(1);
+
+    if (servicesInCategory.length > 0) {
+      return c.json({ 
+        error: 'Cannot delete category', 
+        message: 'This category is still associated with one or more services. Please reassign them before deleting.' 
+      }, 409); // 409 Conflict
+    }
+
     const [deleted] = await db.delete(serviceCategories).where(eq(serviceCategories.id, id)).returning();
     if (!deleted) return c.json({ error: 'Not Found' }, 404);
     return c.json({ success: true });

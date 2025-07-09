@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { PlusCircle } from 'lucide-react';
-import { getAdminServices, upsertService, getAdminServiceCategories, upsertServiceCategory, deleteService, deleteProductCategory } from '@/services/api';
+import { getAdminServices, upsertService, getAdminServiceCategories, upsertServiceCategory, deleteService, deleteServiceCategory } from '@/services/api';
 import { DataTable } from '@/components/ui/data-table';
 import { type AdminService, type ServiceCategory } from '@/lib/types';
 import { columns as serviceColumns } from './columns-service';
@@ -78,7 +78,7 @@ export default function ServicesClient({ initialServices, initialCategories }: S
   });
 
   const deleteCategoryMutation = useMutation({
-    mutationFn: (id: string) => deleteProductCategory(id, session!.access_token),
+    mutationFn: (id: string) => deleteServiceCategory(id, session!.access_token),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminServiceCategories'] });
       toast({ title: 'Success', description: 'Category deleted.' });
@@ -151,8 +151,8 @@ export default function ServicesClient({ initialServices, initialCategories }: S
         <DialogContent>
           <DialogHeader><DialogTitle>{selectedService ? 'Edit Service' : 'Create New Service'}</DialogTitle></DialogHeader>
           <ServiceForm 
-            initialData={selectedService ? { ...selectedService, categoryId: selectedService.serviceCategory?.id || '' } : undefined} 
-            onSubmit={(values) => serviceMutation.mutate({ ...values, id: selectedService?.id, price: String(values.price) })} 
+            initialData={selectedService ? { ...selectedService, categoryId: selectedService.serviceCategory?.id || '', durationMinutes: selectedService.durationMinutes || 0 } : undefined} 
+            onSubmit={(values) => serviceMutation.mutate({ ...values, id: selectedService?.id })} 
             isPending={serviceMutation.isPending} 
             categories={categories || []} 
           />

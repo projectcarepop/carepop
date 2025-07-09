@@ -384,7 +384,7 @@ export async function upsertService(serviceData: any, accessToken: string, servi
     return response.json();
 }
 
-export async function deleteProductCategory(categoryId: string, accessToken: string) {
+export async function deleteServiceCategory(categoryId: string, accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
     const response = await fetch(`${API_BASE_URL}/api/admin/service-categories/${categoryId}`, {
         method: 'DELETE',

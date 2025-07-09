@@ -195,7 +195,7 @@ export const adminServiceSchema = z.object({
     id: z.string(),
     name: z.string(),
     description: z.string().nullable(),
-    price: z.string(),
+    price: z.number(),
     durationMinutes: z.number().nullable(),
     isActive: z.boolean(),
     createdAt: z.string(),
@@ -223,7 +223,7 @@ export const adminProductSchema = z.object({
     id: z.string(),
     name: z.string(),
     description: z.string().nullable(),
-    price: z.string(),
+    price: z.string(), // This should probably be z.number() as well, but out of scope for now.
     isActive: z.boolean(),
     categoryName: z.string(),
     quantityOnHand: z.number(),
@@ -266,18 +266,6 @@ export type MedicalRecordWithRelations = {
   service: {
     name: string | null;
   };
-};
-
-// This is the shape the Admin UI for inventory expects.
-// It might be a flattened/transformed version of the database types.
-export type AdminProduct = {
-  id: string;
-  name: string;
-  description: string | null;
-  price: string;
-  isActive: boolean;
-  categoryName: string;
-  quantityOnHand: number;
 };
 
 export const adminUserSchema = z.object({
