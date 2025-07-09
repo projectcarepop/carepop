@@ -1181,6 +1181,7 @@ adminRoutes.get('/services', async (c) => {
 });
 
 adminRoutes.post('/services', zValidator('json', serviceSchema), async (c) => {
+    console.log('[POST /services] Handler reached. Body validation passed.');
     const newServiceData = c.req.valid('json');
     const [createdService] = await db.insert(services).values({
         ...newServiceData,
