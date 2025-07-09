@@ -384,8 +384,8 @@ adminRoutes
         // Transform the data to match frontend expectations
         const response = {
             ...result,
-            latitude: (result.location as any)?.coordinates[1] ?? null,
-            longitude: (result.location as any)?.coordinates[0] ?? null,
+            latitude: (result.location as any)?.coordinates?.[1] ?? null,
+            longitude: (result.location as any)?.coordinates?.[0] ?? null,
             services: result.clinicServices.map(cs => cs.service),
         };
 
