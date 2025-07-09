@@ -1243,3 +1243,33 @@ export async function getClinicMasterSchedule(
 
     return response.json();
 }
+
+export const getDoctorServiceContext = async (doctorId: string, token: string) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/admin/doctors/${doctorId}/service-context`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.json();
+  } catch (error) {
+    throw new Error("Failed to fetch doctor's service context", { cause: error });
+  }
+};
+
+export const assignServicesToDoctor = async ({ doctorId, serviceIds, token }: { doctorId: string, serviceIds: string[], token: string }) => {
+  try {
+    const headers = await getAuthHeaders(token);
+    const response = await fetch(`${API_BASE_URL}/api/admin/doctors/${doctorId}/services`, {
+      method: 'PUT',
+      headers: headers,
+      body: JSON.stringify({ serviceIds }),
+    });
+    
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
+        throw new Error(error.message || `Failed to assign services`);
+    }
+    return response.json();
+  } catch (error) {
+    throw new Error("Failed to assign services to doctor", { cause: error });
+  }
+};

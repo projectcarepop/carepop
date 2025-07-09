@@ -85,12 +85,15 @@ export const doctorClinics = pgTable("doctor_clinics", {
 	compoundKey: primaryKey({ columns: [table.doctorId, table.clinicId] }),
 }));
 
-export const doctorServices = pgTable("doctor_services", {
+export const doctorClinicServices = pgTable("doctor_clinic_services", {
 	doctorId: uuid("doctor_id").notNull().references(() => doctors.id, { onDelete: 'cascade' }),
+	clinicId: uuid("clinic_id").notNull().references(() => clinics.id, { onDelete: 'cascade' }),
 	serviceId: uuid("service_id").notNull().references(() => services.id, { onDelete: 'cascade' }),
-}, (table) => ({
-	compoundKey: primaryKey({ columns: [table.doctorId, table.serviceId] }),
-}));
+}, (table) => {
+  return {
+    pk: primaryKey({ columns: [table.doctorId, table.clinicId, table.serviceId] }),
+  };
+});
 
 export const doctorSchedules = pgTable("doctor_schedules", {
     id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
@@ -316,7 +319,7 @@ export const clinicsRelations = relations(clinics, ({ many }) => ({
 
 export const doctorsRelations = relations(doctors, ({ many }) => ({
 	doctorClinics: many(doctorClinics),
-	doctorServices: many(doctorServices),
+	doctorClinicServices: many(doctorClinicServices),
     doctorSchedules: many(doctorSchedules),
     doctorAvailabilityOverrides: many(doctorAvailabilityOverrides),
 	appointments: many(appointments),
@@ -330,7 +333,7 @@ export const servicesRelations = relations(services, ({ one, many }) => ({
 	}),
 	appointments: many(appointments),
 	clinicServices: many(clinicServices),
-	doctorServices: many(doctorServices),
+	doctorClinicServices: many(doctorClinicServices),
 }));
 
 export const appointmentsRelations = relations(appointments, ({ one, many }) => ({
@@ -510,9 +513,10 @@ export const doctorClinicsRelations = relations(doctorClinics, ({ one }) => ({
 	clinic: one(clinics, { fields: [doctorClinics.clinicId], references: [clinics.id] }),
 }));
 
-export const doctorServicesRelations = relations(doctorServices, ({ one }) => ({
-	doctor: one(doctors, { fields: [doctorServices.doctorId], references: [doctors.id] }),
-	service: one(services, { fields: [doctorServices.serviceId], references: [services.id] }),
+export const doctorClinicServicesRelations = relations(doctorClinicServices, ({ one }) => ({
+	doctor: one(doctors, { fields: [doctorClinicServices.doctorId], references: [doctors.id] }),
+	clinic: one(clinics, { fields: [doctorClinicServices.clinicId], references: [clinics.id] }),
+	service: one(services, { fields: [doctorClinicServices.serviceId], references: [services.id] }),
 }));
 
 export const doctorSchedulesRelations = relations(doctorSchedules, ({ one }) => ({

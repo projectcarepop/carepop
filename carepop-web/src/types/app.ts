@@ -25,4 +25,24 @@ export interface MedicalRecord {
     title: string;
     // This name is joined in the backend API response
     doctorName: string;
-} 
+}
+
+export type Doctor = {
+  id: string;
+  fullName: string;
+  specialtyText: string | null;
+  bio: string | null;
+  avatarUrl: string | null;
+  isActive: boolean;
+  createdAt: string;
+};
+
+export type Service = {
+  id: string;
+  name: string;
+  description: string | null;
+  price: string;
+  durationMinutes: number;
+  categoryId: string;
+  isActive: boolean;
+}; 

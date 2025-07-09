@@ -1,4 +1,4 @@
-import { pgTable, index, uuid, text, jsonb, boolean, timestamp, check, numeric, integer, date, pgEnum, customType } from "drizzle-orm/pg-core"
+import { pgTable, index, uuid, text, jsonb, boolean, timestamp, check, numeric, integer, date, pgEnum, customType, primaryKey } from "drizzle-orm/pg-core"
 import { sql, relations } from "drizzle-orm"
 
 // Placeholder for auth.users table
@@ -188,6 +188,21 @@ export const inventory = pgTable("inventory", {
 }, () => ({
     quantityCheck: check("inventory_quantity_on_hand_check", sql`quantity_on_hand >= 0`),
 }));
+
+export const doctorClinicServices = pgTable('doctor_clinic_services', {
+  doctorId: uuid('doctor_id').notNull().references(() => doctors.id, { onDelete: 'cascade' }),
+  clinicId: uuid('clinic_id').notNull().references(() => clinics.id, { onDelete: 'cascade' }),
+  serviceId: uuid('service_id').notNull().references(() => services.id, { onDelete: 'cascade' }),
+}, (table) => {
+  return {
+    pk: primaryKey({ columns: [table.doctorId, table.clinicId, table.serviceId] }),
+  };
+});
+
+export const clinicServices = pgTable('clinic_services', {
+  clinicId: uuid('clinic_id').notNull().references(() => clinics.id, { onDelete: 'cascade' }),
+  serviceId: uuid('service_id').notNull().references(() => services.id, { onDelete: 'cascade' }),
+});
 
 
 // --- RELATIONS ---

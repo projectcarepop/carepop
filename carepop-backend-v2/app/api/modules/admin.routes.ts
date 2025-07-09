@@ -21,7 +21,8 @@ import {
     recordDoctorNotes,
     recordPrescriptions,
     recordDocuments,
-    medicalRecords
+    medicalRecords,
+    doctorClinicServices
 } from '../../../drizzle/schema';
 import { eq, sql, count, asc, and, gte, lt, getTableColumns, desc, inArray, SQL, sum, isNotNull } from 'drizzle-orm';
 import { authMiddleware, adminOrManagerMiddleware, AuthEnv } from '../middleware/auth';
@@ -865,6 +866,93 @@ adminRoutes.get(
 
     return c.json({ data: allDoctors });
   }
+);
+
+adminRoutes.get(
+    '/doctors/:id/service-context',
+    zValidator('param', z.object({ id: z.string().uuid() })),
+    async (c) => {
+        const { id: doctorId } = c.req.valid('param');
+
+        // CORRECTED: Fetch the doctor's clinic link first
+        const doctorClinicLink = await db.query.doctorClinics.findFirst({
+            where: eq(doctorClinics.doctorId, doctorId),
+            columns: { clinicId: true }
+        });
+
+        if (!doctorClinicLink || !doctorClinicLink.clinicId) {
+            return c.json({ availableServices: [], assignedServiceIds: [] });
+        }
+
+        const { clinicId } = doctorClinicLink;
+
+        const availableClinicServices = await db.query.clinicServices.findMany({
+            where: eq(clinicServices.clinicId, clinicId),
+            with: { service: true }
+        });
+        
+        const availableServices = availableClinicServices.map(cs => cs.service).filter(Boolean);
+
+        const assignedDoctorServices = await db.query.doctorClinicServices.findMany({
+            where: and(
+                eq(doctorClinicServices.doctorId, doctorId),
+                eq(doctorClinicServices.clinicId, clinicId)
+            ),
+            columns: { serviceId: true }
+        });
+        
+        const assignedServiceIds = assignedDoctorServices.map(ds => ds.serviceId);
+
+        return c.json({
+            availableServices,
+            assignedServiceIds
+        });
+    }
+);
+
+adminRoutes.put(
+    '/doctors/:id/services',
+    zValidator('param', z.object({ id: z.string().uuid() })),
+    zValidator('json', z.object({ serviceIds: z.array(z.string().uuid()) })),
+    async (c) => {
+        const { id: doctorId } = c.req.valid('param');
+        const { serviceIds } = c.req.valid('json');
+
+        const doctorClinicLink = await db.query.doctorClinics.findFirst({
+            where: eq(doctorClinics.doctorId, doctorId),
+            columns: { clinicId: true }
+        });
+
+        if (!doctorClinicLink || !doctorClinicLink.clinicId) {
+            return c.json({ message: "Doctor not found or not assigned to a clinic" }, 404);
+        }
+        const { clinicId } = doctorClinicLink;
+
+        try {
+            await db.transaction(async (tx) => {
+                await tx.delete(doctorClinicServices).where(
+                    and(
+                        eq(doctorClinicServices.doctorId, doctorId),
+                        eq(doctorClinicServices.clinicId, clinicId)
+                    )
+                );
+
+                if (serviceIds.length > 0) {
+                    const newAssignments = serviceIds.map(serviceId => ({
+                        doctorId,
+                        clinicId,
+                        serviceId,
+                    }));
+                    await tx.insert(doctorClinicServices).values(newAssignments);
+                }
+            });
+        } catch (error) {
+            console.error("Failed to update doctor services:", error);
+            return c.json({ message: "Failed to update doctor services", error: (error as Error).message }, 500);
+        }
+        
+        return c.json({ message: "Doctor services updated successfully" }, 200);
+    }
 );
 
 // NEW: Centralized schema for upserting doctors
