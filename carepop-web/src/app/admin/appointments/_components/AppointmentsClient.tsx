@@ -35,7 +35,7 @@ export function AppointmentsClient({ initialAppointments }: AppointmentsClientPr
 
 
   const filters = React.useMemo(() => ({
-    clinicId: clinicId || undefined,
+    clinicId: (clinicId && clinicId !== 'all') ? clinicId : undefined,
     patientName: debouncedPatientName || undefined,
     startDate: dateRange?.from ? dateRange.from.toISOString() : undefined,
     endDate: dateRange?.to ? dateRange.to.toISOString() : undefined,
@@ -91,7 +91,7 @@ export function AppointmentsClient({ initialAppointments }: AppointmentsClientPr
             <Select onValueChange={setClinicId} value={clinicId}>
                 <SelectTrigger><SelectValue placeholder="Filter by clinic..." /></SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="">All Clinics</SelectItem>
+                    <SelectItem value="all">All Clinics</SelectItem>
                     {clinics?.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                 </SelectContent>
             </Select>
