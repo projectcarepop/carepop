@@ -1,25 +1,39 @@
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getAdminAppointments } from '@/services/api';
-import AppointmentsClient from './_components/AppointmentsClient';
+import { AppointmentsClient } from './_components/AppointmentsClient';
+import { redirect } from 'next/navigation';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 
 export default async function AdminAppointmentsPage() {
-    // 1. Consolidate all data fetching logic directly into the page component.
     const cookieStore = await cookies();
     const supabase = createClient(cookieStore);
     
     const { data: { session } } = await supabase.auth.getSession();
 
     if (!session) {
-        return <div className="p-4 text-red-500">Error: Not authenticated</div>;
+        // Use redirect for server components as per Next.js best practices
+        redirect('/sign-in?redirect=/admin/appointments');
     }
     
     try {
         const appointments = await getAdminAppointments(session.access_token);
-        // The data fetching logic is now self-contained within the component.
         return <AppointmentsClient initialAppointments={appointments} />;
     } catch (error: any) {
         console.error("Failed to fetch admin appointments:", error.message);
-        return <div className="p-4 text-red-500">Error: {error.message}</div>;
+        
+        // Use the standard Alert component for displaying errors
+        return (
+            <div className="p-4">
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Error Fetching Appointments</AlertTitle>
+                    <AlertDescription>
+                        {error.message || "An unexpected error occurred. Please try again later."}
+                    </AlertDescription>
+                </Alert>
+            </div>
+        );
     }
 }

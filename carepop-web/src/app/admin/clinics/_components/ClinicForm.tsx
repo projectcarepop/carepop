@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -23,6 +23,7 @@ import { getAdminServices, assignServicesToClinic, getAdminClinicServices } from
 import { useAuth } from '@/lib/contexts/auth-context';
 import { MultiSelect, MultiSelectOption } from '@/components/ui/MultiSelect';
 import { toast } from '@/hooks/use-toast';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const formSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
@@ -49,11 +50,26 @@ interface ClinicFormProps {
 export function ClinicForm({
   initialData,
   onSubmit,
-  isPending,
+  isPending: isSubmitting, // Rename to avoid conflict with useQuery's isPending
 }: ClinicFormProps) {
   const { session } = useAuth();
-  const [allServices, setAllServices] = useState<MultiSelectOption[]>([]);
-  const [isServicesLoading, setIsServicesLoading] = useState(false);
+  const queryClient = useQueryClient();
+
+  // 1. Fetch all services using useQuery
+  const { data: allServices = [], isLoading: isServicesLoading, isError: isServicesError } = useQuery<MultiSelectOption[]>({
+      queryKey: ['adminServices'],
+      queryFn: async () => {
+          if (!session) return [];
+          const services: Service[] = await getAdminServices(session.access_token);
+          return services.map(s => ({ value: s.id, label: s.name }));
+      },
+      enabled: !!session,
+      staleTime: 1000 * 60 * 5, // 5 mins
+  });
+
+  if (isServicesError) {
+      toast({ title: "Error", description: "Could not fetch the list of services.", variant: "destructive" });
+  }
 
   const form = useForm<ClinicFormValues>({
     resolver: zodResolver(formSchema),
@@ -68,18 +84,20 @@ export function ClinicForm({
       latitude: initialData?.latitude || 0,
       longitude: initialData?.longitude || 0,
       isActive: initialData?.isActive ?? true,
-      serviceIds: [],
+      serviceIds: initialData?.serviceIds || [],
     },
   });
 
-  useEffect(() => {
-    async function fetchAssignedServices() {
-      if (initialData?.id && session) {
-        setIsServicesLoading(true);
-        try {
-          const assignedServiceIds = await getAdminClinicServices(initialData.id, session.access_token);
-          form.reset({
-            ...initialData,
+  // 2. Fetch assigned services for the specific clinic (only in edit mode)
+  const { isLoading: isAssignedServicesLoading } = useQuery({
+    queryKey: ['adminClinicServices', initialData?.id],
+    queryFn: async () => {
+        if (!initialData?.id || !session) return null;
+        const assignedServiceIds = await getAdminClinicServices(initialData.id, session.access_token);
+        // Reset the form with the fetched service IDs
+        form.reset({
+            ...form.getValues(),
+            name: initialData.name,
             phoneNumber: initialData.phoneNumber || '',
             latitude: initialData.latitude || 0,
             longitude: initialData.longitude || 0,
@@ -89,64 +107,42 @@ export function ClinicForm({
               zip: typeof initialData.address === 'object' && initialData.address !== null ? (initialData.address as any).zip : '',
             },
             serviceIds: assignedServiceIds,
-          });
-        } catch (error) {
-          console.error("Failed to fetch assigned services", error);
-          toast({ title: "Error", description: "Could not fetch assigned services.", variant: "destructive" });
-        } finally {
-          setIsServicesLoading(false);
-        }
-      }
-    }
-    fetchAssignedServices();
-  }, [initialData, session, form]);
+        });
+        return assignedServiceIds;
+    },
+    enabled: !!initialData?.id && !!session, // Only run if we are editing a clinic
+    refetchOnWindowFocus: false,
+  });
 
-  useEffect(() => {
-    async function fetchAllServices() {
-      if (!session) return;
-      setIsServicesLoading(true);
-      try {
-        const services: Service[] = await getAdminServices(session.access_token);
-        setAllServices(services.map(s => ({ value: s.id, label: s.name })));
-      } catch (error) {
-        console.error("Failed to fetch services", error);
-        toast({ title: "Error", description: "Could not fetch the list of services.", variant: "destructive" });
-      } finally {
-        setIsServicesLoading(false);
-      }
+
+  // 3. Use useMutation for assigning services
+  const { mutate: assignServices, isPending: isAssigningServices } = useMutation({
+    mutationFn: ({ clinicId, serviceIds }: { clinicId: string, serviceIds: string[] }) => {
+        if (!session) throw new Error("Not authenticated");
+        return assignServicesToClinic(clinicId, serviceIds, session.access_token);
+    },
+    onSuccess: () => {
+        toast({ title: "Success", description: "Clinic services updated successfully." });
+        queryClient.invalidateQueries({ queryKey: ['adminClinicServices', initialData?.id] });
+    },
+    onError: (error) => {
+        console.error("Failed to assign services", error);
+        toast({ title: "Error", description: "Could not update the clinic's services.", variant: "destructive" });
     }
-    fetchAllServices();
-  }, [session]);
+  });
+
 
   const handleFormSubmit = async (values: ClinicFormValues) => {
     const { serviceIds, ...clinicDataToSubmit } = values;
     
     const updatedClinic = await onSubmit(clinicDataToSubmit);
 
-    if (updatedClinic && serviceIds && session) {
-      setIsServicesLoading(true);
-      try {
-        await assignServicesToClinic(updatedClinic.id, serviceIds, session.access_token);
-        toast({ title: "Success", description: "Clinic services updated successfully." });
-      } catch (error) {
-          console.error("Failed to assign services", error);
-          toast({ title: "Error", description: "Could not update the clinic's services.", variant: "destructive" });
-      } finally {
-          setIsServicesLoading(false);
-      }
-    } else if (updatedClinic && !serviceIds && session) {
-        setIsServicesLoading(true);
-        try {
-            await assignServicesToClinic(updatedClinic.id, [], session.access_token);
-            toast({ title: "Success", description: "All services unassigned from clinic." });
-        } catch (error) {
-            console.error("Failed to unassign services", error);
-            toast({ title: "Error", description: "Could not update the clinic's services.", variant: "destructive" });
-        } finally {
-            setIsServicesLoading(false);
-        }
+    if (updatedClinic && serviceIds) {
+      assignServices({ clinicId: updatedClinic.id, serviceIds });
     }
   };
+
+  const isLoading = isSubmitting || isServicesLoading || isAssignedServicesLoading || isAssigningServices;
 
   return (
     <Form {...form}>
@@ -161,7 +157,7 @@ export function ClinicForm({
                 <Input
                   placeholder="CarePoP Central Clinic"
                   {...field}
-                  disabled={isPending}
+                  disabled={isLoading}
                 />
               </FormControl>
               <FormMessage />
@@ -178,7 +174,7 @@ export function ClinicForm({
                 <Input
                   placeholder="e.g., 09171234567"
                   {...field}
-                  disabled={isPending}
+                  disabled={isLoading}
                 />
               </FormControl>
               <FormMessage />
@@ -195,7 +191,7 @@ export function ClinicForm({
                 <Input
                   placeholder="123 Health St."
                   {...field}
-                  disabled={isPending}
+                  disabled={isLoading}
                 />
               </FormControl>
               <FormMessage />
@@ -213,7 +209,7 @@ export function ClinicForm({
                   <Input
                     placeholder="Quezon City"
                     {...field}
-                    disabled={isPending}
+                    disabled={isLoading}
                   />
                 </FormControl>
                 <FormMessage />
@@ -227,7 +223,7 @@ export function ClinicForm({
               <FormItem>
                 <FormLabel>ZIP Code</FormLabel>
                 <FormControl>
-                  <Input placeholder="1100" {...field} disabled={isPending} />
+                  <Input placeholder="1100" {...field} disabled={isLoading} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -246,7 +242,7 @@ export function ClinicForm({
                     type="number"
                     placeholder="e.g., 14.6760"
                     {...field}
-                    disabled={isPending}
+                    disabled={isLoading}
                   />
                 </FormControl>
                 <FormMessage />
@@ -264,7 +260,7 @@ export function ClinicForm({
                     type="number"
                     placeholder="e.g., 121.0437"
                     {...field}
-                    disabled={isPending}
+                    disabled={isLoading}
                   />
                 </FormControl>
                 <FormMessage />
@@ -278,24 +274,21 @@ export function ClinicForm({
           name="serviceIds"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Services Offered</FormLabel>
-              <FormControl>
+                <FormLabel>Services Offered</FormLabel>
                 <MultiSelect
-                  options={allServices}
-                  selected={field.value || []}
-                  onChange={field.onChange}
-                  placeholder={isServicesLoading ? "Loading services..." : "Select services"}
-                  className={isServicesLoading ? "cursor-not-allowed" : ""}
+                    options={allServices}
+                    onChange={field.onChange}
+                    selected={field.value || []}
+                    placeholder="Select services..."
+                    disabled={isLoading}
                 />
-              </FormControl>
-               <FormDescription>
-                  Select all the services offered by this clinic.
+                <FormDescription>
+                    Select the medical services this clinic provides.
                 </FormDescription>
-              <FormMessage />
+                <FormMessage />
             </FormItem>
           )}
         />
-
         <FormField
           control={form.control}
           name="isActive"
@@ -304,22 +297,24 @@ export function ClinicForm({
               <div className="space-y-0.5">
                 <FormLabel className="text-base">Active Status</FormLabel>
                 <FormDescription>
-                  Inactive clinics will not be visible to patients.
+                  Inactive clinics will not be shown in search results.
                 </FormDescription>
               </div>
               <FormControl>
                 <Switch
                   checked={field.value}
                   onCheckedChange={field.onChange}
-                  disabled={isPending}
+                  disabled={isLoading}
                 />
               </FormControl>
             </FormItem>
           )}
         />
-        <Button type="submit" disabled={isPending || isServicesLoading}>
-          {(isPending || isServicesLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {initialData ? 'Save changes' : 'Create Clinic'}
+        <Button type="submit" disabled={isLoading}>
+          {isLoading ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : null}
+          {initialData ? 'Save Changes' : 'Create Clinic'}
         </Button>
       </form>
     </Form>

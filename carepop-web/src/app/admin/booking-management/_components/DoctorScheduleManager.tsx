@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
     getDoctorSchedules, 
@@ -22,38 +24,59 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogC
 import { Input } from '@/components/ui/input';
 import { PlusCircle, MoreHorizontal } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
 const WEEK_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const scheduleFormSchema = z.object({
+  dayOfWeek: z.coerce.number().int().min(0).max(6),
+  startTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, "Invalid time format (HH:mm or HH:mm:ss)"),
+  endTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, "Invalid time format (HH:mm or HH:mm:ss)"),
+}).refine(data => {
+    // Basic time comparison
+    return data.endTime > data.startTime;
+}, {
+    message: "End time must be after start time",
+    path: ['endTime']
+});
+
+type ScheduleFormValues = z.infer<typeof scheduleFormSchema>;
 
 interface AddEditScheduleModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSubmit: (values: UpsertDoctorSchedulePayload) => void;
+    onSubmit: (values: ScheduleFormValues) => void;
     initialData: DoctorSchedule | null;
     isLoading: boolean;
 }
 
 const AddEditScheduleModal: React.FC<AddEditScheduleModalProps> = ({ isOpen, onClose, onSubmit, initialData, isLoading }) => {
-    const [dayOfWeek, setDayOfWeek] = useState<number>(1);
-    const [startTime, setStartTime] = useState('09:00:00');
-    const [endTime, setEndTime] = useState('17:00:00');
+    const form = useForm<ScheduleFormValues>({
+        resolver: zodResolver(scheduleFormSchema),
+        defaultValues: {
+            dayOfWeek: 1,
+            startTime: '09:00:00',
+            endTime: '17:00:00',
+        }
+    });
 
     useEffect(() => {
-        if (initialData) {
-            setDayOfWeek(initialData.dayOfWeek);
-            setStartTime(initialData.startTime);
-            setEndTime(initialData.endTime);
-        } else {
-            setDayOfWeek(1);
-            setStartTime('09:00:00');
-            setEndTime('17:00:00');
+        if(isOpen) {
+            if (initialData) {
+                form.reset({
+                    dayOfWeek: initialData.dayOfWeek,
+                    startTime: initialData.startTime,
+                    endTime: initialData.endTime,
+                });
+            } else {
+                form.reset({
+                    dayOfWeek: 1, // Monday
+                    startTime: '09:00:00',
+                    endTime: '17:00:00',
+                });
+            }
         }
-    }, [initialData, isOpen]);
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        onSubmit({ dayOfWeek, startTime, endTime });
-    };
+    }, [initialData, isOpen, form]);
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -61,29 +84,58 @@ const AddEditScheduleModal: React.FC<AddEditScheduleModalProps> = ({ isOpen, onC
                 <DialogHeader>
                     <DialogTitle>{initialData ? 'Edit Schedule' : 'Add New Schedule'}</DialogTitle>
                 </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="dayOfWeek">Day of Week</Label>
-                        <Select onValueChange={(val) => setDayOfWeek(Number(val))} value={String(dayOfWeek)}>
-                            <SelectTrigger><SelectValue/></SelectTrigger>
-                            <SelectContent>
-                                {WEEK_DAYS.map((day, i) => <SelectItem key={day} value={String(i)}>{day}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="startTime">Start Time</Label>
-                        <Input id="startTime" type="time" step="1" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="endTime">End Time</Label>
-                        <Input id="endTime" type="time" step="1" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-                    </div>
-                    <DialogFooter>
-                        <DialogClose asChild><Button type="button" variant="outline" disabled={isLoading}>Cancel</Button></DialogClose>
-                        <Button type="submit" disabled={isLoading}>{isLoading ? 'Saving...' : 'Save'}</Button>
-                    </DialogFooter>
-                </form>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <FormField
+                            control={form.control}
+                            name="dayOfWeek"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Day of Week</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={String(field.value)}>
+                                        <FormControl>
+                                            <SelectTrigger><SelectValue/></SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            {WEEK_DAYS.map((day, i) => <SelectItem key={day} value={String(i)}>{day}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="startTime"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Start Time</FormLabel>
+                                    <FormControl>
+                                        <Input type="time" step="1" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                         <FormField
+                            control={form.control}
+                            name="endTime"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>End Time</FormLabel>
+                                    <FormControl>
+                                        <Input type="time" step="1" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <DialogFooter>
+                            <DialogClose asChild><Button type="button" variant="outline" disabled={isLoading}>Cancel</Button></DialogClose>
+                            <Button type="submit" disabled={isLoading}>{isLoading ? 'Saving...' : 'Save'}</Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
             </DialogContent>
         </Dialog>
     );
@@ -157,29 +209,38 @@ export const DoctorScheduleManager: React.FC<DoctorScheduleManagerProps> = ({ do
   }
   
   const handleDeleteConfirmation = (scheduleId: string) => {
-      deleteMutation.mutate(scheduleId);
+      // It's better to use a confirmation dialog here
+      if (window.confirm("Are you sure you want to delete this schedule?")) {
+        deleteMutation.mutate(scheduleId);
+      }
   }
+
+  const handleFormSubmit = (values: ScheduleFormValues) => {
+    const payload: UpsertDoctorSchedulePayload & { scheduleId?: string } = {
+        ...values,
+        startTime: `${values.startTime}`, // Ensure format is correct
+        endTime: `${values.endTime}`,
+    };
+    if (selectedSchedule?.id) {
+        payload.scheduleId = selectedSchedule.id;
+    }
+    upsertMutation.mutate(payload);
+  };
 
   return (
     <>
     <AddEditScheduleModal 
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSubmit={(values: UpsertDoctorSchedulePayload) => {
-            const payload: UpsertDoctorSchedulePayload & { scheduleId?: string } = values;
-            if (selectedSchedule?.id) {
-                payload.scheduleId = selectedSchedule.id;
-            }
-            upsertMutation.mutate(payload);
-        }}
+        onSubmit={handleFormSubmit}
         initialData={selectedSchedule}
         isLoading={upsertMutation.isPending}
     />
     <Card>
       <CardHeader>
-        <CardTitle>Doctor Schedules & Overrides</CardTitle>
+        <CardTitle>Doctor Schedules</CardTitle>
         <CardDescription>
-          Manage recurring weekly schedules and individual overrides for each doctor at this clinic.
+          Manage recurring weekly schedules for this doctor.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

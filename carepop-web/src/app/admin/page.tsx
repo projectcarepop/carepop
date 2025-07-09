@@ -13,8 +13,14 @@ import {
   Calendar,
 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from 'recharts';
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
+import { getDashboardMetrics } from '@/services/api';
+import { useAuth } from '@/lib/contexts/auth-context';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useEffect } from 'react';
+
 
 // Define types for our metrics payload
 type CoreCounts = {
@@ -62,50 +68,58 @@ const PIE_CHART_COLORS = [BRAND_COLORS.primary, BRAND_COLORS.secondary, BRAND_CO
 
 export default function AdminDashboardPage() {
     const router = useRouter();
-    const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        // This is a client component, so we can't use `cookies()` directly.
-        // We will need to create an API route handler to proxy the request.
-        // For now, let's just fetch from a new proxy endpoint.
-        const fetchMetrics = async () => {
-            setIsLoading(true);
-            try {
-                // We'll create this proxy route next
-                const response = await fetch('/api/admin/metrics'); 
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        router.push('/sign-in?redirect=/admin');
-                        return;
-                    }
-                    if (response.status === 403) {
-                        router.push('/forbidden');
-                        return;
-                    }
-                    const err = await response.json();
-                    throw new Error(err.message || "Failed to fetch metrics");
-                }
-                const data = await response.json();
-                setMetrics(data);
-            } catch (e: any) {
-                setError(e.message);
-            } finally {
-                setIsLoading(false);
+    const { session, isLoading: isAuthLoading } = useAuth();
+    
+    const { data: metrics, isLoading, isError, error } = useQuery<DashboardMetrics, Error>({
+        queryKey: ['dashboardMetrics'],
+        queryFn: () => {
+            if (!session?.access_token) {
+                // This case should be handled by `enabled` but as a safeguard:
+                throw new Error("Not authenticated");
             }
-        };
+            return getDashboardMetrics(session.access_token);
+        },
+        // Only run the query if the auth session has been initialized and a session exists
+        enabled: !isAuthLoading && !!session,
+        staleTime: 1000 * 60 * 5, // 5 minutes
+        retry: (failureCount, err: any) => {
+            if (err.message?.includes('401') || err.message?.includes('403')) {
+                return false; // Do not retry on auth errors
+            }
+            return failureCount < 3;
+        },
+    });
 
-        fetchMetrics();
-    }, [router]);
+    // Handle side-effects from query state
+    useEffect(() => {
+        if (isError) {
+            if (error?.message.includes('401')) {
+                router.push('/sign-in?redirect=/admin');
+            } else if (error?.message.includes('403')) {
+                router.push('/forbidden');
+            }
+        }
+    }, [isError, error, router]);
 
-  if (isLoading) {
-    return <div className="p-4">Loading dashboard data...</div>;
+
+  if (isLoading || isAuthLoading) {
+    return <DashboardSkeleton />;
   }
   
-  if (error) {
-    // A simple error display, could be enhanced with a proper component
-    return <div className="p-4 text-red-500">Error: {error}</div>;
+  if (isError) {
+    // Let the useEffect handle redirection for auth errors.
+    // For other errors, show a message.
+    if (error?.message.includes('401') || error?.message.includes('403')) {
+        return <div className="p-4">Redirecting...</div>
+    }
+    return (
+        <div className="p-4">
+            <Alert variant="destructive">
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error?.message || "An unknown error occurred while fetching dashboard data."}</AlertDescription>
+            </Alert>
+        </div>
+    );
   }
 
   if (!metrics) {
@@ -232,4 +246,23 @@ export default function AdminDashboardPage() {
         </div>
     </div>
   );
-} 
+}
+
+const DashboardSkeleton = () => (
+    <div className="space-y-6">
+        <div className="space-y-2">
+            <Skeleton className="h-8 w-1/4" />
+            <Skeleton className="h-4 w-1/2" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card><CardHeader><Skeleton className="h-4 w-24" /></CardHeader><CardContent><Skeleton className="h-8 w-12" /></CardContent></Card>
+            <Card><CardHeader><Skeleton className="h-4 w-24" /></CardHeader><CardContent><Skeleton className="h-8 w-12" /></CardContent></Card>
+            <Card><CardHeader><Skeleton className="h-4 w-24" /></CardHeader><CardContent><Skeleton className="h-8 w-12" /></CardContent></Card>
+            <Card><CardHeader><Skeleton className="h-4 w-24" /></CardHeader><CardContent><Skeleton className="h-8 w-12" /></CardContent></Card>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+            <Card className="lg:col-span-4"><CardHeader><Skeleton className="h-6 w-1/2" /></CardHeader><CardContent><Skeleton className="h-[350px] w-full" /></CardContent></Card>
+            <Card className="lg:col-span-3"><CardHeader><Skeleton className="h-6 w-1/2" /></CardHeader><CardContent><Skeleton className="h-[350px] w-full" /></CardContent></Card>
+        </div>
+    </div>
+) 

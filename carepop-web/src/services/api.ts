@@ -277,6 +277,16 @@ export async function getAdminAppointments(accessToken: string, filters?: Record
   return result.data || [];
 }
 
+export async function getDashboardMetrics(accessToken: string) {
+    const headers = await getAuthHeaders(accessToken);
+    const response = await fetch('/api/admin/metrics', { headers }); // Uses the proxy route
+    if (!response.ok) {
+        // Propagate the status code in the error message
+        throw new Error(`Failed to fetch dashboard metrics: ${response.status}`);
+    }
+    return response.json();
+}
+
 export async function getAppointmentDetails(appointmentId: string, accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
     const response = await fetch(`${API_BASE_URL}/api/admin/appointments/${appointmentId}`, { headers, cache: 'no-store' });

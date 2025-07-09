@@ -31,6 +31,7 @@ interface MultiSelectProps {
   onChange: (selected: string[]) => void;
   className?: string;
   placeholder?: string;
+  disabled?: boolean;
 }
 
 export function MultiSelect({
@@ -39,6 +40,7 @@ export function MultiSelect({
   onChange,
   className,
   placeholder = "Select options...",
+  disabled = false,
 }: MultiSelectProps) {
   const [open, setOpen] = React.useState(false);
 
@@ -57,6 +59,7 @@ export function MultiSelect({
           role="combobox"
           aria-expanded={open}
           className={cn("w-full justify-between", className)}
+          disabled={disabled}
         >
           <span className="truncate">
             {selected.length > 0
@@ -68,7 +71,7 @@ export function MultiSelect({
       </PopoverTrigger>
       <PopoverContent className="w-full p-0">
         <Command>
-          <CommandInput placeholder="Search options..." />
+          <CommandInput placeholder="Search options..." disabled={disabled} />
           <CommandList>
             <CommandEmpty>No options found.</CommandEmpty>
             <CommandGroup>
@@ -77,10 +80,12 @@ export function MultiSelect({
                   key={option.value}
                   onSelect={() => handleSelect(option.value)}
                   className="flex items-center"
+                  disabled={disabled}
                 >
                   <Checkbox
                     checked={selected.includes(option.value)}
                     className="mr-2"
+                    disabled={disabled}
                   />
                   <span>{option.label}</span>
                 </CommandItem>

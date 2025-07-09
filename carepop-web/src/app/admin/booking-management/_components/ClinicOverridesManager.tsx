@@ -2,6 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import { PlusCircle } from 'lucide-react';
 
 import { getClinicOverrides, upsertClinicOverride, deleteClinicOverride, type ClinicOverride, type UpsertClinicOverridePayload } from '@/services/api';
@@ -23,7 +26,20 @@ import {
     DialogClose
 } from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+
+
+// Zod schema for the form
+const overrideFormSchema = z.object({
+  startDateTime: z.string().min(1, 'Start date and time are required.'),
+  endDateTime: z.string().min(1, 'End date and time are required.'),
+  reason: z.string().optional(),
+}).refine(data => new Date(data.endDateTime) > new Date(data.startDateTime), {
+    message: "End date must be after start date.",
+    path: ["endDateTime"],
+});
+
+type OverrideFormValues = z.infer<typeof overrideFormSchema>;
 
 interface ClinicOverridesManagerProps {
     clinicId: string;
@@ -87,6 +103,7 @@ export const ClinicOverridesManager: React.FC<ClinicOverridesManagerProps> = ({ 
     };
 
     const handleDeleteClick = (overrideId: string) => {
+        // A confirmation dialog would be better, but for now window.confirm is used.
         if (window.confirm('Are you sure you want to delete this override?')) {
             deleteMutation.mutate(overrideId);
         }
@@ -100,12 +117,21 @@ export const ClinicOverridesManager: React.FC<ClinicOverridesManagerProps> = ({ 
         </Alert>
     );
 
+    const handleFormSubmit = (values: OverrideFormValues) => {
+        upsertMutation.mutate({
+            ...values,
+            startDateTime: new Date(values.startDateTime).toISOString(),
+            endDateTime: new Date(values.endDateTime).toISOString(),
+            isAvailable: false, // All clinic-wide overrides make it unavailable
+        });
+    };
+
     return (
         <>
             <AddEditOverrideModal 
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                onSubmit={(values) => upsertMutation.mutate(values)}
+                onSubmit={handleFormSubmit}
                 initialData={selectedOverride}
                 isLoading={upsertMutation.isPending}
             />
@@ -131,47 +157,48 @@ export const ClinicOverridesManager: React.FC<ClinicOverridesManagerProps> = ({ 
     );
 };
 
+
 interface AddEditModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSubmit: (values: UpsertClinicOverridePayload) => void;
+    onSubmit: (values: OverrideFormValues) => void;
     initialData: ClinicOverride | null;
     isLoading: boolean;
 }
 
 const AddEditOverrideModal: React.FC<AddEditModalProps> = ({ isOpen, onClose, onSubmit, initialData, isLoading }) => {
-    const [startDateTime, setStartDateTime] = useState('');
-    const [endDateTime, setEndDateTime] = useState('');
-    const [reason, setReason] = useState('');
-
-    useEffect(() => {
-        if (initialData) {
-            setStartDateTime(formatAsLocalDateTime(initialData.startDateTime));
-            setEndDateTime(formatAsLocalDateTime(initialData.endDateTime));
-            setReason(initialData.reason ?? '');
-        } else {
-            setStartDateTime('');
-            setEndDateTime('');
-            setReason('');
+    const form = useForm<OverrideFormValues>({
+        resolver: zodResolver(overrideFormSchema),
+        defaultValues: {
+            startDateTime: '',
+            endDateTime: '',
+            reason: '',
         }
-    }, [initialData, isOpen]);
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        onSubmit({
-            startDateTime: new Date(startDateTime).toISOString(),
-            endDateTime: new Date(endDateTime).toISOString(),
-            reason,
-            isAvailable: false, // For now, all overrides make the clinic unavailable
-        });
-    };
+    });
     
     // Helper to format date for datetime-local input
     const formatAsLocalDateTime = (dateString: string) => {
         const date = new Date(dateString);
-        // This format is required by the input type="datetime-local"
         return new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().substring(0, 16);
     };
+
+    useEffect(() => {
+        if (isOpen) {
+            if (initialData) {
+                form.reset({
+                    startDateTime: formatAsLocalDateTime(initialData.startDateTime),
+                    endDateTime: formatAsLocalDateTime(initialData.endDateTime),
+                    reason: initialData.reason ?? '',
+                });
+            } else {
+                form.reset({
+                    startDateTime: '',
+                    endDateTime: '',
+                    reason: '',
+                });
+            }
+        }
+    }, [initialData, isOpen, form]);
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -182,24 +209,53 @@ const AddEditOverrideModal: React.FC<AddEditModalProps> = ({ isOpen, onClose, on
                         {initialData ? 'Update the details for this clinic-wide override.' : 'Create a new clinic-wide override.'}
                     </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="startDateTime">Start Date and Time</Label>
-                        <Input id="startDateTime" type="datetime-local" value={startDateTime} onChange={(e) => setStartDateTime(e.target.value)} required />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="endDateTime">End Date and Time</Label>
-                        <Input id="endDateTime" type="datetime-local" value={endDateTime} onChange={(e) => setEndDateTime(e.target.value)} required />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="reason">Reason (Optional)</Label>
-                        <Input id="reason" placeholder="e.g., Company Holiday" value={reason} onChange={(e) => setReason(e.target.value)} />
-                    </div>
-                    <DialogFooter>
-                        <DialogClose asChild><Button type="button" variant="outline" disabled={isLoading}>Cancel</Button></DialogClose>
-                        <Button type="submit" disabled={isLoading}>{isLoading ? 'Saving...' : 'Save Override'}</Button>
-                    </DialogFooter>
-                </form>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <FormField
+                            control={form.control}
+                            name="startDateTime"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Start Date and Time</FormLabel>
+                                    <FormControl>
+                                        <Input type="datetime-local" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="endDateTime"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>End Date and Time</FormLabel>
+                                    <FormControl>
+                                        <Input type="datetime-local" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="reason"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Reason (Optional)</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="e.g., Company Holiday" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <DialogFooter>
+                            <DialogClose asChild><Button type="button" variant="outline" disabled={isLoading}>Cancel</Button></DialogClose>
+                            <Button type="submit" disabled={isLoading}>{isLoading ? 'Saving...' : 'Save Override'}</Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
             </DialogContent>
         </Dialog>
     );
