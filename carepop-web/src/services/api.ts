@@ -1228,48 +1228,49 @@ export async function getClinicMasterSchedule(
     accessToken: string
 ): Promise<MasterScheduleData> {
     const headers = await getAuthHeaders(accessToken);
-    const params = new URLSearchParams({
-        start_date: startDate,
-        end_date: endDate,
-    });
-    const url = `${API_BASE_URL}/api/admin/clinics/${clinicId}/master-schedule?${params.toString()}`;
-
+    const url = `${API_BASE_URL}/api/admin/clinics/${clinicId}/master-schedule?start_date=${startDate}&end_date=${endDate}`;
+    
     const response = await fetch(url, { headers, cache: 'no-store' });
-
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Failed to fetch master schedule' }));
-        throw new Error(error.message);
+        throw new Error('Failed to fetch master schedule');
     }
-
     return response.json();
 }
 
-export const getDoctorServiceContext = async (doctorId: string, token: string) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/admin/doctors/${doctorId}/service-context`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    return response.json();
-  } catch (error) {
-    throw new Error("Failed to fetch doctor's service context", { cause: error });
-  }
+export async function getClinicManagementContext(clinicId: string, token: string) {
+    try {
+        const headers = await getAuthHeaders(token);
+        const url = `${API_BASE_URL}/api/admin/clinics/${clinicId}/management-context`;
+        
+        const response = await fetch(url, { headers, cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error('Failed to fetch clinic management context');
+        }
+        return response.json();
+    } catch (error) {
+        console.error('getClinicManagementContext error:', error);
+        throw new Error('An error occurred while fetching clinic data.');
+    }
 };
 
-export const assignServicesToDoctor = async ({ doctorId, serviceIds, token }: { doctorId: string, serviceIds: string[], token: string }) => {
-  try {
+export async function updateClinicDoctorAssignments({ clinicId, assignments, token }: { clinicId: string, assignments: Record<string, string[]>, token: string }) {
+    const payload = {
+        assignments: Object.entries(assignments).map(([serviceId, doctorIds]) => ({
+            serviceId,
+            doctorIds,
+        })),
+    };
+
     const headers = await getAuthHeaders(token);
-    const response = await fetch(`${API_BASE_URL}/api/admin/doctors/${doctorId}/services`, {
-      method: 'PUT',
-      headers: headers,
-      body: JSON.stringify({ serviceIds }),
+    const response = await fetch(`${API_BASE_URL}/api/admin/clinics/${clinicId}/doctor-assignments`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(payload),
     });
-    
+
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-        throw new Error(error.message || `Failed to assign services`);
+        const error = await response.json().catch(() => ({ message: 'Failed to update doctor assignments.' }));
+        throw new Error(error.message);
     }
     return response.json();
-  } catch (error) {
-    throw new Error("Failed to assign services to doctor", { cause: error });
-  }
 };
