@@ -23,20 +23,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Service, ServiceCategory } from '@/lib/types';
+import { type AdminService, type ServiceCategory } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
   description: z.string().optional(),
   price: z.coerce.number().min(0, 'Price must be a positive number.'),
+  durationMinutes: z.coerce.number().int().min(1, 'Duration must be at least 1 minute.'),
   categoryId: z.string().uuid('Please select a valid category.'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
 interface ServiceFormProps {
-  initialData?: Service;
+  initialData?: Partial<AdminService>;
   onSubmit: (values: FormValues) => void;
   isPending: boolean;
   categories: ServiceCategory[];
@@ -53,8 +54,9 @@ export function ServiceForm({
     defaultValues: {
       name: initialData?.name || '',
       description: initialData?.description || '',
-      price: initialData?.price || 0,
-      categoryId: initialData?.categoryId || '',
+      price: initialData?.price ?? 0,
+      durationMinutes: initialData?.durationMinutes ?? 30,
+      categoryId: initialData?.serviceCategory?.id || '',
     },
   });
 
@@ -101,6 +103,22 @@ export function ServiceForm({
               <FormControl>
                 <Input type="number" placeholder="500.00" {...field} disabled={isPending} />
               </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="durationMinutes"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Duration (minutes)</FormLabel>
+              <FormControl>
+                <Input type="number" placeholder="30" {...field} disabled={isPending} />
+              </FormControl>
+              <FormDescription>
+                How long the service appointment will take.
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
