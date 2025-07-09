@@ -3,10 +3,7 @@ import {
 	serviceCategories, services, profiles, clinics, 
 	appointments, doctors, medicalRecords, reviews, productCategories, 
 	products, inventory,
-	recordDoctorNotes, recordPrescriptions, recordDocuments, usersInAuth,
-	doctorClinics,
-	clinicServices,
-	doctorClinicServices // Import the new table
+	recordDoctorNotes, recordPrescriptions, recordDocuments, usersInAuth
 } from "./schema";
 
 export const servicesRelations = relations(services, ({ one, many }) => ({
@@ -15,8 +12,6 @@ export const servicesRelations = relations(services, ({ one, many }) => ({
 		references: [serviceCategories.id]
 	}),
 	appointments: many(appointments),
-	clinicServices: many(clinicServices),
-	doctorClinicServices: many(doctorClinicServices)
 }));
 
 export const serviceCategoriesRelations = relations(serviceCategories, ({ many }) => ({
@@ -59,32 +54,11 @@ export const appointmentsRelations = relations(appointments, ({one, many}) => ({
 
 export const clinicsRelations = relations(clinics, ({many}) => ({
 	appointments: many(appointments),
-	doctorClinics: many(doctorClinics),
-	clinicServices: many(clinicServices),
-	doctorClinicServices: many(doctorClinicServices)
 }));
 
 export const doctorsRelations = relations(doctors, ({many}) => ({
 	appointments: many(appointments),
 	reviews: many(reviews),
-	doctorClinics: many(doctorClinics),
-	doctorClinicServices: many(doctorClinicServices)
-}));
-
-export const doctorClinicsRelations = relations(doctorClinics, ({ one }) => ({
-	doctor: one(doctors, { fields: [doctorClinics.doctorId], references: [doctors.id] }),
-	clinic: one(clinics, { fields: [doctorClinics.clinicId], references: [clinics.id] }),
-}));
-
-export const clinicServicesRelations = relations(clinicServices, ({ one }) => ({
-	clinic: one(clinics, { fields: [clinicServices.clinicId], references: [clinics.id] }),
-	service: one(services, { fields: [clinicServices.serviceId], references: [services.id] }),
-}));
-
-export const doctorClinicServicesRelations = relations(doctorClinicServices, ({ one }) => ({
-	doctor: one(doctors, { fields: [doctorClinicServices.doctorId], references: [doctors.id] }),
-	clinic: one(clinics, { fields: [doctorClinicServices.clinicId], references: [clinics.id] }),
-	service: one(services, { fields: [doctorClinicServices.serviceId], references: [services.id] }),
 }));
 
 export const medicalRecordsRelations = relations(medicalRecords, ({one, many}) => ({

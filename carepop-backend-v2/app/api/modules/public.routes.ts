@@ -121,24 +121,32 @@ publicRoutes.get('/clinics', zValidator('query', clinicsQuerySchema), async (c) 
   try {
     // If a serviceId is provided, find clinics that have a doctor who offers that service.
     if (serviceId) {
+      // --- CORRECTED LOGIC ---
+      // Use direct JOINs to efficiently find clinics offering a specific service.
       const filteredClinics = await db
-        .selectDistinct({
+        .selectDistinct({ // Use DISTINCT to avoid duplicate clinics
           ...getTableColumns(clinics),
+          latitude: sql<number>`ST_Y(location::geometry)`,
+          longitude: sql<number>`ST_X(location::geometry)`
         })
         .from(clinics)
         .innerJoin(doctorClinics, eq(clinics.id, doctorClinics.clinicId))
-        .innerJoin(doctorClinicServices, eq(doctorClinics.doctorId, doctorClinicServices.doctorId))
+        .innerJoin(doctorServices, eq(doctorClinics.doctorId, doctorServices.doctorId))
         .where(
           and(
             eq(clinics.isActive, true),
-            eq(doctorClinicServices.serviceId, serviceId)
+            eq(doctorServices.serviceId, serviceId)
           )
         );
       return c.json({ data: filteredClinics });
     }
     
     // Fallback to return all active clinics if no serviceId is provided
-    const allClinics = await db.select().from(clinics).where(eq(clinics.isActive, true));
+    const allClinics = await db.select({
+      ...getTableColumns(clinics),
+      latitude: sql<number>`ST_Y(location::geometry)`,
+      longitude: sql<number>`ST_X(location::geometry)`
+    }).from(clinics).where(eq(clinics.isActive, true));
 
     return c.json({ data: allClinics });
   } catch (error) {

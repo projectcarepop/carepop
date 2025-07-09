@@ -21,8 +21,7 @@ import {
     recordDoctorNotes,
     recordPrescriptions,
     recordDocuments,
-    medicalRecords,
-    doctorClinicServices
+    medicalRecords
 } from '../../../drizzle/schema';
 import { eq, sql, count, asc, and, gte, lt, getTableColumns, desc, inArray, SQL, sum, isNotNull } from 'drizzle-orm';
 import { authMiddleware, adminOrManagerMiddleware, AuthEnv } from '../middleware/auth';
@@ -361,43 +360,6 @@ adminRoutes
     };
 
     return c.json(responseData);
-  })
-  .get('/clinics/:id/details', async (c) => {
-    const { id } = c.req.param();
-
-    try {
-        const result = await db.query.clinics.findFirst({
-            where: eq(clinics.id, id),
-            with: {
-                clinicServices: {
-                    with: {
-                        service: true,
-                    },
-                },
-            },
-        });
-
-        if (!result) {
-            return c.json({ error: 'Clinic not found' }, 404);
-        }
-
-        // Transform the data to match frontend expectations
-        const response = {
-            ...result,
-            latitude: (result.location as any)?.coordinates?.[1] ?? null,
-            longitude: (result.location as any)?.coordinates?.[0] ?? null,
-            services: result.clinicServices.map(cs => cs.service),
-        };
-
-        // The original clinicServices property is redundant now.
-        // delete (response as any).clinicServices;
-        
-        return c.json(response);
-
-    } catch (error: any) {
-        console.error(`Error fetching details for clinic ${id}:`, error);
-        return c.json({ error: 'Failed to fetch clinic details', message: error.message }, 500);
-    }
   })
   .put('/clinics/:id', zValidator('json', updateClinicSchema), async (c) => {
     const id = c.req.param('id');
@@ -891,16 +853,6 @@ adminRoutes.get(
             clinicId: true,
           },
         },
-        doctorClinicServices: {
-          with: {
-            service: {
-              columns: {
-                id: true,
-                name: true,
-              }
-            }
-          }
-        }
       },
     });
 
@@ -922,11 +874,6 @@ const upsertDoctorSchema = z.object({
   bio: z.string().optional(),
   isActive: z.boolean().optional().default(true),
   clinicIds: z.array(z.string().uuid()).optional().default([]),
-  // Add service assignments to the schema
-  serviceAssignments: z.array(z.object({
-    clinicId: z.string().uuid(),
-    serviceIds: z.array(z.string().uuid()),
-  })).optional().default([]),
 });
 
 // /api/admin/doctors (CREATE)
@@ -938,7 +885,6 @@ adminRoutes.post(
     
     try {
       const newDoctor = await db.transaction(async (tx) => {
-        // Step 1: Create the doctor
         const [createdDoctor] = await tx.insert(doctors).values({
           fullName: doctorData.fullName,
           specialtyText: doctorData.specialtyText,
@@ -946,7 +892,6 @@ adminRoutes.post(
           isActive: doctorData.isActive,
         }).returning();
 
-        // Step 2: Assign to clinics
         if (doctorData.clinicIds && doctorData.clinicIds.length > 0) {
           const clinicAssignments = doctorData.clinicIds.map(clinicId => ({
             doctorId: createdDoctor.id,
@@ -955,20 +900,6 @@ adminRoutes.post(
           await tx.insert(doctorClinics).values(clinicAssignments);
         }
         
-        // Step 3: Assign services
-        if (doctorData.serviceAssignments && doctorData.serviceAssignments.length > 0) {
-            const newServiceAssignments = doctorData.serviceAssignments.flatMap(assignment => 
-                assignment.serviceIds.map(serviceId => ({
-                    doctorId: createdDoctor.id,
-                    clinicId: assignment.clinicId,
-                    serviceId: serviceId,
-                }))
-            );
-            if (newServiceAssignments.length > 0) {
-                await tx.insert(doctorClinicServices).values(newServiceAssignments);
-            }
-        }
-
         return createdDoctor;
       });
 
@@ -1005,29 +936,16 @@ adminRoutes.put(
           throw new Error("Doctor not found");
         }
         
-        // Step 2: Sync clinic associations
+        // Step 2: Clear existing clinic associations for this doctor
         await tx.delete(doctorClinics).where(eq(doctorClinics.doctorId, id));
+
+        // Step 3: Insert the new clinic associations
         if (doctorData.clinicIds && doctorData.clinicIds.length > 0) {
           const newAssignments = doctorData.clinicIds.map((clinicId) => ({
             doctorId: id,
             clinicId: clinicId,
           }));
           await tx.insert(doctorClinics).values(newAssignments);
-        }
-
-        // Step 3: Sync service assignments
-        await tx.delete(doctorClinicServices).where(eq(doctorClinicServices.doctorId, id));
-        if (doctorData.serviceAssignments && doctorData.serviceAssignments.length > 0) {
-            const newServiceAssignments = doctorData.serviceAssignments.flatMap(assignment => 
-                assignment.serviceIds.map(serviceId => ({
-                    doctorId: id,
-                    clinicId: assignment.clinicId,
-                    serviceId: serviceId,
-                }))
-            );
-            if (newServiceAssignments.length > 0) {
-                await tx.insert(doctorClinicServices).values(newServiceAssignments);
-            }
         }
 
         return result;
@@ -1052,51 +970,6 @@ adminRoutes.delete('/doctors/:id', zValidator('param', z.object({ id: z.string()
     if (!deleted) return c.json({ error: 'Not Found' }, 404);
     return c.json({ success: true });
   });
-
-// NEW endpoint to get service assignments for a specific doctor
-adminRoutes.get('/doctors/:id/services', async (c) => {
-  const { id } = c.req.param();
-  try {
-    const assignments = await db.query.doctorClinicServices.findMany({
-      where: eq(doctorClinicServices.doctorId, id),
-      with: {
-        service: {
-          columns: {
-            id: true,
-            name: true,
-          }
-        },
-        clinic: {
-          columns: {
-            id: true,
-            name: true,
-          }
-        }
-      }
-    });
-
-    // The frontend expects data grouped by clinicId
-    const groupedByClinic = assignments.reduce((acc, current) => {
-      const { clinic, service } = current;
-      if (!acc[clinic.id]) {
-        acc[clinic.id] = {
-          clinicId: clinic.id,
-          clinicName: clinic.name,
-          services: [],
-        };
-      }
-      // @ts-ignore
-      acc[clinic.id].services.push(service);
-      return acc;
-    }, {} as Record<string, { clinicId: string, clinicName: string, services: any[] }>);
-    
-    return c.json({ data: Object.values(groupedByClinic) });
-
-  } catch (error) {
-    console.error(`Failed to get service assignments for doctor ${id}:`, error);
-    return c.json({ error: 'Failed to fetch service assignments' }, 500);
-  }
-});
 
 // --- Service Management Endpoints ---
 adminRoutes.get('/services', async (c) => {
@@ -1205,7 +1078,7 @@ adminRoutes.get('/appointments', zValidator('query', getAppointmentsSchema), asy
             orderBy: [desc(appointments.appointmentTime)],
         });
 
-        return c.json(allAppointments);
+        return c.json({ data: allAppointments });
     } catch (error: any) {
         console.error("Error fetching appointments:", error);
         return c.json({ error: 'Failed to fetch appointments', message: error.message }, 500);
@@ -2173,96 +2046,6 @@ adminRoutes.get(
     }
   }
 );
-
-// --- Doctor Service Management ---
-const updateDoctorClinicServicesSchema = z.object({
-  assignments: z.array(z.object({
-      clinicId: z.string().uuid(),
-      serviceIds: z.array(z.string().uuid())
-  }))
-});
-
-adminRoutes.get(
-  '/doctors/:doctorId/clinic-services',
-  zValidator('param', z.object({ doctorId: z.string().uuid() })),
-  async (c) => {
-      const { doctorId } = c.req.valid('param');
-
-      try {
-          const assignments = await db.query.doctorClinicServices.findMany({
-              where: eq(doctorClinicServices.doctorId, doctorId),
-              with: {
-                  clinic: { columns: { id: true, name: true } },
-                  service: { columns: { id: true, name: true } }
-              }
-          });
-
-          // Group by clinic for a more frontend-friendly structure
-          const groupedByClinic = assignments.reduce((acc, current) => {
-              const { clinic, service } = current;
-              if (!acc[clinic.id]) {
-                  acc[clinic.id] = {
-                      clinicId: clinic.id,
-                      clinicName: clinic.name,
-                      services: []
-                  };
-              }
-              acc[clinic.id].services.push(service);
-              return acc;
-          }, {} as Record<string, { clinicId: string; clinicName: string; services: { id: string; name: string }[] }>);
-
-          return c.json({ data: Object.values(groupedByClinic) });
-
-      } catch (error) {
-          console.error('Failed to fetch doctor clinic-service assignments:', error);
-          return c.json({ message: 'Internal Server Error' }, 500);
-      }
-  }
-);
-
-adminRoutes.put(
-  '/doctors/:doctorId/clinic-services',
-  zValidator('param', z.object({ doctorId: z.string().uuid() })),
-  zValidator('json', updateDoctorClinicServicesSchema),
-  async (c) => {
-      const { doctorId } = c.req.valid('param');
-      const { assignments } = c.req.valid('json');
-
-      try {
-          await db.transaction(async (tx) => {
-              // 1. Delete all existing assignments for this doctor
-              await tx.delete(doctorClinicServices).where(eq(doctorClinicServices.doctorId, doctorId));
-
-              // 2. Insert the new assignments if there are any
-              if (assignments.length > 0) {
-                  const newAssignments = assignments.flatMap(assignment => 
-                      assignment.serviceIds.map(serviceId => ({
-                          doctorId: doctorId,
-                          clinicId: assignment.clinicId,
-                          serviceId: serviceId
-                      }))
-                  );
-                  
-                  if (newAssignments.length > 0) {
-                       await tx.insert(doctorClinicServices).values(newAssignments);
-                  }
-              }
-          });
-
-          return c.json({ message: 'Doctor service assignments updated successfully.' }, 200);
-
-      } catch (error) {
-          console.error('Failed to update doctor clinic-service assignments:', error);
-          return c.json({ message: 'Internal Server Error' }, 500);
-      }
-  }
-);
-
-
-// =================================================================
-// Clinic & Doctor Availability Management
-// =================================================================
-// ... existing code ...
 
 // Add other admin routes here in the future...
 

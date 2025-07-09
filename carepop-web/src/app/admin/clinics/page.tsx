@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { getAdminClinicsList } from '@/services/api';
+import { getAdminClinics } from '@/services/api';
 import ClinicsClient from './_components/ClinicsClient';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Terminal } from 'lucide-react';
@@ -27,7 +27,7 @@ export default async function AdminClinicsPage() {
   try {
     // Fetch clinics using our dedicated service function, passing the access token.
     // The service function will handle the actual fetch call and base error handling.
-    const clinics = await getAdminClinicsList(session.access_token);
+    const clinics = await getAdminClinics(session.access_token);
 
     // If the fetch is successful, render the client component with the initial data.
     return <ClinicsClient initialClinics={clinics} />;

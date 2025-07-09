@@ -192,7 +192,7 @@ export default function DoctorsClient({ initialDoctors }: DoctorsClientProps) {
             </DialogDescription>
           </DialogHeader>
           <DoctorForm
-            initialData={selectedDoctor}
+            initialData={selectedDoctor ? { ...selectedDoctor, clinics: (selectedDoctor as any).doctorClinics } : undefined}
             defaultClinicId={selectedClinic !== 'all' ? selectedClinic : undefined}
             onSubmit={(values) => {
               const payload = { ...values, id: selectedDoctor?.id };

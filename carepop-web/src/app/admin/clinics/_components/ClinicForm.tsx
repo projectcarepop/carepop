@@ -119,37 +119,32 @@ export function ClinicForm({
   }, [session]);
 
   const handleFormSubmit = async (values: ClinicFormValues) => {
-    const { serviceIds, latitude, longitude, ...restOfClinicData } = values;
-
-    const payload = {
-      ...restOfClinicData,
-      location: {
-        lat: latitude,
-        lon: longitude,
-      },
-    };
+    const { serviceIds, ...clinicDataToSubmit } = values;
     
-    try {
-      // The onSubmit prop now returns a promise that will resolve on success or reject on error.
-      const updatedClinic = await onSubmit(payload as any);
+    const updatedClinic = await onSubmit(clinicDataToSubmit);
 
-      // This logic only runs if the clinic creation/update was successful.
-      if (updatedClinic && session) {
-          setIsServicesLoading(true);
-          try {
-              await assignServicesToClinic(updatedClinic.id, serviceIds || [], session.access_token);
-              toast({ title: "Success", description: "Clinic services have been updated successfully." });
-          } catch (error) {
-              console.error("Failed to assign services", error);
-              toast({ title: "Error", description: "Clinic saved, but failed to update services.", variant: "destructive" });
-          } finally {
-              setIsServicesLoading(false);
-          }
+    if (updatedClinic && serviceIds && session) {
+      setIsServicesLoading(true);
+      try {
+        await assignServicesToClinic(updatedClinic.id, serviceIds, session.access_token);
+        toast({ title: "Success", description: "Clinic services updated successfully." });
+      } catch (error) {
+          console.error("Failed to assign services", error);
+          toast({ title: "Error", description: "Could not update the clinic's services.", variant: "destructive" });
+      } finally {
+          setIsServicesLoading(false);
       }
-    } catch (error) {
-      // The error is already displayed by the parent's `onError` toast.
-      // We just log it here and prevent further action.
-      console.error("Clinic form submission failed:", error);
+    } else if (updatedClinic && !serviceIds && session) {
+        setIsServicesLoading(true);
+        try {
+            await assignServicesToClinic(updatedClinic.id, [], session.access_token);
+            toast({ title: "Success", description: "All services unassigned from clinic." });
+        } catch (error) {
+            console.error("Failed to unassign services", error);
+            toast({ title: "Error", description: "Could not update the clinic's services.", variant: "destructive" });
+        } finally {
+            setIsServicesLoading(false);
+        }
     }
   };
 

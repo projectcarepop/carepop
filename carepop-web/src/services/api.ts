@@ -284,8 +284,8 @@ export async function getAdminAppointments(accessToken: string, filters?: Record
 
   const response = await fetch(url, { headers, cache: 'no-store' });
   if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Failed to fetch appointments' }));
-      throw new Error(error.message);
+      const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
+      throw new Error(error.message || 'Failed to fetch appointments.');
   }
   const result = await response.json();
   return result.data || [];
@@ -314,7 +314,7 @@ export async function getAdminClinics(accessToken: string) {
       throw new Error('Failed to fetch clinics.');
   }
   const result = await response.json();
-  return result.data || [];
+  return result;
 }
 
 export async function getAdminClinicsList(accessToken: string) {
@@ -1251,46 +1251,5 @@ export async function getClinicMasterSchedule(
         throw new Error(error.message);
     }
 
-    return response.json();
-}
-
-// --- Doctor Service Management ---
-
-export const getDoctorServiceAssignments = async (doctorId: string, accessToken: string) => {
-    const headers = await getAuthHeaders(accessToken);
-    const response = await fetch(`${API_BASE_URL}/api/admin/doctors/${doctorId}/services`, { headers, cache: 'no-store' });
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Failed to fetch service assignments.' }));
-        throw new Error(error.message);
-    }
-    return response.json();
-};
-
-export const updateDoctorServiceAssignments = async (doctorId: string, assignments: any, token: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/admin/doctors/${doctorId}/clinic-services`, {
-        method: 'PUT',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ assignments }),
-    });
-    if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update doctor service assignments');
-    }
-    return response.json();
-};
-
-export async function getAdminClinicDetails(clinicId: string, accessToken: string) {
-    const headers = await getAuthHeaders(accessToken);
-    const response = await fetch(`${API_BASE_URL}/api/admin/clinics/${clinicId}/details`, { headers, cache: 'no-store' });
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Failed to fetch clinic details.' }));
-        if (response.status === 404) {
-            throw new Error('Clinic not found.');
-        }
-        throw new Error(error.message);
-    }
     return response.json();
 }
