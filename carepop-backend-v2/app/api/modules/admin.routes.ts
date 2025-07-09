@@ -426,7 +426,7 @@ adminRoutes.get(
                 service: true
             }
         });
-        const assignedServices = clinicServicesResult.map(cs => cs.service);
+        const assignedServices = clinicServicesResult.map(cs => cs.service).filter(Boolean);
 
         // 3. Fetch doctors assigned to this clinic
         const doctorClinicsResult = await db.query.doctorClinics.findMany({
