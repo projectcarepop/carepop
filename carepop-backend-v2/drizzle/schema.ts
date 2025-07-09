@@ -1,5 +1,5 @@
 import { pgTable, index, uuid, text, jsonb, boolean, timestamp, check, numeric, integer, date, pgEnum, customType, primaryKey, time } from "drizzle-orm/pg-core"
-import { sql, relations } from "drizzle-orm"
+import { sql } from "drizzle-orm"
 
 // Placeholder for auth.users table
 export const usersInAuth = pgTable("users", {
@@ -85,11 +85,12 @@ export const doctorClinics = pgTable("doctor_clinics", {
 	compoundKey: primaryKey({ columns: [table.doctorId, table.clinicId] }),
 }));
 
-export const doctorServices = pgTable("doctor_services", {
+export const doctorClinicServices = pgTable("doctor_clinic_services", {
 	doctorId: uuid("doctor_id").notNull().references(() => doctors.id, { onDelete: 'cascade' }),
+	clinicId: uuid("clinic_id").notNull().references(() => clinics.id, { onDelete: 'cascade' }),
 	serviceId: uuid("service_id").notNull().references(() => services.id, { onDelete: 'cascade' }),
 }, (table) => ({
-	compoundKey: primaryKey({ columns: [table.doctorId, table.serviceId] }),
+	compoundKey: primaryKey({ columns: [table.doctorId, table.clinicId, table.serviceId] }),
 }));
 
 export const doctorSchedules = pgTable("doctor_schedules", {
@@ -214,6 +215,27 @@ export const productCategories = pgTable("product_categories", {
 	description: text("description"),
 });
 
+export const products = pgTable("products", {
+	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+	categoryId: uuid("category_id").references(() => productCategories.id, { onDelete: 'set null' }),
+	name: text("name").notNull(),
+	description: text("description"),
+	sku: text("sku").unique(),
+	price: numeric("price", { precision: 10, scale:  2 }).notNull(),
+	requiresPrescription: boolean("requires_prescription").default(false).notNull(),
+	isActive: boolean("is_active").default(true).notNull(),
+}, (table) => ({
+    priceCheck: check("products_price_check", sql`price >= 0`),
+}));
+
+export const inventory = pgTable("inventory", {
+	productId: uuid("product_id").primaryKey().notNull().references(() => products.id, { onDelete: 'cascade' }),
+	quantityOnHand: integer("quantity_on_hand").default(0).notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => ({
+    quantityCheck: check("inventory_quantity_on_hand_check", sql`quantity_on_hand >= 0`),
+}));
+
 export const inventory_items = pgTable("inventory_items", {
 	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
 	clinicId: uuid("clinic_id").notNull().references(() => clinics.id, { onDelete: 'cascade' }),
@@ -284,246 +306,3 @@ export const menstrualLogs = pgTable("menstrual_logs", {
 	startDate: date("start_date", { mode: 'string' }).notNull(),
 	endDate: date("end_date", { mode: 'string' }),
 });
-
-
-// --- RELATIONS ---
-
-export const profilesRelations = relations(profiles, ({ many, one }) => ({
-	appointments: many(appointments),
-	reviews: many(reviews),
-    healthLogs: many(healthLogs),
-    menstrualLogs: many(menstrualLogs),
-    user: one(usersInAuth, {
-        fields: [profiles.id],
-        references: [usersInAuth.id],
-    })
-}));
-
-export const usersInAuthRelations = relations(usersInAuth, ({ one }) => ({
-    profile: one(profiles),
-}));
-
-export const clinicsRelations = relations(clinics, ({ many }) => ({
-	appointments: many(appointments),
-	inventoryItems: many(inventory_items),
-	clinicServices: many(clinicServices),
-	doctorClinics: many(doctorClinics),
-    clinicOverrides: many(clinicOverrides),
-}));
-
-export const doctorsRelations = relations(doctors, ({ many }) => ({
-	doctorClinics: many(doctorClinics),
-	doctorServices: many(doctorServices),
-    doctorSchedules: many(doctorSchedules),
-    doctorAvailabilityOverrides: many(doctorAvailabilityOverrides),
-	appointments: many(appointments),
-	reviews: many(reviews),
-}));
-
-export const servicesRelations = relations(services, ({ one, many }) => ({
-	serviceCategory: one(serviceCategories, {
-		fields: [services.categoryId],
-		references: [serviceCategories.id]
-	}),
-	appointments: many(appointments),
-	clinicServices: many(clinicServices),
-	doctorServices: many(doctorServices),
-}));
-
-export const appointmentsRelations = relations(appointments, ({ one, many }) => ({
-	patient: one(profiles, {
-		fields: [appointments.patientId],
-		references: [profiles.id]
-	}),
-	doctor: one(doctors, {
-		fields: [appointments.doctorId],
-		references: [doctors.id]
-	}),
-	service: one(services, {
-		fields: [appointments.serviceId],
-		references: [services.id]
-	}),
-	clinic: one(clinics, {
-		fields: [appointments.clinicId],
-		references: [clinics.id]
-	}),
-	review: one(reviews, {
-		fields: [appointments.id],
-		references: [reviews.appointmentId]
-	}),
-    medicalRecords: many(medicalRecords),
-}));
-
-export const medicalRecordsRelations = relations(medicalRecords, ({ one }) => ({
-  appointment: one(appointments, {
-    fields: [medicalRecords.appointmentId],
-    references: [appointments.id]
-  }),
-}));
-
-export const recordDoctorNotesRelations = relations(recordDoctorNotes, ({ one }) => ({
-    medicalRecord: one(medicalRecords, {
-        fields: [recordDoctorNotes.recordId],
-        references: [medicalRecords.id]
-    }),
-}));
-
-export const recordPrescriptionsRelations = relations(recordPrescriptions, ({ one }) => ({
-    medicalRecord: one(medicalRecords, {
-        fields: [recordPrescriptions.recordId],
-        references: [medicalRecords.id]
-    }),
-}));
-
-export const recordDocumentsRelations = relations(recordDocuments, ({ one }) => ({
-    medicalRecord: one(medicalRecords, {
-        fields: [recordDocuments.recordId],
-        references: [medicalRecords.id]
-    }),
-}));
-
-export const reviewsRelations = relations(reviews, ({ one }) => ({
-	appointment: one(appointments, {
-		fields: [reviews.appointmentId],
-		references: [appointments.id]
-	}),
-	patient: one(profiles, {
-		fields: [reviews.patientId],
-		references: [profiles.id]
-	}),
-	doctor: one(doctors, {
-		fields: [reviews.doctorId],
-		references: [doctors.id]
-	}),
-}));
-
-export const productCategoriesRelations = relations(productCategories, ({ many }) => ({
-    inventoryItems: many(inventory_items),
-}));
-
-export const inventory_itemsRelations = relations(inventory_items, ({ one, many }) => ({
-	productCategory: one(productCategories, {
-		fields: [inventory_items.productCategoryId],
-		references: [productCategories.id]
-	}),
-	clinic: one(clinics, {
-		fields: [inventory_items.clinicId],
-		references: [clinics.id]
-	}),
-	auditLogs: many(inventoryAuditLog),
-	batches: many(inventoryItemBatches),
-}));
-
-export const healthLogsRelations = relations(healthLogs, ({ one }) => ({
-	patient: one(profiles, {
-		fields: [healthLogs.patientId],
-		references: [profiles.id]
-	}),
-}));
-
-export const menstrualLogsRelations = relations(menstrualLogs, ({ one }) => ({
-	patient: one(profiles, {
-		fields: [menstrualLogs.patientId],
-		references: [profiles.id]
-	}),
-}));
-
-export const orders = pgTable("orders", {
-	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
-	patientId: uuid("patient_id").notNull().references(() => profiles.id, { onDelete: 'cascade' }),
-	status: orderStatus("status").default('pending_payment').notNull(),
-	totalAmount: numeric("total_amount", { precision: 10, scale:  2 }).notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, () => ({
-	totalAmountCheck: check("orders_total_amount_check", sql`"total_amount" >= 0`),
-}));
-
-export const orderItems = pgTable("order_items", {
-	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
-	orderId: uuid("order_id").notNull().references(() => orders.id, { onDelete: 'cascade' }),
-	inventoryItemId: uuid("inventory_item_id").notNull().references(() => inventory_items.id, { onDelete: 'restrict' }),
-	quantity: integer("quantity").notNull(),
-	priceAtTimeOfSale: numeric("price_at_time_of_sale", { precision: 10, scale:  2 }).notNull(),
-}, () => ({
-	quantityCheck: check("order_items_quantity_check", sql`quantity > 0`),
-}));
-
-export const ordersRelations = relations(orders, ({ one, many }) => ({
-	patient: one(profiles, {
-		fields: [orders.patientId],
-		references: [profiles.id]
-	}),
-	orderItems: many(orderItems),
-}));
-
-export const orderItemsRelations = relations(orderItems, ({ one }) => ({
-	order: one(orders, {
-		fields: [orderItems.orderId],
-		references: [orders.id]
-	}),
-	inventoryItem: one(inventory_items, {
-		fields: [orderItems.inventoryItemId],
-		references: [inventory_items.id]
-	}),
-}));
-
-export const inventoryAuditLogRelations = relations(inventoryAuditLog, ({ one }) => ({
-    item: one(inventory_items, {
-        fields: [inventoryAuditLog.itemId],
-        references: [inventory_items.id]
-    }),
-    clinic: one(clinics, {
-        fields: [inventoryAuditLog.clinicId],
-        references: [clinics.id]
-    }),
-    user: one(profiles, {
-        fields: [inventoryAuditLog.userId],
-        references: [profiles.id]
-    })
-}));
-
-export const inventoryItemBatchesRelations = relations(inventoryItemBatches, ({ one }) => ({
-    item: one(inventory_items, {
-        fields: [inventoryItemBatches.itemId],
-        references: [inventory_items.id]
-    })
-}));
-
-// Patient App Specific Relations
-
-export const userProfilesRelations = relations(profiles, ({ many, one }) => ({
-    appointments: many(appointments),
-    reviews: many(reviews),
-    healthLogs: many(healthLogs),
-    menstrualLogs: many(menstrualLogs),
-    user: one(usersInAuth, {
-        fields: [profiles.id],
-        references: [usersInAuth.id]
-    })
-}));
-
-export const doctorClinicsRelations = relations(doctorClinics, ({ one }) => ({
-	doctor: one(doctors, { fields: [doctorClinics.doctorId], references: [doctors.id] }),
-	clinic: one(clinics, { fields: [doctorClinics.clinicId], references: [clinics.id] }),
-}));
-
-export const doctorServicesRelations = relations(doctorServices, ({ one }) => ({
-	doctor: one(doctors, { fields: [doctorServices.doctorId], references: [doctors.id] }),
-	service: one(services, { fields: [doctorServices.serviceId], references: [services.id] }),
-}));
-
-export const doctorSchedulesRelations = relations(doctorSchedules, ({ one }) => ({
-    doctor: one(doctors, { fields: [doctorSchedules.doctorId], references: [doctors.id] }),
-}));
-
-export const serviceCategoriesRelations = relations(serviceCategories, ({ one, many }) => ({
-	services: many(services),
-}));
-
-export const clinicOverridesRelations = relations(clinicOverrides, ({ one }) => ({
-    clinic: one(clinics, { fields: [clinicOverrides.clinicId], references: [clinics.id] }),
-}));
-
-export const doctorAvailabilityOverridesRelations = relations(doctorAvailabilityOverrides, ({ one }) => ({
-    doctor: one(doctors, { fields: [doctorAvailabilityOverrides.doctorId], references: [doctors.id] }),
-}));

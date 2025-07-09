@@ -1253,3 +1253,31 @@ export async function getClinicMasterSchedule(
 
     return response.json();
 }
+
+// --- Doctor Service Management ---
+
+export const getDoctorServiceAssignments = async (doctorId: string, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/admin/doctors/${doctorId}/clinic-services`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) {
+        throw new Error('Failed to fetch doctor service assignments');
+    }
+    return response.json();
+};
+
+export const updateDoctorServiceAssignments = async (doctorId: string, assignments: any, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/admin/doctors/${doctorId}/clinic-services`, {
+        method: 'PUT',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ assignments }),
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update doctor service assignments');
+    }
+    return response.json();
+};
