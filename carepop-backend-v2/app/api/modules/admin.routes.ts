@@ -364,37 +364,39 @@ adminRoutes
   })
   .get('/clinics/:id/details', async (c) => {
     const { id } = c.req.param();
-    
-    const clinicQuery = db.select().from(clinics).where(eq(clinics.id, id));
-    
-    const servicesQuery = db.select({
-      id: services.id,
-      name: services.name,
-      description: services.description,
-      price: services.price,
-      isActive: services.isActive,
-    })
-    .from(clinicServices)
-    .innerJoin(services, eq(clinicServices.serviceId, services.id))
-    .where(eq(clinicServices.clinicId, id));
 
     try {
-      const [clinicResult, servicesResult] = await Promise.all([
-        clinicQuery,
-        servicesQuery,
-      ]);
+        const result = await db.query.clinics.findFirst({
+            where: eq(clinics.id, id),
+            with: {
+                clinicServices: {
+                    with: {
+                        service: true,
+                    },
+                },
+            },
+        });
 
-      const [clinic] = clinicResult;
+        if (!result) {
+            return c.json({ error: 'Clinic not found' }, 404);
+        }
 
-      if (!clinic) {
-        return c.json({ error: 'Clinic not found' }, 404);
-      }
-      
-      return c.json({ ...clinic, services: servicesResult });
+        // Transform the data to match frontend expectations
+        const response = {
+            ...result,
+            latitude: (result.location as any)?.coordinates[1] ?? null,
+            longitude: (result.location as any)?.coordinates[0] ?? null,
+            services: result.clinicServices.map(cs => cs.service),
+        };
+
+        // The original clinicServices property is redundant now.
+        // delete (response as any).clinicServices;
+        
+        return c.json(response);
 
     } catch (error: any) {
-      console.error(`Error fetching details for clinic ${id}:`, error);
-      return c.json({ error: 'Failed to fetch clinic details', message: error.message }, 500);
+        console.error(`Error fetching details for clinic ${id}:`, error);
+        return c.json({ error: 'Failed to fetch clinic details', message: error.message }, 500);
     }
   })
   .put('/clinics/:id', zValidator('json', updateClinicSchema), async (c) => {
