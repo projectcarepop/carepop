@@ -2,8 +2,11 @@ import { relations } from "drizzle-orm/relations";
 import { 
 	serviceCategories, services, profiles, clinics, 
 	appointments, doctors, medicalRecords, reviews, productCategories, 
-	products, inventory,
-	recordDoctorNotes, recordPrescriptions, recordDocuments, usersInAuth
+	recordDoctorNotes, recordPrescriptions, recordDocuments, usersInAuth,
+	clinicServices,
+	doctorClinics,
+	doctorClinicServices,
+	inventory_items
 } from "./schema";
 
 export const servicesRelations = relations(services, ({ one, many }) => ({
@@ -107,21 +110,46 @@ export const reviewsRelations = relations(reviews, ({one}) => ({
 	}),
 }));
 
-export const productsRelations = relations(products, ({one, many}) => ({
-	productCategory: one(productCategories, {
-		fields: [products.categoryId],
-		references: [productCategories.id]
-	}),
-	inventory: one(inventory),
-}));
-
 export const productCategoriesRelations = relations(productCategories, ({many}) => ({
-	products: many(products),
+	products: many(inventory_items),
 }));
 
-export const inventoryRelations = relations(inventory, ({one}) => ({
-	product: one(products, {
-		fields: [inventory.productId],
-		references: [products.id]
+
+// --- JOIN TABLE RELATIONS ---
+
+export const clinicServicesRelations = relations(clinicServices, ({ one }) => ({
+	clinic: one(clinics, {
+		fields: [clinicServices.clinicId],
+		references: [clinics.id],
+	}),
+	service: one(services, {
+		fields: [clinicServices.serviceId],
+		references: [services.id],
+	}),
+}));
+
+export const doctorClinicsRelations = relations(doctorClinics, ({ one }) => ({
+	doctor: one(doctors, {
+		fields: [doctorClinics.doctorId],
+		references: [doctors.id],
+	}),
+	clinic: one(clinics, {
+		fields: [doctorClinics.clinicId],
+		references: [clinics.id],
+	}),
+}));
+
+export const doctorClinicServicesRelations = relations(doctorClinicServices, ({ one }) => ({
+	doctor: one(doctors, {
+		fields: [doctorClinicServices.doctorId],
+		references: [doctors.id],
+	}),
+	clinic: one(clinics, {
+		fields: [doctorClinicServices.clinicId],
+		references: [clinics.id],
+	}),
+	service: one(services, {
+		fields: [doctorClinicServices.serviceId],
+		references: [services.id],
 	}),
 }));
