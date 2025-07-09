@@ -854,6 +854,16 @@ adminRoutes.get(
             clinicId: true,
           },
         },
+        doctorClinicServices: {
+          with: {
+            service: {
+              columns: {
+                id: true,
+                name: true,
+              }
+            }
+          }
+        }
       },
     });
 
