@@ -142,7 +142,9 @@ export const profiles = pgTable("profiles", {
 	role: userRole("role").default('patient').notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-});
+}, (table) => ({
+    createdAtIdx: index("idx_profiles_created_at").on(table.createdAt),
+}));
 
 export const appointments = pgTable("appointments", {
 	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
@@ -159,6 +161,7 @@ export const appointments = pgTable("appointments", {
     patientIdx: index("idx_appointments_patient_id").on(table.patientId),
     doctorIdx: index("idx_appointments_doctor_id").on(table.doctorId),
     clinicIdx: index("idx_appointments_clinic_id").on(table.clinicId),
+    appointmentTimeIdx: index("idx_appointments_appointment_time").on(table.appointmentTime),
 }));
 
 export const medicalRecords = pgTable("medical_records", {

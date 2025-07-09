@@ -265,56 +265,49 @@ export async function getSingleMedicalRecord(recordId: string, accessToken: stri
 // When calling from a client component, get the token from the session context.
 
 export async function getAdminAppointments(accessToken: string, filters?: Record<string, any>) {
-  // Make sure filters are string-based for URLSearchParams
-  const stringFilters: Record<string, string> = {};
+  const headers = await getAuthHeaders(accessToken);
+  let url = `${API_BASE_URL}/api/admin/appointments`;
   if (filters) {
-    Object.keys(filters).forEach(key => {
-        if (filters[key] !== undefined) {
-            stringFilters[key] = String(filters[key]);
-        }
-    });
+      const params = new URLSearchParams(filters);
+      url += `?${params.toString()}`;
   }
-
-  const headers = {
-    'Authorization': `Bearer ${accessToken}`,
-    'Content-Type': 'application/json'
-  };
-  const queryParams = new URLSearchParams(stringFilters);
-  const url = `${API_BASE_URL}/api/admin/appointments?${queryParams.toString()}`;
-
   const response = await fetch(url, { headers, cache: 'no-store' });
-  if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-      throw new Error(error.message || 'Failed to fetch appointments.');
-  }
+  if (!response.ok) throw new Error("Failed to fetch admin appointments.");
   const result = await response.json();
   return result.data || [];
 }
 
 export async function getAppointmentDetails(appointmentId: string, accessToken: string) {
-  const headers = await getAuthHeaders(accessToken);
-  const url = `${API_BASE_URL}/api/admin/appointments/${appointmentId}`;
-  const response = await fetch(url, { headers, cache: 'no-store' });
+    const headers = await getAuthHeaders(accessToken);
+    const response = await fetch(`${API_BASE_URL}/api/admin/appointments/${appointmentId}`, { headers, cache: 'no-store' });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: `HTTP Error: ${response.statusText}` }));
+        return { data: null, error: error.message };
+    }
+    const result = await response.json();
+    return { data: result.data, error: null };
+}
 
-  if (!response.ok) {
-    if (response.status === 404) return null;
-    const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-    throw new Error(error.message || `Failed to fetch details for appointment ${appointmentId}.`);
-  }
-  return response.json();
+export async function adminCancelAppointment(appointmentId: string, reason: string, accessToken: string) {
+    const headers = await getAuthHeaders(accessToken);
+    const response = await fetch(`${API_BASE_URL}/api/admin/appointments/${appointmentId}/cancel`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ reason }),
+    });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: "An unknown error occurred" }));
+        throw new Error(error.message || `Failed to cancel appointment`);
+    }
+    return response.json();
 }
 
 export async function getAdminClinics(accessToken: string) {
-  const headers = {
-    'Authorization': `Bearer ${accessToken}`,
-    'Content-Type': 'application/json'
-  };
+  const headers = await getAuthHeaders(accessToken);
   const response = await fetch(`${API_BASE_URL}/api/admin/clinics`, { headers, cache: 'no-store' });
-  if (!response.ok) {
-      throw new Error('Failed to fetch clinics.');
-  }
+  if (!response.ok) throw new Error("Failed to fetch admin clinics.");
   const result = await response.json();
-  return result;
+  return result.data || [];
 }
 
 export async function getAdminClinicsList(accessToken: string) {
@@ -344,46 +337,36 @@ export async function getAdminDoctors(accessToken: string, clinicId?: string) {
 }
 
 export async function getAdminServiceCategories(accessToken: string) {
-    const headers = {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    };
-    const response = await fetch(`${API_BASE_URL}/api/admin/service-categories`, { headers, cache: 'no-store' });
-    if (!response.ok) throw new Error("Failed to fetch service categories.");
+    const headers = await getAuthHeaders(accessToken);
+    const response = await fetch(`${API_BASE_URL}/api/admin/service-categories`, { headers });
+    if (!response.ok) throw new Error("Failed to fetch service categories");
     const result = await response.json();
     return result.data || [];
 }
 
 export async function getAdminServices(accessToken: string) {
     const headers = await getAuthHeaders(accessToken);
-    const response = await fetch(`${API_BASE_URL}/api/admin/services`, { headers, cache: 'no-store' });
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-        throw new Error(error.message || 'Failed to fetch services.');
-    }
+    const response = await fetch(`${API_BASE_URL}/api/admin/services`, { headers });
+    if (!response.ok) throw new Error("Failed to fetch services");
     const result = await response.json();
     return result.data || [];
 }
 
 export async function deleteService(serviceId: string, accessToken: string) {
-  const headers = await getAuthHeaders(accessToken);
-  const response = await fetch(`${API_BASE_URL}/api/admin/services/${serviceId}`, {
-    method: 'DELETE',
-    headers,
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-    throw new Error(error.message || 'Failed to delete service.');
-  }
-  return response.json();
+    const headers = await getAuthHeaders(accessToken);
+    const response = await fetch(`${API_BASE_URL}/api/admin/services/${serviceId}`, {
+        method: 'DELETE',
+        headers
+    });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: "An unknown error occurred" }));
+        throw new Error(error.message || `Failed to delete service`);
+    }
+    return response.json();
 }
 
 export async function upsertService(serviceData: any, accessToken: string, serviceId?: string) {
-    const headers = {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    };
+    const headers = await getAuthHeaders(accessToken);
     const method = serviceId ? 'PUT' : 'POST';
     const url = serviceId ? `${API_BASE_URL}/api/admin/services/${serviceId}` : `${API_BASE_URL}/api/admin/services`;
     const response = await fetch(url, { method, headers, body: JSON.stringify(serviceData) });
@@ -392,23 +375,20 @@ export async function upsertService(serviceData: any, accessToken: string, servi
 }
 
 export async function deleteProductCategory(categoryId: string, accessToken: string) {
-  const headers = await getAuthHeaders(accessToken);
-  const response = await fetch(`${API_BASE_URL}/api/admin/product-categories/${categoryId}`, {
-    method: 'DELETE',
-    headers,
-  });
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: "Failed to delete product category." }));
-    throw new Error(error.message);
-  }
-  return response.json();
+    const headers = await getAuthHeaders(accessToken);
+    const response = await fetch(`${API_BASE_URL}/api/admin/service-categories/${categoryId}`, {
+        method: 'DELETE',
+        headers
+    });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: "An unknown error occurred" }));
+        throw new Error(error.message || `Failed to delete category`);
+    }
+    return response.json();
 }
 
 export async function upsertServiceCategory(categoryData: any, accessToken: string, categoryId?: string) {
-    const headers = {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    };
+    const headers = await getAuthHeaders(accessToken);
     const method = categoryId ? 'PUT' : 'POST';
     const url = categoryId ? `${API_BASE_URL}/api/admin/service-categories/${categoryId}` : `${API_BASE_URL}/api/admin/service-categories`;
     const response = await fetch(url, { method, headers, body: JSON.stringify(categoryData) });

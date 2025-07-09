@@ -6,7 +6,7 @@ import {
     clinics, 
     doctors, 
     services, 
-    serviceCategories, 
+    serviceCategories,
     profiles,
     inventory_items,
     productCategories,
@@ -1496,6 +1496,27 @@ adminRoutes.delete('/appointments/:id', async (c) => {
     } catch (error: any) {
         console.error(`[DELETE /appointments/:id] CRASH:`, error);
         return c.json({ message: "Error deleting appointment", error: error.message }, 500);
+    }
+});
+
+adminRoutes.patch(
+  '/appointments/:id/cancel', 
+  zValidator('json', z.object({ reason: z.string().min(1, { message: "Cancellation reason is required."}) })), 
+  async (c) => {
+    const { id } = c.req.param();
+    const { reason } = c.req.valid('json');
+    try {
+        const [updatedAppointment] = await db.update(appointments)
+            .set({ status: 'canceled_by_admin' })
+            .where(eq(appointments.id, id))
+            .returning();
+
+        if (!updatedAppointment) {
+            return c.json({ error: "Appointment not found or could not be updated." }, 404);
+        }
+        return c.json({ data: updatedAppointment });
+    } catch (e: any) {
+        return c.json({ error: 'Internal Server Error', message: e.message }, 500);
     }
 });
 
