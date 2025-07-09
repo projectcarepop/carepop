@@ -1281,3 +1281,16 @@ export const updateDoctorServiceAssignments = async (doctorId: string, assignmen
     }
     return response.json();
 };
+
+export async function getAdminClinicDetails(clinicId: string, accessToken: string) {
+    const headers = await getAuthHeaders(accessToken);
+    const response = await fetch(`${API_BASE_URL}/api/admin/clinics/${clinicId}/details`, { headers, cache: 'no-store' });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Failed to fetch clinic details.' }));
+        if (response.status === 404) {
+            throw new Error('Clinic not found.');
+        }
+        throw new Error(error.message);
+    }
+    return response.json();
+}

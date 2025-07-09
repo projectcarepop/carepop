@@ -362,6 +362,41 @@ adminRoutes
 
     return c.json(responseData);
   })
+  .get('/clinics/:id/details', async (c) => {
+    const { id } = c.req.param();
+    
+    const clinicQuery = db.select().from(clinics).where(eq(clinics.id, id));
+    
+    const servicesQuery = db.select({
+      id: services.id,
+      name: services.name,
+      description: services.description,
+      price: services.price,
+      isActive: services.isActive,
+    })
+    .from(clinicServices)
+    .innerJoin(services, eq(clinicServices.serviceId, services.id))
+    .where(eq(clinicServices.clinicId, id));
+
+    try {
+      const [clinicResult, servicesResult] = await Promise.all([
+        clinicQuery,
+        servicesQuery,
+      ]);
+
+      const [clinic] = clinicResult;
+
+      if (!clinic) {
+        return c.json({ error: 'Clinic not found' }, 404);
+      }
+      
+      return c.json({ ...clinic, services: servicesResult });
+
+    } catch (error: any) {
+      console.error(`Error fetching details for clinic ${id}:`, error);
+      return c.json({ error: 'Failed to fetch clinic details', message: error.message }, 500);
+    }
+  })
   .put('/clinics/:id', zValidator('json', updateClinicSchema), async (c) => {
     const id = c.req.param('id');
     const { latitude, longitude, ...clinicData } = c.req.valid('json');

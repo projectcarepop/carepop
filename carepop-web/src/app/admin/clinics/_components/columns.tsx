@@ -9,10 +9,12 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Clinic } from '@/lib/types';
+import Link from 'next/link';
 
 interface ColumnActions {
   onEdit: (clinic: Clinic) => void;
@@ -89,14 +91,13 @@ export const columns = ({ onEdit, onDelete }: ColumnActions): ColumnDef<Clinic>[
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={() => navigator.clipboard.writeText(clinic.id)}
-            >
-              Copy Clinic ID
+            <DropdownMenuItem asChild>
+                <Link href={`/admin/clinics/${clinic.id}`}>View Details</Link>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onEdit(clinic)}>
               Edit Clinic
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => onDelete(clinic)}
               className="text-red-600"
