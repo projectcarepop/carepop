@@ -1089,7 +1089,7 @@ adminRoutes.get('/appointments', zValidator('query', getAppointmentsSchema), asy
             orderBy: [desc(appointments.appointmentTime)],
         });
 
-        return c.json({ data: allAppointments });
+        return c.json(allAppointments);
     } catch (error: any) {
         console.error("Error fetching appointments:", error);
         return c.json({ error: 'Failed to fetch appointments', message: error.message }, 500);

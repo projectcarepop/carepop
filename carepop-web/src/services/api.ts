@@ -284,8 +284,8 @@ export async function getAdminAppointments(accessToken: string, filters?: Record
 
   const response = await fetch(url, { headers, cache: 'no-store' });
   if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-      throw new Error(error.message || 'Failed to fetch appointments.');
+      const error = await response.json().catch(() => ({ message: 'Failed to fetch appointments' }));
+      throw new Error(error.message);
   }
   const result = await response.json();
   return result.data || [];
