@@ -1256,12 +1256,12 @@ export async function getClinicMasterSchedule(
 
 // --- Doctor Service Management ---
 
-export const getDoctorServiceAssignments = async (doctorId: string, token: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/admin/doctors/${doctorId}/clinic-services`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-    });
+export const getDoctorServiceAssignments = async (doctorId: string, accessToken: string) => {
+    const headers = await getAuthHeaders(accessToken);
+    const response = await fetch(`${API_BASE_URL}/api/admin/doctors/${doctorId}/services`, { headers, cache: 'no-store' });
     if (!response.ok) {
-        throw new Error('Failed to fetch doctor service assignments');
+        const error = await response.json().catch(() => ({ message: 'Failed to fetch service assignments.' }));
+        throw new Error(error.message);
     }
     return response.json();
 };

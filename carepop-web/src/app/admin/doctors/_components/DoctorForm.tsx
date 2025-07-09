@@ -42,7 +42,8 @@ type DoctorFormValues = z.infer<typeof formSchema>;
 
 interface DoctorFormProps {
   initialData?: Doctor & { 
-      clinics?: { clinicId: string }[]
+      doctorClinics?: { clinicId: string }[],
+      doctorClinicServices?: any[], // Note: 'any' is used for now, can be tightened
   };
   defaultClinicId?: string;
   onSubmit: (values: any) => void;
@@ -57,11 +58,10 @@ const ClinicServiceSelector = ({
     clinic: Clinic;
     control: any;
 }) => {
-    const { session } = useAuth();
     const { data: clinicDetails, isLoading } = useQuery({
         queryKey: ['clinicDetails', clinic.id],
-        queryFn: () => getClinicDetails(clinic.id, session!.access_token),
-        enabled: !!clinic.id && !!session,
+        queryFn: () => getClinicDetails(clinic.id),
+        enabled: !!clinic.id,
     });
 
     const allServicesForClinic = clinicDetails?.services || [];
@@ -158,7 +158,7 @@ export function DoctorForm({
         specialtyText: initialData?.specialtyText || '',
         bio: initialData?.bio || '',
         isActive: initialData?.isActive ?? true,
-        clinicIds: initialData?.clinics?.map(c => c.clinicId) || (defaultClinicId ? [defaultClinicId] : []),
+        clinicIds: initialData?.doctorClinics?.map(c => c.clinicId) || (defaultClinicId ? [defaultClinicId] : []),
         serviceAssignments: {},
     },
   });
@@ -173,7 +173,9 @@ export function DoctorForm({
   // When initial assignments are loaded, populate the form
   React.useEffect(() => {
     if (initialAssignments?.data) {
+        // The API now returns an array of objects, each with a clinicId and a services array
         const assignmentsForForm = initialAssignments.data.reduce((acc: any, assignment: any) => {
+            // assignment is { clinicId: string, clinicName: string, services: {id: string, name: string}[] }
             acc[assignment.clinicId] = assignment.services.map((s: any) => s.id);
             return acc;
         }, {});
