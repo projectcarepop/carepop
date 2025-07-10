@@ -533,15 +533,36 @@ export async function getAdminProducts(accessToken: string): Promise<any> {
     return response.json();
 }
 
-export async function getProductCategories(accessToken: string): Promise<{data: ProductCategory[]}> {
+export async function getProductCategories(
+  accessToken: string,
+  params?: { page?: number; limit?: number; q?: string }
+): Promise<{data: ProductCategory[], pagination?: { totalPages: number, currentPage: number, totalCount: number }}> {
   const headers = await getAuthHeaders(accessToken);
-  const response = await fetch(`${API_BASE_URL}/api/admin/product-categories`, { headers, cache: 'no-store' });
+  const url = new URL(`${API_BASE_URL}/api/admin/product-categories`);
+  
+  if (params?.page) url.searchParams.set('page', String(params.page));
+  if (params?.limit) url.searchParams.set('limit', String(params.limit));
+  if (params?.q) url.searchParams.set('q', params.q);
+  
+  const response = await fetch(url.toString(), { headers, cache: 'no-store' });
   if (!response.ok) throw new Error("Failed to fetch product categories.");
   const result = await response.json();
   return result;
 }
 export const getAdminProductCategories = getProductCategories; // Alias for compatibility
 
+export async function deleteProductCategory(categoryId: string, accessToken: string) {
+  const headers = await getAuthHeaders(accessToken);
+  const response = await fetch(`${API_BASE_URL}/api/admin/product-categories/${categoryId}`, {
+    method: 'DELETE',
+    headers,
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: `Failed to delete product category.` }));
+    throw new Error(error.message || `Failed to delete category`);
+  }
+  return response.json();
+}
 
 export async function upsertProductCategory(categoryData: NewProductCategoryPayload, accessToken: string, categoryId?: string) {
   const method = categoryId ? 'PUT' : 'POST';
@@ -566,14 +587,22 @@ export async function upsertProductCategory(categoryData: NewProductCategoryPayl
 export async function getInventoryForClinic(
   clinicId: string, 
   accessToken: string,
-  filters?: { lowStock?: boolean; expiringSoon?: boolean; q?: string }
-): Promise<{data: InventoryItem[]}> {
+  filters?: { 
+    lowStock?: boolean; 
+    expiringSoon?: boolean; 
+    q?: string; 
+    page?: number; 
+    limit?: number; 
+  }
+): Promise<{data: InventoryItem[], pagination?: { totalPages: number, currentPage: number, totalCount: number }}> {
     const headers = await getAuthHeaders(accessToken);
     
     const params = new URLSearchParams();
     if (filters?.lowStock) params.append('lowStock', 'true');
     if (filters?.expiringSoon) params.append('expiringSoon', 'true');
     if (filters?.q) params.append('q', filters.q);
+    if (filters?.page) params.append('page', String(filters.page));
+    if (filters?.limit) params.append('limit', String(filters.limit));
     
     const queryString = params.toString();
     const url = `${API_BASE_URL}/api/admin/clinics/${clinicId}/inventory${queryString ? `?${queryString}` : ''}`;

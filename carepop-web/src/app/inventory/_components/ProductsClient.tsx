@@ -56,6 +56,12 @@ export default function ProductsClient() {
   const debouncedFilter = useDebounce(globalFilter, 300);
   const [showLowStockOnly, setShowLowStockOnly] = React.useState(false);
   const [showExpiringSoon, setShowExpiringSoon] = React.useState(false);
+  
+  // Server-side pagination state
+  const [pagination, setPagination] = React.useState({
+    pageIndex: 0,
+    pageSize: 10,
+  });
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = React.useState(false);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = React.useState(false);
@@ -74,19 +80,23 @@ export default function ProductsClient() {
         enabled: !!accessToken,
     });
 
-  const { data: products, isLoading: isLoadingProducts } = useQuery({
-    queryKey: ['inventory-items', selectedClinicId, { lowStock: showLowStockOnly, expiringSoon: showExpiringSoon, q: debouncedFilter }],
+  const { data: productsResponse, isLoading: isLoadingProducts } = useQuery({
+    queryKey: ['inventory-items', selectedClinicId, pagination, { lowStock: showLowStockOnly, expiringSoon: showExpiringSoon, q: debouncedFilter }],
     queryFn: () => {
-        if (!selectedClinicId || !accessToken) return Promise.resolve({ data: [] });
+        if (!selectedClinicId || !accessToken) return Promise.resolve({ data: [], pagination: { totalPages: 0, currentPage: 1, totalCount: 0 } });
         return getInventoryForClinic(selectedClinicId, accessToken, {
             lowStock: showLowStockOnly,
             expiringSoon: showExpiringSoon,
-            q: debouncedFilter
+            q: debouncedFilter,
+            page: pagination.pageIndex + 1,
+            limit: pagination.pageSize,
         });
     },
     enabled: !!accessToken && !!selectedClinicId,
-    select: (data) => data.data,
   });
+
+  const products = productsResponse?.data || [];
+  const pageCount = productsResponse?.pagination?.totalPages ?? 0;
 
   const { data: categories } = useQuery({
     queryKey: ['admin-product-categories'],
@@ -299,6 +309,11 @@ export default function ProductsClient() {
             <DataTable
                 columns={columns}
                 data={products || []}
+                pageCount={pageCount}
+                pagination={pagination}
+                setPagination={setPagination as React.Dispatch<React.SetStateAction<any>>}
+                globalFilter={globalFilter}
+                setGlobalFilter={setGlobalFilter}
                 isLoading={isLoadingProducts}
             />
             </CardContent>

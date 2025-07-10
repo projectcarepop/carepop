@@ -24,6 +24,7 @@ import { getProductCategories, upsertProductCategory, deleteProductCategory } fr
 import { type ProductCategory } from '@/lib/types/inventory';
 import { categoryColumns } from '../../_components/category-columns';
 import { CategoryForm, type CategoryFormValues } from '../../_components/CategoryForm';
+import { useDebounce } from '@/hooks/useDebounce';
 
 interface CategoryClientProps {
     initialCategories: ProductCategory[];
@@ -35,6 +36,13 @@ export default function CategoryClient({ initialCategories }: CategoryClientProp
     const accessToken = session?.access_token;
 
     const [globalFilter, setGlobalFilter] = React.useState('');
+    const [debouncedFilter] = useDebounce(globalFilter, 500);
+    
+    // Server-side pagination state
+    const [pagination, setPagination] = React.useState({
+        pageIndex: 0,
+        pageSize: 10,
+    });
     const [isDialogOpen, setIsDialogOpen] = React.useState(false);
     const [isDeleteAlertOpen, setIsDeleteAlertOpen] = React.useState(false);
     const [dialogMode, setDialogMode] = React.useState<'addCategory' | 'editCategory' | null>(null);
@@ -43,13 +51,21 @@ export default function CategoryClient({ initialCategories }: CategoryClientProp
 
     const queryClient = useQueryClient();
 
-    const { data: categories, isLoading: isLoadingCategories } = useQuery({
-        queryKey: ['admin-product-categories'],
-        queryFn: () => getProductCategories(accessToken!),
+    const queryKey = ['admin-product-categories', pagination, debouncedFilter];
+
+    const { data: categoriesResponse, isLoading: isLoadingCategories } = useQuery({
+        queryKey,
+        queryFn: () => getProductCategories(accessToken!, {
+            page: pagination.pageIndex + 1,
+            limit: pagination.pageSize,
+            q: debouncedFilter || undefined,
+        }),
         enabled: !!accessToken,
-        select: (data) => data.data,
-        initialData: { data: initialCategories },
+        initialData: { data: initialCategories, pagination: { totalPages: 1, currentPage: 1, totalCount: initialCategories.length } },
     });
+
+    const categories = categoriesResponse?.data || [];
+    const pageCount = categoriesResponse?.pagination?.totalPages ?? 0;
 
     const handleMutationSuccess = () => {
         toast({ title: `Category saved successfully.` });
@@ -139,8 +155,11 @@ export default function CategoryClient({ initialCategories }: CategoryClientProp
                     <DataTable
                         columns={categoryCols}
                         data={categories || []}
-                        filterColumn="name"
+                        pageCount={pageCount}
+                        pagination={pagination}
+                        setPagination={setPagination as React.Dispatch<React.SetStateAction<any>>}
                         globalFilter={globalFilter}
+                        setGlobalFilter={setGlobalFilter}
                         isLoading={isLoadingCategories}
                     />
                 </CardContent>

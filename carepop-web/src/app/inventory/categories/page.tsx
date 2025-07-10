@@ -5,7 +5,7 @@ import { getProductCategories } from '@/services/api';
 import CategoryClient from './_components/CategoryClient';
 
 export default async function CategoriesPage() {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
   const {
@@ -13,7 +13,8 @@ export default async function CategoriesPage() {
   } = await supabase.auth.getSession();
 
   // The API service function will handle the actual fetching
-  const { data: initialCategories } = await getProductCategories(session!.access_token);
+  const initialCategoriesResponse = await getProductCategories(session!.access_token, { page: 1, limit: 10 });
+  const initialCategories = initialCategoriesResponse.data;
 
   return (
     <div className="container mx-auto py-10">
