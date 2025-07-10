@@ -33,7 +33,7 @@ interface DataTableProps<TData, TValue> {
     pageIndex: number;
     pageSize: number;
   };
-  setPagination?: (updater: OnChangeFn<PaginationState>) => void;
+  setPagination?: OnChangeFn<PaginationState>;
   toolbarActions?: React.ReactNode;
 }
 
@@ -93,9 +93,9 @@ export function DataTable<TData, TValue>({
       <div className="rounded-md border">
         <Table>
           <TableHeader>
-            {Array.isArray(table.getHeaderGroups()) && table.getHeaderGroups().map((headerGroup) => (
+            {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {Array.isArray(headerGroup.headers) && headerGroup.headers.map((header) => {
+                {headerGroup.headers.map((header) => {
                   return <TableHead key={header.id}>{header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}</TableHead>;
                 })}
               </TableRow>
@@ -108,10 +108,10 @@ export function DataTable<TData, TValue>({
                   <Loader2 className="mx-auto h-8 w-8 animate-spin" />
                 </TableCell>
               </TableRow>
-            ) : Array.isArray(table.getRowModel().rows) && table.getRowModel().rows?.length ? (
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
-                  {Array.isArray(row.getVisibleCells()) && row.getVisibleCells().map((cell) => (
+                  {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
                   ))}
                 </TableRow>

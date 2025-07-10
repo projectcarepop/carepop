@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2 } from 'lucide-react';
 
 interface UsersClientProps {
   initialUsers: any; // Allow any for initial data to handle paginated response
@@ -26,6 +27,9 @@ interface UsersClientProps {
 export default function UsersClient({ initialUsers }: UsersClientProps) {
   const { session } = useAuth();
   const queryClient = useQueryClient();
+  
+  // Hydration state - only render DataTable after component mounts
+  const [isHydrated, setIsHydrated] = React.useState(false);
 
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [selectedUser, setSelectedUser] = React.useState<AdminUser | undefined>(undefined);
@@ -37,6 +41,11 @@ export default function UsersClient({ initialUsers }: UsersClientProps) {
     pageSize: 10,
   });
   const [debouncedFilter] = useDebounce(globalFilter, 500);
+
+  // Set hydrated state after component mounts
+  React.useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   const queryKey = ['adminUsers', pagination, debouncedFilter];
 
@@ -53,7 +62,7 @@ export default function UsersClient({ initialUsers }: UsersClientProps) {
       q: debouncedFilter || undefined,
     }),
     initialData: initialUsers,
-    enabled: !!session,
+    enabled: !!session && isHydrated, // Only fetch after hydration
   });
 
   const users = usersResponse?.data || [];
@@ -99,16 +108,23 @@ export default function UsersClient({ initialUsers }: UsersClientProps) {
         </CardDescription>
       </CardHeader>
       
-      <DataTable
-        columns={dynamicColumns}
-        data={users || []}
-        pageCount={pageCount}
-        pagination={pagination}
-        setPagination={setPagination as React.Dispatch<React.SetStateAction<any>>}
-        isLoading={isLoading}
-        globalFilter={globalFilter}
-        setGlobalFilter={setGlobalFilter}
-      />
+      {/* Show loading state during hydration to prevent mismatch */}
+      {!isHydrated ? (
+        <div className="flex items-center justify-center p-8">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      ) : (
+        <DataTable
+          columns={dynamicColumns}
+          data={users || []}
+          pageCount={pageCount}
+          pagination={pagination}
+          setPagination={setPagination as React.Dispatch<React.SetStateAction<any>>}
+          isLoading={isLoading}
+          globalFilter={globalFilter}
+          setGlobalFilter={setGlobalFilter}
+        />
+      )}
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-[425px]">
