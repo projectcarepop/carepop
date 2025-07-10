@@ -93,9 +93,9 @@ export function DataTable<TData, TValue>({
       <div className="rounded-md border">
         <Table>
           <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
+            {Array.isArray(table.getHeaderGroups()) && table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
+                {Array.isArray(headerGroup.headers) && headerGroup.headers.map((header) => {
                   return <TableHead key={header.id}>{header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}</TableHead>;
                 })}
               </TableRow>
@@ -108,10 +108,10 @@ export function DataTable<TData, TValue>({
                   <Loader2 className="mx-auto h-8 w-8 animate-spin" />
                 </TableCell>
               </TableRow>
-            ) : table.getRowModel().rows?.length ? (
+            ) : Array.isArray(table.getRowModel().rows) && table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
-                  {row.getVisibleCells().map((cell) => (
+                  {Array.isArray(row.getVisibleCells()) && row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
                   ))}
                 </TableRow>

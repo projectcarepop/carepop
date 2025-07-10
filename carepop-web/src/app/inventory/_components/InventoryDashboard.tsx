@@ -92,7 +92,7 @@ export function InventoryDashboard({ stats, isLoading }: InventoryDashboardProps
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {dashboardStats.map((stat) => (
+        {Array.isArray(dashboardStats) && dashboardStats.map((stat) => (
           <StatCard
             key={stat.title}
             title={stat.title}
@@ -151,7 +151,7 @@ export function InventoryDashboard({ stats, isLoading }: InventoryDashboardProps
                             nameKey="name"
                             label={(entry) => `${entry.name}: ${formatCurrency(entry.value)}`}
                         >
-                            {valueDistributionData.map((_entry, index) => (
+                            {Array.isArray(valueDistributionData) && valueDistributionData.map((_entry, index) => (
                                 <Cell key={`cell-${index}`} fill={valueChartColors[index % valueChartColors.length]} />
                             ))}
                         </Pie>

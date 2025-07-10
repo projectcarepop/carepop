@@ -454,7 +454,7 @@ export default function ProductsClient() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {itemBatches && itemBatches.length > 0 ? (
+                                {itemBatches && Array.isArray(itemBatches) && itemBatches.length > 0 ? (
                                     itemBatches.map((batch: InventoryItemBatch) => (
                                         <TableRow key={batch.id}>
                                             <TableCell>{batch.batchNumber || 'N/A'}</TableCell>

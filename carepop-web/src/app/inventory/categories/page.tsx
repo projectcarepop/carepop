@@ -12,13 +12,23 @@ export default async function CategoriesPage() {
     data: { session },
   } = await supabase.auth.getSession();
 
-  // The API service function will handle the actual fetching
-  const initialCategoriesResponse = await getProductCategories(session!.access_token, { page: 1, limit: 10 });
-  const initialCategories = initialCategoriesResponse.data;
+  // Handle missing session gracefully
+  let initialCategories: any[] = [];
+  
+  if (session?.access_token) {
+    try {
+      const initialCategoriesResponse = await getProductCategories(session.access_token, { page: 1, limit: 10 });
+      initialCategories = Array.isArray(initialCategoriesResponse?.data) ? initialCategoriesResponse.data : [];
+    } catch (error) {
+      console.error('Failed to fetch initial categories on server:', error);
+      // Categories will be loaded client-side instead
+      initialCategories = [];
+    }
+  }
 
   return (
     <div className="container mx-auto py-10">
-      <CategoryClient initialCategories={initialCategories || []} />
+      <CategoryClient initialCategories={initialCategories} />
     </div>
   );
 } 

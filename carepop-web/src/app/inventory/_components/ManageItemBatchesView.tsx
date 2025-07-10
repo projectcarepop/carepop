@@ -145,7 +145,7 @@ export function ManageItemBatchesView({ item, onDeleteBatch, onMutationSuccess }
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {batches.map((batch: InventoryItemBatch) => (
+                        {Array.isArray(batches) && batches.map((batch: InventoryItemBatch) => (
                             <TableRow key={batch.id}>
                             <TableCell>{batch.quantity}</TableCell>
                             <TableCell>{batch.batchNumber || 'N/A'}</TableCell>
