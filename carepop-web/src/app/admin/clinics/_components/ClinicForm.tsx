@@ -18,6 +18,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
+import { MultiSelect } from '@/components/ui/multi-select';
+import { Service } from '@/lib/types';
 
 const formSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
@@ -29,18 +31,21 @@ const formSchema = z.object({
   latitude: z.coerce.number().min(-90, 'Invalid Latitude').max(90, 'Invalid Latitude'),
   longitude: z.coerce.number().min(-180, 'Invalid Longitude').max(180, 'Invalid Longitude'),
   isActive: z.boolean(),
+  serviceIds: z.array(z.string()).optional(),
 });
 
 type ClinicFormValues = z.infer<typeof formSchema>;
 
 interface ClinicFormProps {
   initialData?: any;
+  allServices: Service[];
   onSubmit: (values: ClinicFormValues) => void;
   isPending: boolean;
 }
 
 export function ClinicForm({
   initialData,
+  allServices,
   onSubmit,
   isPending: isSubmitting,
 }: ClinicFormProps) {
@@ -56,8 +61,14 @@ export function ClinicForm({
       latitude: initialData?.latitude || 0,
       longitude: initialData?.longitude || 0,
       isActive: initialData?.isActive ?? true,
+      serviceIds: initialData?.services?.map((s: any) => s.serviceId) || [],
     },
   });
+
+  const serviceOptions = allServices.map(service => ({
+    value: service.id,
+    label: service.name,
+  }));
 
   const handleFormSubmit = (values: ClinicFormValues) => {
     onSubmit(values);
@@ -206,6 +217,22 @@ export function ClinicForm({
             )}
           />
         </div>
+         <FormField
+          control={form.control}
+          name="serviceIds"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Services Offered</FormLabel>
+                <MultiSelect
+                    options={serviceOptions}
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                    placeholder="Select services..."
+                />
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <FormField
           control={form.control}
           name="isActive"

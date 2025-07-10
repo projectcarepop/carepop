@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { PlusCircle } from 'lucide-react';
 
-import { getAdminClinics, upsertClinic } from '@/services/api';
+import { getAdminClinics, upsertClinic, getAdminServices } from '@/services/api';
 import { DataTable } from '@/components/ui/data-table';
 import { type Clinic } from '@/lib/types';
 import { columns } from './columns';
@@ -60,7 +60,7 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
 
   const {
     data,
-    isLoading,
+    isLoading: isLoadingClinics,
     isError,
     error,
   } = useQuery({
@@ -74,8 +74,17 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
     enabled: !!session,
   });
 
+  const { data: servicesData, isLoading: isLoadingServices } = useQuery({
+    queryKey: ['adminServices'],
+    queryFn: () => getAdminServices(session!.access_token),
+    enabled: !!session,
+  });
+
+  const allServices = servicesData?.data || [];
+
   const clinics = data?.data || [];
   const pageCount = data?.pagination?.totalPages ?? 0;
+  const isLoading = isLoadingClinics || isLoadingServices;
 
   const upsertMutation = useMutation({
     mutationFn: (clinicData: Partial<Clinic>) => {
@@ -183,6 +192,7 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
           </DialogHeader>
           <ClinicForm
             initialData={selectedClinic}
+            allServices={allServices}
             onSubmit={(values) => {
               const payload = {
                 ...values,

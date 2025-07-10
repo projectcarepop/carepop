@@ -3,7 +3,7 @@ import { type ProfileFormData } from '@/lib/validation/profile-schema';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { type InventoryItem, type ProductCategory } from '@/lib/types/inventory';
-import type { Doctor } from "@/lib/types";
+import type { Clinic, Doctor } from "@/lib/types";
 
 // Temporary Type Definitions - TODO: Move to a dedicated types/bookings.ts file
 export type ClinicOverride = {
@@ -457,17 +457,46 @@ export async function upsertDoctor(
   return response.json();
 }
 
-export async function upsertClinic(clinicData: any, accessToken: string, clinicId?: string) {
-    const headers = await getAuthHeaders(accessToken);
-    const url = clinicId ? `${API_BASE_URL}/api/admin/clinics/${clinicId}` : `${API_BASE_URL}/api/admin/clinics`;
-    const method = clinicId ? 'PUT' : 'POST';
+export async function upsertClinic(clinicData: Partial<Clinic & { serviceIds?: string[] }>, accessToken: string, clinicId?: string) {
+  const { serviceIds, ...clinicPayload } = clinicData;
+  const url = clinicId ? `${API_BASE_URL}/api/admin/clinics/${clinicId}` : `${API_BASE_URL}/api/admin/clinics`;
+  const method = clinicId ? 'PUT' : 'POST';
+  const headers = await getAuthHeaders(accessToken);
 
-    const response = await fetch(url, { method, headers, body: JSON.stringify(clinicData) });
+  try {
+    const response = await fetch(url, {
+      method,
+      headers,
+      body: JSON.stringify(clinicPayload),
+    });
+
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Failed to save clinic.'}));
-        throw new Error(error.message);
+      const error = await response.json().catch(() => ({ message: `Failed to save clinic details: ${response.statusText}`}));
+      throw new Error(error.message);
     }
-    return response.json();
+
+    const savedClinic = await response.json();
+    const newClinicId = savedClinic.id;
+
+    if (serviceIds) {
+      const assignServicesResponse = await fetch(`${API_BASE_URL}/api/admin/clinics/${newClinicId}/services`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ serviceIds }),
+      });
+
+      if (!assignServicesResponse.ok) {
+        const error = await assignServicesResponse.json().catch(() => ({ message: 'Failed to assign services to the clinic.'}));
+        throw new Error(error.message);
+      }
+    }
+    
+    return savedClinic;
+
+  } catch (error: any) {
+    console.error("Error in upsertClinic:", error);
+    throw error;
+  }
 }
 
 // --- START: Inventory and Product Category Management ---
