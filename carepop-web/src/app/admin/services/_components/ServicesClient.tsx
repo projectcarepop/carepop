@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { PlusCircle } from 'lucide-react';
 import { getAdminServices, upsertService, getAdminServiceCategories, upsertServiceCategory, deleteService, deleteServiceCategory } from '@/services/api';
+import { useDebounce } from 'use-debounce';
 import { DataTable } from '@/components/ui/data-table';
 import { type AdminService, type ServiceCategory } from '@/lib/types';
 import { columns as serviceColumns } from './columns-service';
@@ -19,8 +20,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface ServicesClientProps {
-  initialServices: AdminService[];
-  initialCategories: ServiceCategory[];
+  initialServices: any; // Allow any for initial data to handle paginated response
+  initialCategories: any; // Allow any for initial data to handle paginated response
 }
 
 export default function ServicesClient({ initialServices, initialCategories }: ServicesClientProps) {
@@ -36,10 +37,48 @@ export default function ServicesClient({ initialServices, initialCategories }: S
   const [selectedService, setSelectedService] = React.useState<AdminService | undefined>(undefined);
   const [selectedCategory, setSelectedCategory] = React.useState<ServiceCategory | undefined>(undefined);
   const [globalFilter, setGlobalFilter] = React.useState('');
+  
+  // Server-side filtering and pagination state
+  const [servicesPagination, setServicesPagination] = React.useState({
+    pageIndex: 0,
+    pageSize: 10,
+  });
+  const [categoriesPagination, setCategoriesPagination] = React.useState({
+    pageIndex: 0,
+    pageSize: 10,
+  });
+  const [debouncedFilter] = useDebounce(globalFilter, 500);
 
   // Queries
-  const { data: services, isError: isErrorServices } = useQuery({ queryKey: ['adminServices'], queryFn: () => getAdminServices(session!.access_token), initialData: initialServices, enabled: !!session });
-  const { data: categories, isError: isErrorCategories } = useQuery({ queryKey: ['adminServiceCategories'], queryFn: () => getAdminServiceCategories(session!.access_token), initialData: initialCategories, enabled: !!session });
+  const servicesQueryKey = ['adminServices', servicesPagination, debouncedFilter];
+  const categoriesQueryKey = ['adminServiceCategories', categoriesPagination, debouncedFilter];
+
+  const { data: servicesResponse, isError: isErrorServices } = useQuery({ 
+    queryKey: servicesQueryKey, 
+    queryFn: () => getAdminServices(session!.access_token, {
+      page: servicesPagination.pageIndex + 1,
+      limit: servicesPagination.pageSize,
+      q: debouncedFilter || undefined,
+    }), 
+    initialData: initialServices, 
+    enabled: !!session 
+  });
+  
+  const { data: categoriesResponse, isError: isErrorCategories } = useQuery({ 
+    queryKey: categoriesQueryKey, 
+    queryFn: () => getAdminServiceCategories(session!.access_token, {
+      page: categoriesPagination.pageIndex + 1,
+      limit: categoriesPagination.pageSize,
+      q: debouncedFilter || undefined,
+    }), 
+    initialData: initialCategories, 
+    enabled: !!session 
+  });
+
+  const services = servicesResponse?.data || [];
+  const servicesPageCount = servicesResponse?.pagination?.totalPages ?? 0;
+  const categories = categoriesResponse?.data || [];
+  const categoriesPageCount = categoriesResponse?.pagination?.totalPages ?? 0;
 
   // UPSERT Mutations
   const serviceMutation = useMutation({
@@ -121,6 +160,9 @@ export default function ServicesClient({ initialServices, initialCategories }: S
           <DataTable 
             columns={serviceColumns({ onEdit: handleEditService, onDelete: handleDeleteService })} 
             data={services || []} 
+            pageCount={servicesPageCount}
+            pagination={servicesPagination}
+            setPagination={setServicesPagination as React.Dispatch<React.SetStateAction<any>>}
             globalFilter={globalFilter} 
             setGlobalFilter={setGlobalFilter}
             toolbarActions={
@@ -132,6 +174,9 @@ export default function ServicesClient({ initialServices, initialCategories }: S
           <DataTable 
             columns={categoryColumns({ onEdit: handleEditCategory, onDelete: handleDeleteCategory })} 
             data={categories || []} 
+            pageCount={categoriesPageCount}
+            pagination={categoriesPagination}
+            setPagination={setCategoriesPagination as React.Dispatch<React.SetStateAction<any>>}
             globalFilter={globalFilter} 
             setGlobalFilter={setGlobalFilter}
             toolbarActions={

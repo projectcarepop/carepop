@@ -23,8 +23,8 @@ export default async function AdminDoctorsPage() {
   }
 
   try {
-    const doctorsResponse = await getAdminDoctors(session.access_token);
-    return <DoctorsClient initialDoctors={doctorsResponse.data || []} />;
+    const doctorsResponse = await getAdminDoctors(session.access_token, { limit: 10 });
+    return <DoctorsClient initialDoctors={doctorsResponse} />;
   } catch (error: any) {
     console.error(`[AdminDoctorsPage] Error fetching doctors:`, error);
     if (error.message.includes('Forbidden') || error.message.includes('Unauthorized')) {

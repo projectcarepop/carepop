@@ -23,8 +23,8 @@ export default async function AdminServicesPage() {
   try {
     // Fetch both sets of data in parallel for efficiency.
     const [services, categories] = await Promise.all([
-      getAdminServices(session.access_token),
-      getAdminServiceCategories(session.access_token)
+      getAdminServices(session.access_token, { limit: 10 }),
+      getAdminServiceCategories(session.access_token, { limit: 10 })
     ]);
     
     return <ServicesClient initialServices={services} initialCategories={categories} />;

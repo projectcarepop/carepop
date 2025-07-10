@@ -359,12 +359,20 @@ export async function getAdminClinicsList(accessToken: string) {
     return result.data || [];
 }
 
-export async function getAdminDoctors(accessToken: string, clinicId?: string) {
+export async function getAdminDoctors(
+    accessToken: string, 
+    params: { page?: number; limit?: number; clinicId?: string; q?: string } = {}
+) {
     const headers = await getAuthHeaders(accessToken);
     const url = new URL(`${API_BASE_URL}/api/admin/doctors`);
-    if (clinicId && clinicId !== 'all') {
-        url.searchParams.set('clinicId', clinicId);
+    
+    if (params.page) url.searchParams.set('page', String(params.page));
+    if (params.limit) url.searchParams.set('limit', String(params.limit));
+    if (params.clinicId && params.clinicId !== 'all') {
+        url.searchParams.set('clinicId', params.clinicId);
     }
+    if (params.q) url.searchParams.set('q', params.q);
+    
     const response = await fetch(url.toString(), { headers, cache: 'no-store' });
 
     if (!response.ok) {
@@ -374,20 +382,36 @@ export async function getAdminDoctors(accessToken: string, clinicId?: string) {
     return response.json();
 }
 
-export async function getAdminServiceCategories(accessToken: string) {
+export async function getAdminServiceCategories(
+    accessToken: string, 
+    params: { page?: number; limit?: number; q?: string } = {}
+) {
     const headers = await getAuthHeaders(accessToken);
-    const response = await fetch(`${API_BASE_URL}/api/admin/service-categories`, { headers });
+    const url = new URL(`${API_BASE_URL}/api/admin/service-categories`);
+    
+    if (params.page) url.searchParams.set('page', String(params.page));
+    if (params.limit) url.searchParams.set('limit', String(params.limit));
+    if (params.q) url.searchParams.set('q', params.q);
+    
+    const response = await fetch(url.toString(), { headers });
     if (!response.ok) throw new Error("Failed to fetch service categories");
-    const result = await response.json();
-    return result.data || [];
+    return response.json();
 }
 
-export async function getAdminServices(accessToken: string) {
+export async function getAdminServices(
+    accessToken: string, 
+    params: { page?: number; limit?: number; q?: string } = {}
+) {
     const headers = await getAuthHeaders(accessToken);
-    const response = await fetch(`${API_BASE_URL}/api/admin/services`, { headers });
+    const url = new URL(`${API_BASE_URL}/api/admin/services`);
+    
+    if (params.page) url.searchParams.set('page', String(params.page));
+    if (params.limit) url.searchParams.set('limit', String(params.limit));
+    if (params.q) url.searchParams.set('q', params.q);
+    
+    const response = await fetch(url.toString(), { headers });
     if (!response.ok) throw new Error("Failed to fetch services");
-    const result = await response.json();
-    return result.data || [];
+    return response.json();
 }
 
 export async function deleteService(serviceId: string, accessToken: string) {
@@ -856,15 +880,24 @@ export async function getAdminDashboardMetrics(cookieStore: ReturnType<typeof co
   }
 }
 
-export async function getAdminUsers(accessToken: string): Promise<AdminUser[]> {
+export async function getAdminUsers(
+    accessToken: string, 
+    params: { page?: number; limit?: number; q?: string; role?: string } = {}
+) {
     const headers = await getAuthHeaders(accessToken);
-    const response = await fetch(`${API_BASE_URL}/api/admin/users`, { headers });
+    const url = new URL(`${API_BASE_URL}/api/admin/users`);
+    
+    if (params.page) url.searchParams.set('page', String(params.page));
+    if (params.limit) url.searchParams.set('limit', String(params.limit));
+    if (params.q) url.searchParams.set('q', params.q);
+    if (params.role) url.searchParams.set('role', params.role);
+    
+    const response = await fetch(url.toString(), { headers });
     if (!response.ok) {
         const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
         throw new Error(error.message || 'Failed to fetch users.');
     }
-    const result = await response.json();
-    return result.data || [];
+    return response.json();
 }
 
 export async function updateUserRole(

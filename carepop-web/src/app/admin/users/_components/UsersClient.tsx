@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 
 import { getAdminUsers, updateUserRole } from '@/services/api';
+import { useDebounce } from 'use-debounce';
 import { DataTable } from '@/components/ui/data-table';
 import { type AdminUser } from '@/services/api';
 import { columns } from './columns';
@@ -19,7 +20,7 @@ import {
 import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface UsersClientProps {
-  initialUsers: AdminUser[];
+  initialUsers: any; // Allow any for initial data to handle paginated response
 }
 
 export default function UsersClient({ initialUsers }: UsersClientProps) {
@@ -29,18 +30,34 @@ export default function UsersClient({ initialUsers }: UsersClientProps) {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [selectedUser, setSelectedUser] = React.useState<AdminUser | undefined>(undefined);
   const [globalFilter, setGlobalFilter] = React.useState('');
+  
+  // Server-side filtering and pagination state
+  const [pagination, setPagination] = React.useState({
+    pageIndex: 0,
+    pageSize: 10,
+  });
+  const [debouncedFilter] = useDebounce(globalFilter, 500);
+
+  const queryKey = ['adminUsers', pagination, debouncedFilter];
 
   const {
-    data: users,
+    data: usersResponse,
     isLoading,
     isError,
     error,
   } = useQuery({
-    queryKey: ['adminUsers'],
-    queryFn: () => getAdminUsers(session!.access_token),
+    queryKey,
+    queryFn: () => getAdminUsers(session!.access_token, {
+      page: pagination.pageIndex + 1,
+      limit: pagination.pageSize,
+      q: debouncedFilter || undefined,
+    }),
     initialData: initialUsers,
     enabled: !!session,
   });
+
+  const users = usersResponse?.data || [];
+  const pageCount = usersResponse?.pagination?.totalPages ?? 0;
 
   const updateRoleMutation = useMutation({
     mutationFn: (data: { userId: string; role: 'patient' | 'admin' }) => {
@@ -85,6 +102,9 @@ export default function UsersClient({ initialUsers }: UsersClientProps) {
       <DataTable
         columns={dynamicColumns}
         data={users || []}
+        pageCount={pageCount}
+        pagination={pagination}
+        setPagination={setPagination as React.Dispatch<React.SetStateAction<any>>}
         isLoading={isLoading}
         globalFilter={globalFilter}
         setGlobalFilter={setGlobalFilter}

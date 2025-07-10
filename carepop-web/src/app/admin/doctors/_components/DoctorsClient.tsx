@@ -6,6 +6,7 @@ import { toast } from '@/hooks/use-toast';
 import { PlusCircle } from 'lucide-react';
 
 import { getAdminDoctors, upsertDoctor, deleteDoctor, getAdminClinicsList } from '@/services/api';
+import { useDebounce } from 'use-debounce';
 import { DataTable } from '@/components/ui/data-table';
 import { type Doctor } from '@/lib/types';
 import { columns } from './columns';
@@ -34,7 +35,7 @@ import { Clinic } from '@/lib/types/bookings';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface DoctorsClientProps {
-  initialDoctors: (Doctor & { doctorClinics?: { clinicId: string }[] })[];
+  initialDoctors: any; // Allow any for initial data to handle paginated response
 }
 
 export default function DoctorsClient({ initialDoctors }: DoctorsClientProps) {
@@ -48,6 +49,13 @@ export default function DoctorsClient({ initialDoctors }: DoctorsClientProps) {
   const [doctorToDelete, setDoctorToDelete] = React.useState<Doctor | undefined>(undefined);
   const [globalFilter, setGlobalFilter] = React.useState('');
   const [selectedClinic, setSelectedClinic] = React.useState('all');
+  
+  // Server-side filtering and pagination state
+  const [pagination, setPagination] = React.useState({
+    pageIndex: 0,
+    pageSize: 10,
+  });
+  const [debouncedFilter] = useDebounce(globalFilter, 500);
 
   const { data: clinicsList } = useQuery({
     queryKey: ['adminClinicsList'],
@@ -55,19 +63,27 @@ export default function DoctorsClient({ initialDoctors }: DoctorsClientProps) {
     enabled: !!session,
   });
 
+  const queryKey = ['adminDoctors', pagination, debouncedFilter, selectedClinic];
+
   const {
     data: doctorsResponse,
     isLoading,
     isError,
     error,
   } = useQuery({
-    queryKey: ['adminDoctors', selectedClinic],
-    queryFn: () => getAdminDoctors(session!.access_token, selectedClinic),
-    initialData: { data: initialDoctors },
+    queryKey,
+    queryFn: () => getAdminDoctors(session!.access_token, {
+      page: pagination.pageIndex + 1,
+      limit: pagination.pageSize,
+      q: debouncedFilter || undefined,
+      clinicId: selectedClinic !== 'all' ? selectedClinic : undefined,
+    }),
+    initialData: initialDoctors,
     enabled: !!session,
   });
 
   const doctors = doctorsResponse?.data || [];
+  const pageCount = doctorsResponse?.pagination?.totalPages ?? 0;
 
   const upsertMutation = useMutation({
     mutationFn: (doctorData: Partial<Doctor & { clinicIds?: string[] }>) => {
@@ -146,6 +162,9 @@ export default function DoctorsClient({ initialDoctors }: DoctorsClientProps) {
       <DataTable
         columns={dynamicColumns}
         data={doctors}
+        pageCount={pageCount}
+        pagination={pagination}
+        setPagination={setPagination as React.Dispatch<React.SetStateAction<any>>}
         globalFilter={globalFilter}
         setGlobalFilter={setGlobalFilter}
         isLoading={isLoading}

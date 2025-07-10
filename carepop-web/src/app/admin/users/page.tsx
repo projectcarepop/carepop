@@ -21,7 +21,7 @@ export default async function AdminUsersPage() {
   }
 
   try {
-    const users = await getAdminUsers(session.access_token);
+    const users = await getAdminUsers(session.access_token, { limit: 10 });
     return <UsersClient initialUsers={users} />;
   } catch (error: any) {
     console.error(`[AdminUsersPage] Error fetching users:`, error);
