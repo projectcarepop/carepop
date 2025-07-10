@@ -476,10 +476,10 @@ export async function upsertClinic(clinicData: Partial<Clinic & { serviceIds?: s
     }
 
     const savedClinic = await response.json();
-    const newClinicId = savedClinic.id;
+    const clinicIdForServices = clinicId || savedClinic.id;
 
-    if (serviceIds) {
-      const assignServicesResponse = await fetch(`${API_BASE_URL}/api/admin/clinics/${newClinicId}/services`, {
+    if (serviceIds && clinicIdForServices) {
+      const assignServicesResponse = await fetch(`${API_BASE_URL}/api/admin/clinics/${clinicIdForServices}/services`, {
         method: 'PUT',
         headers,
         body: JSON.stringify({ serviceIds }),
