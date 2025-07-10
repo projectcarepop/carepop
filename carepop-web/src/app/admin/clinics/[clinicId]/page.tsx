@@ -20,6 +20,15 @@ export default async function ClinicManagementPage({ params }: { params: { clini
 
   try {
     const context = await getClinicManagementContext(params.clinicId, session.access_token);
+    
+    // Debug: Log the returned context
+    console.log('=== SERVER-SIDE: getClinicManagementContext returned ===');
+    console.log('context keys:', Object.keys(context || {}));
+    console.log('context.clinic exists:', !!context?.clinic);
+    console.log('context.allServices length:', context?.allServices?.length || 'undefined');
+    console.log('context.allDoctors length:', context?.allDoctors?.length || 'undefined');
+    console.log('context.clinic.services length:', context?.clinic?.services?.length || 'undefined');
+    console.log('context.clinic.doctors length:', context?.clinic?.doctors?.length || 'undefined');
 
     if (!context || !context.clinic) {
       return (

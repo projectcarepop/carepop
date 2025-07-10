@@ -426,56 +426,8 @@ adminRoutes
     return c.json({ data: deactivatedClinic, message: 'Clinic has been deactivated.' });
   });
 
-adminRoutes.get(
-    '/clinics/:id/management-context',
-    zValidator('param', z.object({ id: z.string().uuid() })),
-    async (c) => {
-        const { id: clinicId } = c.req.valid('param');
-
-        // 1. Fetch clinic details
-        const clinicDetails = await db.query.clinics.findFirst({
-            where: eq(clinics.id, clinicId)
-        });
-
-        if (!clinicDetails) {
-            return c.json({ error: 'Clinic not found' }, 404);
-        }
-
-        // 2. Fetch services assigned to this clinic
-        const clinicServicesResult = await db.query.clinicServices.findMany({
-            where: eq(clinicServices.clinicId, clinicId),
-            with: {
-                service: true
-            }
-        });
-        const assignedServices = clinicServicesResult.map(cs => cs.service).filter(Boolean);
-
-        // 3. Fetch doctors assigned to this clinic
-        const doctorClinicsResult = await db.query.doctorClinics.findMany({
-            where: eq(doctorClinics.clinicId, clinicId),
-            with: {
-                doctor: true
-            }
-        });
-        const assignedDoctors = doctorClinicsResult.map(dc => dc.doctor);
-
-        // 4. Fetch the existing doctor-service assignments for this clinic
-        const doctorServiceAssignments = await db.query.doctorClinicServices.findMany({
-            where: eq(doctorClinicServices.clinicId, clinicId),
-            columns: {
-                doctorId: true,
-                serviceId: true
-            }
-        });
-
-        return c.json({
-            clinic: clinicDetails,
-            assignedServices,
-            assignedDoctors,
-            doctorServiceAssignments
-        });
-    }
-);
+// REMOVED DUPLICATE ENDPOINT: The correct management-context endpoint is defined later
+// This was causing the wrong data structure to be returned (missing allServices and allDoctors)
 
 const doctorAssignmentsSchema = z.object({
     assignments: z.array(z.object({
