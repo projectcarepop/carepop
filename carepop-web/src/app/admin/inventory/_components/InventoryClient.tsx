@@ -25,7 +25,7 @@ export default function InventoryClient() {
         return getInventoryStats(selectedClinicId, accessToken);
     },
     enabled: !!accessToken && !!selectedClinicId,
-    select: (data) => data.data,
+    select: (data) => data?.data || null,
   });
 
   const { data: clinicsResponse, isLoading: isLoadingClinics } = useQuery({
@@ -71,7 +71,10 @@ export default function InventoryClient() {
             </CardContent>
         </Card>
       ) : (
-        <InventoryDashboard stats={inventoryStats} isLoading={isLoadingStats} />
+        <InventoryDashboard 
+          stats={inventoryStats || undefined} 
+          isLoading={isLoadingStats} 
+        />
       )}
     </div>
   );

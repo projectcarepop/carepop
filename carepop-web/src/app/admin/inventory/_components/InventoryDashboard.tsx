@@ -6,7 +6,9 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import React from 'react';
 
 // Custom Peso Icon Component
-const PesoSign = () => <span className="font-bold">₱</span>;
+const PesoSign = ({ className }: { className?: string }) => (
+  <span className={`font-bold ${className || ''}`}>₱</span>
+);
 
 export type InventoryStats = {
   totalProducts: number;
@@ -51,21 +53,39 @@ const StatCard = ({ title, value, icon: Icon, description, isLoading, iconColor 
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-4 w-4" style={{ color: iconColor }} />
+        <Icon className={`h-4 w-4 ${getIconColorClass(iconColor)}`} />
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
+        <div className="text-2xl font-bold">{String(value)}</div>
         {description && <p className="text-xs text-muted-foreground">{description}</p>}
       </CardContent>
     </Card>
   );
 };
 
+// Helper function to convert iconColor to CSS class
+const getIconColorClass = (iconColor?: string) => {
+  if (!iconColor) return 'text-muted-foreground';
+  
+  if (iconColor.includes('--primary')) return 'text-primary';
+  if (iconColor.includes('--secondary')) return 'text-secondary';
+  if (iconColor.includes('--warning')) return 'text-yellow-500';
+  if (iconColor.includes('--destructive')) return 'text-red-500';
+  if (iconColor.includes('--info')) return 'text-blue-500';
+  if (iconColor.includes('--success')) return 'text-green-500';
+  
+  return 'text-muted-foreground';
+};
+
 
 export function InventoryDashboard({ stats, isLoading }: InventoryDashboardProps) {
   const formatCurrency = (amount: number | undefined) => {
-    if (amount === undefined || amount === null) return '₱0.00';
-    return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(amount);
+    if (amount === undefined || amount === null || isNaN(amount)) return '₱0.00';
+    try {
+      return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(amount);
+    } catch {
+      return '₱0.00';
+    }
   };
 
   const dashboardStats: Omit<StatCardProps, 'isLoading'>[] = [
@@ -73,8 +93,8 @@ export function InventoryDashboard({ stats, isLoading }: InventoryDashboardProps
     { title: "Total Units", value: stats?.totalQuantity ?? 0, icon: Archive, description: "Total quantity of all items", iconColor: "hsl(var(--secondary))" },
     { title: "Low Stock Items", value: stats?.lowStockCount ?? 0, icon: TrendingDown, description: "Items at or below reorder level", iconColor: "hsl(var(--warning))" },
     { title: "Expiring Soon", value: stats?.expiringSoonCount ?? 0, icon: AlertTriangle, description: "Items expiring in next 30 days", iconColor: "hsl(var(--destructive))" },
-    { title: "Total Purchase Value", value: formatCurrency(stats?.totalPurchaseValue), icon: PesoSign, description: "Based on purchase price", iconColor: "hsl(var(--info))" },
-    { title: "Total Selling Value", value: formatCurrency(stats?.totalSellingValue), icon: PesoSign, description: "Potential revenue", iconColor: "hsl(var(--success))" },
+    { title: "Total Purchase Value", value: formatCurrency(stats?.totalPurchaseValue) || '₱0.00', icon: PesoSign, description: "Based on purchase price", iconColor: "hsl(var(--info))" },
+    { title: "Total Selling Value", value: formatCurrency(stats?.totalSellingValue) || '₱0.00', icon: PesoSign, description: "Potential revenue", iconColor: "hsl(var(--success))" },
   ];
 
   const valueDistributionData = [
@@ -149,7 +169,7 @@ export function InventoryDashboard({ stats, isLoading }: InventoryDashboardProps
                             fill="#8884d8"
                             dataKey="value"
                             nameKey="name"
-                            label={(entry) => `${entry.name}: ${formatCurrency(entry.value)}`}
+                            label={(entry) => `${String(entry.name)}: ${formatCurrency(Number(entry.value))}`}
                         >
                             {Array.isArray(valueDistributionData) && valueDistributionData.map((_entry, index) => (
                                 <Cell key={`cell-${index}`} fill={valueChartColors[index % valueChartColors.length]} />
