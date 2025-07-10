@@ -80,6 +80,14 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
     enabled: !!session,
   });
 
+  // --- START OF DIAGNOSTIC LOGGING ---
+  React.useEffect(() => {
+    console.log('[ClinicsClient] Raw data from useQuery for services:', servicesData);
+    const services = servicesData?.data || [];
+    console.log('[ClinicsClient] Processed `allServices` prop:', services);
+  }, [servicesData]);
+  // --- END OF DIAGNOSTIC LOGGING ---
+
   const allServices = servicesData?.data || [];
 
   const clinics = data?.data || [];
