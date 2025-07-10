@@ -315,11 +315,10 @@ export const usersInAuthRelations = relations(usersInAuth, ({ one }) => ({
 }));
 
 export const clinicsRelations = relations(clinics, ({ many }) => ({
+	services: many(clinicServices),
+	doctors: many(doctorClinics),
 	appointments: many(appointments),
 	inventoryItems: many(inventory_items),
-	clinicServices: many(clinicServices),
-	doctorClinics: many(doctorClinics),
-    clinicOverrides: many(clinicOverrides),
 }));
 
 export const doctorsRelations = relations(doctors, ({ many }) => ({
@@ -511,6 +510,11 @@ export const userProfilesRelations = relations(profiles, ({ many, one }) => ({
         fields: [profiles.id],
         references: [usersInAuth.id]
     })
+}));
+
+export const clinicServicesRelations = relations(clinicServices, ({ one }) => ({
+	clinic: one(clinics, { fields: [clinicServices.clinicId], references: [clinics.id] }),
+	service: one(services, { fields: [clinicServices.serviceId], references: [services.id] }),
 }));
 
 export const doctorClinicsRelations = relations(doctorClinics, ({ one }) => ({

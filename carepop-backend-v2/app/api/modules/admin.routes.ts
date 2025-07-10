@@ -2215,6 +2215,75 @@ adminRoutes.get(
   }
 );
 
+// This is the new endpoint to fetch all data needed for the clinic management page
+adminRoutes.get('/clinics/:id/management-context', async (c) => {
+    const { id } = c.req.param();
+
+    try {
+        const clinicQuery = db.query.clinics.findFirst({
+            where: eq(clinics.id, id),
+            with: {
+                services: { with: { service: true } },
+                doctors: { with: { doctor: true } },
+            }
+        });
+
+        const allServicesQuery = db.query.services.findMany();
+        const allDoctorsQuery = db.query.doctors.findMany();
+
+        const [clinic, allServices, allDoctors] = await Promise.all([
+            clinicQuery,
+            allServicesQuery,
+            allDoctorsQuery,
+        ]);
+
+        if (!clinic) {
+            return c.json({ error: 'Clinic not found' }, 404);
+        }
+
+        // We need to shape the data correctly for the frontend.
+        const context = {
+            clinic: {
+                ...clinic,
+                assignedServiceIds: clinic.services.map(cs => cs.service.id),
+                assignedDoctorIds: clinic.doctors.map(cd => cd.doctor.id),
+            },
+            allServices,
+            allDoctors,
+        };
+        
+        return c.json(context);
+
+    } catch (error: any) {
+        console.error(`Failed to get management context for clinic ${id}:`, error);
+        return c.json({ error: 'Internal Server Error', message: error.message }, 500);
+    }
+});
+
+adminRoutes.get('/doctors', async (c) => {
+    const { clinic_id } = c.req.query();
+
+    const allDoctors = await db.query.doctors.findMany({
+      orderBy: [asc(doctors.fullName)],
+      with: {
+        doctorClinics: {
+          columns: {
+            clinicId: true,
+          },
+        },
+      },
+    });
+
+    if (clinic_id) {
+      const filtered = allDoctors.filter(d =>
+        d.doctorClinics.some(dc => dc.clinicId === clinic_id)
+      );
+      return c.json({ data: filtered });
+    }
+
+    return c.json({ data: allDoctors });
+  });
+
 // Add other admin routes here in the future...
 
 export default adminRoutes;
