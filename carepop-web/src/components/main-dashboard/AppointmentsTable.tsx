@@ -25,7 +25,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { cancelAppointment } from '@/services/api';
+import { cancelMyAppointment } from '@/services/api';
 import type { Appointment, AppointmentWithRelations } from "@/lib/types";
 import { useAuth } from '@/lib/contexts/auth-context';
 
@@ -74,7 +74,7 @@ export function AppointmentsTable({ appointments }: AppointmentsTableProps) {
       if (!session?.access_token) {
         throw new Error("You must be logged in to cancel an appointment.");
       }
-      return cancelAppointment(appointmentId, session.access_token);
+      return cancelMyAppointment(appointmentId, session.access_token);
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Your appointment has been canceled." });
