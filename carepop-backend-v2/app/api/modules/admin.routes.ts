@@ -2548,38 +2548,73 @@ adminRoutes.get('/users', zValidator('query', adminUsersQuerySchema), async (c) 
 
         let filteredUsers = usersResponse?.users || [];
 
-        // Filter by role if specified
+        // Filter by role if specified (from Supabase Auth app_metadata)
         if (role) {
             filteredUsers = filteredUsers.filter(user => user.app_metadata?.role === role);
         }
 
-        // Filter by search query if provided
+        // Get user IDs to fetch profile data
+        const userIds = filteredUsers.map(user => user.id);
+
+        // Fetch profile data from database for these users
+        let userProfiles: any[] = [];
+        if (userIds.length > 0) {
+            try {
+                userProfiles = await db
+                    .select()
+                    .from(profiles)
+                    .where(inArray(profiles.id, userIds))
+                    .orderBy(asc(profiles.firstName), asc(profiles.lastName));
+            } catch (dbError) {
+                console.log('Error fetching user profiles:', dbError);
+                // Continue without profile data if database query fails
+                userProfiles = [];
+            }
+        }
+
+        // Create a map for quick profile lookup
+        const profileMap = new Map(userProfiles.map(profile => [profile.id, profile]));
+
+        // Transform users to match frontend expectations
+        const transformedUsers = filteredUsers.map(user => {
+            const profile = profileMap.get(user.id);
+            
+            // Construct full name from first_name and last_name
+            let fullName = null;
+            if (profile?.firstName || profile?.lastName) {
+                const firstName = profile?.firstName || '';
+                const lastName = profile?.lastName || '';
+                fullName = `${firstName} ${lastName}`.trim() || null;
+            }
+
+            return {
+                id: user.id,
+                email: user.email,
+                role: user.app_metadata?.role || profile?.role || 'patient',
+                fullName: fullName,
+                createdAt: user.created_at,
+                lastSignIn: user.last_sign_in_at,
+                emailConfirmed: !!user.email_confirmed_at,
+            };
+        });
+
+        // Apply search filter after transformation (so we can search full names)
+        let finalUsers = transformedUsers;
         if (q) {
             const searchTerm = q.toLowerCase();
-            filteredUsers = filteredUsers.filter(user => 
+            finalUsers = transformedUsers.filter(user => 
                 user.email?.toLowerCase().includes(searchTerm) ||
-                user.user_metadata?.full_name?.toLowerCase().includes(searchTerm)
+                user.fullName?.toLowerCase().includes(searchTerm)
             );
         }
 
-        // Transform users to match frontend expectations
-        const transformedUsers = filteredUsers.map(user => ({
-            id: user.id,
-            email: user.email,
-            role: user.app_metadata?.role || 'patient',
-            fullName: user.user_metadata?.full_name || null,
-            createdAt: user.created_at,
-            lastSignIn: user.last_sign_in_at,
-            emailConfirmed: !!user.email_confirmed_at,
-        }));
-
         return c.json({
-            data: transformedUsers,
+            data: finalUsers,
             pagination: {
                 page,
                 pageSize: limit,
-                totalCount: filteredUsers.length,
-                totalPages: Math.ceil(filteredUsers.length / limit)
+                totalCount: finalUsers.length,
+                totalPages: Math.ceil(finalUsers.length / limit)
             }
         });
 
@@ -2611,23 +2646,41 @@ adminRoutes.put('/users/:userId/role',
                 }
             );
 
-            // Update user role in Supabase Auth
-            const { data, error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-                app_metadata: { role }
-            });
+            // Update user role in both Supabase Auth and database profiles table
+            await db.transaction(async (tx) => {
+                // 1. Update role in Supabase Auth (for authentication/authorization)
+                const { data: authData, error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+                    app_metadata: { role }
+                });
 
-            if (error) {
-                console.error('Failed to update user role:', error);
-                return c.json({ error: 'Failed to update user role', message: error.message }, 500);
-            }
+                if (authError) {
+                    console.error('Failed to update user role in Supabase Auth:', authError);
+                    throw new Error(`Failed to update auth role: ${authError.message}`);
+                }
+
+                // 2. Update role in database profiles table (for application logic)
+                try {
+                    await tx
+                        .update(profiles)
+                        .set({ 
+                            role: role as any, // Cast to satisfy TypeScript
+                            updatedAt: new Date().toISOString()
+                        })
+                        .where(eq(profiles.id, userId));
+                } catch (dbError) {
+                    console.error('Failed to update user role in database:', dbError);
+                    throw new Error(`Failed to update database role: ${dbError}`);
+                }
+
+                return authData;
+            });
 
             return c.json({ 
                 success: true, 
-                message: 'User role updated successfully',
+                message: 'User role updated successfully in both auth and database',
                 user: {
-                    id: data.user?.id,
-                    email: data.user?.email,
-                    role: data.user?.app_metadata?.role
+                    id: userId,
+                    role: role
                 }
             });
 
