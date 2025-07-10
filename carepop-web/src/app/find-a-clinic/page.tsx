@@ -237,12 +237,22 @@ function FindAClinicClient() {
           <div className="flex-grow overflow-y-auto space-y-3 border-t pt-4">
               {isLoadingClinics ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)
               : clinics.length > 0 ? clinics.map((clinic) => (
-                      <Card key={clinic.id} className="cursor-pointer hover:bg-gray-100" onClick={() => handleListSelect(clinic)}>
-                        <CardHeader className="p-4"><CardTitle className="text-lg">{clinic.name}</CardTitle></CardHeader>
-                        <CardContent className="p-4 pt-0 text-sm text-gray-600">
-                          {clinic.address?.street}, {clinic.address?.city}
-                          {clinic.distance && <p className="text-xs text-blue-600 font-semibold mt-1">{(clinic.distance / 1000).toFixed(2)} km away</p>}
-                        </CardContent>
+                      <Card key={clinic.id} className="cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleListSelect(clinic)}>
+                        <CardHeader className="pb-2 px-4 pt-3">
+                          <CardTitle className="text-base font-semibold leading-tight">{clinic.name}</CardTitle>
+                        </CardHeader>
+                                                 <CardContent className="px-4 pb-3 pt-0">
+                           <p className="text-sm text-gray-600 leading-snug">
+                             {clinic.street && clinic.cityMunicipality 
+                               ? `${clinic.street}, ${typeof clinic.cityMunicipality === 'string' ? clinic.cityMunicipality : clinic.cityMunicipality?.name || ''}`
+                               : 'Address not available'}
+                           </p>
+                           {clinic.distance && (
+                             <p className="text-xs text-blue-600 font-medium mt-1">
+                               {(clinic.distance / 1000).toFixed(2)} km away
+                             </p>
+                           )}
+                         </CardContent>
                       </Card>
                   ))
               : <div className="text-center text-gray-500 py-10"><p>No clinics found for the selected criteria.</p></div>

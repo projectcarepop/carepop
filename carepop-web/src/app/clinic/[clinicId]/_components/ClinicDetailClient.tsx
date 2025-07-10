@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { MapPin, Navigation, Phone, Globe } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { MapPin, Navigation, Phone, Globe, Clock, Star, Calendar, User, Stethoscope } from 'lucide-react';
 
 interface ClinicDetailClientProps {
     clinic: Clinic;
@@ -26,8 +27,8 @@ const ClinicMap = ({ lat, lng, name }: { lat: number; lng: number; name: string 
         libraries: ['places'],
     });
 
-    if (loadError) return <div>Map cannot be loaded right now, sorry.</div>;
-    if (!isLoaded) return <div>Loading Map...</div>;
+    if (loadError) return <div className="bg-gray-100 rounded-lg h-[400px] flex items-center justify-center text-gray-500">Map cannot be loaded right now, sorry.</div>;
+    if (!isLoaded) return <div className="bg-gray-100 rounded-lg h-[400px] flex items-center justify-center">Loading Map...</div>;
 
     const center = { lat, lng };
 
@@ -44,102 +45,231 @@ const ClinicMap = ({ lat, lng, name }: { lat: number; lng: number; name: string 
 };
 
 export default function ClinicDetailClient({ clinic }: ClinicDetailClientProps) {
-    const { name, address, phone, website, latitude, longitude, services } = clinic;
+    const { name, street, cityMunicipality, province, zipCode, phone, website, latitude, longitude, services } = clinic;
 
-    const fullAddress = [address?.street, address?.barangay, address?.city, address?.province, address?.postal_code]
-        .filter(Boolean)
-        .join(', ');
+    // Build full address from individual components
+    const addressParts = [street, typeof cityMunicipality === 'string' ? cityMunicipality : cityMunicipality?.name, typeof province === 'string' ? province : province?.name, zipCode].filter(Boolean);
+    const fullAddress = addressParts.join(', ');
 
     const directionsUrl = latitude && longitude
         ? `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`
         : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ', ' + fullAddress)}`;
 
+    // Sample doctors data (this would come from the API in a real implementation)
+    const sampleDoctors = [
+        { id: '1', fullName: 'Dr. Maria Santos', specialization: 'General Medicine', experience: '8 years', rating: 4.8 },
+        { id: '2', fullName: 'Dr. Juan Dela Cruz', specialization: 'Pediatrics', experience: '12 years', rating: 4.9 },
+        { id: '3', fullName: 'Dr. Anna Reyes', specialization: 'Gynecology', experience: '6 years', rating: 4.7 },
+    ];
+
     return (
-        <div className="container mx-auto max-w-5xl py-8 md:py-12 px-4">
+        <div className="container mx-auto max-w-7xl py-8 md:py-12 px-4">
+            {/* Header Section */}
             <header className="mb-8">
-                <h1 className="text-4xl font-extrabold tracking-tight lg:text-5xl text-gray-900">{name}</h1>
-                <div className="mt-4 flex items-center space-x-4 text-gray-600 flex-wrap">
-                    {fullAddress && (
-                        <span className="flex items-center mt-2">
-                            <MapPin className="h-5 w-5 mr-2" />
-                            {fullAddress}
-                        </span>
-                    )}
-                    {phone && (
-                        <>
-                            <Separator orientation="vertical" className="h-5 hidden md:block" />
-                            <span className="flex items-center mt-2">
-                                <Phone className="h-5 w-5 mr-2" />
-                                {phone}
-                            </span>
-                        </>
-                    )}
-                    {website && (
-                         <>
-                            <Separator orientation="vertical" className="h-5 hidden md:block" />
-                            <a href={website} target="_blank" rel="noopener noreferrer" className="flex items-center hover:text-blue-600 mt-2">
-                                <Globe className="h-5 w-5 mr-2" />
-                                {website}
-                            </a>
-                        </>
-                    )}
+                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+                    <div className="flex-1">
+                        <h1 className="text-4xl font-extrabold tracking-tight lg:text-5xl text-gray-900 mb-4">{name}</h1>
+                        <div className="space-y-3">
+                            {fullAddress && (
+                                <div className="flex items-start gap-3">
+                                    <MapPin className="h-5 w-5 mt-0.5 text-gray-500 flex-shrink-0" />
+                                    <span className="text-gray-600">{fullAddress}</span>
+                                </div>
+                            )}
+                            {phone && (
+                                <div className="flex items-center gap-3">
+                                    <Phone className="h-5 w-5 text-gray-500" />
+                                    <span className="text-gray-600">{phone}</span>
+                                </div>
+                            )}
+                            {website && (
+                                <div className="flex items-center gap-3">
+                                    <Globe className="h-5 w-5 text-gray-500" />
+                                    <a href={website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 hover:underline">
+                                        {website}
+                                    </a>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    
+                    {/* Quick Actions Card */}
+                    <Card className="lg:w-80">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Calendar className="h-5 w-5" />
+                                Book an Appointment
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <p className="text-sm text-gray-600">
+                                Ready to visit? Book your appointment through our booking system for the best experience.
+                            </p>
+                            <div className="space-y-2">
+                                <Button className="w-full" asChild>
+                                    <Link href={`/book-appointment?clinicId=${clinic.id}`}>
+                                        <Calendar className="h-4 w-4 mr-2" />
+                                        Book Appointment
+                                    </Link>
+                                </Button>
+                                {latitude && longitude && (
+                                    <Button variant="outline" className="w-full" asChild>
+                                        <Link href={directionsUrl} target="_blank" rel="noopener noreferrer">
+                                            <Navigation className="h-4 w-4 mr-2" />
+                                            Get Directions
+                                        </Link>
+                                    </Button>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
             </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div className="md:col-span-2 space-y-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Main Content */}
+                <div className="lg:col-span-2 space-y-8">
+                    {/* Map Section */}
                     {latitude && longitude && (
                         <section>
+                            <h2 className="text-2xl font-bold mb-4">Location</h2>
                             <ClinicMap lat={latitude} lng={longitude} name={name} />
-                            <Button asChild className="mt-4 w-full md:w-auto">
-                                <Link href={directionsUrl} target="_blank" rel="noopener noreferrer">
-                                    <Navigation className="mr-2 h-4 w-4" />
-                                    Get Directions
-                                </Link>
-                            </Button>
                         </section>
                     )}
                     
-                    <Separator />
-                    
+                    {/* Services Section */}
                     <section>
-                        <h2 className="text-3xl font-bold tracking-tight mb-6">Services Available</h2>
+                        <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                            <Stethoscope className="h-6 w-6" />
+                            Services Available
+                        </h2>
                         {services && services.length > 0 ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {services.map(service => (
-                                    <Card key={service.id} className="shadow-sm">
-                                        <CardHeader>
+                                    <Card key={service.id} className="hover:shadow-md transition-shadow">
+                                        <CardHeader className="pb-3">
                                             <CardTitle className="text-lg">{service.name}</CardTitle>
                                         </CardHeader>
                                         <CardContent>
-                                            <p className="text-sm text-gray-600 mb-2">{service.description}</p>
-                                            {service.price && <Badge variant="secondary">₱{service.price}</Badge>}
+                                            {service.description && (
+                                                <p className="text-sm text-gray-600 mb-3">{service.description}</p>
+                                            )}
+                                            <div className="flex items-center justify-between">
+                                                {service.price && (
+                                                    <Badge variant="secondary" className="font-medium">
+                                                        ₱{parseFloat(service.price).toLocaleString()}
+                                                    </Badge>
+                                                )}
+                                                <Button size="sm" variant="outline" asChild>
+                                                    <Link href={`/book-appointment?clinicId=${clinic.id}&serviceId=${service.id}`}>
+                                                        Book Now
+                                                    </Link>
+                                                </Button>
+                                            </div>
                                         </CardContent>
                                     </Card>
                                 ))}
                             </div>
                         ) : (
-                            <p className="text-gray-500">No specific services are listed for this clinic at the moment. Please call for information.</p>
+                            <Card>
+                                <CardContent className="text-center py-8">
+                                    <Stethoscope className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                                    <p className="text-gray-500 text-lg">No specific services are listed for this clinic at the moment.</p>
+                                    <p className="text-gray-400 text-sm mt-2">Please call the clinic directly for information about available services.</p>
+                                </CardContent>
+                            </Card>
                         )}
+                    </section>
+
+                    {/* Doctors Section */}
+                    <section>
+                        <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                            <User className="h-6 w-6" />
+                            Our Doctors
+                        </h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {sampleDoctors.map(doctor => (
+                                <Card key={doctor.id} className="hover:shadow-md transition-shadow">
+                                    <CardContent className="p-6">
+                                        <div className="flex items-start gap-4">
+                                            <Avatar className="h-16 w-16">
+                                                <AvatarImage src={`https://api.dicebear.com/7.x/personas/svg?seed=${doctor.fullName}`} />
+                                                <AvatarFallback>{doctor.fullName.split(' ').map(n => n[0]).join('').slice(0, 2)}</AvatarFallback>
+                                            </Avatar>
+                                            <div className="flex-1">
+                                                <h3 className="font-semibold text-lg mb-1">{doctor.fullName}</h3>
+                                                <p className="text-blue-600 font-medium mb-2">{doctor.specialization}</p>
+                                                <div className="flex items-center gap-4 text-sm text-gray-600">
+                                                    <div className="flex items-center gap-1">
+                                                        <Clock className="h-4 w-4" />
+                                                        {doctor.experience}
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                                        {doctor.rating}
+                                                    </div>
+                                                </div>
+                                                <Button size="sm" className="mt-3" asChild>
+                                                    <Link href={`/book-appointment?clinicId=${clinic.id}&doctorId=${doctor.id}`}>
+                                                        Book with Dr. {doctor.fullName.split(' ')[1]}
+                                                    </Link>
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
                     </section>
                 </div>
 
-                <aside className="md:col-span-1">
-                    <Card className="sticky top-24">
-                        <CardHeader>
-                            <CardTitle>Book an Appointment</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-sm text-gray-600 mb-4">
-                                Ready to visit? Book your appointment through our mobile app for the best experience.
-                            </p>
-                            <Button className="w-full" asChild>
-                               <Link href="/book-appointment">
-                                 Go to Booking
-                               </Link>
-                            </Button>
-                        </CardContent>
-                    </Card>
+                {/* Sidebar */}
+                <aside className="lg:col-span-1">
+                    <div className="sticky top-24 space-y-6">
+                        {/* Quick Info Card */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Quick Information</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div>
+                                    <h4 className="font-medium text-sm text-gray-700 mb-2">Operating Hours</h4>
+                                    <p className="text-sm text-gray-600">Monday - Friday: 8:00 AM - 6:00 PM</p>
+                                    <p className="text-sm text-gray-600">Saturday: 8:00 AM - 4:00 PM</p>
+                                    <p className="text-sm text-gray-600">Sunday: Closed</p>
+                                </div>
+                                
+                                <Separator />
+                                
+                                <div>
+                                    <h4 className="font-medium text-sm text-gray-700 mb-2">Services Available</h4>
+                                    <p className="text-sm text-gray-600">{services ? services.length : 0} services offered</p>
+                                </div>
+                                
+                                <Separator />
+                                
+                                <div>
+                                    <h4 className="font-medium text-sm text-gray-700 mb-2">Contact</h4>
+                                    {phone && <p className="text-sm text-gray-600">{phone}</p>}
+                                    {website && (
+                                        <a href={website} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline block">
+                                            Visit Website
+                                        </a>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Emergency Notice */}
+                        <Card className="border-red-200 bg-red-50">
+                            <CardContent className="p-4">
+                                <h4 className="font-medium text-red-800 mb-2">Emergency Notice</h4>
+                                <p className="text-sm text-red-700">
+                                    For medical emergencies, please call 911 or go to the nearest emergency room immediately.
+                                </p>
+                            </CardContent>
+                        </Card>
+                    </div>
                 </aside>
             </div>
         </div>

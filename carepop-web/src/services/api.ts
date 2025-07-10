@@ -804,6 +804,9 @@ export const getClinicDetails = async (clinicId: string) => {
     return response.json();
 }
 
+// Alias for consistency with mobile app naming
+export const getPublicClinicDetails = getClinicDetails;
+
 /**
  * Gets all available time slots for a given doctor and service on a specific date.
  * @param doctorId The UUID of the doctor.
