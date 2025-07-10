@@ -1482,19 +1482,20 @@ adminRoutes.post(
 
 adminRoutes
     .get('/users', async (c) => {
-        // This is a sensitive operation, ensure only super-admins can do this if needed.
-        // For now, any 'admin' can.
+        try {
+            const userProfiles = await db
+                .select()
+                .from(profiles);
+            
+            // This is a simplified approach. Ideally, you would also fetch the role
+            // from the auth.users table and merge it. For now, let's return the profiles.
+            // A more advanced query would join profiles with auth.users.
 
-        // Get the Supabase client from context, which was created by the auth middleware
-        const supabase = c.get('supabase');
-
-        const { data: { users }, error } = await supabase.auth.admin.listUsers();
-
-        if (error) {
-            console.error("Error fetching users:", error);
-            return c.json({ error: "Failed to fetch users", details: error.message }, 500);
+            return c.json({ data: userProfiles });
+        } catch (error: any) {
+            console.error("Error fetching user profiles:", error);
+            return c.json({ error: "Failed to fetch user profiles", details: error.message }, 500);
         }
-        return c.json({ data: users });
     })
     .get('/users/:userId', async (c) => {
         const { userId } = c.req.param();

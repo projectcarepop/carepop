@@ -21,7 +21,7 @@ interface ColumnActions {
 
 export const columns = ({ onEditRole }: ColumnActions): ColumnDef<AdminUser>[] => [
   {
-    id: 'fullName',
+    accessorKey: 'fullName',
     header: ({ column }) => {
       return (
         <Button
@@ -33,12 +33,6 @@ export const columns = ({ onEditRole }: ColumnActions): ColumnDef<AdminUser>[] =
         </Button>
       );
     },
-    accessorFn: row => `${row.firstName || ''} ${row.lastName || ''}`,
-    cell: ({ row }) => {
-        const firstName = row.original.firstName || '';
-        const lastName = row.original.lastName || '';
-        return `${firstName} ${lastName}`.trim();
-    }
   },
   {
     accessorKey: 'email',
@@ -65,8 +59,15 @@ export const columns = ({ onEditRole }: ColumnActions): ColumnDef<AdminUser>[] =
     accessorKey: 'createdAt',
     header: 'Date Joined',
     cell: ({ row }) => {
-      const date = new Date(row.getValue('createdAt'));
-      return date.toLocaleDateString();
+      const dateValue = row.getValue('createdAt');
+      if (!dateValue) return 'N/A';
+      try {
+        const date = new Date(dateValue as string);
+        // Check if the date is valid before formatting
+        return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleDateString();
+      } catch {
+        return 'Invalid Date';
+      }
     },
   },
   {
