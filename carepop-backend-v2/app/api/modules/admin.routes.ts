@@ -2398,12 +2398,12 @@ const getDoctorsSchema = z.object({
   page: z.coerce.number().int().min(1).optional().default(1),
   limit: z.coerce.number().int().min(1).max(100).optional().default(10),
   q: z.string().optional(),
-  clinic_id: z.string().optional(), // Keep existing clinic filtering
+  clinicId: z.string().optional(), // Match frontend parameter name
 });
 
 adminRoutes.get('/doctors', zValidator('query', getDoctorsSchema), async (c) => {
     try {
-      const { page, limit, q, clinic_id } = c.req.valid('query');
+      const { page, limit, q, clinicId } = c.req.valid('query');
       const offset = (page - 1) * limit;
 
       const whereClause = q 
@@ -2443,10 +2443,10 @@ adminRoutes.get('/doctors', zValidator('query', getDoctorsSchema), async (c) => 
       let totalCount = totalResult[0]?.count ?? 0;
 
       // Apply clinic filtering if specified (post-query for simplicity)
-      if (clinic_id) {
+      if (clinicId) {
         finalDoctors = allDoctors.filter(d => 
           Array.isArray(d.doctorClinics) && 
-          d.doctorClinics.some((dc: any) => dc.clinicId === clinic_id)
+          d.doctorClinics.some((dc: any) => dc.clinicId === clinicId)
         );
         totalCount = finalDoctors.length; // Approximate count for filtered results
       }
