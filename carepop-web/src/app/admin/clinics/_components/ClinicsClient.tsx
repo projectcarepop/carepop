@@ -154,13 +154,7 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
         </CardDescription>
       </CardHeader>
       
-      <div className="flex items-center justify-between">
-        <Input
-          placeholder="Filter by name..."
-          value={globalFilter}
-          onChange={(event) => setGlobalFilter(event.target.value)}
-          className="max-w-sm"
-        />
+      <div className="flex items-center justify-end">
         <Button onClick={handleCreateNew}>
           <PlusCircle className="mr-2 h-4 w-4" />
           Create Clinic

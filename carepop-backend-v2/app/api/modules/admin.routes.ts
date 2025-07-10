@@ -1278,38 +1278,21 @@ adminRoutes
 const getAppointmentsSchema = z.object({
     page: z.coerce.number().int().min(1).optional().default(1),
     limit: z.coerce.number().int().min(1).max(100).optional().default(10),
-    clinicId: z.string().uuid().optional(),
     patientName: z.string().optional(),
-    date_from: z.string().optional(),
-    date_to: z.string().optional(),
 });
 
 adminRoutes.get('/appointments', zValidator('query', getAppointmentsSchema), async (c) => {
     try {
-        const { page, limit, date_from, date_to, clinicId, patientName } = c.req.valid('query');
+        const { page, limit, patientName } = c.req.valid('query');
         const offset = (page - 1) * limit;
 
-        let conditions: (SQL | undefined)[] = [];
-        if (date_from) {
-            conditions.push(gte(appointments.appointmentTime, date_from));
-        }
-        if (date_to) {
-            const toDate = new Date(date_to);
-            toDate.setDate(toDate.getDate() + 1);
-            conditions.push(lt(appointments.appointmentTime, toDate.toISOString().split('T')[0]));
-        }
-        if (clinicId) {
-            conditions.push(eq(appointments.clinicId, clinicId));
-        }
-        if (patientName) {
-            conditions.push(or(
+        const whereClause = patientName 
+            ? or(
                 ilike(profiles.firstName, `%${patientName}%`),
                 ilike(profiles.lastName, `%${patientName}%`)
-            ));
-        }
+              )
+            : undefined;
         
-        const whereClause = and(...conditions.filter(c => c !== undefined));
-
         const appointmentsQuery = db.select({
             ...getTableColumns(appointments),
             clinicName: clinics.name,
