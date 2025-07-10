@@ -153,10 +153,15 @@ adminRoutes.use('*', async (c, next) => {
   // This will help us see if the auth check is passing before the route handler runs.
   try {
     const user = c.get('user');
-    // @ts-ignore
-    console.log(`[ADMIN] Middleware check: User found with role '${user?.app_metadata?.role}'.`);
+    if (user) {
+      // Check both Supabase Auth app_metadata and database profile
+      const authRole = user.app_metadata?.role;
+      console.log(`[ADMIN] Middleware check: User ${user.id} found. Auth role: '${authRole}', Email: '${user.email}'`);
+    } else {
+      console.log("[ADMIN] Middleware check: No user found in context yet.");
+    }
   } catch (e) {
-    console.log("[ADMIN] Middleware check: 'user' not found in context yet.");
+    console.log("[ADMIN] Middleware check: Error accessing user context:", e);
   }
   await next(); // Pass control to the next middleware (auth, admin, then the handler)
 });
@@ -2654,7 +2659,7 @@ adminRoutes.get('/users', zValidator('query', adminUsersQuerySchema), async (c) 
 
         return c.json(response);
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error fetching admin users:', error);
         return c.json({ error: 'Failed to fetch users', message: error.message }, 500);
     }
