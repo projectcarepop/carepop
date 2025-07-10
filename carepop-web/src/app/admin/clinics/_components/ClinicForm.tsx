@@ -122,13 +122,13 @@ export function ClinicForm({
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="cityMunicipalityCode"
+            name="provinceCode"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>City</FormLabel>
+                <FormLabel>Province</FormLabel>
                 <FormControl>
                   <Input
-                    placeholder="Quezon City"
+                    placeholder="e.g., Metro Manila"
                     {...field}
                     disabled={isLoading}
                   />
@@ -138,6 +138,24 @@ export function ClinicForm({
             )}
           />
           <FormField
+            control={form.control}
+            name="cityMunicipalityCode"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>City / Municipality</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="e.g., Quezon City"
+                    {...field}
+                    disabled={isLoading}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+         <FormField
             control={form.control}
             name="zipCode"
             render={({ field }) => (
@@ -150,7 +168,6 @@ export function ClinicForm({
               </FormItem>
             )}
           />
-        </div>
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -210,12 +227,11 @@ export function ClinicForm({
             </FormItem>
           )}
         />
-        <Button type="submit" className="w-full" disabled={isLoading}>
+        <Button type="submit" disabled={isLoading}>
           {isLoading ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            'Save Changes'
-          )}
+          ) : null}
+          {initialData ? 'Save Changes' : 'Create Clinic'}
         </Button>
       </form>
     </Form>

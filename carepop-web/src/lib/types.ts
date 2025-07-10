@@ -30,19 +30,16 @@ export type ClinicService = {
 };
 
 export type Clinic = InferSelectModel<typeof schema.clinics> & {
-    latitude: number;
-    longitude: number;
+    latitude?: number;
+    longitude?: number;
     phone?: string | null;
     website?: string | null;
-    address: {
-        street: string;
-        barangay?: string | null;
-        city: string;
-        province: string;
-        postal_code?: string | null; // Changed from zip
-    } | null;
+    street?: string | null;
+    cityMunicipality?: { name: string, code: string } | string | null;
+    province?: { name: string, code: string } | string | null;
+    zipCode?: string | null;
     distance?: number;
-    services?: ClinicService[]; // Added services array
+    services?: ClinicService[];
 };
 export type NewClinic = InferInsertModel<typeof schema.clinics>;
 

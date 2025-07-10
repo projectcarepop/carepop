@@ -192,8 +192,16 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
           <ClinicForm
             initialData={selectedClinic}
             onSubmit={(values) => {
-              const payload = { ...values, id: selectedClinic?.id };
-              upsertMutation.mutate(payload);
+              const { latitude, longitude, ...rest } = values;
+              const payload = {
+                ...rest,
+                id: selectedClinic?.id,
+                location: {
+                  latitude,
+                  longitude,
+                },
+              };
+              upsertMutation.mutate(payload as any);
             }}
             isPending={upsertMutation.isPending}
           />

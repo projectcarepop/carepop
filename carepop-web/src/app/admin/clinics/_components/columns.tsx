@@ -74,20 +74,23 @@ export const columns = ({ onEdit, onDelete }: Omit<ColumnActionsProps, 'clinic'>
     },
   },
   {
-    accessorKey: 'address',
     header: 'Address',
     cell: ({ row }) => {
-      const address = row.original.address as { street?: string; city?: string; zip?: string };
-      return `${address?.street || ''}, ${address?.city || ''} ${address?.zip || ''}`;
+      const { street, cityMunicipality, province, zipCode } = row.original;
+      // Note: cityMunicipality and province might be objects with a 'name' property
+      // depending on the API response. Let's handle both cases.
+      const cityName = typeof cityMunicipality === 'object' ? cityMunicipality?.name : cityMunicipality;
+      const provinceName = typeof province === 'object' ? province?.name : province;
+
+      return `${street || ''}, ${cityName || ''}, ${provinceName || ''} ${zipCode || ''}`;
     },
   },
   {
-    accessorKey: 'location',
     header: 'Location (Lat, Lon)',
     cell: ({ row }) => {
-      const location = row.original.location as { x?: number; y?: number };
-      if (location?.y && location?.x) {
-        return `${location.y.toFixed(4)}, ${location.x.toFixed(4)}`;
+      const { latitude, longitude } = row.original;
+      if (latitude && longitude) {
+        return `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
       }
       return 'N/A';
     }
@@ -108,8 +111,13 @@ export const columns = ({ onEdit, onDelete }: Omit<ColumnActionsProps, 'clinic'>
     accessorKey: 'createdAt',
     header: 'Date Added',
     cell: ({ row }) => {
-      const date = new Date(row.getValue('createdAt'));
-      return date.toLocaleDateString();
+      const date = row.getValue('createdAt');
+      if (!date) return 'N/A';
+      return new Date(date as string).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
     },
   },
   {
