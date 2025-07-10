@@ -2520,8 +2520,10 @@ const adminUsersQuerySchema = z.object({
 
 // GET /admin/users - List all users with pagination and filtering
 adminRoutes.get('/users', zValidator('query', adminUsersQuerySchema), async (c) => {
+    console.log('[ADMIN USERS] Endpoint called - starting user fetch');
     try {
         const { page, limit, q, role } = c.req.valid('query');
+        console.log('[ADMIN USERS] Query params:', { page, limit, q, role });
 
         // Initialize Supabase admin client for user management
         const supabaseAdmin = createClient(
@@ -2629,17 +2631,30 @@ adminRoutes.get('/users', zValidator('query', adminUsersQuerySchema), async (c) 
             );
         }
 
-        return c.json({
+        // Return paginated response
+        const response = {
             data: finalUsers,
             pagination: {
                 page,
-                pageSize: limit,
-                totalCount: finalUsers.length,
-                totalPages: Math.ceil(finalUsers.length / limit)
-            }
-        });
+                limit,
+                totalPages: Math.ceil(filteredUsers.length / limit),
+                totalCount: filteredUsers.length,
+                hasNextPage: page < Math.ceil(filteredUsers.length / limit),
+                hasPreviousPage: page > 1,
+            },
+        };
 
-    } catch (error: any) {
+        console.log('[ADMIN USERS] Returning response with', finalUsers.length, 'users');
+        console.log('[ADMIN USERS] Sample user:', finalUsers[0] ? {
+            id: finalUsers[0].id,
+            email: finalUsers[0].email,
+            fullName: finalUsers[0].fullName,
+            role: finalUsers[0].role
+        } : 'No users found');
+
+        return c.json(response);
+
+    } catch (error) {
         console.error('Error fetching admin users:', error);
         return c.json({ error: 'Failed to fetch users', message: error.message }, 500);
     }
