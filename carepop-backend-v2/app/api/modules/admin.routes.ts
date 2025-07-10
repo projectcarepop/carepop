@@ -2285,6 +2285,88 @@ adminRoutes.get('/doctors', async (c) => {
     return c.json({ data: allDoctors });
   });
 
+// START: CLINIC MANAGEMENT CONTEXT ENDPOINT
+adminRoutes.get('/clinics/:id/management-context', async (c) => {
+    const { id } = c.req.param();
+    try {
+        const clinicPromise = db.query.clinics.findFirst({
+            where: eq(clinics.id, id),
+            with: { 
+                services: { with: { service: true } },
+                doctors: { with: { doctor: true } },
+            }
+        });
+        const allServicesPromise = db.query.services.findMany();
+        const allDoctorsPromise = db.query.doctors.findMany();
+
+        const [clinic, allServices, allDoctors] = await Promise.all([
+            clinicPromise,
+            allServicesPromise,
+            allDoctorsPromise,
+        ]);
+
+        if (!clinic) {
+            return c.json({ error: 'Clinic not found' }, 404);
+        }
+
+        return c.json({
+            data: { clinic, allServices, allDoctors }
+        });
+
+    } catch (error: any) {
+        console.error(`Error fetching management context for clinic ${id}:`, error);
+        return c.json({ error: 'Failed to fetch management context', details: error.message }, 500);
+    }
+});
+// END: CLINIC MANAGEMENT CONTEXT ENDPOINT
+
+// START: UPDATE DOCTOR-SERVICE ASSIGNMENTS
+adminRoutes.put('/clinics/:clinicId/doctor-assignments',
+    zValidator('json', z.object({
+        assignments: z.array(z.object({
+            serviceId: z.string().uuid(),
+            doctorIds: z.array(z.string().uuid()),
+        }))
+    })),
+    async (c) => {
+        const { clinicId } = c.req.param();
+        const { assignments } = c.req.valid('json');
+
+        try {
+            await db.transaction(async (tx) => {
+                // 1. Delete all existing assignments for this clinic's services
+                const serviceIdsForClinic = assignments.map(a => a.serviceId);
+                if (serviceIdsForClinic.length > 0) {
+                    await tx.delete(doctorClinicServices).where(and(
+                        eq(doctorClinicServices.clinicId, clinicId),
+                        inArray(doctorClinicServices.serviceId, serviceIdsForClinic)
+                    ));
+                }
+
+                // 2. Insert the new assignments
+                const newAssignments = assignments.flatMap(a => 
+                    a.doctorIds.map(doctorId => ({
+                        id: uuidv4(),
+                        clinicId,
+                        doctorId,
+                        serviceId: a.serviceId,
+                    }))
+                );
+
+                if (newAssignments.length > 0) {
+                    await tx.insert(doctorClinicServices).values(newAssignments);
+                }
+            });
+
+            return c.json({ success: true, message: 'Assignments updated successfully.' });
+        } catch (error: any) {
+            console.error(`Failed to update assignments for clinic ${clinicId}:`, error);
+            return c.json({ error: 'Failed to update assignments', details: error.message }, 500);
+        }
+    }
+);
+// END: UPDATE DOCTOR-SERVICE ASSIGNMENTS
+
 // Add other admin routes here in the future...
 
 export default adminRoutes;

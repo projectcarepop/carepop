@@ -1,54 +1,84 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useQueryClient, useMutation } from '@tanstack/react-query';
-import { useAuth } from '@/lib/contexts/auth-context';
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
-import { Clinic, Doctor, Service } from '@/lib/types';
-import { ServiceDoctorAssignments, Assignments } from './ServiceDoctorAssignments';
-import { ClinicForm } from '../../_components/ClinicForm';
-import { ClinicDetailsCard } from './ClinicDetailsCard'; // Import the new component
+import { useAuth } from '@/lib/contexts/auth-context';
+
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ServiceDoctorAssignments, Assignments } from './ServiceDoctorAssignments';
 import { updateClinicDoctorAssignments } from '@/services/api';
-import { Pencil } from 'lucide-react';
 
-// Define a more specific type for the context we expect
+
+// This type should match the data structure returned by our new backend endpoint.
 type ManagementContext = {
-  clinic: Clinic;
-  assignedServices: Service[];
-  assignedDoctors: Doctor[];
-  doctorServiceAssignments: {
-    doctorId: string;
-    serviceId: string;
-  }[];
+  clinic: {
+    id: string;
+    name: string;
+    street: string | null;
+    cityMunicipalityCode: string | null;
+    provinceCode: string | null;
+    zipCode: string | null;
+    phoneNumber: string | null;
+    services: { service: { id: string; name: string } }[];
+    // This now represents the full doctor_clinic_services relationship
+    doctorClinicServices: {
+      doctorId: string;
+      serviceId: string;
+    }[];
+  };
+  allServices: { id: string; name: string }[];
+  allDoctors: { id: string; fullName: string }[];
 };
 
 interface ClinicManagementClientProps {
   initialContext: ManagementContext;
 }
 
+const ClinicDetails = ({ clinic }: { clinic: ManagementContext['clinic'] }) => {
+    const address = [
+        clinic.street,
+        clinic.cityMunicipalityCode,
+        clinic.provinceCode,
+        clinic.zipCode
+    ].filter(Boolean).join(', ');
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Clinic Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+                <p><strong>Name:</strong> {clinic.name}</p>
+                <p><strong>Address:</strong> {address || 'Not available'}</p>
+                <p><strong>Phone:</strong> {clinic.phoneNumber || 'Not available'}</p>
+            </CardContent>
+        </Card>
+    );
+};
+
 export function ClinicManagementClient({ initialContext }: ClinicManagementClientProps) {
   const { session } = useAuth();
   const queryClient = useQueryClient();
-  const [clinic] = useState(initialContext.clinic);
-  const [isEditing, setIsEditing] = useState(false); // State for edit mode
+  const { clinic, allServices, allDoctors } = initialContext;
+
   const [assignments, setAssignments] = useState<Assignments>(() => {
-    // Transform the initial flat array into a map of serviceId -> doctorId[]
-    return initialContext.doctorServiceAssignments.reduce((acc, assignment) => {
-      if (!acc[assignment.serviceId]) {
-        acc[assignment.serviceId] = [];
+    // Transform the initial flat array into the nested map structure
+    return initialContext.clinic.doctorClinicServices.reduce((acc, current) => {
+      const { serviceId, doctorId } = current;
+      if (!acc[serviceId]) {
+        acc[serviceId] = [];
       }
-      acc[assignment.serviceId].push(assignment.doctorId);
+      acc[serviceId].push(doctorId);
       return acc;
     }, {} as Assignments);
   });
 
-  const handleAssignmentsChange = (newAssignments: Assignments) => {
-    setAssignments(newAssignments);
-  };
-  
-  const { mutate: saveAssignments, isPending: isSavingAssignments } = useMutation({
+  const { mutate: saveAssignments, isPending } = useMutation({
     mutationFn: (newAssignments: Assignments) => {
         if (!session) throw new Error("Not authenticated");
         return updateClinicDoctorAssignments({
@@ -66,80 +96,36 @@ export function ClinicManagementClient({ initialContext }: ClinicManagementClien
     }
   });
 
-  const handleClinicSubmit = async (values: any) => {
-      // This is a placeholder for the clinic details update logic
-      console.log("Clinic details submitted", values);
-      // In a real scenario, this would also be a mutation
-      // For now, we just log it.
-      return null;
-  }
-  
-  const handleSaveChanges = () => {
-      // For now, we only save the assignments.
-      // A more robust implementation would save both clinic details and assignments
-      // and handle the combined loading/error states.
-      saveAssignments(assignments);
-      setIsEditing(false); // Exit edit mode on save
-  }
-  
-  const isLoading = isSavingAssignments;
 
   return (
     <div className="p-4 md:p-6 lg:p-8 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Manage Clinic</h1>
-        <p className="text-lg text-muted-foreground">{clinic.name}</p>
-      </div>
-
-      <Separator />
-
-      {/* Section 1: Clinic Details */}
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-semibold">Clinic Details</h2>
-          {!isEditing && (
-            <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
-              <Pencil className="mr-2 h-4 w-4" />
-              Edit Details
-            </Button>
-          )}
-        </div>
-        {isEditing ? (
-          <ClinicForm
-              initialData={clinic}
-              onSubmit={handleClinicSubmit}
-              isPending={false} // Will be wired up in the next step
-          />
-        ) : (
-          <ClinicDetailsCard clinic={clinic} />
-        )}
-      </div>
-
-      <Separator />
-
-      {/* Section 2: Service & Doctor Assignments */}
-       <div>
-        <h2 className="text-2xl font-semibold mb-4">Service & Doctor Assignments</h2>
-         <ServiceDoctorAssignments
-            services={initialContext.assignedServices}
-            doctors={initialContext.assignedDoctors}
-            initialAssignments={assignments}
-            onAssignmentsChange={handleAssignmentsChange}
-            isLoading={false} // Will be wired up in the next step
-         />
-      </div>
+      <Link href="/admin/clinics" className="flex items-center text-sm text-muted-foreground hover:underline">
+        <ArrowLeft className="mr-2 h-4 w-4" />
+        Back to Clinics
+      </Link>
       
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Manage {clinic.name}</h1>
+        <p className="text-lg text-muted-foreground">Update clinic details and manage service-doctor assignments.</p>
+      </div>
+
       <Separator />
 
-      <div className="flex justify-end space-x-2">
-          {isEditing && (
-            <Button variant="outline" onClick={() => setIsEditing(false)} disabled={isLoading}>
-              Cancel
-            </Button>
-          )}
-          <Button onClick={handleSaveChanges} disabled={isLoading}>
-              {isLoading ? "Saving..." : "Save Changes"}
-          </Button>
+      <ClinicDetails clinic={clinic} />
+
+      <Separator />
+
+      <ServiceDoctorAssignments 
+        assignedServices={clinic.services.map(s => s.service)}
+        allDoctors={allDoctors}
+        initialAssignments={assignments}
+        onAssignmentsChange={setAssignments}
+      />
+      
+      <div className="flex justify-end">
+        <Button onClick={() => saveAssignments(assignments)} disabled={isPending}>
+            {isPending ? 'Saving...' : 'Save Changes'}
+        </Button>
       </div>
     </div>
   );

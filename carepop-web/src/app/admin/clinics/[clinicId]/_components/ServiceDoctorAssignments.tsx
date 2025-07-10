@@ -1,69 +1,95 @@
 'use client';
 
-import React from 'react';
-import { Doctor, Service } from '@/lib/types';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MultiSelect } from '@/components/ui/MultiSelect';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+
+type Service = {
+  id: string;
+  name: string;
+};
+
+type Doctor = {
+  id:string;
+  fullName: string;
+};
 
 // This will represent the state of assignments: a map from serviceId to a list of doctorIds
 export type Assignments = Record<string, string[]>;
 
 interface ServiceDoctorAssignmentsProps {
-  services: Service[];
-  doctors: Doctor[];
+  assignedServices: Service[];
+  allDoctors: Doctor[];
   initialAssignments: Assignments;
   onAssignmentsChange: (newAssignments: Assignments) => void;
-  isLoading: boolean;
 }
 
-export function ServiceDoctorAssignments({
-  services,
-  doctors,
-  initialAssignments,
-  onAssignmentsChange,
-  isLoading,
+export function ServiceDoctorAssignments({ 
+    assignedServices, 
+    allDoctors,
+    initialAssignments,
+    onAssignmentsChange,
 }: ServiceDoctorAssignmentsProps) {
-  
-  const doctorOptions = doctors.map(doc => ({
-    value: doc.id,
-    label: doc.fullName || 'Unnamed Doctor',
-  }));
+  const [assignments, setAssignments] = useState<Assignments>(initialAssignments);
 
-  const handleSelectionChange = (serviceId: string, selectedDoctorIds: string[]) => {
-    const newAssignments = {
-      ...initialAssignments,
-      [serviceId]: selectedDoctorIds,
-    };
-    onAssignmentsChange(newAssignments);
+  useEffect(() => {
+    onAssignmentsChange(assignments);
+  }, [assignments, onAssignmentsChange]);
+
+  const handleCheckboxChange = (serviceId: string, doctorId: string, isChecked: boolean) => {
+    setAssignments(prev => {
+        const currentDoctorIds = prev[serviceId] || [];
+        const newDoctorIds = isChecked
+            ? [...currentDoctorIds, doctorId]
+            : currentDoctorIds.filter(id => id !== doctorId);
+        
+        return { ...prev, [serviceId]: newDoctorIds };
+    });
   };
 
-  if (services.length === 0) {
+  if (!assignedServices || assignedServices.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">
-        There are no services assigned to this clinic yet. You can assign services by editing the clinic&apos;s details.
-      </p>
+      <Card>
+        <CardHeader>
+          <CardTitle>Service & Doctor Assignments</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground">This clinic has no services assigned to it yet.</p>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {services.map(service => (
-        <Card key={service.id}>
-          <CardHeader>
-            <CardTitle>{service.name}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <MultiSelect
-              options={doctorOptions}
-              selected={initialAssignments[service.id] || []}
-              onChange={(selectedIds) => handleSelectionChange(service.id, selectedIds)}
-              placeholder="Assign doctors to this service..."
-              disabled={isLoading}
-              className="w-full"
-            />
-          </CardContent>
-        </Card>
-      ))}
-    </div>
+    <Card>
+        <CardHeader>
+            <CardTitle>Service & Doctor Assignments</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+            {assignedServices.map(service => (
+                <div key={service.id} className="p-4 border rounded-md">
+                    <h3 className="font-semibold mb-3">{service.name}</h3>
+                    <div className="space-y-2">
+                        <Label>Assigned Doctors:</Label>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {allDoctors.map(doctor => (
+                                <div key={doctor.id} className="flex items-center space-x-2">
+                                    <Checkbox 
+                                        id={`${service.id}-${doctor.id}`}
+                                        checked={assignments[service.id]?.includes(doctor.id) || false}
+                                        onCheckedChange={(checked) => handleCheckboxChange(service.id, doctor.id, !!checked)}
+                                    />
+                                    <Label htmlFor={`${service.id}-${doctor.id}`} className="font-normal">
+                                        {doctor.fullName}
+                                    </Label>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            ))}
+        </CardContent>
+    </Card>
   );
 } 
