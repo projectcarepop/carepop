@@ -68,14 +68,19 @@ export function ClinicManagementClient({ initialContext }: ClinicManagementClien
 
   const [assignments, setAssignments] = useState<Assignments>(() => {
     // Transform the initial flat array into the nested map structure
-    return initialContext.clinic.doctorClinicServices.reduce((acc, current) => {
-      const { serviceId, doctorId } = current;
-      if (!acc[serviceId]) {
-        acc[serviceId] = [];
-      }
-      acc[serviceId].push(doctorId);
-      return acc;
-    }, {} as Assignments);
+    // Defensively check if doctorClinicServices exists and is an array before reducing.
+    if (initialContext?.clinic?.doctorClinicServices && Array.isArray(initialContext.clinic.doctorClinicServices)) {
+      return initialContext.clinic.doctorClinicServices.reduce((acc, current) => {
+        const { serviceId, doctorId } = current;
+        if (!acc[serviceId]) {
+          acc[serviceId] = [];
+        }
+        acc[serviceId].push(doctorId);
+        return acc;
+      }, {} as Assignments);
+    }
+    // If it doesn't exist, return an empty object.
+    return {} as Assignments;
   });
 
   const { mutate: saveAssignments, isPending } = useMutation({
