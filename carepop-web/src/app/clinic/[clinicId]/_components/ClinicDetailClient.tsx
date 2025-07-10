@@ -77,7 +77,7 @@ export default function ClinicDetailClient({ clinic }: ClinicDetailClientProps) 
         <div className="container mx-auto max-w-7xl py-8 md:py-12 px-4">
             {/* Header Section */}
             <header className="mb-4">
-                <div className="flex items-center gap-4 mb-4">
+                <div className="flex items-center gap-4 mb-8">
                     <Button
                         variant="ghost"
                         size="sm"
@@ -88,7 +88,7 @@ export default function ClinicDetailClient({ clinic }: ClinicDetailClientProps) 
                         Back
                     </Button>
                 </div>
-                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mt-8">
                     <div className="flex-1">
                         <h1 className="text-4xl font-extrabold tracking-tight lg:text-5xl text-gray-900 mb-4">{name}</h1>
                         <div className="space-y-3">
