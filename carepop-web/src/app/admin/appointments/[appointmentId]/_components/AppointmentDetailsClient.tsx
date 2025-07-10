@@ -131,7 +131,7 @@ export function AppointmentDetailsClient({ appointmentId }: AppointmentDetailsCl
     }
 
     return (
-        <div className="container mx-auto p-4 md:p-8 space-y-6 max-w-4xl">
+        <div className="container mx-auto p-4 md:p-8 space-y-6 max-w-7xl">
             {/* Header with Back Button */}
             <div className="flex items-center gap-4">
                 <Button variant="ghost" size="sm" asChild>
@@ -161,7 +161,7 @@ export function AppointmentDetailsClient({ appointmentId }: AppointmentDetailsCl
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid gap-6 md:grid-cols-2">
+                    <div className="grid gap-6 lg:grid-cols-3">
                         {/* Patient Information */}
                         <Card>
                             <CardHeader className="pb-3">
@@ -203,7 +203,7 @@ export function AppointmentDetailsClient({ appointmentId }: AppointmentDetailsCl
                         </Card>
 
                         {/* Service Information */}
-                        <Card className="md:col-span-2">
+                        <Card>
                             <CardHeader className="pb-3">
                                 <CardTitle className="text-lg flex items-center gap-2">
                                     <Stethoscope className="h-4 w-4" />
