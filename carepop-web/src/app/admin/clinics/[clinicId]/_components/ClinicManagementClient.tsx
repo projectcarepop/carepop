@@ -332,6 +332,18 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
         <CardContent>
           <div className="space-y-4">
             <div>
+              <h4 className="font-medium">All Services ({initialContext?.allServices?.length || 0}):</h4>
+              <pre className="text-xs bg-gray-50 p-2 rounded max-h-32 overflow-y-auto">
+                {JSON.stringify(initialContext?.allServices, null, 2)}
+              </pre>
+            </div>
+            <div>
+              <h4 className="font-medium">All Doctors ({initialContext?.allDoctors?.length || 0}):</h4>
+              <pre className="text-xs bg-gray-50 p-2 rounded max-h-32 overflow-y-auto">
+                {JSON.stringify(initialContext?.allDoctors, null, 2)}
+              </pre>
+            </div>
+            <div>
               <h4 className="font-medium">Clinic Services ({initialContext?.clinic?.services?.length || 0}):</h4>
               <pre className="text-xs bg-gray-50 p-2 rounded max-h-32 overflow-y-auto">
                 {JSON.stringify(initialContext?.clinic?.services, null, 2)}
@@ -413,10 +425,28 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Clinic Services</CardTitle>
-                <Button onClick={() => setIsAddServicesModalOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Services
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      console.log('Test button clicked');
+                      console.log('allDoctors:', initialContext?.allDoctors);
+                      console.log('servicesData:', servicesData);
+                      if (servicesData.length > 0) {
+                        setSelectedService(servicesData[0]);
+                        setIsDoctorAssignmentsModalOpen(true);
+                      } else {
+                        toast({ title: 'No services found', description: 'Add some services first' });
+                      }
+                    }}
+                  >
+                    Test Doctor Assignment
+                  </Button>
+                  <Button onClick={() => setIsAddServicesModalOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Services
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
