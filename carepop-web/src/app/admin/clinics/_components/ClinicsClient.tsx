@@ -171,7 +171,7 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
   }
 
   // Pass the edit and deactivate handlers to the columns definition
-  const dynamicColumns = React.useMemo(() => columns({ onEdit: handleEdit, onDelete: handleDeactivate }), []);
+  const dynamicColumns = React.useMemo(() => columns({ onEdit: handleEdit, onDelete: handleDeactivate }), [handleEdit, handleDeactivate]);
 
   if (isError) return <div>Failed to load clinics: {error?.message}</div>;
 

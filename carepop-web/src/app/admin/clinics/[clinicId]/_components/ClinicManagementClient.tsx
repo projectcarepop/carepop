@@ -182,12 +182,12 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
     }
   };
 
-  const handleManageServices = (doctor: { id: string; fullName: string; specialization?: string; assignedServices?: { id: string; name: string }[] }) => {
+  const handleManageServices = () => {
     // TODO: Implement doctor service management modal
     toast({ title: 'Info', description: 'Doctor service management coming soon' });
   };
 
-  const handleRemoveDoctor = (doctor: { id: string; fullName: string; specialization?: string; assignedServices?: { id: string; name: string }[] }) => {
+  const handleRemoveDoctor = () => {
     // TODO: Implement doctor removal
     toast({ title: 'Info', description: 'Doctor removal coming soon' });
   };
@@ -302,8 +302,8 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
             .filter(dcs => dcs.serviceId === selectedService.id)
             .map(dcs => dcs.doctorId) : []
         }
-        onSave={(doctorIds) => updateDoctorAssignmentsMutation.mutate({ 
-          serviceId: selectedService?.id || '', 
+        onSave={(serviceId: string, doctorIds: string[]) => updateDoctorAssignmentsMutation.mutate({ 
+          serviceId, 
           doctorIds 
         })}
         isLoading={updateDoctorAssignmentsMutation.isPending}
