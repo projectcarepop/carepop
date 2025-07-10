@@ -9,7 +9,7 @@ import { useAuth } from '@/lib/contexts/auth-context';
 
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DataTable } from '@/components/ui/data-table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -340,7 +340,7 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="space-y-3">
         <Link href="/admin/clinics">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -402,7 +402,12 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Clinic Services</CardTitle>
+                <div>
+                  <CardTitle>Clinic Services</CardTitle>
+                  <CardDescription>
+                    Manage medical services offered at this clinic and assign doctors to provide each service
+                  </CardDescription>
+                </div>
                 <div className="flex gap-2">
                   <Button onClick={() => setIsAddServicesModalOpen(true)}>
                     <Plus className="h-4 w-4 mr-2" />
@@ -439,6 +444,9 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
           <Card>
             <CardHeader>
               <CardTitle>Clinic Doctors</CardTitle>
+              <CardDescription>
+                View doctors assigned to this clinic and manage which services each doctor can provide
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
