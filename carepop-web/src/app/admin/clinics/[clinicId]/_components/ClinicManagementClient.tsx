@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Plus } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/contexts/auth-context';
@@ -10,11 +10,17 @@ import { useAuth } from '@/lib/contexts/auth-context';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ServiceDoctorAssignments, Assignments } from './ServiceDoctorAssignments';
-import { updateClinicDoctorAssignments } from '@/services/api';
+import { DataTable } from '@/components/ui/data-table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
 
+import { assignServicesToClinic, updateClinicDoctorAssignments } from '@/services/api';
+import { serviceAssignmentsColumns } from './service-assignments-columns';
+import { doctorAssignmentsColumns } from './doctor-assignments-columns';
+import { AddServicesModal } from './AddServicesModal';
+import { ManageDoctorAssignmentsModal } from './ManageDoctorAssignmentsModal';
 
-// This type should match the data structure returned by our new backend endpoint.
+// Updated type to match new backend response
 type ManagementContext = {
   clinic: {
     id: string;
@@ -24,112 +30,284 @@ type ManagementContext = {
     provinceCode: string | null;
     zipCode: string | null;
     phoneNumber: string | null;
+    services: { service: { id: string; name: string; description?: string } }[];
+    doctors: { doctor: { id: string; fullName: string } }[];
+    doctorClinicServices: { doctorId: string; serviceId: string }[];
   };
-  assignedServices: { id: string; name: string }[];
-  assignedDoctors: { id: string; fullName: string }[];
-  doctorServiceAssignments: {
-    doctorId: string;
-    serviceId: string;
-  }[];
+  allServices: { id: string; name: string; description?: string; serviceCategory?: { name: string } }[];
+  allDoctors: { id: string; fullName: string; specialization?: string }[];
 };
 
 interface ClinicManagementClientProps {
   initialContext: ManagementContext;
+  clinicId: string;
 }
 
-const ClinicDetails = ({ clinic }: { clinic: ManagementContext['clinic'] }) => {
-    const address = [
-        clinic.street,
-        clinic.cityMunicipalityCode,
-        clinic.provinceCode,
-        clinic.zipCode
-    ].filter(Boolean).join(', ');
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Clinic Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-                <p><strong>Name:</strong> {clinic.name}</p>
-                <p><strong>Address:</strong> {address || 'Not available'}</p>
-                <p><strong>Phone:</strong> {clinic.phoneNumber || 'Not available'}</p>
-            </CardContent>
-        </Card>
-    );
-};
-
-export function ClinicManagementClient({ initialContext }: ClinicManagementClientProps) {
+export function ClinicManagementClient({ initialContext, clinicId }: ClinicManagementClientProps) {
   const { session } = useAuth();
   const queryClient = useQueryClient();
-  const { clinic, assignedDoctors, assignedServices, doctorServiceAssignments } = initialContext;
+  
+  // State for modals
+  const [isAddServicesModalOpen, setIsAddServicesModalOpen] = useState(false);
+  const [isDoctorAssignmentsModalOpen, setIsDoctorAssignmentsModalOpen] = useState(false);
+  const [selectedService, setSelectedService] = useState<any>(null);
+  
+  // State for search
+  const [servicesSearch, setServicesSearch] = useState('');
+  const [doctorsSearch, setDoctorsSearch] = useState('');
 
-  const [assignments, setAssignments] = useState<Assignments>(() => {
-    // Transform the initial flat array into the nested map structure
-    // Use doctorServiceAssignments from the root level, not from clinic
-    if (doctorServiceAssignments && Array.isArray(doctorServiceAssignments)) {
-      return doctorServiceAssignments.reduce((acc, current) => {
-        const { serviceId, doctorId } = current;
-        if (!acc[serviceId]) {
-          acc[serviceId] = [];
-        }
-        acc[serviceId].push(doctorId);
-        return acc;
-      }, {} as Assignments);
-    }
-    // If it doesn't exist, return an empty object.
-    return {} as Assignments;
-  });
+  // Transform data for tables
+  const servicesData = useMemo(() => {
+    if (!initialContext.clinic?.services) return [];
+    
+    return initialContext.clinic.services.map(cs => {
+      const service = cs.service;
+      const assignedDoctors = initialContext.clinic.doctorClinicServices
+        .filter(dcs => dcs.serviceId === service.id)
+        .map(dcs => {
+          const doctor = initialContext.allDoctors.find(d => d.id === dcs.doctorId);
+          return doctor ? { id: doctor.id, fullName: doctor.fullName } : null;
+        })
+        .filter((doctor): doctor is { id: string; fullName: string } => doctor !== null);
+      
+      return {
+        id: service.id,
+        name: service.name,
+        description: service.description,
+        assignedDoctors: assignedDoctors.length > 0 ? assignedDoctors : undefined
+      };
+    });
+  }, [initialContext]);
 
-  const { mutate: saveAssignments, isPending } = useMutation({
-    mutationFn: (newAssignments: Assignments) => {
-        if (!session) throw new Error("Not authenticated");
-        return updateClinicDoctorAssignments({
-            clinicId: clinic.id,
-            assignments: newAssignments,
-            token: session.access_token,
-        });
+  const doctorsData = useMemo(() => {
+    if (!initialContext.clinic?.doctors) return [];
+    
+    return initialContext.clinic.doctors.map(cd => {
+      const doctor = cd.doctor;
+      const assignedServices = initialContext.clinic.doctorClinicServices
+        .filter(dcs => dcs.doctorId === doctor.id)
+        .map(dcs => {
+          const service = initialContext.clinic.services.find(cs => cs.service.id === dcs.serviceId);
+          return service ? { id: service.service.id, name: service.service.name } : null;
+        })
+        .filter((service): service is { id: string; name: string } => service !== null);
+      
+      return {
+        id: doctor.id,
+        fullName: doctor.fullName,
+        specialization: undefined, // TODO: Add specialization to doctor data
+        assignedServices: assignedServices.length > 0 ? assignedServices : undefined
+      };
+    });
+  }, [initialContext]);
+
+  // Filtered data for search
+  const filteredServicesData = useMemo(() => {
+    if (!servicesSearch) return servicesData;
+    return servicesData.filter(service => 
+      service.name.toLowerCase().includes(servicesSearch.toLowerCase())
+    );
+  }, [servicesData, servicesSearch]);
+
+  const filteredDoctorsData = useMemo(() => {
+    if (!doctorsSearch) return doctorsData;
+    return doctorsData.filter(doctor => 
+      doctor.fullName.toLowerCase().includes(doctorsSearch.toLowerCase())
+    );
+  }, [doctorsData, doctorsSearch]);
+
+  // Mutation for adding services
+  const addServicesMutation = useMutation({
+    mutationFn: async (serviceIds: string[]) => {
+      const currentServiceIds = initialContext.clinic.services.map(cs => cs.service.id);
+      const allServiceIds = [...new Set([...currentServiceIds, ...serviceIds])];
+      return assignServicesToClinic(clinicId, allServiceIds, session!.access_token);
     },
     onSuccess: () => {
-        toast({ title: "Success", description: "Doctor assignments have been updated." });
-        queryClient.invalidateQueries({ queryKey: ['clinicManagementContext', clinic.id] });
+      queryClient.invalidateQueries({ queryKey: ['clinic-management', clinicId] });
+      toast({ title: 'Success', description: 'Services added successfully' });
+      setIsAddServicesModalOpen(false);
     },
-    onError: (error) => {
-        toast({ title: "Error", description: `Failed to update assignments: ${error.message}`, variant: "destructive" });
-    }
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
   });
 
+  // Mutation for removing service
+  const removeServiceMutation = useMutation({
+    mutationFn: async (serviceId: string) => {
+      const remainingServiceIds = initialContext.clinic.services
+        .filter(cs => cs.service.id !== serviceId)
+        .map(cs => cs.service.id);
+      return assignServicesToClinic(clinicId, remainingServiceIds, session!.access_token);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clinic-management', clinicId] });
+      toast({ title: 'Success', description: 'Service removed successfully' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  // Mutation for updating doctor assignments
+  const updateDoctorAssignmentsMutation = useMutation({
+    mutationFn: async ({ serviceId, doctorIds }: { serviceId: string, doctorIds: string[] }) => {
+      return updateClinicDoctorAssignments({
+        clinicId,
+        assignments: [{ serviceId, doctorIds }],
+        token: session!.access_token
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clinic-management', clinicId] });
+      toast({ title: 'Success', description: 'Doctor assignments updated successfully' });
+      setIsDoctorAssignmentsModalOpen(false);
+      setSelectedService(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  // Action handlers - using the exact types from the column definitions
+  const handleManageDoctors = (service: { id: string; name: string; description?: string; assignedDoctors?: { id: string; fullName: string }[] }) => {
+    setSelectedService(service);
+    setIsDoctorAssignmentsModalOpen(true);
+  };
+
+  const handleRemoveService = (service: { id: string; name: string; description?: string; assignedDoctors?: { id: string; fullName: string }[] }) => {
+    if (confirm(`Are you sure you want to remove "${service.name}" from this clinic?`)) {
+      removeServiceMutation.mutate(service.id);
+    }
+  };
+
+  const handleManageServices = (doctor: { id: string; fullName: string; specialization?: string; assignedServices?: { id: string; name: string }[] }) => {
+    // TODO: Implement doctor service management modal
+    toast({ title: 'Info', description: 'Doctor service management coming soon' });
+  };
+
+  const handleRemoveDoctor = (doctor: { id: string; fullName: string; specialization?: string; assignedServices?: { id: string; name: string }[] }) => {
+    // TODO: Implement doctor removal
+    toast({ title: 'Info', description: 'Doctor removal coming soon' });
+  };
+
+  // Column configurations
+  const serviceColumns = serviceAssignmentsColumns({
+    onManageDoctors: handleManageDoctors,
+    onRemoveService: handleRemoveService
+  });
+
+  const doctorColumns = doctorAssignmentsColumns({
+    onManageServices: handleManageServices,
+    onRemoveDoctor: handleRemoveDoctor
+  });
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 space-y-6">
-      <Link href="/admin/clinics" className="flex items-center text-sm text-muted-foreground hover:underline">
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Clinics
-      </Link>
-      
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Manage {clinic.name}</h1>
-        <p className="text-lg text-muted-foreground">Update clinic details and manage service-doctor assignments.</p>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <Link href="/admin/clinics">
+          <Button variant="ghost" size="sm">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Clinics
+          </Button>
+        </Link>
+        <div>
+          <h1 className="text-2xl font-bold">{initialContext.clinic.name}</h1>
+          <p className="text-muted-foreground">Manage services and doctors</p>
+        </div>
       </div>
 
       <Separator />
 
-      <ClinicDetails clinic={clinic} />
+      {/* Main Content */}
+      <Tabs defaultValue="services" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="services">Services</TabsTrigger>
+          <TabsTrigger value="doctors">Doctors</TabsTrigger>
+        </TabsList>
 
-      <Separator />
+        <TabsContent value="services" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Clinic Services</CardTitle>
+                <Button onClick={() => setIsAddServicesModalOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Services
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <Input
+                  placeholder="Search services..."
+                  value={servicesSearch}
+                  onChange={(e) => setServicesSearch(e.target.value)}
+                  className="max-w-sm"
+                />
+                <DataTable
+                  columns={serviceColumns}
+                  data={filteredServicesData}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      <ServiceDoctorAssignments 
-        assignedServices={assignedServices || []}
-        allDoctors={assignedDoctors}
-        initialAssignments={assignments}
-        onAssignmentsChange={setAssignments}
+        <TabsContent value="doctors" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Clinic Doctors</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <Input
+                  placeholder="Search doctors..."
+                  value={doctorsSearch}
+                  onChange={(e) => setDoctorsSearch(e.target.value)}
+                  className="max-w-sm"
+                />
+                <DataTable
+                  columns={doctorColumns}
+                  data={filteredDoctorsData}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Modals */}
+      <AddServicesModal
+        isOpen={isAddServicesModalOpen}
+        onClose={() => setIsAddServicesModalOpen(false)}
+        availableServices={initialContext.allServices}
+        currentServiceIds={initialContext.clinic.services.map(cs => cs.service.id)}
+        onSave={(serviceIds) => addServicesMutation.mutate(serviceIds)}
+        isLoading={addServicesMutation.isPending}
       />
-      
-      <div className="flex justify-end">
-        <Button onClick={() => saveAssignments(assignments)} disabled={isPending}>
-            {isPending ? 'Saving...' : 'Save Changes'}
-        </Button>
-      </div>
+
+      <ManageDoctorAssignmentsModal
+        isOpen={isDoctorAssignmentsModalOpen}
+        onClose={() => {
+          setIsDoctorAssignmentsModalOpen(false);
+          setSelectedService(null);
+        }}
+        service={selectedService}
+        availableDoctors={initialContext.allDoctors}
+        currentAssignments={selectedService ? 
+          initialContext.clinic.doctorClinicServices
+            .filter(dcs => dcs.serviceId === selectedService.id)
+            .map(dcs => dcs.doctorId) : []
+        }
+        onSave={(doctorIds) => updateDoctorAssignmentsMutation.mutate({ 
+          serviceId: selectedService?.id || '', 
+          doctorIds 
+        })}
+        isLoading={updateDoctorAssignmentsMutation.isPending}
+      />
     </div>
   );
 } 

@@ -994,7 +994,7 @@ export async function assignServicesToClinic(clinicId: string, serviceIds: strin
       'Content-Type': 'application/json'
     };
     const response = await fetch(`${API_BASE_URL}/api/admin/clinics/${clinicId}/services`, {
-        method: 'POST',
+        method: 'PUT', // Changed from POST to PUT to match backend
         headers,
         body: JSON.stringify({ serviceIds })
     });
@@ -1298,39 +1298,37 @@ export async function getClinicMasterSchedule(
 }
 
 export async function getClinicManagementContext(clinicId: string, token: string) {
-    try {
-        const headers = await getAuthHeaders(token);
-        const url = `${API_BASE_URL}/api/admin/clinics/${clinicId}/management-context`;
-        
-        const response = await fetch(url, { headers, cache: 'no-store' });
-        if (!response.ok) {
-          throw new Error('Failed to fetch clinic management context');
-        }
-        return response.json();
-    } catch (error) {
-        console.error('getClinicManagementContext error:', error);
-        throw new Error('An error occurred while fetching clinic data.');
+    const headers = await getAuthHeaders(token);
+    const response = await fetch(`${API_BASE_URL}/api/admin/clinics/${clinicId}/management-context`, { 
+        headers, 
+        cache: 'no-store' 
+    });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: "Failed to fetch clinic management context." }));
+        throw new Error(error.message);
     }
-};
+    return response.json();
+}
 
-export async function updateClinicDoctorAssignments({ clinicId, assignments, token }: { clinicId: string, assignments: Record<string, string[]>, token: string }) {
-    const payload = {
-        assignments: Object.entries(assignments).map(([serviceId, doctorIds]) => ({
-            serviceId,
-            doctorIds,
-        })),
-    };
-
+// Remove the old updateClinicDoctorAssignments function and replace with new one
+export async function updateClinicDoctorAssignments({ 
+    clinicId, 
+    assignments, 
+    token 
+}: { 
+    clinicId: string, 
+    assignments: { serviceId: string, doctorIds: string[] }[], 
+    token: string 
+}) {
     const headers = await getAuthHeaders(token);
     const response = await fetch(`${API_BASE_URL}/api/admin/clinics/${clinicId}/doctor-assignments`, {
         method: 'PUT',
         headers,
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ assignments }),
     });
-
     if (!response.ok) {
         const error = await response.json().catch(() => ({ message: 'Failed to update doctor assignments.' }));
         throw new Error(error.message);
     }
     return response.json();
-};
+}

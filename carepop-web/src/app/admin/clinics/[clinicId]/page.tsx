@@ -35,7 +35,7 @@ export default async function ClinicManagementPage({ params }: { params: { clini
       );
     }
 
-    return <ClinicManagementClient initialContext={context} />;
+    return <ClinicManagementClient initialContext={context} clinicId={params.clinicId} />;
 
   } catch (error) {
     console.error('Failed to load clinic management page:', error);
