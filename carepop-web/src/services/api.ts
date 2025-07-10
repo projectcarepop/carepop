@@ -264,17 +264,35 @@ export async function getSingleMedicalRecord(recordId: string, accessToken: stri
 // When calling from a server component, pass the access token directly.
 // When calling from a client component, get the token from the session context.
 
-export async function getAdminAppointments(accessToken: string, filters?: Record<string, any>) {
+export async function getAdminAppointments(
+  accessToken: string, 
+  params: { 
+    page?: number;
+    limit?: number;
+    clinicId?: string;
+    patientName?: string;
+    date_from?: string;
+    date_to?: string;
+  } = {}
+) {
   const headers = await getAuthHeaders(accessToken);
-  let url = `${API_BASE_URL}/api/admin/appointments`;
-  if (filters) {
-      const params = new URLSearchParams(filters);
-      url += `?${params.toString()}`;
-  }
+  const queryParams = new URLSearchParams();
+  
+  Object.entries(params).forEach(([key, value]) => {
+    if (value) {
+      queryParams.append(key, String(value));
+    }
+  });
+
+  const url = `${API_BASE_URL}/api/admin/appointments?${queryParams.toString()}`;
   const response = await fetch(url, { headers, cache: 'no-store' });
-  if (!response.ok) throw new Error("Failed to fetch admin appointments.");
-  const result = await response.json();
-  return result.data || [];
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({ message: 'Failed to fetch appointments' }));
+    throw new Error(errorBody.message);
+  }
+
+  return response.json();
 }
 
 export async function getDashboardMetrics(accessToken: string) {
@@ -312,12 +330,22 @@ export async function adminCancelAppointment(appointmentId: string, reason: stri
     return response.json();
 }
 
-export async function getAdminClinics(accessToken: string) {
+export async function getAdminClinics(accessToken: string, params?: { page?: number, limit?: number, q?: string }) {
   const headers = await getAuthHeaders(accessToken);
-  const response = await fetch(`${API_BASE_URL}/api/admin/clinics`, { headers, cache: 'no-store' });
-  if (!response.ok) throw new Error("Failed to fetch admin clinics.");
-  const result = await response.json();
-  return result.data || [];
+  const queryParams = new URLSearchParams();
+  if (params?.page) queryParams.append('page', String(params.page));
+  if (params?.limit) queryParams.append('limit', String(params.limit));
+  if (params?.q) queryParams.append('q', params.q);
+  
+  const url = `${API_BASE_URL}/api/admin/clinics?${queryParams.toString()}`;
+
+  const response = await fetch(url, { headers });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'An unknown error occurred.' }));
+    throw new Error(error.message);
+  }
+  return response.json();
 }
 
 export async function getAdminClinicsList(accessToken: string) {
@@ -434,7 +462,18 @@ export async function upsertClinic(clinicData: any, accessToken: string, clinicI
     const url = clinicId ? `${API_BASE_URL}/api/admin/clinics/${clinicId}` : `${API_BASE_URL}/api/admin/clinics`;
     const method = clinicId ? 'PUT' : 'POST';
 
-    const response = await fetch(url, { method, headers, body: JSON.stringify(clinicData) });
+    // The backend now expects a flat structure for the address.
+    // We need to transform the data if it comes from a form with a nested address object.
+    const payload = {
+      ...clinicData,
+      street: clinicData.address?.street,
+      cityMunicipalityCode: clinicData.address?.city, // Note: field name mismatch
+      provinceCode: clinicData.address?.province,     // Note: field name mismatch
+      zipCode: clinicData.address?.zip,          // Note: field name mismatch
+    };
+    delete payload.address; // remove the nested object
+
+    const response = await fetch(url, { method, headers, body: JSON.stringify(payload) });
     if (!response.ok) {
         const error = await response.json().catch(() => ({ message: 'Failed to save clinic.'}));
         throw new Error(error.message);
@@ -836,19 +875,22 @@ export async function getAdminUsersByRole(role: 'doctor' | 'patient', accessToke
     return response.json();
 }
 
+/* This function is deprecated. Use a soft-delete (deactivate) pattern instead.
 export async function deleteClinic(clinicId: string, accessToken: string) {
-    const headers = await getAuthHeaders(accessToken);
-    const response = await fetch(`${API_BASE_URL}/api/admin/clinics/${clinicId}`, {
-        method: 'DELETE',
-        headers,
-    });
+  const headers = await getServerAuthHeaders(accessToken);
+  const response = await fetch(`${API_BASE_URL}/api/admin/clinics/${clinicId}`, {
+    method: 'DELETE',
+    headers,
+  });
 
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: "An unknown error occurred" }));
-        throw new Error(error.message || `Failed to delete clinic`);
-    }
-    return response.json();
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'An unknown error occurred.' }));
+    throw new Error(error.message);
+  }
+
+  return response.json();
 }
+*/
 
 export async function deleteDoctor(doctorId: string, accessToken: string) {
   const headers = await getAuthHeaders(accessToken);

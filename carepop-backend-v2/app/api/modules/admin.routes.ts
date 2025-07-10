@@ -24,7 +24,7 @@ import {
     medicalRecords,
     doctorClinicServices
 } from '../../../drizzle/schema';
-import { eq, sql, count, asc, and, gte, lt, getTableColumns, desc, inArray, SQL, sum, isNotNull } from 'drizzle-orm';
+import { eq, sql, count, asc, and, gte, lt, getTableColumns, desc, inArray, SQL, sum, isNotNull, or, ilike } from 'drizzle-orm';
 import { authMiddleware, adminOrManagerMiddleware, AuthEnv } from '../middleware/auth';
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
@@ -168,11 +168,10 @@ adminRoutes.use('*', authMiddleware, adminOrManagerMiddleware);
 // --- Zod Schemas for Validation ---
 const createClinicSchema = z.object({
   name: z.string().min(1),
-  address: z.object({
-    street: z.string(),
-    city: z.string(),
-    zip: z.string(),
-  }),
+  street: z.string().optional(),
+  cityMunicipalityCode: z.string().optional(),
+  provinceCode: z.string().optional(),
+  zipCode: z.string().optional(),
   location: z.object({
     lat: z.number().min(-90).max(90),
     lon: z.number().min(-180).max(180),
@@ -182,11 +181,10 @@ const createClinicSchema = z.object({
 
 const updateClinicSchema = z.object({
   name: z.string().min(1).optional(),
-  address: z.object({
-    street: z.string(),
-    city: z.string(),
-    zip: z.string(),
-  }).optional(),
+  street: z.string().optional(),
+  cityMunicipalityCode: z.string().optional(),
+  provinceCode: z.string().optional(),
+  zipCode: z.string().optional(),
   isActive: z.boolean().optional(),
   // Add latitude and longitude for location updates
   latitude: z.number().min(-90).max(90).optional(),
@@ -310,25 +308,48 @@ const uploadDocumentSchema = z.object({
 // --- Clinic Management Endpoints ---
 
 adminRoutes
-  .get('/clinics', async (c) => {
-    // Use Drizzle's `sql` to extract coordinates
-    const clinicsWithCoords = await db.select({
-        // Select all original columns
+  .get('/clinics', zValidator('query', z.object({
+    page: z.coerce.number().int().min(1).optional().default(1),
+    limit: z.coerce.number().int().min(1).max(100).optional().default(10),
+    q: z.string().optional(),
+  })), async (c) => {
+    const { page, limit, q } = c.req.valid('query');
+    const offset = (page - 1) * limit;
+
+    const whereConditions = q ? [sql.raw(`LOWER(name) ILIKE LOWER('%${q}%')`)] : [];
+
+    // Fetch total count and data in parallel for efficiency
+    const [totalResult, clinicsWithCoords] = await Promise.all([
+      db.select({ count: count() }).from(clinics).where(and(...whereConditions)),
+      db.select({
         ...getTableColumns(clinics),
-        // And add the extracted lat/lon
         latitude: sql<number>`ST_Y(location::geometry)`,
         longitude: sql<number>`ST_X(location::geometry)`
-    }).from(clinics);
+      }).from(clinics).where(and(...whereConditions)).limit(limit).offset(offset)
+    ]);
 
-    return c.json({ data: clinicsWithCoords });
+    const totalCount = totalResult[0]?.count ?? 0;
+
+    return c.json({ 
+      data: clinicsWithCoords,
+      pagination: {
+        page,
+        pageSize: limit,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limit)
+      }
+    });
   })
   .post('/clinics', zValidator('json', createClinicSchema), async (c) => {
-    const { name, address, location, isActive } = c.req.valid('json');
+    const { name, street, cityMunicipalityCode, provinceCode, zipCode, location, isActive } = c.req.valid('json');
     const point = `POINT(${location.lon} ${location.lat})`;
 
     const [newClinic] = await db.insert(clinics).values({
       name,
-      address,
+      street,
+      cityMunicipalityCode,
+      provinceCode,
+      zipCode,
       location: sql`ST_GeomFromText(${point}, 4326)`,
       isActive,
     }).returning();
@@ -390,18 +411,19 @@ adminRoutes
     }
   })
   .delete('/clinics/:id', async (c) => {
-    // This endpoint should probably have more checks, like if the clinic has active appointments.
-    // For now, it's a direct deletion.
     const { id } = c.req.param();
-    if (!id) {
-      return c.json({ error: 'ID is required' }, 400);
-    }
 
-    const deletedClinic = await db.delete(clinics).where(eq(clinics.id, id)).returning();
-    if (deletedClinic.length === 0) {
+    // This is now a soft delete.
+    const [deactivatedClinic] = await db.update(clinics)
+        .set({ isActive: false })
+        .where(eq(clinics.id, id))
+        .returning();
+
+    if (!deactivatedClinic) {
       return c.json({ error: 'Clinic not found' }, 404);
     }
-    return c.json({ data: deletedClinic[0], message: 'Clinic deleted successfully' });
+    
+    return c.json({ data: deactivatedClinic, message: 'Clinic has been deactivated.' });
   });
 
 adminRoutes.get(
@@ -1254,16 +1276,20 @@ adminRoutes
 
 // --- Appointment Management Endpoints ---
 const getAppointmentsSchema = z.object({
+    page: z.coerce.number().int().min(1).optional().default(1),
+    limit: z.coerce.number().int().min(1).max(100).optional().default(10),
+    clinicId: z.string().uuid().optional(),
+    patientName: z.string().optional(),
     date_from: z.string().optional(),
     date_to: z.string().optional(),
-    clinicId: z.string().optional(),
 });
 
 adminRoutes.get('/appointments', zValidator('query', getAppointmentsSchema), async (c) => {
     try {
-        const { date_from, date_to, clinicId } = c.req.valid('query');
-        const conditions = [];
+        const { page, limit, date_from, date_to, clinicId, patientName } = c.req.valid('query');
+        const offset = (page - 1) * limit;
 
+        let conditions: (SQL | undefined)[] = [];
         if (date_from) {
             conditions.push(gte(appointments.appointmentTime, date_from));
         }
@@ -1275,18 +1301,52 @@ adminRoutes.get('/appointments', zValidator('query', getAppointmentsSchema), asy
         if (clinicId) {
             conditions.push(eq(appointments.clinicId, clinicId));
         }
+        if (patientName) {
+            conditions.push(or(
+                ilike(profiles.firstName, `%${patientName}%`),
+                ilike(profiles.lastName, `%${patientName}%`)
+            ));
+        }
         
-        const allAppointments = await db.query.appointments.findMany({
-            where: conditions.length > 0 ? and(...conditions) : undefined,
-            with: {
-                clinic: { columns: { name: true } },
-                doctor: { columns: { fullName: true } },
-                patient: { columns: { firstName: true, lastName: true } },
-            },
-            orderBy: [desc(appointments.appointmentTime)],
-        });
+        const whereClause = and(...conditions.filter(c => c !== undefined));
 
-        return c.json({ data: allAppointments });
+        const appointmentsQuery = db.select({
+            ...getTableColumns(appointments),
+            clinicName: clinics.name,
+            doctorName: doctors.fullName,
+            patientFirstName: profiles.firstName,
+            patientLastName: profiles.lastName,
+        })
+        .from(appointments)
+        .leftJoin(clinics, eq(appointments.clinicId, clinics.id))
+        .leftJoin(doctors, eq(appointments.doctorId, doctors.id))
+        .leftJoin(profiles, eq(appointments.patientId, profiles.id))
+        .where(whereClause)
+        .orderBy(desc(appointments.appointmentTime))
+        .limit(limit)
+        .offset(offset);
+
+        const totalCountQuery = db.select({ count: count() })
+            .from(appointments)
+            .leftJoin(profiles, eq(appointments.patientId, profiles.id))
+            .where(whereClause);
+        
+        const [allAppointments, totalResult] = await Promise.all([
+            appointmentsQuery,
+            totalCountQuery
+        ]);
+        
+        const totalCount = totalResult[0]?.count ?? 0;
+
+        return c.json({
+            data: allAppointments,
+            pagination: {
+                page,
+                pageSize: limit,
+                totalCount,
+                totalPages: Math.ceil(totalCount / limit)
+            }
+        });
     } catch (error: any) {
         console.error("Error fetching appointments:", error);
         return c.json({ error: 'Failed to fetch appointments', message: error.message }, 500);
@@ -1296,81 +1356,35 @@ adminRoutes.get('/appointments', zValidator('query', getAppointmentsSchema), asy
 adminRoutes.get('/appointments/:id', async (c) => {
     try {
         const { id } = c.req.param();
-        const user = c.get('user');
+        if (!id) {
+            return c.json({ error: 'Appointment ID is required' }, 400);
+        }
 
-        console.log(`[GET /appointments/:id] Admin user ${user?.id} fetching appointment ${id}`);
+        const [appointmentDetails] = await db.select({
+            ...getTableColumns(appointments),
+            clinicName: clinics.name,
+            doctorName: doctors.fullName,
+            patientFirstName: profiles.firstName,
+            patientLastName: profiles.lastName,
+            serviceName: services.name,
+            servicePrice: services.price,
+        })
+        .from(appointments)
+        .leftJoin(clinics, eq(appointments.clinicId, clinics.id))
+        .leftJoin(doctors, eq(appointments.doctorId, doctors.id))
+        .leftJoin(profiles, eq(appointments.patientId, profiles.id))
+        .leftJoin(services, eq(appointments.serviceId, services.id))
+        .where(eq(appointments.id, id));
 
-        // Step 1: Fetch the core appointment details and simple relations
-        const appointment = await db.query.appointments.findFirst({
-            where: eq(appointments.id, id),
-            with: {
-                patient: {
-                    columns: {
-                        id: true,
-                        firstName: true,
-                        lastName: true,
-                        email: true,
-                        birthday: true,
-                        genderIdentity: true,
-                    }
-                },
-                doctor: true,
-                service: true,
-                clinic: true,
-                // Fetch base medical records. We will enrich them below.
-                medicalRecords: {
-                    orderBy: (medicalRecords, { desc }) => [desc(medicalRecords.createdAt)],
-                }
-            }
-        });
 
-        if (!appointment) {
-            console.warn(`[GET /appointments/:id] Appointment ${id} not found.`);
+        if (!appointmentDetails) {
             return c.json({ error: 'Appointment not found' }, 404);
         }
 
-        // Step 2 & 3: Enrich medical records with details from specialized tables
-        const enrichedMedicalRecords = await Promise.all(
-            appointment.medicalRecords.map(async (record) => {
-                let details: any = null;
-                switch (record.recordType) {
-                    case 'DOCTOR_NOTE':
-                        details = await db.query.recordDoctorNotes.findFirst({
-                            where: eq(recordDoctorNotes.recordId, record.id)
-                        });
-                        break;
-                    case 'PRESCRIPTION':
-                        details = await db.query.recordPrescriptions.findFirst({
-                            where: eq(recordPrescriptions.recordId, record.id)
-                        });
-                        break;
-                    case 'LAB_RESULT':
-                    case 'CLINICAL_DOCUMENT':
-                        details = await db.query.recordDocuments.findFirst({
-                            where: eq(recordDocuments.recordId, record.id)
-                        });
-                        break;
-                    default:
-                        // Handle 'LAB_ORDER' or other unknown types if necessary
-                        break;
-                }
-                return { ...record, details };
-            })
-        );
-        
-        // Step 4: Replace the original medical records with the enriched ones
-        const finalAppointmentData = {
-            ...appointment,
-            medicalRecords: enrichedMedicalRecords
-        };
-
-        console.log(`[GET /appointments/:id] Successfully found and enriched appointment ${id}.`);
-        // Step 5: Return the fully composed appointment object
-        return c.json({ data: finalAppointmentData });
-
+        return c.json({ data: appointmentDetails });
     } catch (error: any) {
-        console.error(`[GET /appointments/:id] CRASH:`, error);
-        return c.json({ message: "Error fetching appointment details", error: error.message }, 500);
+        console.error("Error fetching appointment details:", error);
+        return c.json({ error: 'Failed to fetch appointment details', message: error.message }, 500);
     }
 });
 
@@ -1715,7 +1729,10 @@ adminRoutes.patch(
     const { reason } = c.req.valid('json');
     try {
         const [updatedAppointment] = await db.update(appointments)
-            .set({ status: 'canceled_by_admin' })
+            .set({ 
+                status: 'canceled_by_admin',
+                cancellationReason: reason 
+            })
             .where(eq(appointments.id, id))
             .returning();
 
@@ -2082,67 +2099,6 @@ adminRoutes.get('/doctors/:doctorId/calculated-availability',
     }
   }
 );
-
-// --- Clinic Details ---
-adminRoutes
-  .get('/clinics/:id', async (c) => {
-    const { id } = c.req.param();
-    
-    // Step 1: Get the basic clinic data
-    const [clinic] = await db.select().from(clinics).where(eq(clinics.id, id));
-
-    if (!clinic) {
-      return c.json({ error: 'Not Found' }, 404);
-    }
-
-    // Step 2: Get the IDs of all services assigned to this clinic
-    const assignedServices = await db.select({
-      serviceId: clinicServices.serviceId
-    }).from(clinicServices).where(eq(clinicServices.clinicId, id));
-
-    const serviceIds = assignedServices.map(s => s.serviceId);
-
-    // Step 3: Combine and return the data
-    const responseData = {
-      ...clinic,
-      serviceIds: serviceIds,
-    };
-
-    return c.json(responseData);
-  })
-  .put('/clinics/:id', zValidator('json', updateClinicSchema), async (c) => {
-    const id = c.req.param('id');
-    const { latitude, longitude, ...clinicData } = c.req.valid('json');
-
-    const payloadForDb: Record<string, any> = { ...clinicData };
-
-    if (latitude !== undefined && longitude !== undefined) {
-        payloadForDb.location = sql`ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography`;
-    }
-
-    if (Object.keys(payloadForDb).length === 0) {
-        return c.json({ error: 'No fields to update' }, 400);
-    }
-
-    try {
-        const [updatedClinic] = await db.update(clinics)
-            .set(payloadForDb)
-            .where(eq(clinics.id, id))
-            .returning();
-
-        if (!updatedClinic) return c.json({ error: 'Not Found' }, 404);
-        return c.json(updatedClinic);
-    } catch (error: any) {
-        console.error("Error updating clinic:", error);
-        return c.json({ error: 'Failed to update clinic', message: error.message }, 500);
-    }
-  })
-  .delete('/clinics/:id', async (c) => {
-    const { id } = c.req.param();
-    const [deletedClinic] = await db.delete(clinics).where(eq(clinics.id, id)).returning();
-    if (!deletedClinic) return c.json({ error: 'Not Found' }, 404);
-    return c.json({ success: true });
-  });
 
 // --- CORRECTED NEW ENDPOINT to get doctors by clinic ---
 adminRoutes.get('/clinics/:clinicId/doctors', async (c) => {

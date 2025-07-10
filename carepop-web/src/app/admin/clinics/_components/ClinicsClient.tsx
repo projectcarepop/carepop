@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { PlusCircle } from 'lucide-react';
 
-import { getAdminClinics, upsertClinic, deleteClinic } from '@/services/api';
+import { getAdminClinics, upsertClinic } from '@/services/api';
 import { DataTable } from '@/components/ui/data-table';
 import { type Clinic } from '@/lib/types';
 import { columns } from './columns';
@@ -31,9 +31,10 @@ import { ClinicForm } from './ClinicForm';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useDebounce } from 'use-debounce';
 
 interface ClinicsClientProps {
-  initialClinics: Clinic[];
+  initialClinics: any; // Allow any for initial data to handle paginated response
 }
 
 export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
@@ -44,22 +45,38 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [selectedClinic, setSelectedClinic] = React.useState<Clinic | undefined>(undefined);
 
-  // State for controlling the Delete confirmation dialog
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
-  const [clinicToDelete, setClinicToDelete] = React.useState<Clinic | undefined>(undefined);
+  // State for controlling the Deactivate confirmation dialog
+  const [isDeactivateDialogOpen, setIsDeactivateDialogOpen] = React.useState(false);
+  const [clinicToDeactivate, setClinicToDeactivate] = React.useState<Clinic | undefined>(undefined);
+  
+  // Server-side filtering and pagination state
   const [globalFilter, setGlobalFilter] = React.useState('');
+  const [pagination, setPagination] = React.useState({
+    pageIndex: 0, // tanstack-table uses 0-based index
+    pageSize: 10,
+  });
+  const [debouncedFilter] = useDebounce(globalFilter, 500);
+
+  const queryKey = ['adminClinics', pagination, debouncedFilter];
 
   const {
-    data: clinics,
+    data,
     isLoading,
     isError,
     error,
   } = useQuery({
-    queryKey: ['adminClinics'],
-    queryFn: () => getAdminClinics(session!.access_token),
+    queryKey,
+    queryFn: () => getAdminClinics(session!.access_token, { 
+      page: pagination.pageIndex + 1,
+      limit: pagination.pageSize,
+      q: debouncedFilter,
+     }),
     initialData: initialClinics,
     enabled: !!session,
   });
+
+  const clinics = data?.data || [];
+  const pageCount = data?.pagination?.totalPages ?? 0;
 
   const upsertMutation = useMutation({
     mutationFn: (clinicData: Partial<Clinic>) => {
@@ -83,27 +100,28 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
     },
   });
 
-  const deleteMutation = useMutation({
+  const deactivateMutation = useMutation({
     mutationFn: (clinicId: string) => {
-      return deleteClinic(clinicId, session!.access_token);
+      // We now call upsertClinic with isActive: false to deactivate.
+      return upsertClinic({ id: clinicId, isActive: false }, session!.access_token, clinicId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminClinics'] });
       toast({
-        title: 'Clinic Deleted',
-        description: 'The clinic has been successfully deleted.',
+        title: 'Clinic Deactivated',
+        description: 'The clinic has been successfully deactivated and is no longer visible to patients.',
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Error Deleting Clinic',
+        title: 'Error Deactivating Clinic',
         description: error.message,
         variant: 'destructive',
       });
     },
     onSettled: () => {
-      setIsDeleteDialogOpen(false);
-      setClinicToDelete(undefined);
+      setIsDeactivateDialogOpen(false);
+      setClinicToDeactivate(undefined);
     }
   });
 
@@ -117,13 +135,13 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (clinic: Clinic) => {
-    setClinicToDelete(clinic);
-    setIsDeleteDialogOpen(true);
+  const handleDeactivate = (clinic: Clinic) => {
+    setClinicToDeactivate(clinic);
+    setIsDeactivateDialogOpen(true);
   }
 
-  // Pass the edit and delete handlers to the columns definition
-  const dynamicColumns = React.useMemo(() => columns({ onEdit: handleEdit, onDelete: handleDelete }), []);
+  // Pass the edit and deactivate handlers to the columns definition
+  const dynamicColumns = React.useMemo(() => columns({ onEdit: handleEdit, onDelete: handleDeactivate }), []);
 
   if (isError) return <div>Failed to load clinics: {error?.message}</div>;
 
@@ -132,7 +150,7 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
       <CardHeader className="p-0">
         <CardTitle>Manage Clinics</CardTitle>
         <CardDescription>
-          This page allows you to create, view, edit, and delete all clinic locations on the platform.
+          This page allows you to create, view, edit, and deactivate all clinic locations on the platform.
         </CardDescription>
       </CardHeader>
       
@@ -152,7 +170,9 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
       <DataTable
         columns={dynamicColumns}
         data={clinics || []}
-        filterColumn="name"
+        pageCount={pageCount}
+        pagination={pagination}
+        setPagination={setPagination}
         globalFilter={globalFilter}
         setGlobalFilter={setGlobalFilter}
         isLoading={isLoading}
@@ -180,24 +200,24 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
         </DialogContent>
       </Dialog>
       
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      {/* Deactivate Confirmation Dialog */}
+      <AlertDialog open={isDeactivateDialogOpen} onOpenChange={setIsDeactivateDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogTitle>Are you sure you want to deactivate this clinic?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the 
-              <span className="font-semibold"> {clinicToDelete?.name} </span> 
-              clinic.
+              This action will make the 
+              <span className="font-semibold"> {clinicToDeactivate?.name} </span> 
+              clinic inactive and hidden from users. It will not be deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={() => clinicToDelete && deleteMutation.mutate(clinicToDelete.id)}
-              disabled={deleteMutation.isPending}
+              onClick={() => clinicToDeactivate && deactivateMutation.mutate(clinicToDeactivate.id)}
+              disabled={deactivateMutation.isPending}
             >
-              {deleteMutation.isPending ? 'Deleting...' : 'Continue'}
+              {deactivateMutation.isPending ? 'Deactivating...' : 'Deactivate'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
