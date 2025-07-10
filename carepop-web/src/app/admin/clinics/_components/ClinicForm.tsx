@@ -18,8 +18,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
-import { MultiSelect } from '@/components/ui/multi-select';
-import { Service } from '@/lib/types';
 
 const formSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
@@ -31,21 +29,18 @@ const formSchema = z.object({
   latitude: z.coerce.number().min(-90, 'Invalid Latitude').max(90, 'Invalid Latitude'),
   longitude: z.coerce.number().min(-180, 'Invalid Longitude').max(180, 'Invalid Longitude'),
   isActive: z.boolean(),
-  serviceIds: z.array(z.string()).optional(),
 });
 
 type ClinicFormValues = z.infer<typeof formSchema>;
 
 interface ClinicFormProps {
   initialData?: any;
-  allServices: Service[];
   onSubmit: (values: ClinicFormValues) => void;
   isPending: boolean;
 }
 
 export function ClinicForm({
   initialData,
-  allServices,
   onSubmit,
   isPending,
 }: ClinicFormProps) {
@@ -61,7 +56,6 @@ export function ClinicForm({
       latitude: initialData?.latitude || initialData?.location?.lat || 0,
       longitude: initialData?.longitude || initialData?.location?.lon || 0,
       isActive: initialData?.isActive ?? true,
-      serviceIds: initialData?.serviceIds || [],
     },
   });
 
@@ -217,24 +211,14 @@ export function ClinicForm({
 
           {/* Right Column */}
           <div className="space-y-8">
-            <FormField
-              control={form.control}
-              name="serviceIds"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Services Offered</FormLabel>
-                  <FormControl>
-                    <MultiSelect
-                      options={allServices.map(s => ({ label: s.name, value: s.id }))}
-                      onValueChange={field.onChange}
-                      defaultValue={field.value || []}
-                      placeholder="Select services..."
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="rounded-lg border p-4 bg-blue-50">
+              <h4 className="font-medium text-blue-900 mb-2">Service Management</h4>
+              <p className="text-sm text-blue-800">
+                Services and doctor assignments are managed in the dedicated clinic management page. 
+                After saving this clinic, use the &quot;View &amp; Manage&quot; action to configure services and assign doctors.
+              </p>
+            </div>
+            
             <FormField
               control={form.control}
               name="isActive"

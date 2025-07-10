@@ -361,8 +361,12 @@ adminRoutes
   .get('/clinics/:id', async (c) => {
     const { id } = c.req.param();
     
-    // Step 1: Get the basic clinic data
-    const [clinic] = await db.select().from(clinics).where(eq(clinics.id, id));
+    // Step 1: Get the clinic data with extracted coordinates
+    const [clinic] = await db.select({
+      ...getTableColumns(clinics),
+      latitude: sql<number>`ST_Y(location::geometry)`,
+      longitude: sql<number>`ST_X(location::geometry)`
+    }).from(clinics).where(eq(clinics.id, id));
 
     if (!clinic) {
       return c.json({ error: 'Not Found' }, 404);

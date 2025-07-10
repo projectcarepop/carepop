@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { PlusCircle } from 'lucide-react';
 
-import { getAdminClinics, upsertClinic, getAdminServices } from '@/services/api';
+import { getAdminClinics, upsertClinic } from '@/services/api';
 import { DataTable } from '@/components/ui/data-table';
 import { type Clinic } from '@/lib/types';
 import { columns } from './columns';
@@ -74,17 +74,9 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
     enabled: !!session,
   });
 
-  const { data: servicesData, isLoading: isLoadingServices } = useQuery({
-    queryKey: ['adminServicesForClinicForm'],
-    queryFn: () => getAdminServices(session!.access_token),
-    enabled: !!session,
-  });
-
-  const allServices = servicesData || [];
-
   const clinics = data?.data || [];
   const pageCount = data?.pagination?.totalPages ?? 0;
-  const isLoading = isLoadingClinics || isLoadingServices;
+  const isLoading = isLoadingClinics;
 
   const upsertMutation = useMutation({
     mutationFn: (clinicData: Partial<Clinic>) => {
@@ -139,7 +131,7 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
   };
 
   const handleEdit = async (clinic: Clinic) => {
-    // Fetch the full clinic data including serviceIds
+    // Fetch the full clinic data including coordinates and serviceIds
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/admin/clinics/${clinic.id}`, { 
         headers: {
@@ -150,16 +142,18 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to fetch clinic details');
+        throw new Error(`Failed to fetch clinic details: ${response.status} ${response.statusText}`);
       }
       
       const fullClinicData = await response.json();
+      console.log('Fetched clinic data for editing:', fullClinicData);
       setSelectedClinic(fullClinicData);
       setIsModalOpen(true);
-    } catch {
+    } catch (error: any) {
+      console.error('Error fetching clinic details:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load clinic details',
+        description: `Failed to load clinic details: ${error.message}`,
         variant: 'destructive',
       });
     }
@@ -214,9 +208,8 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
           </DialogHeader>
           <ClinicForm
             initialData={selectedClinic}
-            allServices={allServices}
             onSubmit={(values) => {
-              const { latitude, longitude, serviceIds, ...rest } = values;
+              const { latitude, longitude, ...rest } = values;
               const payload = {
                 ...rest,
                 location: {
@@ -224,7 +217,6 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
                   lon: longitude,
                 },
                 id: selectedClinic?.id,
-                serviceIds, // Pass this along to the upsertClinic function
               };
               upsertMutation.mutate(payload as any);
             }}
