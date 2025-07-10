@@ -1848,8 +1848,9 @@ adminRoutes.patch(
     try {
         const [updatedAppointment] = await db.update(appointments)
             .set({
-                status: 'canceled_by_admin',
-                cancellationReason: reason
+                status: 'canceled_by_admin'
+                // TODO: Store cancellation reason in separate table or add column to DB
+                // cancellationReason: reason
             })
             .where(eq(appointments.id, id))
             .returning();

@@ -162,8 +162,6 @@ export const appointments = pgTable("appointments", {
 	appointmentTime: timestamp("appointment_time", { withTimezone: true, mode: 'string' }).notNull(),
 	status: appointmentStatus("status").default('scheduled').notNull(),
 	reasonForVisit: text("reason_for_visit"),
-	cancellationReason: text("cancellation_reason"),
-	visitSummary: text("visit_summary"),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => ({
     patientIdx: index("idx_appointments_patient_id").on(table.patientId),

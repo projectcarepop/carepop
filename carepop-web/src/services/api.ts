@@ -842,7 +842,7 @@ export const getAvailableDays = async (
     month: number, 
     year: number
 ) => {
-    const response = await fetch(`${API_BASE_URL}/public/doctors/${doctorId}/available-days?serviceId=${serviceId}&clinicId=${clinicId}&month=${month}&year=${year}`);
+    const response = await fetch(`${API_BASE_URL}/api/public/doctors/${doctorId}/available-days?serviceId=${serviceId}&clinicId=${clinicId}&month=${month}&year=${year}`);
     if (!response.ok) {
         throw new Error('Failed to fetch available days');
     }
