@@ -20,8 +20,9 @@ import { doctorAssignmentsColumns } from './doctor-assignments-columns';
 import { AddServicesModal } from './AddServicesModal';
 import { ManageDoctorAssignmentsModal } from './ManageDoctorAssignmentsModal';
 
-// Updated type to match new backend response
+// Updated type to handle both possible backend response formats
 type ManagementContext = {
+  // Format 1: New nested structure
   clinic: {
     id: string;
     name: string;
@@ -30,12 +31,17 @@ type ManagementContext = {
     provinceCode: string | null;
     zipCode: string | null;
     phoneNumber: string | null;
-    services: { service: { id: string; name: string; description?: string } }[];
-    doctors: { doctor: { id: string; fullName: string } }[];
-    doctorClinicServices: { doctorId: string; serviceId: string }[];
+    services?: { service: { id: string; name: string; description?: string } }[];
+    doctors?: { doctor: { id: string; fullName: string } }[];
+    doctorClinicServices?: { doctorId: string; serviceId: string }[];
   };
-  allServices: { id: string; name: string; description?: string; serviceCategory?: { name: string } }[];
-  allDoctors: { id: string; fullName: string; specialization?: string }[];
+  allServices?: { id: string; name: string; description?: string; serviceCategory?: { name: string } }[];
+  allDoctors?: { id: string; fullName: string; specialization?: string }[];
+  
+  // Format 2: Original flat structure  
+  assignedServices?: { id: string; name: string; description?: string }[];
+  assignedDoctors?: { id: string; fullName: string }[];
+  doctorServiceAssignments?: { doctorId: string; serviceId: string }[];
 };
 
 interface ClinicManagementClientProps {
@@ -64,23 +70,41 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
 
   // Transform data for tables
   const servicesData = useMemo(() => {
-    if (!initialContext?.clinic?.services || !Array.isArray(initialContext.clinic.services)) {
-      console.log('No services data found');
+    console.log('Processing services data...');
+    
+    // Try Format 1: New nested structure
+    let clinicServices = initialContext?.clinic?.services;
+    let doctorClinicServices = initialContext?.clinic?.doctorClinicServices;
+    let allDoctors = initialContext?.allDoctors;
+    
+    // Fallback to Format 2: Original flat structure
+    if (!clinicServices && initialContext?.assignedServices) {
+      console.log('Using Format 2 (flat structure)');
+      clinicServices = initialContext.assignedServices.map(service => ({ service }));
+      doctorClinicServices = initialContext?.doctorServiceAssignments || [];
+      allDoctors = initialContext?.assignedDoctors || [];
+    }
+    
+    if (!clinicServices || !Array.isArray(clinicServices)) {
+      console.log('No services data found in either format');
       return [];
     }
     
-    const result = initialContext.clinic.services
+    const result = clinicServices
       .map(cs => {
-        const service = cs?.service;
-        if (!service) return null;
+        const rawService = cs?.service || cs; // Handle both nested and flat service objects
+        if (!rawService || !('id' in rawService)) return null;
         
-        const doctorClinicServices = initialContext.clinic?.doctorClinicServices || [];
-        const allDoctors = initialContext?.allDoctors || [];
+        // Type assertion after checking for 'id' property
+        const service = rawService as { id: string; name: string; description?: string };
         
-        const assignedDoctors = doctorClinicServices
+        const assignments = doctorClinicServices || [];
+        const doctors = allDoctors || [];
+        
+        const assignedDoctors = assignments
           .filter(dcs => dcs?.serviceId === service.id)
           .map(dcs => {
-            const doctor = allDoctors.find(d => d?.id === dcs?.doctorId);
+            const doctor = doctors.find(d => d?.id === dcs?.doctorId);
             return doctor ? { id: doctor.id, fullName: doctor.fullName } : null;
           })
           .filter((doctor): doctor is { id: string; fullName: string } => doctor !== null);
@@ -88,7 +112,7 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
         return {
           id: service.id,
           name: service.name,
-          description: service.description,
+          description: service.description || undefined,
           assignedDoctors: assignedDoctors.length > 0 ? assignedDoctors : undefined
         };
       })
@@ -99,31 +123,50 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
   }, [initialContext]);
 
   const doctorsData = useMemo(() => {
-    if (!initialContext?.clinic?.doctors || !Array.isArray(initialContext.clinic.doctors)) {
-      console.log('No doctors data found');
+    console.log('Processing doctors data...');
+    
+    // Try Format 1: New nested structure
+    let clinicDoctors = initialContext?.clinic?.doctors;
+    let clinicServices = initialContext?.clinic?.services;
+    let doctorClinicServices = initialContext?.clinic?.doctorClinicServices;
+    
+    // Fallback to Format 2: Original flat structure
+    if (!clinicDoctors && initialContext?.assignedDoctors) {
+      console.log('Using Format 2 (flat structure) for doctors');
+      clinicDoctors = initialContext.assignedDoctors.map(doctor => ({ doctor }));
+      clinicServices = (initialContext?.assignedServices || []).map(service => ({ service }));
+      doctorClinicServices = initialContext?.doctorServiceAssignments || [];
+    }
+    
+    if (!clinicDoctors || !Array.isArray(clinicDoctors)) {
+      console.log('No doctors data found in either format');
       return [];
     }
     
-    const result = initialContext.clinic.doctors
+    const result = clinicDoctors
       .map(cd => {
-        const doctor = cd?.doctor;
+        const doctor = cd?.doctor || cd; // Handle both nested and flat doctor objects
         if (!doctor) return null;
         
-        const doctorClinicServices = initialContext.clinic?.doctorClinicServices || [];
-        const clinicServices = initialContext.clinic?.services || [];
+        const assignments = doctorClinicServices || [];
+        const services = clinicServices || [];
         
-        const assignedServices = doctorClinicServices
+        const assignedServices = assignments
           .filter(dcs => dcs?.doctorId === doctor.id)
           .map(dcs => {
-            const service = clinicServices.find(cs => cs?.service?.id === dcs?.serviceId);
-            return service ? { id: service.service.id, name: service.service.name } : null;
+            const service = services.find(cs => {
+              const svc = cs?.service || cs;
+              return svc?.id === dcs?.serviceId;
+            });
+            const svc = service?.service || service;
+            return (svc && 'id' in svc) ? { id: svc.id, name: svc.name } : null;
           })
           .filter((service): service is { id: string; name: string } => service !== null);
         
         return {
           id: doctor.id,
           fullName: doctor.fullName,
-          specialization: undefined, // TODO: Add specialization to doctor data
+          specialization: undefined,
           assignedServices: assignedServices.length > 0 ? assignedServices : undefined
         };
       })
@@ -151,8 +194,19 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
   // Mutation for adding services
   const addServicesMutation = useMutation({
     mutationFn: async (serviceIds: string[]) => {
-      const currentServices = initialContext?.clinic?.services || [];
-      const currentServiceIds = currentServices.map(cs => cs?.service?.id).filter(Boolean) as string[];
+      // Handle both data formats
+      const clinicServices = initialContext?.clinic?.services || [];
+      const assignedServices = initialContext?.assignedServices || [];
+      
+      let currentServiceIds: string[];
+      if (clinicServices.length > 0) {
+        // Format 1: nested structure
+        currentServiceIds = clinicServices.map(cs => cs?.service?.id).filter(Boolean) as string[];
+      } else {
+        // Format 2: flat structure
+        currentServiceIds = assignedServices.map(s => s?.id).filter(Boolean) as string[];
+      }
+      
       const allServiceIds = [...new Set([...currentServiceIds, ...serviceIds])];
       return assignServicesToClinic(clinicId, allServiceIds, session!.access_token);
     },
@@ -169,11 +223,25 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
   // Mutation for removing service
   const removeServiceMutation = useMutation({
     mutationFn: async (serviceId: string) => {
-      const currentServices = initialContext?.clinic?.services || [];
-      const remainingServiceIds = currentServices
-        .filter(cs => cs?.service?.id !== serviceId)
-        .map(cs => cs?.service?.id)
-        .filter(Boolean) as string[];
+      // Handle both data formats
+      const clinicServices = initialContext?.clinic?.services || [];
+      const assignedServices = initialContext?.assignedServices || [];
+      
+      let remainingServiceIds: string[];
+      if (clinicServices.length > 0) {
+        // Format 1: nested structure
+        remainingServiceIds = clinicServices
+          .filter(cs => cs?.service?.id !== serviceId)
+          .map(cs => cs?.service?.id)
+          .filter(Boolean) as string[];
+      } else {
+        // Format 2: flat structure
+        remainingServiceIds = assignedServices
+          .filter(s => s?.id !== serviceId)
+          .map(s => s?.id)
+          .filter(Boolean) as string[];
+      }
+      
       return assignServicesToClinic(clinicId, remainingServiceIds, session!.access_token);
     },
     onSuccess: () => {
@@ -410,7 +478,16 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
         isOpen={isAddServicesModalOpen}
         onClose={() => setIsAddServicesModalOpen(false)}
         availableServices={initialContext?.allServices || []}
-        currentServiceIds={(initialContext?.clinic?.services || []).map(cs => cs?.service?.id).filter(Boolean) as string[]}
+        currentServiceIds={(() => {
+          const clinicServices = initialContext?.clinic?.services || [];
+          const assignedServices = initialContext?.assignedServices || [];
+          
+          if (clinicServices.length > 0) {
+            return clinicServices.map(cs => cs?.service?.id).filter(Boolean) as string[];
+          } else {
+            return assignedServices.map(s => s?.id).filter(Boolean) as string[];
+          }
+        })()}
         onSave={(serviceIds) => addServicesMutation.mutate(serviceIds)}
         isLoading={addServicesMutation.isPending}
       />
@@ -423,12 +500,17 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
         }}
         service={selectedService}
         availableDoctors={initialContext?.allDoctors || []}
-        currentAssignments={selectedService ? 
-          (initialContext?.clinic?.doctorClinicServices || [])
+        currentAssignments={selectedService ? (() => {
+          const doctorClinicServices = initialContext?.clinic?.doctorClinicServices || [];
+          const doctorServiceAssignments = initialContext?.doctorServiceAssignments || [];
+          
+          const assignments = doctorClinicServices.length > 0 ? doctorClinicServices : doctorServiceAssignments;
+          
+          return assignments
             .filter(dcs => dcs?.serviceId === selectedService.id)
             .map(dcs => dcs?.doctorId)
-            .filter(Boolean) as string[] : []
-        }
+            .filter(Boolean) as string[];
+        })() : []}
         onSave={(serviceId: string, doctorIds: string[]) => updateDoctorAssignmentsMutation.mutate({ 
           serviceId, 
           doctorIds 
