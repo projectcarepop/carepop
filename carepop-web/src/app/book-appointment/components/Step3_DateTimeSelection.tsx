@@ -85,14 +85,6 @@ export const Step3_DateTimeSelection: React.FC<Step3_DateTimeSelectionProps> = (
             disabled={(date) => date <= startOfDay(new Date())}
             modifiers={{ available: availableDaysAsDates }}
             modifiersClassNames={{ available: 'day-available' }}
-            formatters={{
-              formatDay: (day) => {
-                const isAvailable = availableDaysAsDates.some(
-                  (d: Date) => d.getDate() === day.getDate() && d.getMonth() === day.getMonth() && d.getFullYear() === day.getFullYear()
-                );
-                return `${day.getDate()}${isAvailable ? ', Available' : ''}`;
-              }
-            }}
             className="rounded-md border"
           />
         </div>
