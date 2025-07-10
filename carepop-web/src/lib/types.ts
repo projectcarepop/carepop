@@ -1,7 +1,7 @@
 import { type InferSelectModel, type InferInsertModel } from "drizzle-orm";
 import * as schema from "../drizzle/schema";
 import { z } from "zod";
-import { type Database } from './supabase/types';
+import { type Database } from '../types/supabase';
 
 // =================================================================
 // ENUMS
@@ -34,6 +34,22 @@ export type Clinic = InferSelectModel<typeof schema.clinics> & {
     longitude?: number;
     phone?: string | null;
     website?: string | null;
+    // Supabase address fields
+    full_address?: string | null;
+    street_address?: string | null;
+    locality?: string | null;
+    region?: string | null;
+    postal_code?: string | null;
+    // Address can be stored as JSONB in database (Drizzle format)
+    address?: {
+        street?: string;
+        city?: string;
+        cityMunicipality?: string;
+        province?: string;
+        zipCode?: string;
+        barangay?: string;
+    } | null;
+    // Individual address fields for backward compatibility (legacy)
     street?: string | null;
     cityMunicipality?: { name: string, code: string } | string | null;
     province?: { name: string, code: string } | string | null;
