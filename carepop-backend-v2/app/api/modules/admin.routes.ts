@@ -146,11 +146,13 @@ export const updateDoctorOverrideSchema = z.object({
 
 const adminRoutes = new Hono<AuthEnv>();
 
-// --- DIAGNOSTIC MIDDLEWARE ---
+// Apply auth middleware first
+adminRoutes.use('*', authMiddleware, adminOrManagerMiddleware);
+
+// --- DIAGNOSTIC MIDDLEWARE (after auth) ---
 adminRoutes.use('*', async (c, next) => {
   console.log(`[ADMIN] Received request for: ${c.req.path}`);
-  // We will try to get the user from the authMiddleware's context
-  // This will help us see if the auth check is passing before the route handler runs.
+  // Now we can get the user from the authMiddleware's context
   try {
     const user = c.get('user');
     if (user) {
@@ -158,17 +160,14 @@ adminRoutes.use('*', async (c, next) => {
       const authRole = user.app_metadata?.role;
       console.log(`[ADMIN] Middleware check: User ${user.id} found. Auth role: '${authRole}', Email: '${user.email}'`);
     } else {
-      console.log("[ADMIN] Middleware check: No user found in context yet.");
+      console.log("[ADMIN] Middleware check: No user found in context after auth.");
     }
   } catch (e) {
     console.log("[ADMIN] Middleware check: Error accessing user context:", e);
   }
-  await next(); // Pass control to the next middleware (auth, admin, then the handler)
+  await next(); // Pass control to the route handler
 });
 // --- END DIAGNOSTIC MIDDLEWARE ---
-
-// Apply middleware to all routes in this file
-adminRoutes.use('*', authMiddleware, adminOrManagerMiddleware);
 
 // --- Zod Schemas for Validation ---
 const createClinicSchema = z.object({
