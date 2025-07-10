@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { format, differenceInHours } from 'date-fns';
 
@@ -29,23 +29,21 @@ import { cancelMyAppointment } from '@/services/api';
 import type { Appointment, AppointmentWithRelations } from "@/lib/types";
 import { useAuth } from '@/lib/contexts/auth-context';
 
-// --- Type Definition ---
-/*
-interface Appointment {
-  id: string;
-  appointment_date: string;
-  status: 'scheduled' | 'cancelled' | 'completed';
-  serviceName: string;
-  doctorName: string;
-  clinicName: string;
-}
-*/
-
 interface AppointmentsTableProps {
   appointments: AppointmentWithRelations[];
 }
 
-// --- Helper for styling status badges ---
+// Helper for safe date formatting to prevent hydration issues
+function formatAppointmentDate(dateString: string) {
+  try {
+    const date = new Date(dateString);
+    return format(date, 'EEE, MMM d, yyyy, h:mm a');
+  } catch {
+    return 'Invalid Date';
+  }
+}
+
+// Helper for styling status badges
 const getStatusVariant = (status: Appointment['status']) => {
   switch (status) {
     case 'completed':
@@ -60,14 +58,18 @@ const getStatusVariant = (status: Appointment['status']) => {
   }
 };
 
-
-// --- The Appointments Table Component ---
 export function AppointmentsTable({ appointments }: AppointmentsTableProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { session } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  // Ensure we're on the client side to prevent hydration mismatches
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const { mutate: handleCancel, isPending } = useMutation({
     mutationFn: (appointmentId: string) => {
@@ -78,8 +80,11 @@ export function AppointmentsTable({ appointments }: AppointmentsTableProps) {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Your appointment has been canceled." });
+      // Invalidate queries to refresh the data
       queryClient.invalidateQueries({ queryKey: ['myAppointments'] }); 
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      // Refetch immediately to ensure fresh data
+      queryClient.refetchQueries({ queryKey: ['myAppointments'] });
     },
     onError: (error) => {
       toast({ title: "Cancellation Failed", description: error.message, variant: "destructive" });
@@ -93,6 +98,18 @@ export function AppointmentsTable({ appointments }: AppointmentsTableProps) {
   const openConfirmationDialog = (appointmentId: string) => {
     setSelectedAppointmentId(appointmentId);
     setIsDialogOpen(true);
+  };
+
+  const isCancelDisabled = (appointment: AppointmentWithRelations) => {
+    if (!isClient) return true; // Disable until client-side hydration is complete
+    
+    try {
+      const appointmentDate = new Date(appointment.appointmentTime);
+      const hoursUntilAppointment = differenceInHours(appointmentDate, new Date());
+      return hoursUntilAppointment < 36;
+    } catch {
+      return true; // Disable if date parsing fails
+    }
   };
 
   return (
@@ -112,7 +129,7 @@ export function AppointmentsTable({ appointments }: AppointmentsTableProps) {
           {appointments.map((appointment) => (
             <TableRow key={appointment.id}>
               <TableCell className="font-medium">
-                {format(new Date(appointment.appointmentTime), 'EEE, MMM d, yyyy, h:mm a')}
+                {isClient ? formatAppointmentDate(appointment.appointmentTime) : 'Loading...'}
               </TableCell>
               <TableCell>{appointment.service?.name ?? 'N/A'}</TableCell>
               <TableCell>{appointment.doctor?.fullName ?? 'N/A'}</TableCell>
@@ -130,10 +147,10 @@ export function AppointmentsTable({ appointments }: AppointmentsTableProps) {
                     onClick={() => openConfirmationDialog(appointment.id)}
                     disabled={
                       (isPending && selectedAppointmentId === appointment.id) ||
-                      differenceInHours(new Date(appointment.appointmentTime), new Date()) < 36
+                      isCancelDisabled(appointment)
                     }
                   >
-                    {isPending && selectedAppointmentId === appointment.id ? '...' : 'Cancel'}
+                    {isPending && selectedAppointmentId === appointment.id ? 'Canceling...' : 'Cancel'}
                   </Button>
                 )}
               </TableCell>
