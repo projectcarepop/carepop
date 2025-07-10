@@ -181,7 +181,7 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
       
       {/* Create/Edit Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>
               {selectedClinic ? 'Edit Clinic' : 'Create New Clinic'}
@@ -194,9 +194,15 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
             initialData={selectedClinic}
             allServices={allServices}
             onSubmit={(values) => {
+              const { latitude, longitude, serviceIds, ...rest } = values;
               const payload = {
-                ...values,
+                ...rest,
+                location: {
+                  lat: latitude,
+                  lon: longitude,
+                },
                 id: selectedClinic?.id,
+                serviceIds, // Pass this along to the upsertClinic function
               };
               upsertMutation.mutate(payload as any);
             }}
