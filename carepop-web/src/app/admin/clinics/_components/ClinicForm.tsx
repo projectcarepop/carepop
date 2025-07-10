@@ -47,7 +47,7 @@ export function ClinicForm({
   initialData,
   allServices,
   onSubmit,
-  isPending: isSubmitting,
+  isPending,
 }: ClinicFormProps) {
   const form = useForm<ClinicFormValues>({
     resolver: zodResolver(formSchema),
@@ -58,18 +58,16 @@ export function ClinicForm({
       cityMunicipalityCode: initialData?.cityMunicipalityCode || '',
       provinceCode: initialData?.provinceCode || '',
       zipCode: initialData?.zipCode || '',
-      latitude: initialData?.latitude || 0,
-      longitude: initialData?.longitude || 0,
+      latitude: initialData?.latitude || initialData?.location?.lat || 0,
+      longitude: initialData?.longitude || initialData?.location?.lon || 0,
       isActive: initialData?.isActive ?? true,
-      serviceIds: initialData?.services?.map((s: any) => s.serviceId) || [],
+      serviceIds: initialData?.serviceIds || [],
     },
   });
 
   const handleFormSubmit = (values: ClinicFormValues) => {
     onSubmit(values);
   };
-
-  const isLoading = isSubmitting;
 
   return (
     <Form {...form}>
@@ -87,7 +85,7 @@ export function ClinicForm({
                     <Input
                       placeholder="CarePoP Central Clinic"
                       {...field}
-                      disabled={isLoading}
+                      disabled={isPending}
                     />
                   </FormControl>
                   <FormMessage />
@@ -104,7 +102,7 @@ export function ClinicForm({
                     <Input
                       placeholder="e.g., 09171234567"
                       {...field}
-                      disabled={isLoading}
+                      disabled={isPending}
                     />
                   </FormControl>
                   <FormMessage />
@@ -121,7 +119,7 @@ export function ClinicForm({
                     <Input
                       placeholder="123 Health St."
                       {...field}
-                      disabled={isLoading}
+                      disabled={isPending}
                     />
                   </FormControl>
                   <FormMessage />
@@ -139,7 +137,7 @@ export function ClinicForm({
                       <Input
                         placeholder="e.g., Metro Manila"
                         {...field}
-                        disabled={isLoading}
+                        disabled={isPending}
                       />
                     </FormControl>
                     <FormMessage />
@@ -156,7 +154,7 @@ export function ClinicForm({
                       <Input
                         placeholder="e.g., Quezon City"
                         {...field}
-                        disabled={isLoading}
+                        disabled={isPending}
                       />
                     </FormControl>
                     <FormMessage />
@@ -171,7 +169,7 @@ export function ClinicForm({
                   <FormItem>
                     <FormLabel>ZIP Code</FormLabel>
                     <FormControl>
-                      <Input placeholder="1100" {...field} disabled={isLoading} />
+                      <Input placeholder="1100" {...field} disabled={isPending} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -189,7 +187,7 @@ export function ClinicForm({
                         type="number"
                         placeholder="e.g., 14.6760"
                         {...field}
-                        disabled={isLoading}
+                        disabled={isPending}
                       />
                     </FormControl>
                     <FormMessage />
@@ -207,7 +205,7 @@ export function ClinicForm({
                         type="number"
                         placeholder="e.g., 121.0437"
                         {...field}
-                        disabled={isLoading}
+                        disabled={isPending}
                       />
                     </FormControl>
                     <FormMessage />
@@ -269,4 +267,4 @@ export function ClinicForm({
       </form>
     </Form>
   );
-} 
+}
