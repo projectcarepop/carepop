@@ -1,16 +1,16 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Clinic } from '@/lib/types/clinic';
-import { Service } from '@/lib/types/service';
+import { Clinic, Service } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import ClinicList from '@/app/clinic-finder/components/ClinicList';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import Link from 'next/link';
+import { ExternalLink } from 'lucide-react';
 
 interface AllClinicsClientProps {
   initialClinics: Clinic[];
@@ -25,12 +25,14 @@ export default function AllClinicsClient({ initialClinics, allServices }: AllCli
   // Memoize the filtered clinics to avoid re-calculating on every render
   const filteredClinics = useMemo(() => {
     return initialClinics.filter(clinic => {
+      const c = clinic as any;
+      const address = c.full_address || c.street_address || c.locality || 'unknown';
       const matchesSearchTerm = clinic.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                              clinic.full_address.toLowerCase().includes(searchTerm.toLowerCase());
+                              address.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesServices = selectedServices.length === 0 || 
                               selectedServices.every(serviceId => 
-                                (clinic.services_offered || []).includes(serviceId)
+                                (clinic.services?.map(s => s.id) || []).includes(serviceId)
                               );
 
       return matchesSearchTerm && matchesServices;
@@ -101,9 +103,56 @@ export default function AllClinicsClient({ initialClinics, allServices }: AllCli
       {/* Clinic list */}
       <div>
         <h2 className="text-xl font-semibold mb-4">{filteredClinics.length} Clinics Found</h2>
-        {/* We need a location for the directions button, which we don't have on this page. */}
-        {/* So we pass null to disable the button. */}
-        <ClinicList clinics={filteredClinics} userLocation={null} onViewDetails={() => {}} />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredClinics.map((clinic) => (
+            <Card key={clinic.id} className="cursor-pointer hover:bg-gray-100 transition-colors">
+              <CardHeader className="pb-2 px-4 pt-3">
+                <CardTitle className="text-base font-semibold leading-tight">{clinic.name}</CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-3 pt-0">
+                <p className="text-sm text-gray-600 leading-snug">
+                  {(() => {
+                    // Check if clinic has any address property (cast to any to access all possible fields)
+                    const c = clinic as any;
+                    
+                    // Option 1: Use full_address if available (Supabase format)
+                    if (c.full_address) {
+                      return c.full_address;
+                    }
+                    
+                    // Option 2: Build from individual Supabase fields
+                    if (c.street_address || c.locality || c.region) {
+                      const parts = [c.street_address, c.locality, c.region].filter(Boolean);
+                      return parts.length > 0 ? parts.join(', ') : 'Address not available';
+                    }
+                    
+                    // Option 3: Handle address as JSONB object (Drizzle format)
+                    if (c.address && typeof c.address === 'object') {
+                      const addr = c.address;
+                      const parts = [addr.street, addr.city || addr.cityMunicipality, addr.province].filter(Boolean);
+                      return parts.length > 0 ? parts.join(', ') : 'Address not available';
+                    }
+                    
+                    // Option 4: Handle individual address fields (legacy format)
+                    if (c.street || c.cityMunicipality) {
+                      const cityName = typeof c.cityMunicipality === 'string' 
+                        ? c.cityMunicipality 
+                        : c.cityMunicipality?.name;
+                      return [c.street, cityName].filter(Boolean).join(', ');
+                    }
+                    
+                    return 'Address not available';
+                  })()}
+                </p>
+                <div className="mt-3">
+                  <Link href={`/clinic/${clinic.id}`} className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 font-medium">
+                    View Details <ExternalLink className="h-4 w-4 ml-1"/>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     </div>
   );
