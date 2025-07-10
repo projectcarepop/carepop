@@ -9,8 +9,7 @@ import {
     appointments, 
     dayOfWeekEnum, 
     serviceCategories, 
-    doctorServices, 
-    doctorClinics, 
+    doctorClinicServices, 
     profiles,
     doctorSchedules,
     doctorAvailabilityOverrides,
@@ -130,12 +129,11 @@ publicRoutes.get('/clinics', zValidator('query', clinicsQuerySchema), async (c) 
           longitude: sql<number>`ST_X(location::geometry)`
         })
         .from(clinics)
-        .innerJoin(doctorClinics, eq(clinics.id, doctorClinics.clinicId))
-        .innerJoin(doctorServices, eq(doctorClinics.doctorId, doctorServices.doctorId))
+        .innerJoin(doctorClinicServices, eq(clinics.id, doctorClinicServices.clinicId))
         .where(
           and(
             eq(clinics.isActive, true),
-            eq(doctorServices.serviceId, serviceId)
+            eq(doctorClinicServices.serviceId, serviceId)
           )
         );
       return c.json({ data: filteredClinics });
@@ -181,10 +179,9 @@ publicRoutes.get('/clinics/:id', zValidator('param', z.object({ id: z.string().u
             durationMinutes: services.durationMinutes,
         })
         .from(services)
-        .innerJoin(doctorServices, eq(services.id, doctorServices.serviceId))
-        .innerJoin(doctorClinics, eq(doctorServices.doctorId, doctorClinics.doctorId))
+        .innerJoin(doctorClinicServices, eq(services.id, doctorClinicServices.serviceId))
         .where(and(
-            eq(doctorClinics.clinicId, id),
+            eq(doctorClinicServices.clinicId, id),
             eq(services.isActive, true)
         ))
         .orderBy(asc(services.name));
@@ -289,10 +286,9 @@ publicRoutes.get('/doctors', async (c) => {
             const conditions: (SQL | undefined)[] = [eq(services.isActive, true)];
 
             if (clinicId) {
-                const clinicServiceIds = db.selectDistinct({ serviceId: doctorServices.serviceId })
-                    .from(doctorServices)
-                    .innerJoin(doctorClinics, eq(doctorServices.doctorId, doctorClinics.doctorId))
-                    .where(eq(doctorClinics.clinicId, clinicId));
+                const clinicServiceIds = db.selectDistinct({ serviceId: doctorClinicServices.serviceId })
+                    .from(doctorClinicServices)
+                    .where(eq(doctorClinicServices.clinicId, clinicId));
 
                 conditions.push(inArray(services.id, clinicServiceIds));
             }
@@ -427,10 +423,9 @@ publicRoutes.get('/search/clinics', zValidator('query', universalSearchSchema), 
             // Create a single, more efficient subquery to find all clinic IDs
             // that are associated with the given serviceId.
             const clinicIdsWithService = db
-                .selectDistinct({ clinicId: doctorClinics.clinicId })
-                .from(doctorServices)
-                .innerJoin(doctorClinics, eq(doctorServices.doctorId, doctorClinics.doctorId))
-                .where(eq(doctorServices.serviceId, serviceId));
+                .selectDistinct({ clinicId: doctorClinicServices.clinicId })
+                .from(doctorClinicServices)
+                .where(eq(doctorClinicServices.serviceId, serviceId));
             
             conditions.push(inArray(clinics.id, clinicIdsWithService));
         }
@@ -476,9 +471,9 @@ publicRoutes.get(
         const { clinicId } = c.req.valid('query');
 
         try {
-            const conditions = [eq(doctorServices.serviceId, serviceId)];
+            const conditions = [eq(doctorClinicServices.serviceId, serviceId)];
             if (clinicId) {
-                conditions.push(eq(doctorClinics.clinicId, clinicId));
+                conditions.push(eq(doctorClinicServices.clinicId, clinicId));
             }
 
             let query = db
@@ -489,10 +484,10 @@ publicRoutes.get(
                     avatarUrl: doctors.avatarUrl,
                 })
                 .from(doctors)
-                .innerJoin(doctorServices, eq(doctors.id, doctorServices.doctorId));
+                .innerJoin(doctorClinicServices, eq(doctors.id, doctorClinicServices.doctorId));
             
             if (clinicId) {
-                query = query.innerJoin(doctorClinics, eq(doctors.id, doctorClinics.doctorId));
+                query = query.innerJoin(doctorClinicServices, eq(doctors.id, doctorClinicServices.doctorId));
             }
 
             const serviceDoctors = await query.where(and(...conditions));
@@ -592,7 +587,7 @@ publicRoutes.get('/services/:serviceId/providers',
         try {
             const conditions = [
                 eq(doctors.isActive, true),
-                eq(doctorServices.serviceId, serviceId)
+                eq(doctorClinicServices.serviceId, serviceId)
             ];
 
             let query = db.selectDistinct({
@@ -602,12 +597,11 @@ publicRoutes.get('/services/:serviceId/providers',
                 specialtyText: doctors.specialtyText
             })
             .from(doctors)
-            .innerJoin(doctorServices, eq(doctors.id, doctorServices.doctorId));
+            .innerJoin(doctorClinicServices, eq(doctors.id, doctorClinicServices.doctorId));
 
             if (clinicId) {
-                // If a clinicId is provided, further join to ensure the doctor works at that clinic.
-                query = query.innerJoin(doctorClinics, eq(doctors.id, doctorClinics.doctorId));
-                conditions.push(eq(doctorClinics.clinicId, clinicId));
+                // If a clinicId is provided, add condition to ensure the doctor works at that clinic.
+                conditions.push(eq(doctorClinicServices.clinicId, clinicId));
             }
             
             const providers = await query.where(and(...conditions));
