@@ -155,7 +155,7 @@ publicRoutes.get('/clinics', zValidator('query', clinicsQuerySchema), async (c) 
 
 /**
  * GET /public/clinics/:id
- * Fetches a single clinic by its ID, including a list of all services offered.
+ * Fetches a single clinic by its ID, including a list of all services offered and doctors.
  */
 publicRoutes.get('/clinics/:id', zValidator('param', z.object({ id: z.string().uuid() })), async (c) => {
     const { id } = c.req.valid('param');
@@ -186,10 +186,28 @@ publicRoutes.get('/clinics/:id', zValidator('param', z.object({ id: z.string().u
         ))
         .orderBy(asc(services.name));
 
-        // Step 3: Combine into the final response shape
+        // Step 3: Fetch all doctors associated with this clinic
+        const clinicDoctorsList = await db.selectDistinct({
+            id: doctors.id,
+            fullName: doctors.fullName,
+            specialtyText: doctors.specialtyText,
+            bio: doctors.bio,
+            avatarUrl: doctors.avatarUrl,
+            isActive: doctors.isActive,
+        })
+        .from(doctors)
+        .innerJoin(doctorClinicServices, eq(doctors.id, doctorClinicServices.doctorId))
+        .where(and(
+            eq(doctorClinicServices.clinicId, id),
+            eq(doctors.isActive, true)
+        ))
+        .orderBy(asc(doctors.fullName));
+
+        // Step 4: Combine into the final response shape
         const response = {
             ...clinicDetails,
             services: clinicServicesList,
+            doctors: clinicDoctorsList,
         };
 
         return c.json(response);

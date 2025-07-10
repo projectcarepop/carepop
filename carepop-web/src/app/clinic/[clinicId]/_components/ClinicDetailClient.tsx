@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { GoogleMap, useJsApiLoader, MarkerF } from '@react-google-maps/api';
-import { type Clinic } from '@/lib/types';
+import { type Clinic, type ClinicDoctor } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,7 +45,7 @@ const ClinicMap = ({ lat, lng, name }: { lat: number; lng: number; name: string 
 };
 
 export default function ClinicDetailClient({ clinic }: ClinicDetailClientProps) {
-    const { name, street, cityMunicipality, province, zipCode, phone, website, latitude, longitude, services } = clinic;
+    const { name, street, cityMunicipality, province, zipCode, phone, website, latitude, longitude, services, doctors } = clinic;
     const [searchTerm, setSearchTerm] = useState('');
 
     // Build full address from individual components
@@ -55,13 +55,6 @@ export default function ClinicDetailClient({ clinic }: ClinicDetailClientProps) 
     const directionsUrl = latitude && longitude
         ? `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`
         : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ', ' + fullAddress)}`;
-
-    // Sample doctors data (simplified)
-    const sampleDoctors = [
-        { id: '1', fullName: 'Dr. Maria Santos', specialization: 'General Medicine' },
-        { id: '2', fullName: 'Dr. Juan Dela Cruz', specialization: 'Pediatrics' },
-        { id: '3', fullName: 'Dr. Anna Reyes', specialization: 'Gynecology' },
-    ];
 
     // Filter services based on search only
     const filteredServices = useMemo(() => {
@@ -262,23 +255,33 @@ export default function ClinicDetailClient({ clinic }: ClinicDetailClientProps) 
                         Our Doctors
                     </h2>
                     <div className="space-y-4">
-                        {sampleDoctors.map(doctor => (
-                            <Card key={doctor.id} className="hover:shadow-md transition-shadow">
-                                <CardContent className="p-6">
-                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                                        <div className="flex-1">
-                                            <h3 className="font-semibold text-lg mb-1">{doctor.fullName}</h3>
-                                            <p className="text-blue-600 font-medium">{doctor.specialization}</p>
+                        {doctors && doctors.length > 0 ? (
+                            doctors.map((doctor: ClinicDoctor) => (
+                                <Card key={doctor.id} className="hover:shadow-md transition-shadow">
+                                    <CardContent className="p-6">
+                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                            <div className="flex-1">
+                                                <h3 className="font-semibold text-lg mb-1">{doctor.fullName}</h3>
+                                                <p className="text-blue-600 font-medium">{doctor.specialtyText || 'General Medicine'}</p>
+                                            </div>
+                                            <Button size="sm" asChild>
+                                                <Link href={`/book-appointment?clinicId=${clinic.id}&doctorId=${doctor.id}`}>
+                                                    Book with {doctor.fullName.split(' ').slice(-1)[0]}
+                                                </Link>
+                                            </Button>
                                         </div>
-                                        <Button size="sm" asChild>
-                                            <Link href={`/book-appointment?clinicId=${clinic.id}&doctorId=${doctor.id}`}>
-                                                Book with Dr. {doctor.fullName.split(' ')[1]}
-                                            </Link>
-                                        </Button>
-                                    </div>
+                                    </CardContent>
+                                </Card>
+                            ))
+                        ) : (
+                            <Card>
+                                <CardContent className="text-center py-8">
+                                    <User className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                                    <p className="text-gray-500 text-lg">No specific doctors are listed for this clinic at the moment.</p>
+                                    <p className="text-gray-400 text-sm mt-2">Please call the clinic directly for information about available doctors.</p>
                                 </CardContent>
                             </Card>
-                        ))}
+                        )}
                     </div>
                 </section>
 

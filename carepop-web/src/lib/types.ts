@@ -29,6 +29,16 @@ export type ClinicService = {
   price: string | null;
 };
 
+// Basic doctor shape for nesting inside Clinic
+export type ClinicDoctor = {
+  id: string;
+  fullName: string;
+  specialtyText: string | null;
+  bio: string | null;
+  avatarUrl: string | null;
+  isActive: boolean;
+};
+
 export type Clinic = InferSelectModel<typeof schema.clinics> & {
     latitude?: number;
     longitude?: number;
@@ -56,6 +66,7 @@ export type Clinic = InferSelectModel<typeof schema.clinics> & {
     zipCode?: string | null;
     distance?: number;
     services?: ClinicService[];
+    doctors?: ClinicDoctor[];
 };
 export type NewClinic = InferInsertModel<typeof schema.clinics>;
 
