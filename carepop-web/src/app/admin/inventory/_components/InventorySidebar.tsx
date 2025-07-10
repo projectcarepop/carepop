@@ -7,9 +7,9 @@ import { Package, Tag, LayoutDashboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
-  { href: '/inventory', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/inventory/products', label: 'Products', icon: Package },
-  { href: '/inventory/categories', label: 'Categories', icon: Tag },
+  { href: '/admin/inventory', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/admin/inventory/products', label: 'Products', icon: Package },
+  { href: '/admin/inventory/categories', label: 'Categories', icon: Tag },
 ];
 
 const NavLink = ({ href, label, icon: Icon, isActive }: { href: string; label: string; icon: React.ElementType; isActive: boolean; }) => (
