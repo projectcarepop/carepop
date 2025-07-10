@@ -6,7 +6,7 @@ import { Step1_ClinicSelection } from './Step1_ClinicSelection';
 import { Step2_ServiceAndDoctorSelection } from './Step2_ServiceAndDoctorSelection';
 import { Step3_DateTimeSelection } from './Step3_DateTimeSelection';
 import { Step4_Confirmation } from './Step4_Confirmation';
-import { createAppointment } from '@/services/api';
+
 import { useAuth } from '@/lib/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
@@ -127,8 +127,28 @@ export function BookingFlowManager() {
   const router = useRouter();
 
   const bookingMutation = useMutation({
-    mutationFn: (payload: { clinic_id: string; service_id: string; doctor_id: string; appointment_time: string; }) => {
+    mutationFn: async (payload: { clinic_id: string; service_id: string; doctor_id: string; appointment_time: string; }) => {
         if (!accessToken) throw new Error("Not authorized");
+        
+        // Import validateSlotAvailability dynamically to avoid circular dependency
+        const { validateSlotAvailability, createAppointment } = await import('@/services/api');
+        
+        // Validate slot availability before attempting to book
+        const validation = await validateSlotAvailability(
+          payload.doctor_id,
+          payload.service_id,
+          payload.clinic_id,
+          payload.appointment_time,
+          accessToken
+        );
+        
+        if (!validation.available) {
+          // Throw a specific error that we can handle differently
+          const error = new Error(validation.message || 'This time slot is no longer available.');
+          (error as any).code = 'SLOT_UNAVAILABLE';
+          throw error;
+        }
+        
         return createAppointment(payload, accessToken);
     },
     onSuccess: () => {
@@ -139,12 +159,34 @@ export function BookingFlowManager() {
         queryClient.invalidateQueries({ queryKey: ['myAppointments'] });
         router.push('/main-dashboard'); // Redirect to dashboard after booking
     },
-    onError: (error) => {
-        toast({
-            title: "Booking Failed",
-            description: error.message,
-            variant: "destructive",
-        });
+    onError: (error: any) => {
+        // Handle slot unavailability differently
+        if (error.code === 'SLOT_UNAVAILABLE' || error.message.includes('no longer available')) {
+            toast({
+                title: "Time Slot Unavailable",
+                description: "Someone else just booked this time slot. Please select a different time.",
+                variant: "destructive",
+            });
+            
+            // Automatically refresh available slots and go back to date/time selection
+            queryClient.invalidateQueries({ 
+              queryKey: ['availableSlots', bookingData.doctor?.id, bookingData.clinic?.id] 
+            });
+            queryClient.invalidateQueries({ 
+              queryKey: ['availableDays', bookingData.doctor?.id, bookingData.clinic?.id] 
+            });
+            
+            // Clear the selected slot and go back to date/time selection
+            updateBookingData({ slot: undefined });
+            setCurrentStep(STEPS.SELECT_DATE_TIME);
+            setSelectionMade(false);
+        } else {
+            toast({
+                title: "Booking Failed",
+                description: error.message || "Unable to complete your booking. Please try again.",
+                variant: "destructive",
+            });
+        }
     }
   });
 

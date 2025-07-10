@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { type InventoryItem, type ProductCategory } from '@/lib/types/inventory';
 import type { Clinic, Doctor } from "@/lib/types";
+import { format } from 'date-fns';
 
 // Temporary Type Definitions - TODO: Move to a dedicated types/bookings.ts file
 export type ClinicOverride = {
@@ -880,9 +881,76 @@ export async function createAppointment(payload: AppointmentBookingPayload, acce
     });
     if (!response.ok) {
         const error = await response.json().catch(() => ({ message: 'Failed to create appointment.' }));
-        throw new Error(error.message);
+        // Handle specific conflict error
+        if (response.status === 409) {
+            throw new Error(error.message || 'This time slot is no longer available. Please select another time.');
+        }
+        throw new Error(error.message || 'Failed to create appointment.');
     }
     return response.json();
+}
+
+// New function to validate slot availability before booking
+export async function validateSlotAvailability(
+    doctorId: string,
+    serviceId: string,
+    clinicId: string,
+    appointmentTime: string,
+    accessToken: string
+): Promise<{ available: boolean; message?: string }> {
+    try {
+        const headers = await getAuthHeaders(accessToken);
+        const response = await fetch(`${API_BASE_URL}/api/me/appointments/validate-slot`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+                doctor_id: doctorId,
+                service_id: serviceId,
+                clinic_id: clinicId,
+                appointment_time: appointmentTime,
+            }),
+        });
+
+        if (!response.ok) {
+            // If endpoint doesn't exist, fall back to checking available slots
+            if (response.status === 404) {
+                return await fallbackSlotValidation(doctorId, serviceId, clinicId, appointmentTime);
+            }
+            return { available: false, message: 'Unable to verify slot availability.' };
+        }
+
+        const result = await response.json();
+        return result;
+    } catch {
+        // Fall back to checking available slots if API fails
+        return await fallbackSlotValidation(doctorId, serviceId, clinicId, appointmentTime);
+    }
+}
+
+// Fallback validation by checking if the slot still appears in available slots
+async function fallbackSlotValidation(
+    doctorId: string,
+    serviceId: string,
+    clinicId: string,
+    appointmentTime: string
+): Promise<{ available: boolean; message?: string }> {
+    try {
+        const appointmentDate = new Date(appointmentTime);
+        const dateStr = format(appointmentDate, 'yyyy-MM-dd');
+        
+        const availableSlots = await getAvailableSlots(doctorId, serviceId, clinicId, dateStr);
+        const isAvailable = availableSlots.includes(appointmentTime);
+        
+        return {
+            available: isAvailable,
+            message: isAvailable ? undefined : 'This time slot is no longer available.'
+        };
+    } catch {
+        return { 
+            available: false, 
+            message: 'Unable to verify slot availability. Please try again.' 
+        };
+    }
 }
 
 export async function cancelMyAppointment(appointmentId: string, accessToken: string) {
