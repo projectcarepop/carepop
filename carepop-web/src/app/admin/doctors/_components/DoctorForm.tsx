@@ -46,18 +46,22 @@ const formSchema = z.object({
   clinicId: z.string().uuid('A valid clinic must be selected.').nullable(),
 });
 
-type DoctorFormValues = z.infer<typeof formSchema>;
+type DoctorFormValues = z.infer<typeof formSchema> & { 
+  clinicIds?: string[] 
+};
 
 interface DoctorFormProps {
   initialData?: Doctor & { clinics?: { clinicId: string }[] };
-  onSubmit: (values: DoctorFormValues) => Promise<Doctor | void>;
-  isSubmitting: boolean;
+  defaultClinicId?: string;
+  onSubmit: (values: DoctorFormValues) => void;
+  isPending: boolean;
 }
 
 export function DoctorForm({
   initialData,
+  defaultClinicId,
   onSubmit,
-  isSubmitting,
+  isPending,
 }: DoctorFormProps) {
   const { session } = useAuth();
   const [open, setOpen] = useState(false);
@@ -69,7 +73,7 @@ export function DoctorForm({
       specialtyText: initialData?.specialtyText || '',
       bio: initialData?.bio || '',
       isActive: initialData?.isActive ?? true,
-      clinicId: initialData?.clinics?.[0]?.clinicId || null,
+      clinicId: initialData?.clinics?.[0]?.clinicId || defaultClinicId || null,
     },
   });
 
@@ -80,12 +84,17 @@ export function DoctorForm({
     }
   );
 
-  const handleFormSubmit = async (values: DoctorFormValues) => {
-    await onSubmit(values);
+  const handleFormSubmit = (values: DoctorFormValues) => {
+    // Transform the single clinicId to clinicIds array for backend compatibility
+    const transformedValues = {
+      ...values,
+      clinicIds: values.clinicId ? [values.clinicId] : []
+    };
+    onSubmit(transformedValues);
   };
 
   return (
-    <Form {...form}>
+    <Form {...form} key={initialData?.id || 'new'}>
       <form
         onSubmit={form.handleSubmit(handleFormSubmit)}
         className="space-y-8"
@@ -98,7 +107,7 @@ export function DoctorForm({
               <FormLabel>Full Name</FormLabel>
               <FormControl>
                 <Input
-                  disabled={isSubmitting}
+                  disabled={isPending}
                   placeholder="e.g. Dr. Juan Dela Cruz"
                   {...field}
                 />
@@ -115,7 +124,7 @@ export function DoctorForm({
               <FormLabel>Specialty</FormLabel>
               <FormControl>
                 <Input
-                  disabled={isSubmitting}
+                  disabled={isPending}
                   placeholder="e.g. General Physician"
                   {...field}
                 />
@@ -132,7 +141,7 @@ export function DoctorForm({
               <FormLabel>Bio</FormLabel>
               <FormControl>
                 <Textarea
-                  disabled={isSubmitting}
+                  disabled={isPending}
                   placeholder="A brief background about the doctor."
                   className="resize-none"
                   {...field}
@@ -223,14 +232,14 @@ export function DoctorForm({
                 <Switch
                   checked={field.value}
                   onCheckedChange={field.onChange}
-                  disabled={isSubmitting}
+                  disabled={isPending}
                 />
               </FormControl>
             </FormItem>
           )}
         />
-        <Button disabled={isSubmitting} className="ml-auto w-full" type="submit">
-          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        <Button disabled={isPending} className="ml-auto w-full" type="submit">
+          {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {initialData ? 'Save Changes' : 'Create Doctor'}
         </Button>
       </form>
