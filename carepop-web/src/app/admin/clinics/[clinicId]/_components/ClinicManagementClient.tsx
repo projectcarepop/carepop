@@ -121,7 +121,7 @@ export function ClinicManagementClient({ initialContext }: ClinicManagementClien
       <Separator />
 
       <ServiceDoctorAssignments 
-        assignedServices={clinic.services.map(s => s.service)}
+        assignedServices={clinic?.services?.map(s => s.service) || []}
         allDoctors={allDoctors}
         initialAssignments={assignments}
         onAssignmentsChange={setAssignments}
