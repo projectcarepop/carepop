@@ -62,11 +62,36 @@ export const columns = ({ onCancel }: GetColumnsOptions): ColumnDef<AdminAppoint
         header: () => (
             <div className="text-center">Status</div>
         ),
-        cell: ({ row }) => (
-            <div className="text-center">
-                <Badge>{row.original.status}</Badge>
-            </div>
-        ),
+        cell: ({ row }) => {
+            const status = row.original.status;
+            let variant: "default" | "secondary" | "destructive" | "outline" = "default";
+            
+            switch (status) {
+                case 'scheduled':
+                    variant = "secondary";
+                    break;
+                case 'canceled_by_admin':
+                case 'canceled_by_patient':
+                    variant = "destructive";
+                    break;
+                case 'completed':
+                    variant = "outline";
+                    break;
+                case 'no_show':
+                    variant = "destructive";
+                    break;
+                default:
+                    variant = "default";
+            }
+            
+            return (
+                <div className="text-center">
+                    <Badge variant={variant}>
+                        {status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </Badge>
+                </div>
+            );
+        },
     },
     {
         id: "actions",

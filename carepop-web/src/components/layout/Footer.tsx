@@ -30,7 +30,7 @@ export default function Footer() {
       title: "Services",
       links: [
         { href: "/book-appointment", label: "Book a Service" },
-        { href: "/clinic-finder", label: "Find a Clinic" },
+        { href: "/find-a-clinic", label: "Find a Clinic" },
         { href: "/appointments", label: "My Appointments" },
       ],
     },
