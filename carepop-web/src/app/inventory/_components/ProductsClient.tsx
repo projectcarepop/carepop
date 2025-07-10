@@ -105,21 +105,17 @@ export default function ProductsClient() {
   const products = Array.isArray(productsResponse?.data) ? productsResponse.data : [];
   const pageCount = productsResponse?.pagination?.totalPages ?? 0;
 
-  const { data: categories } = useQuery({
+  const { data: categoriesResponse } = useQuery({
     queryKey: ['admin-product-categories'],
     queryFn: async () => {
-      try {
-        const response = await getProductCategories(accessToken!, { limit: 100 });
-        return response;
-      } catch (error) {
-        console.error('Failed to fetch categories:', error);
-        // Fallback to empty response structure
-        return { data: [], pagination: { totalPages: 0, currentPage: 1, totalCount: 0 } };
-      }
+      const response = await getProductCategories(accessToken!, { limit: 100 });
+      return response;
     },
     enabled: !!accessToken,
-    select: (data) => Array.isArray(data?.data) ? data.data : [],
   });
+
+  // Extract categories array from the response following the golden pattern
+  const categories = Array.isArray(categoriesResponse?.data) ? categoriesResponse.data : [];
 
   const { data: itemBatches, isLoading: isLoadingBatches } = useQuery({
     queryKey: ['itemBatches', selectedItem?.id],
@@ -356,7 +352,7 @@ export default function ProductsClient() {
                 onSubmit={handleSubmitProduct} 
                 initialData={selectedItem as InventoryItem | undefined}
                 isPending={productMutation.isPending}
-                categories={categories || []}
+                categories={categories}
                 serverError={serverError}
                 setServerError={setServerError}
               />
