@@ -66,15 +66,22 @@ export const columns = ({ onEdit, onDelete }: Omit<ColumnActionsProps, 'clinic'>
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+          className="h-auto p-0 text-left justify-start"
         >
           Name
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       );
     },
+    cell: ({ row }) => (
+      <div className="text-left font-medium">{row.original.name}</div>
+    ),
   },
   {
-    header: 'Address',
+    id: 'address',
+    header: () => (
+      <div className="text-left">Address</div>
+    ),
     cell: ({ row }) => {
       const { street, cityMunicipality, province, zipCode } = row.original;
       // Note: cityMunicipality and province might be objects with a 'name' property
@@ -82,49 +89,72 @@ export const columns = ({ onEdit, onDelete }: Omit<ColumnActionsProps, 'clinic'>
       const cityName = typeof cityMunicipality === 'object' ? cityMunicipality?.name : cityMunicipality;
       const provinceName = typeof province === 'object' ? province?.name : province;
 
-      return `${street || ''}, ${cityName || ''}, ${provinceName || ''} ${zipCode || ''}`;
+      return (
+        <div className="text-left">
+          {`${street || ''}, ${cityName || ''}, ${provinceName || ''} ${zipCode || ''}`}
+        </div>
+      );
     },
   },
   {
-    header: 'Location (Lat, Lon)',
+    id: 'location',
+    header: () => (
+      <div className="text-center">Location (Lat, Lon)</div>
+    ),
     cell: ({ row }) => {
       const { latitude, longitude } = row.original;
-      if (latitude && longitude) {
-        return `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
-      }
-      return 'N/A';
+      const content = latitude && longitude 
+        ? `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
+        : 'N/A';
+      return (
+        <div className="text-center font-mono text-sm">{content}</div>
+      );
     }
   },
   {
     accessorKey: 'isActive',
-    header: 'Status',
+    header: () => (
+      <div className="text-center">Status</div>
+    ),
     cell: ({ row }) => {
       const isActive = row.getValue('isActive');
       return (
-        <Badge variant={isActive ? 'default' : 'destructive'}>
-          {isActive ? 'Active' : 'Inactive'}
-        </Badge>
+        <div className="text-center">
+          <Badge variant={isActive ? 'default' : 'destructive'}>
+            {isActive ? 'Active' : 'Inactive'}
+          </Badge>
+        </div>
       );
     },
   },
   {
     accessorKey: 'createdAt',
-    header: 'Date Added',
+    header: () => (
+      <div className="text-left">Date Added</div>
+    ),
     cell: ({ row }) => {
       const date = row.getValue('createdAt');
-      if (!date) return 'N/A';
-      return new Date(date as string).toLocaleDateString('en-US', {
+      if (!date) return <div className="text-left">N/A</div>;
+      const formattedDate = new Date(date as string).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
       });
+      return <div className="text-left">{formattedDate}</div>;
     },
   },
   {
     id: 'actions',
+    header: () => (
+      <div className="text-right">Actions</div>
+    ),
     cell: ({ row }) => {
       const clinic = row.original;
-      return <CellActions clinic={clinic} onEdit={onEdit} onDelete={onDelete} />;
+      return (
+        <div className="text-right">
+          <CellActions clinic={clinic} onEdit={onEdit} onDelete={onDelete} />
+        </div>
+      );
     },
   },
 ]; 

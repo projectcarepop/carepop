@@ -28,69 +28,91 @@ export const columns = ({ onEdit, onDelete }: ColumnActions): ColumnDef<Doctor>[
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+          className="h-auto p-0 text-left justify-start"
         >
           Full Name
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       );
     },
+    cell: ({ row }) => (
+      <div className="text-left font-medium">{row.original.fullName}</div>
+    ),
   },
   {
     accessorKey: 'specialtyText',
-    header: 'Specialty',
+    header: () => (
+      <div className="text-left">Specialty</div>
+    ),
+    cell: ({ row }) => (
+      <div className="text-left">{row.original.specialtyText}</div>
+    ),
   },
   {
     accessorKey: 'isActive',
-    header: 'Status',
+    header: () => (
+      <div className="text-center">Status</div>
+    ),
     cell: ({ row }) => {
       const isActive = row.getValue('isActive');
       return (
-        <Badge variant={isActive ? 'default' : 'destructive'}>
-          {isActive ? 'Active' : 'Inactive'}
-        </Badge>
+        <div className="text-center">
+          <Badge variant={isActive ? 'default' : 'destructive'}>
+            {isActive ? 'Active' : 'Inactive'}
+          </Badge>
+        </div>
       );
     },
   },
   {
     accessorKey: 'createdAt',
-    header: 'Date Added',
+    header: () => (
+      <div className="text-left">Date Added</div>
+    ),
     cell: ({ row }) => {
       const date = new Date(row.getValue('createdAt'));
-      return date.toLocaleDateString();
+      return (
+        <div className="text-left">{date.toLocaleDateString()}</div>
+      );
     },
   },
   {
     id: 'actions',
+    header: () => (
+      <div className="text-right">Actions</div>
+    ),
     cell: ({ row }) => {
       const doctor = row.original;
 
       return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={() => navigator.clipboard.writeText(doctor.id)}
-            >
-              Copy Doctor ID
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => onEdit(doctor)}>
-              Edit Doctor
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => onDelete(doctor)}
-              className="text-red-600"
-            >
-              Delete Doctor
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="text-right">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={() => navigator.clipboard.writeText(doctor.id)}
+              >
+                Copy Doctor ID
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onEdit(doctor)}>
+                Edit Doctor
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onDelete(doctor)}
+                className="text-red-600"
+              >
+                Delete Doctor
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       );
     },
   },

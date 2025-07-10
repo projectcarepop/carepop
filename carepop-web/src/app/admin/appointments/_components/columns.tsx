@@ -23,40 +23,67 @@ type GetColumnsOptions = {
 export const columns = ({ onCancel }: GetColumnsOptions): ColumnDef<AdminAppointment>[] => [
     {
         accessorKey: "patientName",
-        header: "Patient",
+        header: () => (
+            <div className="text-left">Patient</div>
+        ),
+        cell: ({ row }) => (
+            <div className="text-left">{row.original.patientName}</div>
+        ),
     },
     {
         accessorKey: "doctorName",
-        header: "Doctor",
+        header: () => (
+            <div className="text-left">Doctor</div>
+        ),
+        cell: ({ row }) => (
+            <div className="text-left">{row.original.doctorName}</div>
+        ),
     },
     {
         accessorKey: "clinicName",
-        header: "Clinic",
+        header: () => (
+            <div className="text-left">Clinic</div>
+        ),
+        cell: ({ row }) => (
+            <div className="text-left">{row.original.clinicName}</div>
+        ),
     },
     {
         accessorKey: "appointmentTime",
-        header: "Date & Time",
-        cell: ({ row }) => format(new Date(row.original.appointmentTime), "Pp"),
+        header: () => (
+            <div className="text-left">Date & Time</div>
+        ),
+        cell: ({ row }) => (
+            <div className="text-left">{format(new Date(row.original.appointmentTime), "Pp")}</div>
+        ),
     },
     {
         accessorKey: "status",
-        header: "Status",
-        cell: ({ row }) => {
-            return <Badge>{row.original.status}</Badge>;
-        },
+        header: () => (
+            <div className="text-center">Status</div>
+        ),
+        cell: ({ row }) => (
+            <div className="text-center">
+                <Badge>{row.original.status}</Badge>
+            </div>
+        ),
     },
     {
         id: "actions",
+        header: () => (
+            <div className="text-right">Actions</div>
+        ),
         cell: ({ row }) => {
             const appointment = row.original;
             return (
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                    </DropdownMenuTrigger>
+                <div className="text-right">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                                <span className="sr-only">Open menu</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuItem asChild>
@@ -71,7 +98,8 @@ export const columns = ({ onCancel }: GetColumnsOptions): ColumnDef<AdminAppoint
                             </DropdownMenuItem>
                         )}
                     </DropdownMenuContent>
-                </DropdownMenu>
+                    </DropdownMenu>
+                </div>
             );
         },
     },

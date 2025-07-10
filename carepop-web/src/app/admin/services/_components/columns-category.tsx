@@ -21,38 +21,53 @@ interface ColumnActions {
 export const columns = ({ onEdit, onDelete }: ColumnActions): ColumnDef<ServiceCategory>[] => [
   {
     accessorKey: 'name',
-    header: 'Name',
+    header: () => (
+      <div className="text-left">Name</div>
+    ),
+    cell: ({ row }) => (
+      <div className="text-left font-medium">{row.original.name}</div>
+    ),
   },
   {
     accessorKey: 'description',
-    header: 'Description',
+    header: () => (
+      <div className="text-left">Description</div>
+    ),
+    cell: ({ row }) => (
+      <div className="text-left">{row.original.description}</div>
+    ),
   },
   {
     id: 'actions',
+    header: () => (
+      <div className="text-right">Actions</div>
+    ),
     cell: ({ row }) => {
       const category = row.original;
 
       return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => onEdit(category)}>
-              Edit Category
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => onDelete(category)}
-              className="text-red-600"
-            >
-              Delete Category
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="text-right">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => onEdit(category)}>
+                Edit Category
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onDelete(category)}
+                className="text-red-600"
+              >
+                Delete Category
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       );
     },
   },
