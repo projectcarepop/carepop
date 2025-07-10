@@ -37,7 +37,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 interface ServiceFormProps {
-  initialData?: Partial<AdminService>;
+  initialData?: Partial<AdminService> & { categoryId?: string };
   onSubmit: (values: FormValues) => void;
   isPending: boolean;
   categories: ServiceCategory[];
@@ -56,12 +56,12 @@ export function ServiceForm({
       description: initialData?.description || '',
       price: initialData?.price ?? 0,
       durationMinutes: initialData?.durationMinutes ?? 30,
-      categoryId: initialData?.serviceCategory?.id || '',
+      categoryId: initialData?.categoryId || initialData?.serviceCategory?.id || '',
     },
   });
 
   return (
-    <Form {...form}>
+    <Form {...form} key={initialData?.id || 'new'}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <FormField
           control={form.control}

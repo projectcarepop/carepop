@@ -38,11 +38,14 @@ export function CategoryForm({
 }: CategoryFormProps) {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: initialData || { name: '', description: '' },
+    defaultValues: {
+      name: initialData?.name || '',
+      description: initialData?.description || '',
+    },
   });
 
   return (
-    <Form {...form}>
+    <Form {...form} key={initialData?.id || 'new'}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <FormField
           control={form.control}
