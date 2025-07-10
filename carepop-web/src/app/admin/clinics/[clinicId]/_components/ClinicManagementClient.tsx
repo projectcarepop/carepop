@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Plus } from 'lucide-react';
+import { ArrowLeft, Plus, MapPin, Phone } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/contexts/auth-context';
@@ -56,11 +56,20 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
   const [servicesSearch, setServicesSearch] = useState('');
   const [doctorsSearch, setDoctorsSearch] = useState('');
 
+  // Debug logging
+  console.log('Initial Context:', initialContext);
+  console.log('Clinic Services:', initialContext?.clinic?.services);
+  console.log('Clinic Doctors:', initialContext?.clinic?.doctors);
+  console.log('Doctor Clinic Services:', initialContext?.clinic?.doctorClinicServices);
+
   // Transform data for tables
   const servicesData = useMemo(() => {
-    if (!initialContext?.clinic?.services || !Array.isArray(initialContext.clinic.services)) return [];
+    if (!initialContext?.clinic?.services || !Array.isArray(initialContext.clinic.services)) {
+      console.log('No services data found');
+      return [];
+    }
     
-    return initialContext.clinic.services
+    const result = initialContext.clinic.services
       .map(cs => {
         const service = cs?.service;
         if (!service) return null;
@@ -84,12 +93,18 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
         };
       })
       .filter((item): item is NonNullable<typeof item> => item !== null);
+    
+    console.log('Transformed services data:', result);
+    return result;
   }, [initialContext]);
 
   const doctorsData = useMemo(() => {
-    if (!initialContext?.clinic?.doctors || !Array.isArray(initialContext.clinic.doctors)) return [];
+    if (!initialContext?.clinic?.doctors || !Array.isArray(initialContext.clinic.doctors)) {
+      console.log('No doctors data found');
+      return [];
+    }
     
-    return initialContext.clinic.doctors
+    const result = initialContext.clinic.doctors
       .map(cd => {
         const doctor = cd?.doctor;
         if (!doctor) return null;
@@ -113,6 +128,9 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
         };
       })
       .filter((item): item is NonNullable<typeof item> => item !== null);
+    
+    console.log('Transformed doctors data:', result);
+    return result;
   }, [initialContext]);
 
   // Filtered data for search
@@ -238,11 +256,88 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
 
       <Separator />
 
+      {/* Debug Section - Temporary */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Debug Information</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div>
+              <h4 className="font-medium">Clinic Services ({initialContext?.clinic?.services?.length || 0}):</h4>
+              <pre className="text-xs bg-gray-50 p-2 rounded max-h-32 overflow-y-auto">
+                {JSON.stringify(initialContext?.clinic?.services, null, 2)}
+              </pre>
+            </div>
+            <div>
+              <h4 className="font-medium">Clinic Doctors ({initialContext?.clinic?.doctors?.length || 0}):</h4>
+              <pre className="text-xs bg-gray-50 p-2 rounded max-h-32 overflow-y-auto">
+                {JSON.stringify(initialContext?.clinic?.doctors, null, 2)}
+              </pre>
+            </div>
+            <div>
+              <h4 className="font-medium">Doctor Clinic Services ({initialContext?.clinic?.doctorClinicServices?.length || 0}):</h4>
+              <pre className="text-xs bg-gray-50 p-2 rounded max-h-32 overflow-y-auto">
+                {JSON.stringify(initialContext?.clinic?.doctorClinicServices, null, 2)}
+              </pre>
+            </div>
+            <div>
+              <h4 className="font-medium">Transformed Services Data ({servicesData.length}):</h4>
+              <pre className="text-xs bg-gray-50 p-2 rounded max-h-32 overflow-y-auto">
+                {JSON.stringify(servicesData, null, 2)}
+              </pre>
+            </div>
+            <div>
+              <h4 className="font-medium">Transformed Doctors Data ({doctorsData.length}):</h4>
+              <pre className="text-xs bg-gray-50 p-2 rounded max-h-32 overflow-y-auto">
+                {JSON.stringify(doctorsData, null, 2)}
+              </pre>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Clinic Details */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Clinic Information</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">Address</span>
+              </div>
+              <p className="text-sm text-muted-foreground ml-6">
+                {initialContext?.clinic?.street ? (
+                  <>
+                    {initialContext.clinic.street}
+                    {initialContext.clinic.zipCode && `, ${initialContext.clinic.zipCode}`}
+                  </>
+                ) : (
+                  'No address specified'
+                )}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Phone className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">Phone</span>
+              </div>
+              <p className="text-sm text-muted-foreground ml-6">
+                {initialContext?.clinic?.phoneNumber || 'No phone number specified'}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Main Content */}
       <Tabs defaultValue="services" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="services">Services</TabsTrigger>
-          <TabsTrigger value="doctors">Doctors</TabsTrigger>
+          <TabsTrigger value="services">Services ({servicesData.length})</TabsTrigger>
+          <TabsTrigger value="doctors">Doctors ({doctorsData.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="services" className="space-y-4">
@@ -264,10 +359,17 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
                   onChange={(e) => setServicesSearch(e.target.value)}
                   className="max-w-sm"
                 />
-                <DataTable
-                  columns={serviceColumns}
-                  data={filteredServicesData}
-                />
+                {filteredServicesData.length === 0 && !servicesSearch ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>No services assigned to this clinic yet.</p>
+                    <p className="text-sm">Click &quot;Add Services&quot; to get started.</p>
+                  </div>
+                ) : (
+                  <DataTable
+                    columns={serviceColumns}
+                    data={filteredServicesData}
+                  />
+                )}
               </div>
             </CardContent>
           </Card>
@@ -286,10 +388,17 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
                   onChange={(e) => setDoctorsSearch(e.target.value)}
                   className="max-w-sm"
                 />
-                <DataTable
-                  columns={doctorColumns}
-                  data={filteredDoctorsData}
-                />
+                {filteredDoctorsData.length === 0 && !doctorsSearch ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>No doctors assigned to this clinic yet.</p>
+                    <p className="text-sm">Doctors need to be added through the main doctors page.</p>
+                  </div>
+                ) : (
+                  <DataTable
+                    columns={doctorColumns}
+                    data={filteredDoctorsData}
+                  />
+                )}
               </div>
             </CardContent>
           </Card>
