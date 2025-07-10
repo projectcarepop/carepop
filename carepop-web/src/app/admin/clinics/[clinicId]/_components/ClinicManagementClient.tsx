@@ -346,11 +346,11 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
     mutationFn: async ({ serviceId, doctorIds }: { serviceId: string, doctorIds: string[] }) => {
       // Only update assignments for this specific service
       // The backend will only delete/update assignments for the services we specify
-      return updateClinicDoctorAssignments({
+        return updateClinicDoctorAssignments({
         clinicId,
         assignments: [{ serviceId, doctorIds }],
         token: session!.access_token
-      });
+        });
     },
     onMutate: async ({ serviceId, doctorIds }) => {
       // Cancel any outgoing refetches so they don't overwrite our optimistic update
@@ -565,10 +565,10 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
         <Link href="/admin/clinics">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Clinics
+        Back to Clinics
           </Button>
-        </Link>
-        <div>
+      </Link>
+      <div>
           <h1 className="text-2xl font-bold">{initialContext?.clinic?.name || 'Clinic Management'}</h1>
           <p className="text-muted-foreground">Manage services and doctors</p>
         </div>

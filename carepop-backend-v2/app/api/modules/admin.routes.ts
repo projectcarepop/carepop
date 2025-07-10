@@ -2508,6 +2508,134 @@ adminRoutes.put('/clinics/:clinicId/doctor-assignments',
 );
 // END: UPDATE DOCTOR-SERVICE ASSIGNMENTS
 
-// Add other admin routes here in the future...
+// === USER MANAGEMENT ENDPOINTS ===
+
+// Zod schema for admin user queries
+const adminUsersQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(10),
+  q: z.string().optional(),
+  role: z.enum(['admin', 'patient', 'manager']).optional(),
+});
+
+// GET /admin/users - List all users with pagination and filtering
+adminRoutes.get('/users', zValidator('query', adminUsersQuerySchema), async (c) => {
+    try {
+        const { page, limit, q, role } = c.req.valid('query');
+
+        // Initialize Supabase admin client for user management
+        const supabaseAdmin = createClient(
+            process.env.SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            {
+                auth: {
+                    autoRefreshToken: false,
+                    persistSession: false
+                }
+            }
+        );
+
+        // Get users from Supabase Auth with pagination
+        const { data: usersResponse, error } = await supabaseAdmin.auth.admin.listUsers({
+            page: page,
+            perPage: limit,
+        });
+
+        if (error) {
+            console.error('Failed to fetch users from Supabase:', error);
+            return c.json({ error: 'Failed to fetch users', message: error.message }, 500);
+        }
+
+        let filteredUsers = usersResponse?.users || [];
+
+        // Filter by role if specified
+        if (role) {
+            filteredUsers = filteredUsers.filter(user => user.app_metadata?.role === role);
+        }
+
+        // Filter by search query if provided
+        if (q) {
+            const searchTerm = q.toLowerCase();
+            filteredUsers = filteredUsers.filter(user => 
+                user.email?.toLowerCase().includes(searchTerm) ||
+                user.user_metadata?.full_name?.toLowerCase().includes(searchTerm)
+            );
+        }
+
+        // Transform users to match frontend expectations
+        const transformedUsers = filteredUsers.map(user => ({
+            id: user.id,
+            email: user.email,
+            role: user.app_metadata?.role || 'patient',
+            fullName: user.user_metadata?.full_name || null,
+            createdAt: user.created_at,
+            lastSignIn: user.last_sign_in_at,
+            emailConfirmed: !!user.email_confirmed_at,
+        }));
+
+        return c.json({
+            data: transformedUsers,
+            pagination: {
+                page,
+                pageSize: limit,
+                totalCount: filteredUsers.length,
+                totalPages: Math.ceil(filteredUsers.length / limit)
+            }
+        });
+
+    } catch (error: any) {
+        console.error('Error fetching admin users:', error);
+        return c.json({ error: 'Failed to fetch users', message: error.message }, 500);
+    }
+});
+
+// PUT /admin/users/:userId/role - Update user role
+adminRoutes.put('/users/:userId/role', 
+    zValidator('json', z.object({
+        role: z.enum(['admin', 'patient', 'manager'])
+    })),
+    async (c) => {
+        try {
+            const { userId } = c.req.param();
+            const { role } = c.req.valid('json');
+
+            // Initialize Supabase admin client
+            const supabaseAdmin = createClient(
+                process.env.SUPABASE_URL!,
+                process.env.SUPABASE_SERVICE_ROLE_KEY!,
+                {
+                    auth: {
+                        autoRefreshToken: false,
+                        persistSession: false
+                    }
+                }
+            );
+
+            // Update user role in Supabase Auth
+            const { data, error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+                app_metadata: { role }
+            });
+
+            if (error) {
+                console.error('Failed to update user role:', error);
+                return c.json({ error: 'Failed to update user role', message: error.message }, 500);
+            }
+
+            return c.json({ 
+                success: true, 
+                message: 'User role updated successfully',
+                user: {
+                    id: data.user?.id,
+                    email: data.user?.email,
+                    role: data.user?.app_metadata?.role
+                }
+            });
+
+        } catch (error: any) {
+            console.error('Error updating user role:', error);
+            return c.json({ error: 'Failed to update user role', message: error.message }, 500);
+        }
+    }
+);
 
 export default adminRoutes;

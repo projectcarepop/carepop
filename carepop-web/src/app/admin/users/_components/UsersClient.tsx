@@ -60,7 +60,7 @@ export default function UsersClient({ initialUsers }: UsersClientProps) {
   const pageCount = usersResponse?.pagination?.totalPages ?? 0;
 
   const updateRoleMutation = useMutation({
-    mutationFn: (data: { userId: string; role: 'patient' | 'admin' }) => {
+    mutationFn: (data: { userId: string; role: 'patient' | 'admin' | 'manager' }) => {
       return updateUserRole(data, session!.access_token);
     },
     onSuccess: () => {

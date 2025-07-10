@@ -54,13 +54,26 @@ export const columns = ({ onEditRole }: ColumnActions): ColumnDef<AdminUser>[] =
     ),
     cell: ({ row }) => {
       const role = row.getValue('role') as string;
+      const getBadgeProps = (role: string) => {
+        switch (role) {
+          case 'admin':
+            return { variant: 'default' as const, className: 'bg-green-600 text-white' };
+          case 'manager':
+            return { variant: 'default' as const, className: 'bg-blue-600 text-white' };
+          case 'patient':
+            return { variant: 'secondary' as const, className: 'bg-gray-200' };
+          default:
+            return { variant: 'secondary' as const, className: 'bg-gray-200' };
+        }
+      };
+      
+      const badgeProps = getBadgeProps(role);
+      
       return (
         <div className="text-center">
           <Badge
-            variant={role === 'admin' ? 'default' : 'secondary'}
-            className={
-              role === 'admin' ? 'bg-green-600 text-white' : 'bg-gray-200'
-            }
+            variant={badgeProps.variant}
+            className={badgeProps.className}
           >
             {role}
           </Badge>

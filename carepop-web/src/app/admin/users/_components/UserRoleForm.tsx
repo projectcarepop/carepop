@@ -32,7 +32,7 @@ import { AdminUser } from '@/services/api';
 import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
-  role: z.enum(['patient', 'admin'], {
+  role: z.enum(['patient', 'admin', 'manager'], {
     required_error: 'Please select a role.',
   }),
 });
@@ -97,6 +97,7 @@ export function UserRoleForm({
                     <SelectContent>
                       <SelectItem value="patient">Patient</SelectItem>
                       <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="manager">Manager</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormDescription>
