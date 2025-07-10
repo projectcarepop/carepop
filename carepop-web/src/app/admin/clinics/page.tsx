@@ -27,7 +27,7 @@ export default async function AdminClinicsPage() {
   try {
     // Fetch clinics using our dedicated service function, passing the access token.
     // The service function will handle the actual fetch call and base error handling.
-    const clinics = await getAdminClinics(session.access_token);
+    const clinics = await getAdminClinics(session.access_token, { page: 1, limit: 10 });
 
     // If the fetch is successful, render the client component with the initial data.
     return <ClinicsClient initialClinics={clinics} />;

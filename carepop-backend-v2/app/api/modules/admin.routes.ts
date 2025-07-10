@@ -357,6 +357,62 @@ adminRoutes
     return c.json(newClinic, 201);
   });
 
+// --- Main Clinics Endpoint ---
+const getClinicsSchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(10),
+  q: z.string().optional(),
+});
+
+adminRoutes.get('/clinics', zValidator('query', getClinicsSchema), async (c) => {
+  try {
+    const { page, limit, q } = c.req.valid('query');
+    const offset = (page - 1) * limit;
+
+    const whereClause = q 
+      ? or(
+          ilike(clinics.name, `%${q}%`),
+          ilike(clinics.street, `%${q}%`)
+        )
+      : undefined;
+
+    const clinicsQuery = db.select({
+      ...getTableColumns(clinics),
+      latitude: sql<number>`ST_Y(location::geometry)`,
+      longitude: sql<number>`ST_X(location::geometry)`
+    })
+    .from(clinics)
+    .where(whereClause)
+    .orderBy(asc(clinics.name))
+    .limit(limit)
+    .offset(offset);
+
+    const totalCountQuery = db.select({ count: count() })
+      .from(clinics)
+      .where(whereClause);
+
+    const [allClinics, totalResult] = await Promise.all([
+      clinicsQuery,
+      totalCountQuery
+    ]);
+
+    const totalCount = totalResult[0]?.count ?? 0;
+
+    return c.json({
+      data: allClinics,
+      pagination: {
+        page,
+        pageSize: limit,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limit)
+      }
+    });
+  } catch (error: any) {
+    console.error("Error fetching clinics:", error);
+    return c.json({ error: 'Failed to fetch clinics', message: error.message }, 500);
+  }
+});
+
 adminRoutes
   .get('/clinics/:id', async (c) => {
     const { id } = c.req.param();
@@ -1231,12 +1287,56 @@ adminRoutes.delete('/services/:id', async (c) => {
 });
 
 // -- Service Categories --
+const getServiceCategoriesSchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(10),
+  q: z.string().optional(),
+});
+
 adminRoutes
-  .get('/service-categories', async (c) => {
-    const categories = await db.query.serviceCategories.findMany({
-      orderBy: (serviceCategories, { asc }) => [asc(serviceCategories.name)],
-    });
-    return c.json({ data: categories });
+  .get('/service-categories', zValidator('query', getServiceCategoriesSchema), async (c) => {
+    try {
+      const { page, limit, q } = c.req.valid('query');
+      const offset = (page - 1) * limit;
+
+      const whereClause = q 
+        ? or(
+            ilike(serviceCategories.name, `%${q}%`),
+            ilike(serviceCategories.description, `%${q}%`)
+          )
+        : undefined;
+
+      const categoriesQuery = db.select()
+        .from(serviceCategories)
+        .where(whereClause)
+        .orderBy(asc(serviceCategories.name))
+        .limit(limit)
+        .offset(offset);
+
+      const totalCountQuery = db.select({ count: count() })
+        .from(serviceCategories)
+        .where(whereClause);
+
+      const [categories, totalResult] = await Promise.all([
+        categoriesQuery,
+        totalCountQuery
+      ]);
+
+      const totalCount = totalResult[0]?.count ?? 0;
+
+      return c.json({
+        data: categories,
+        pagination: {
+          page,
+          pageSize: limit,
+          totalCount,
+          totalPages: Math.ceil(totalCount / limit)
+        }
+      });
+    } catch (error: any) {
+      console.error("Error fetching service categories:", error);
+      return c.json({ error: 'Failed to fetch service categories', message: error.message }, 500);
+    }
   })
   .post('/service-categories', zValidator('json', serviceCategorySchema), async (c) => {
     const newCategoryData = c.req.valid('json');
@@ -1474,18 +1574,54 @@ adminRoutes.post(
 
 // --- User Management ---
 
-adminRoutes
-    .get('/users', async (c) => {
-        try {
-            const userProfiles = await db
-                .select()
-                .from(profiles);
-            
-            // This is a simplified approach. Ideally, you would also fetch the role
-            // from the auth.users table and merge it. For now, let's return the profiles.
-            // A more advanced query would join profiles with auth.users.
+const getUsersSchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(10),
+  q: z.string().optional(),
+  role: z.string().optional(),
+});
 
-            return c.json({ data: userProfiles });
+adminRoutes
+    .get('/users', zValidator('query', getUsersSchema), async (c) => {
+        try {
+            const { page, limit, q, role } = c.req.valid('query');
+            const offset = (page - 1) * limit;
+
+            const whereClause = q 
+                ? or(
+                    ilike(profiles.firstName, `%${q}%`),
+                    ilike(profiles.lastName, `%${q}%`),
+                    ilike(profiles.email, `%${q}%`)
+                  )
+                : undefined;
+
+            const usersQuery = db.select()
+                .from(profiles)
+                .where(whereClause)
+                .orderBy(asc(profiles.firstName), asc(profiles.lastName))
+                .limit(limit)
+                .offset(offset);
+
+            const totalCountQuery = db.select({ count: count() })
+                .from(profiles)
+                .where(whereClause);
+
+            const [userProfiles, totalResult] = await Promise.all([
+                usersQuery,
+                totalCountQuery
+            ]);
+
+            const totalCount = totalResult[0]?.count ?? 0;
+
+            return c.json({
+                data: userProfiles,
+                pagination: {
+                    page,
+                    pageSize: limit,
+                    totalCount,
+                    totalPages: Math.ceil(totalCount / limit)
+                }
+            });
         } catch (error: any) {
             console.error("Error fetching user profiles:", error);
             return c.json({ error: "Failed to fetch user profiles", details: error.message }, 500);
@@ -2253,28 +2389,76 @@ adminRoutes.get('/clinics/:id/management-context', async (c) => {
     }
 });
 
-adminRoutes.get('/doctors', async (c) => {
-    const { clinic_id } = c.req.query();
+const getDoctorsSchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(10),
+  q: z.string().optional(),
+  clinic_id: z.string().optional(), // Keep existing clinic filtering
+});
 
-    const allDoctors = await db.query.doctors.findMany({
-      orderBy: [asc(doctors.fullName)],
-      with: {
-        doctorClinics: {
-          columns: {
-            clinicId: true,
-          },
-        },
-      },
-    });
+adminRoutes.get('/doctors', zValidator('query', getDoctorsSchema), async (c) => {
+    try {
+      const { page, limit, q, clinic_id } = c.req.valid('query');
+      const offset = (page - 1) * limit;
 
-    if (clinic_id) {
-      const filtered = allDoctors.filter(d =>
-        d.doctorClinics.some(dc => dc.clinicId === clinic_id)
-      );
-      return c.json({ data: filtered });
+      const whereClause = q 
+        ? or(
+            ilike(doctors.fullName, `%${q}%`),
+            ilike(doctors.specialtyText, `%${q}%`)
+          )
+        : undefined;
+
+      let doctorsQuery = db.select({
+        ...getTableColumns(doctors),
+        doctorClinics: sql<any>`COALESCE(
+          json_agg(
+            json_build_object('clinicId', ${doctorClinics.clinicId})
+          ) FILTER (WHERE ${doctorClinics.clinicId} IS NOT NULL),
+          '[]'
+        )`.as('doctorClinics')
+      })
+      .from(doctors)
+      .leftJoin(doctorClinics, eq(doctors.id, doctorClinics.doctorId))
+      .where(whereClause)
+      .groupBy(doctors.id)
+      .orderBy(asc(doctors.fullName))
+      .limit(limit)
+      .offset(offset);
+
+      let totalCountQuery = db.select({ count: count() })
+        .from(doctors)
+        .where(whereClause);
+
+      const [allDoctors, totalResult] = await Promise.all([
+        doctorsQuery,
+        totalCountQuery
+      ]);
+
+      let finalDoctors = allDoctors;
+      let totalCount = totalResult[0]?.count ?? 0;
+
+      // Apply clinic filtering if specified (post-query for simplicity)
+      if (clinic_id) {
+        finalDoctors = allDoctors.filter(d => 
+          Array.isArray(d.doctorClinics) && 
+          d.doctorClinics.some((dc: any) => dc.clinicId === clinic_id)
+        );
+        totalCount = finalDoctors.length; // Approximate count for filtered results
+      }
+
+      return c.json({
+        data: finalDoctors,
+        pagination: {
+          page,
+          pageSize: limit,
+          totalCount,
+          totalPages: Math.ceil(totalCount / limit)
+        }
+      });
+    } catch (error: any) {
+      console.error("Error fetching doctors:", error);
+      return c.json({ error: 'Failed to fetch doctors', message: error.message }, 500);
     }
-
-    return c.json({ data: allDoctors });
   });
 
 // START: UPDATE DOCTOR-SERVICE ASSIGNMENTS
