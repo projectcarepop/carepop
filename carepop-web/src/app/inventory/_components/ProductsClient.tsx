@@ -74,11 +74,14 @@ export default function ProductsClient() {
 
   const queryClient = useQueryClient();
 
-    const { data: clinics, isLoading: isLoadingClinics } = useQuery({
+    const { data: clinicsResponse, isLoading: isLoadingClinics } = useQuery({
         queryKey: ['admin-clinics'],
         queryFn: () => getAdminClinics(accessToken!),
         enabled: !!accessToken,
     });
+
+    // Extract clinics array from the response following the golden pattern
+    const clinics = Array.isArray(clinicsResponse?.data) ? clinicsResponse.data : [];
 
   const { data: productsResponse, isLoading: isLoadingProducts } = useQuery({
     queryKey: ['inventory-items', selectedClinicId, pagination, { lowStock: showLowStockOnly, expiringSoon: showExpiringSoon, q: debouncedFilter }],
@@ -268,7 +271,7 @@ export default function ProductsClient() {
                 </p>
             </div>
             <ClinicSelector
-                clinics={clinics || []}
+                clinics={clinics}
                 selectedClinicId={selectedClinicId}
                 onClinicSelect={handleClinicSelect}
                 isLoading={isLoadingClinics || !accessToken}

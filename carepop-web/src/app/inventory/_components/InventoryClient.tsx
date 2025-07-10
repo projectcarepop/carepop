@@ -28,11 +28,14 @@ export default function InventoryClient() {
     select: (data) => data.data,
   });
 
-  const { data: clinics, isLoading: isLoadingClinics } = useQuery({
+  const { data: clinicsResponse, isLoading: isLoadingClinics } = useQuery({
     queryKey: ['admin-clinics'],
     queryFn: () => getAdminClinics(accessToken!),
     enabled: !!accessToken,
   });
+
+  // Extract clinics array from the response following the golden pattern
+  const clinics = Array.isArray(clinicsResponse?.data) ? clinicsResponse.data : [];
 
   const handleClinicSelect = (clinicId: string | null) => {
       const params = new URLSearchParams(searchParams);
@@ -54,7 +57,7 @@ export default function InventoryClient() {
             </p>
           </div>
           <ClinicSelector 
-            clinics={clinics || []}
+            clinics={clinics}
             selectedClinicId={selectedClinicId}
             onClinicSelect={handleClinicSelect}
             isLoading={isLoadingClinics || !accessToken}
