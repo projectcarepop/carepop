@@ -429,9 +429,10 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
                   <Button 
                     variant="outline" 
                     onClick={() => {
-                      console.log('Test button clicked');
-                      console.log('allDoctors:', initialContext?.allDoctors);
+                      console.log('=== TEST DOCTOR ASSIGNMENT BUTTON CLICKED ===');
+                      console.log('initialContext?.allDoctors:', initialContext?.allDoctors);
                       console.log('servicesData:', servicesData);
+                      console.log('selectedService will be:', servicesData[0]);
                       if (servicesData.length > 0) {
                         setSelectedService(servicesData[0]);
                         setIsDoctorAssignmentsModalOpen(true);
@@ -442,7 +443,21 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
                   >
                     Test Doctor Assignment
                   </Button>
-                  <Button onClick={() => setIsAddServicesModalOpen(true)}>
+                  <Button onClick={() => {
+                    console.log('=== ADD SERVICES BUTTON CLICKED ===');
+                    console.log('initialContext?.allServices:', initialContext?.allServices);
+                    console.log('currentServiceIds calculation:', (() => {
+                      const clinicServices = initialContext?.clinic?.services || [];
+                      const assignedServices = initialContext?.assignedServices || [];
+                      
+                      if (clinicServices.length > 0) {
+                        return clinicServices.map(cs => cs?.service?.id).filter(Boolean) as string[];
+                      } else {
+                        return assignedServices.map(s => s?.id).filter(Boolean) as string[];
+                      }
+                    })());
+                    setIsAddServicesModalOpen(true);
+                  }}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Services
                   </Button>
