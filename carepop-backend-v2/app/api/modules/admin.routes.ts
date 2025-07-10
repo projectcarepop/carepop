@@ -2524,6 +2524,8 @@ const adminUsersQuerySchema = z.object({
 
 // GET /admin/users - List all users with pagination and filtering
 adminRoutes.get('/users', zValidator('query', adminUsersQuerySchema), async (c) => {
+    console.log('=== ADMIN USERS ENDPOINT CALLED ===');
+    console.log('=== THIS IS THE NEW CODE VERSION ===');
     console.log('[ADMIN USERS] Endpoint called - starting user fetch');
     try {
         const { page, limit, q, role } = c.req.valid('query');
@@ -2655,6 +2657,9 @@ adminRoutes.get('/users', zValidator('query', adminUsersQuerySchema), async (c) 
             fullName: finalUsers[0].fullName,
             role: finalUsers[0].role
         } : 'No users found');
+        
+        console.log('=== ABOUT TO RETURN RESPONSE ===');
+        console.log('=== FINAL USERS SAMPLE ===', finalUsers.slice(0, 2));
 
         return c.json(response);
 
