@@ -153,13 +153,6 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
         </CardDescription>
       </CardHeader>
       
-      <div className="flex items-center justify-end">
-        <Button onClick={handleCreateNew}>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Create Clinic
-        </Button>
-      </div>
-
       <DataTable
         columns={dynamicColumns}
         data={clinics || []}
@@ -169,6 +162,12 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
         globalFilter={globalFilter}
         setGlobalFilter={setGlobalFilter}
         isLoading={isLoading}
+        toolbarActions={
+          <Button onClick={handleCreateNew}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Create Clinic
+          </Button>
+        }
       />
       
       {/* Create/Edit Modal */}
@@ -185,14 +184,9 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
           <ClinicForm
             initialData={selectedClinic}
             onSubmit={(values) => {
-              const { latitude, longitude, ...rest } = values;
               const payload = {
-                ...rest,
+                ...values,
                 id: selectedClinic?.id,
-                location: {
-                  latitude,
-                  longitude,
-                },
               };
               upsertMutation.mutate(payload as any);
             }}

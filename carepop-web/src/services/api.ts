@@ -462,18 +462,7 @@ export async function upsertClinic(clinicData: any, accessToken: string, clinicI
     const url = clinicId ? `${API_BASE_URL}/api/admin/clinics/${clinicId}` : `${API_BASE_URL}/api/admin/clinics`;
     const method = clinicId ? 'PUT' : 'POST';
 
-    // The backend now expects a flat structure for the address.
-    // We need to transform the data if it comes from a form with a nested address object.
-    const payload = {
-      ...clinicData,
-      street: clinicData.address?.street,
-      cityMunicipalityCode: clinicData.address?.city, // Note: field name mismatch
-      provinceCode: clinicData.address?.province,     // Note: field name mismatch
-      zipCode: clinicData.address?.zip,          // Note: field name mismatch
-    };
-    delete payload.address; // remove the nested object
-
-    const response = await fetch(url, { method, headers, body: JSON.stringify(payload) });
+    const response = await fetch(url, { method, headers, body: JSON.stringify(clinicData) });
     if (!response.ok) {
         const error = await response.json().catch(() => ({ message: 'Failed to save clinic.'}));
         throw new Error(error.message);

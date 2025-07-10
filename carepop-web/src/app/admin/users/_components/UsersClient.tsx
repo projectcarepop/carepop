@@ -16,7 +16,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface UsersClientProps {
@@ -82,21 +81,10 @@ export default function UsersClient({ initialUsers }: UsersClientProps) {
           View all registered users and manage their roles on the platform.
         </CardDescription>
       </CardHeader>
-
-      <div className="flex items-center">
-         <Input
-            placeholder="Filter by name..."
-            value={globalFilter}
-            onChange={(event) => setGlobalFilter(event.target.value)}
-            className="max-w-sm"
-          />
-      </div>
       
       <DataTable
         columns={dynamicColumns}
         data={users || []}
-        filterColumn="fullName"
-        filterPlaceholder="Filter by name..."
         isLoading={isLoading}
         globalFilter={globalFilter}
         setGlobalFilter={setGlobalFilter}

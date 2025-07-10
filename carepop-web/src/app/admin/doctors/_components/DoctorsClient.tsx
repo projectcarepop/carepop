@@ -30,7 +30,6 @@ import {
 import { DoctorForm } from './DoctorForm';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Clinic } from '@/lib/types/bookings';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -143,42 +142,34 @@ export default function DoctorsClient({ initialDoctors }: DoctorsClientProps) {
               This page allows you to create, view, edit, and delete doctor profiles.
           </CardDescription>
       </CardHeader>
-
-      <div className="flex items-center justify-between gap-2">
-        <Input
-            placeholder="Filter by name..."
-            value={globalFilter}
-            onChange={(event) => setGlobalFilter(event.target.value)}
-            className="max-w-sm"
-        />
-        <div className="flex items-center gap-2">
-            <Select value={selectedClinic} onValueChange={setSelectedClinic}>
-                <SelectTrigger className="w-[280px]">
-                    <SelectValue placeholder="Filter by clinic..." />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">All Clinics</SelectItem>
-                    {(clinicsList || []).map((clinic: Clinic) => (
-                        <SelectItem key={clinic.id} value={clinic.id}>
-                            {clinic.name}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-            <Button onClick={handleCreateNew}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Create Doctor
-            </Button>
-        </div>
-      </div>
       
       <DataTable
         columns={dynamicColumns}
         data={doctors}
-        filterColumn="fullName"
         globalFilter={globalFilter}
         setGlobalFilter={setGlobalFilter}
         isLoading={isLoading}
+        toolbarActions={
+            <div className="flex items-center gap-2">
+                <Select value={selectedClinic} onValueChange={setSelectedClinic}>
+                    <SelectTrigger className="w-[280px]">
+                        <SelectValue placeholder="Filter by clinic..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Clinics</SelectItem>
+                        {(clinicsList || []).map((clinic: Clinic) => (
+                            <SelectItem key={clinic.id} value={clinic.id}>
+                                {clinic.name}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <Button onClick={handleCreateNew}>
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Create Doctor
+                </Button>
+            </div>
+        }
       />
       
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

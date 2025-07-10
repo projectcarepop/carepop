@@ -34,6 +34,7 @@ interface DataTableProps<TData, TValue> {
     pageSize: number;
   };
   setPagination?: (updater: OnChangeFn<PaginationState>) => void;
+  toolbarActions?: React.ReactNode;
 }
 
 export function DataTable<TData, TValue>({
@@ -45,6 +46,7 @@ export function DataTable<TData, TValue>({
   pageCount,
   pagination,
   setPagination,
+  toolbarActions,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -77,7 +79,7 @@ export function DataTable<TData, TValue>({
 
   return (
     <div>
-      <div className="flex items-center py-4">
+      <div className="flex items-center justify-between py-4">
         {setGlobalFilter && (
           <Input
             placeholder="Search..."
@@ -86,6 +88,7 @@ export function DataTable<TData, TValue>({
             className="max-w-sm"
           />
         )}
+        {toolbarActions}
       </div>
       <div className="rounded-md border">
         <Table>
