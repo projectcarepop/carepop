@@ -24,15 +24,13 @@ type ManagementContext = {
     provinceCode: string | null;
     zipCode: string | null;
     phoneNumber: string | null;
-    services: { service: { id: string; name: string } }[];
-    // This now represents the full doctor_clinic_services relationship
-    doctorClinicServices: {
-      doctorId: string;
-      serviceId: string;
-    }[];
   };
-  allServices: { id: string; name: string }[];
-  allDoctors: { id: string; fullName: string }[];
+  assignedServices: { id: string; name: string }[];
+  assignedDoctors: { id: string; fullName: string }[];
+  doctorServiceAssignments: {
+    doctorId: string;
+    serviceId: string;
+  }[];
 };
 
 interface ClinicManagementClientProps {
@@ -64,13 +62,13 @@ const ClinicDetails = ({ clinic }: { clinic: ManagementContext['clinic'] }) => {
 export function ClinicManagementClient({ initialContext }: ClinicManagementClientProps) {
   const { session } = useAuth();
   const queryClient = useQueryClient();
-  const { clinic, allDoctors } = initialContext;
+  const { clinic, assignedDoctors, assignedServices, doctorServiceAssignments } = initialContext;
 
   const [assignments, setAssignments] = useState<Assignments>(() => {
     // Transform the initial flat array into the nested map structure
-    // Defensively check if doctorClinicServices exists and is an array before reducing.
-    if (initialContext?.clinic?.doctorClinicServices && Array.isArray(initialContext.clinic.doctorClinicServices)) {
-      return initialContext.clinic.doctorClinicServices.reduce((acc, current) => {
+    // Use doctorServiceAssignments from the root level, not from clinic
+    if (doctorServiceAssignments && Array.isArray(doctorServiceAssignments)) {
+      return doctorServiceAssignments.reduce((acc, current) => {
         const { serviceId, doctorId } = current;
         if (!acc[serviceId]) {
           acc[serviceId] = [];
@@ -121,8 +119,8 @@ export function ClinicManagementClient({ initialContext }: ClinicManagementClien
       <Separator />
 
       <ServiceDoctorAssignments 
-        assignedServices={clinic?.services?.map(s => s.service) || []}
-        allDoctors={allDoctors}
+        assignedServices={assignedServices || []}
+        allDoctors={assignedDoctors}
         initialAssignments={assignments}
         onAssignmentsChange={setAssignments}
       />

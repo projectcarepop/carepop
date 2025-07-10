@@ -138,9 +138,31 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
     setIsModalOpen(true);
   };
 
-  const handleEdit = (clinic: Clinic) => {
-    setSelectedClinic(clinic);
-    setIsModalOpen(true);
+  const handleEdit = async (clinic: Clinic) => {
+    // Fetch the full clinic data including serviceIds
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/admin/clinics/${clinic.id}`, { 
+        headers: {
+          'Authorization': `Bearer ${session!.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-store' 
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch clinic details');
+      }
+      
+      const fullClinicData = await response.json();
+      setSelectedClinic(fullClinicData);
+      setIsModalOpen(true);
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to load clinic details',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleDeactivate = (clinic: Clinic) => {
