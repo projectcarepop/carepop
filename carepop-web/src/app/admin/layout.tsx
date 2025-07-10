@@ -15,6 +15,7 @@ export default async function AdminLayout({
 
   // 1. Use the recommended getUser() for a secure, server-validated check.
   const { data: { user } } = await supabase.auth.getUser();
+  const { data: { session } } = await supabase.auth.getSession();
 
   if (!user) {
     // This is the most reliable way to check for an active user.
@@ -38,17 +39,17 @@ export default async function AdminLayout({
   console.log('--- End Admin Layout Auth Check ---');
   // --- END ENHANCED DEBUG LOGGING ---
   
-  if (profileError || profile?.role !== 'admin') {
-    // If there's an error fetching the profile or the role is not admin, redirect.
-    console.log(`Redirecting to /forbidden. Reason: ${profileError ? 'Profile Error' : `Role is not admin, it is '${profile?.role}'`}`);
+  // 3. Check if user has admin or manager role
+  if (profileError || !profile?.role || !['admin', 'manager'].includes(profile.role)) {
+    console.log(`Redirecting to /forbidden. Reason: ${profileError ? 'Profile Error' : `Role is not admin/manager, it is '${profile?.role}'`}`);
     return redirect('/forbidden');
   }
 
   // If all checks pass, render the layout.
   return (
-    <AdminProvider>
+    <AdminProvider session={session}>
       <div className="flex h-screen overflow-hidden">
-        <AdminSidebar />
+        <AdminSidebar userRole={profile.role} />
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
           {children}
         </main>

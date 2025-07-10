@@ -5,6 +5,7 @@ import { getAdminUsers } from '@/services/api';
 import UsersClient from './_components/UsersClient';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Terminal } from 'lucide-react';
+import { requireAdminRole } from '@/lib/utils/auth';
 
 /**
  * This is the main server component for the Admin Users page.
@@ -12,6 +13,9 @@ import { Terminal } from 'lucide-react';
  * passes the data to the client component.
  */
 export default async function AdminUsersPage() {
+  // Require admin role for this page (managers cannot access)
+  await requireAdminRole(['admin']);
+
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 

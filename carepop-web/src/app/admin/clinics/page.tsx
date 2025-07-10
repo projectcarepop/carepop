@@ -1,10 +1,11 @@
-import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
-import { getAdminClinics } from '@/services/api';
-import ClinicsClient from './_components/ClinicsClient';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Terminal } from 'lucide-react';
+import ClinicsClient from "./_components/ClinicsClient";
+import { getAdminClinics } from "@/services/api";
+import { createClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Terminal } from "lucide-react";
+import { requireAdminRole } from "@/lib/utils/auth";
 
 /**
  * This is the main server component for the Admin Clinics page.
@@ -14,14 +15,16 @@ import { Terminal } from 'lucide-react';
  * 3.  Passing the initial data to the client component for interactive display.
  */
 export default async function AdminClinicsPage() {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+    // Require admin role for this page (managers cannot access)
+    await requireAdminRole(['admin']);
 
-  // First, get the session. If no session, redirect to sign-in.
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
-    redirect('/sign-in?redirect=/admin/clinics');
-  }
+    const cookieStore = await cookies();
+    const supabase = createClient(cookieStore);
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+        redirect('/sign-in?redirect=/admin/clinics');
+    }
 
   // Use a try-catch block for robust error handling during data fetch.
   try {
