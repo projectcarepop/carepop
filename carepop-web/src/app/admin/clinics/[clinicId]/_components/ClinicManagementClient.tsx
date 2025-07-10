@@ -213,13 +213,60 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
       const allServiceIds = [...new Set([...currentServiceIds, ...serviceIds])];
       return assignServicesToClinic(clinicId, allServiceIds, session!.access_token);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clinic-management', clinicId] });
-      toast({ title: 'Success', description: 'Services added successfully' });
+    onMutate: async (serviceIds) => {
+      // Cancel any outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: ['clinic-management', clinicId] });
+
+      // Snapshot the previous value
+      const previousData = queryClient.getQueryData(['clinic-management', clinicId]);
+
+      // Optimistically update the cache
+      queryClient.setQueryData(['clinic-management', clinicId], (old: any) => {
+        if (!old) return old;
+        
+        const newData = { ...old };
+        
+        // Add the new services to clinic.services
+        if (newData.clinic && newData.allServices) {
+          const currentServices = newData.clinic.services || [];
+          const currentServiceIds = currentServices.map((cs: any) => cs.service?.id || cs.id);
+          
+          // Find the new services to add
+          const servicesToAdd = newData.allServices.filter((service: any) => 
+            serviceIds.includes(service.id) && !currentServiceIds.includes(service.id)
+          );
+          
+          // Add them to clinic.services
+          const newServices = servicesToAdd.map((service: any) => ({
+            service: service
+          }));
+          
+          newData.clinic.services = [...currentServices, ...newServices];
+        }
+        
+        return newData;
+      });
+
+      // Close modal immediately
       setIsAddServicesModalOpen(false);
+
+      // Return a context object with the snapshotted value
+      return { previousData };
     },
-    onError: (error: Error) => {
+    onSuccess: () => {
+      toast({ title: 'Success', description: 'Services added successfully' });
+      // Invalidate to ensure we have the latest data from server
+      queryClient.invalidateQueries({ queryKey: ['clinic-management', clinicId] });
+    },
+    onError: (error: Error, variables, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousData) {
+        queryClient.setQueryData(['clinic-management', clinicId], context.previousData);
+      }
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      
+      // Reopen modal on error
+      setIsAddServicesModalOpen(true);
     },
   });
 
@@ -247,11 +294,49 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
       
       return assignServicesToClinic(clinicId, remainingServiceIds, session!.access_token);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clinic-management', clinicId] });
-      toast({ title: 'Success', description: 'Service removed successfully' });
+    onMutate: async (serviceId) => {
+      // Cancel any outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: ['clinic-management', clinicId] });
+
+      // Snapshot the previous value
+      const previousData = queryClient.getQueryData(['clinic-management', clinicId]);
+
+      // Optimistically update the cache
+      queryClient.setQueryData(['clinic-management', clinicId], (old: any) => {
+        if (!old) return old;
+        
+        const newData = { ...old };
+        
+        // Remove the service from clinic.services
+        if (newData.clinic?.services) {
+          newData.clinic.services = newData.clinic.services.filter(
+            (cs: any) => cs.service?.id !== serviceId
+          );
+        }
+        
+        // Also remove any doctor assignments for this service
+        if (newData.clinic?.doctorClinicServices) {
+          newData.clinic.doctorClinicServices = newData.clinic.doctorClinicServices.filter(
+            (dcs: any) => dcs.serviceId !== serviceId
+          );
+        }
+        
+        return newData;
+      });
+
+      // Return a context object with the snapshotted value
+      return { previousData };
     },
-    onError: (error: Error) => {
+    onSuccess: () => {
+      toast({ title: 'Success', description: 'Service removed successfully' });
+      // Invalidate to ensure we have the latest data from server
+      queryClient.invalidateQueries({ queryKey: ['clinic-management', clinicId] });
+    },
+    onError: (error: Error, variables, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousData) {
+        queryClient.setQueryData(['clinic-management', clinicId], context.previousData);
+      }
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     },
   });
@@ -267,14 +352,63 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
         token: session!.access_token
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clinic-management', clinicId] });
-      toast({ title: 'Success', description: 'Doctor assignments updated successfully' });
+    onMutate: async ({ serviceId, doctorIds }) => {
+      // Cancel any outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: ['clinic-management', clinicId] });
+
+      // Snapshot the previous value
+      const previousData = queryClient.getQueryData(['clinic-management', clinicId]);
+
+      // Optimistically update the cache
+      queryClient.setQueryData(['clinic-management', clinicId], (old: any) => {
+        if (!old) return old;
+        
+        const newData = { ...old };
+        
+        // Update doctorClinicServices with new assignments
+        if (newData.clinic?.doctorClinicServices) {
+          // Remove existing assignments for this service
+          newData.clinic.doctorClinicServices = newData.clinic.doctorClinicServices.filter(
+            (dcs: any) => dcs.serviceId !== serviceId
+          );
+          
+          // Add new assignments
+          const newAssignments = doctorIds.map(doctorId => ({
+            doctorId,
+            serviceId,
+            clinicId
+          }));
+          
+          newData.clinic.doctorClinicServices = [
+            ...newData.clinic.doctorClinicServices,
+            ...newAssignments
+          ];
+        }
+        
+        return newData;
+      });
+
+      // Close modal immediately
       setIsDoctorAssignmentsModalOpen(false);
       setSelectedService(null);
+
+      // Return a context object with the snapshotted value
+      return { previousData };
     },
-    onError: (error: Error) => {
+    onSuccess: () => {
+      toast({ title: 'Success', description: 'Doctor assignments updated successfully' });
+      // Invalidate to ensure we have the latest data from server
+      queryClient.invalidateQueries({ queryKey: ['clinic-management', clinicId] });
+    },
+    onError: (error: Error, variables, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousData) {
+        queryClient.setQueryData(['clinic-management', clinicId], context.previousData);
+      }
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      
+      // Reopen modal on error
+      setIsDoctorAssignmentsModalOpen(true);
     },
   });
 
@@ -353,14 +487,63 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
         token: session!.access_token
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clinic-management', clinicId] });
-      toast({ title: 'Success', description: 'Service assignments updated successfully' });
+    onMutate: async ({ doctorId, serviceIds }) => {
+      // Cancel any outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: ['clinic-management', clinicId] });
+
+      // Snapshot the previous value
+      const previousData = queryClient.getQueryData(['clinic-management', clinicId]);
+
+      // Optimistically update the cache
+      queryClient.setQueryData(['clinic-management', clinicId], (old: any) => {
+        if (!old) return old;
+        
+        const newData = { ...old };
+        
+        // Update doctorClinicServices with new assignments
+        if (newData.clinic?.doctorClinicServices) {
+          // Remove all existing assignments for this doctor
+          newData.clinic.doctorClinicServices = newData.clinic.doctorClinicServices.filter(
+            (dcs: any) => dcs.doctorId !== doctorId
+          );
+          
+          // Add new assignments for this doctor
+          const newAssignments = serviceIds.map((serviceId: string) => ({
+            doctorId,
+            serviceId,
+            clinicId
+          }));
+          
+          newData.clinic.doctorClinicServices = [
+            ...newData.clinic.doctorClinicServices,
+            ...newAssignments
+          ];
+        }
+        
+        return newData;
+      });
+
+      // Close modal immediately
       setIsServiceAssignmentsModalOpen(false);
       setSelectedDoctor(null);
+
+      // Return a context object with the snapshotted value
+      return { previousData };
     },
-    onError: (error: Error) => {
+    onSuccess: () => {
+      toast({ title: 'Success', description: 'Service assignments updated successfully' });
+      // Invalidate to ensure we have the latest data from server
+      queryClient.invalidateQueries({ queryKey: ['clinic-management', clinicId] });
+    },
+    onError: (error: Error, variables, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousData) {
+        queryClient.setQueryData(['clinic-management', clinicId], context.previousData);
+      }
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      
+      // Reopen modal on error
+      setIsServiceAssignmentsModalOpen(true);
     },
   });
 
