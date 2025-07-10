@@ -58,47 +58,61 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
 
   // Transform data for tables
   const servicesData = useMemo(() => {
-    if (!initialContext.clinic?.services) return [];
+    if (!initialContext?.clinic?.services || !Array.isArray(initialContext.clinic.services)) return [];
     
-    return initialContext.clinic.services.map(cs => {
-      const service = cs.service;
-      const assignedDoctors = initialContext.clinic.doctorClinicServices
-        .filter(dcs => dcs.serviceId === service.id)
-        .map(dcs => {
-          const doctor = initialContext.allDoctors.find(d => d.id === dcs.doctorId);
-          return doctor ? { id: doctor.id, fullName: doctor.fullName } : null;
-        })
-        .filter((doctor): doctor is { id: string; fullName: string } => doctor !== null);
-      
-      return {
-        id: service.id,
-        name: service.name,
-        description: service.description,
-        assignedDoctors: assignedDoctors.length > 0 ? assignedDoctors : undefined
-      };
-    });
+    return initialContext.clinic.services
+      .map(cs => {
+        const service = cs?.service;
+        if (!service) return null;
+        
+        const doctorClinicServices = initialContext.clinic?.doctorClinicServices || [];
+        const allDoctors = initialContext?.allDoctors || [];
+        
+        const assignedDoctors = doctorClinicServices
+          .filter(dcs => dcs?.serviceId === service.id)
+          .map(dcs => {
+            const doctor = allDoctors.find(d => d?.id === dcs?.doctorId);
+            return doctor ? { id: doctor.id, fullName: doctor.fullName } : null;
+          })
+          .filter((doctor): doctor is { id: string; fullName: string } => doctor !== null);
+        
+        return {
+          id: service.id,
+          name: service.name,
+          description: service.description,
+          assignedDoctors: assignedDoctors.length > 0 ? assignedDoctors : undefined
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
   }, [initialContext]);
 
   const doctorsData = useMemo(() => {
-    if (!initialContext.clinic?.doctors) return [];
+    if (!initialContext?.clinic?.doctors || !Array.isArray(initialContext.clinic.doctors)) return [];
     
-    return initialContext.clinic.doctors.map(cd => {
-      const doctor = cd.doctor;
-      const assignedServices = initialContext.clinic.doctorClinicServices
-        .filter(dcs => dcs.doctorId === doctor.id)
-        .map(dcs => {
-          const service = initialContext.clinic.services.find(cs => cs.service.id === dcs.serviceId);
-          return service ? { id: service.service.id, name: service.service.name } : null;
-        })
-        .filter((service): service is { id: string; name: string } => service !== null);
-      
-      return {
-        id: doctor.id,
-        fullName: doctor.fullName,
-        specialization: undefined, // TODO: Add specialization to doctor data
-        assignedServices: assignedServices.length > 0 ? assignedServices : undefined
-      };
-    });
+    return initialContext.clinic.doctors
+      .map(cd => {
+        const doctor = cd?.doctor;
+        if (!doctor) return null;
+        
+        const doctorClinicServices = initialContext.clinic?.doctorClinicServices || [];
+        const clinicServices = initialContext.clinic?.services || [];
+        
+        const assignedServices = doctorClinicServices
+          .filter(dcs => dcs?.doctorId === doctor.id)
+          .map(dcs => {
+            const service = clinicServices.find(cs => cs?.service?.id === dcs?.serviceId);
+            return service ? { id: service.service.id, name: service.service.name } : null;
+          })
+          .filter((service): service is { id: string; name: string } => service !== null);
+        
+        return {
+          id: doctor.id,
+          fullName: doctor.fullName,
+          specialization: undefined, // TODO: Add specialization to doctor data
+          assignedServices: assignedServices.length > 0 ? assignedServices : undefined
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
   }, [initialContext]);
 
   // Filtered data for search
@@ -119,7 +133,8 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
   // Mutation for adding services
   const addServicesMutation = useMutation({
     mutationFn: async (serviceIds: string[]) => {
-      const currentServiceIds = initialContext.clinic.services.map(cs => cs.service.id);
+      const currentServices = initialContext?.clinic?.services || [];
+      const currentServiceIds = currentServices.map(cs => cs?.service?.id).filter(Boolean) as string[];
       const allServiceIds = [...new Set([...currentServiceIds, ...serviceIds])];
       return assignServicesToClinic(clinicId, allServiceIds, session!.access_token);
     },
@@ -136,9 +151,11 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
   // Mutation for removing service
   const removeServiceMutation = useMutation({
     mutationFn: async (serviceId: string) => {
-      const remainingServiceIds = initialContext.clinic.services
-        .filter(cs => cs.service.id !== serviceId)
-        .map(cs => cs.service.id);
+      const currentServices = initialContext?.clinic?.services || [];
+      const remainingServiceIds = currentServices
+        .filter(cs => cs?.service?.id !== serviceId)
+        .map(cs => cs?.service?.id)
+        .filter(Boolean) as string[];
       return assignServicesToClinic(clinicId, remainingServiceIds, session!.access_token);
     },
     onSuccess: () => {
@@ -214,7 +231,7 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold">{initialContext.clinic.name}</h1>
+          <h1 className="text-2xl font-bold">{initialContext?.clinic?.name || 'Clinic Management'}</h1>
           <p className="text-muted-foreground">Manage services and doctors</p>
         </div>
       </div>
@@ -283,8 +300,8 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
       <AddServicesModal
         isOpen={isAddServicesModalOpen}
         onClose={() => setIsAddServicesModalOpen(false)}
-        availableServices={initialContext.allServices}
-        currentServiceIds={initialContext.clinic.services.map(cs => cs.service.id)}
+        availableServices={initialContext?.allServices || []}
+        currentServiceIds={(initialContext?.clinic?.services || []).map(cs => cs?.service?.id).filter(Boolean) as string[]}
         onSave={(serviceIds) => addServicesMutation.mutate(serviceIds)}
         isLoading={addServicesMutation.isPending}
       />
@@ -296,11 +313,12 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
           setSelectedService(null);
         }}
         service={selectedService}
-        availableDoctors={initialContext.allDoctors}
+        availableDoctors={initialContext?.allDoctors || []}
         currentAssignments={selectedService ? 
-          initialContext.clinic.doctorClinicServices
-            .filter(dcs => dcs.serviceId === selectedService.id)
-            .map(dcs => dcs.doctorId) : []
+          (initialContext?.clinic?.doctorClinicServices || [])
+            .filter(dcs => dcs?.serviceId === selectedService.id)
+            .map(dcs => dcs?.doctorId)
+            .filter(Boolean) as string[] : []
         }
         onSave={(serviceId: string, doctorIds: string[]) => updateDoctorAssignmentsMutation.mutate({ 
           serviceId, 
