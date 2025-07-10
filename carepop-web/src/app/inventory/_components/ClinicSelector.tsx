@@ -37,7 +37,7 @@ export function ClinicSelector({
         <SelectValue placeholder={isLoading ? "Loading clinics..." : "Select a clinic"} />
       </SelectTrigger>
       <SelectContent>
-        {clinics.map((clinic) => (
+        {Array.isArray(clinics) && clinics.map((clinic) => (
           <SelectItem key={clinic.id} value={clinic.id}>
             {clinic.name}
           </SelectItem>
