@@ -259,6 +259,8 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
   // Mutation for updating doctor assignments
   const updateDoctorAssignmentsMutation = useMutation({
     mutationFn: async ({ serviceId, doctorIds }: { serviceId: string, doctorIds: string[] }) => {
+      // Only update assignments for this specific service
+      // The backend will only delete/update assignments for the services we specify
       return updateClinicDoctorAssignments({
         clinicId,
         assignments: [{ serviceId, doctorIds }],
@@ -302,16 +304,52 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
   // Mutation for updating service assignments to doctors
   const updateServiceAssignmentsMutation = useMutation({
     mutationFn: async ({ doctorId, serviceIds }: { doctorId: string, serviceIds: string[] }) => {
-      // We need to update all assignments for this doctor
-      // Create assignments array for all services this doctor should have
-      const assignments = serviceIds.map(serviceId => ({
-        serviceId,
-        doctorIds: [doctorId] // Only this doctor for each service
-      }));
+      // We need to be smart about preserving existing assignments for other doctors
+      // Get current assignments for all services this doctor should be assigned to
+      const currentAssignments = initialContext?.clinic?.doctorClinicServices || [];
+      
+      // Create assignments array that preserves existing doctors and adds/removes this doctor
+      const assignments = serviceIds.map(serviceId => {
+        // Get all doctors currently assigned to this service (excluding the current doctor)
+        const existingDoctorIds = currentAssignments
+          .filter(dcs => dcs.serviceId === serviceId && dcs.doctorId !== doctorId)
+          .map(dcs => dcs.doctorId);
+        
+        // Add the current doctor to the list
+        return {
+          serviceId,
+          doctorIds: [...existingDoctorIds, doctorId]
+        };
+      });
+      
+      // Also handle services that this doctor should be REMOVED from
+      // Find services this doctor was previously assigned to but is no longer in serviceIds
+      const previouslyAssignedServices = currentAssignments
+        .filter(dcs => dcs.doctorId === doctorId)
+        .map(dcs => dcs.serviceId);
+      
+      const servicesToRemoveFrom = previouslyAssignedServices.filter(serviceId => 
+        !serviceIds.includes(serviceId)
+      );
+      
+      // For services to remove from, preserve other doctors but exclude this doctor
+      const removalAssignments = servicesToRemoveFrom.map(serviceId => {
+        const existingDoctorIds = currentAssignments
+          .filter(dcs => dcs.serviceId === serviceId && dcs.doctorId !== doctorId)
+          .map(dcs => dcs.doctorId);
+        
+        return {
+          serviceId,
+          doctorIds: existingDoctorIds // Don't include current doctor
+        };
+      });
+      
+      // Combine both assignment and removal operations
+      const allAssignments = [...assignments, ...removalAssignments];
       
       return updateClinicDoctorAssignments({
         clinicId,
-        assignments,
+        assignments: allAssignments,
         token: session!.access_token
       });
     },
