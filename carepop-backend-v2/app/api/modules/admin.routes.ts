@@ -1705,16 +1705,16 @@ adminRoutes.delete('/appointments/:id', async (c) => {
 });
 
 adminRoutes.patch(
-  '/appointments/:id/cancel', 
-  zValidator('json', z.object({ reason: z.string().min(1, { message: "Cancellation reason is required."}) })), 
+  '/appointments/:id/cancel',
+  zValidator('json', z.object({ reason: z.string().min(1, { message: "Cancellation reason is required."}) })),
   async (c) => {
     const { id } = c.req.param();
     const { reason } = c.req.valid('json');
     try {
         const [updatedAppointment] = await db.update(appointments)
-            .set({ 
+            .set({
                 status: 'canceled_by_admin',
-                cancellationReason: reason 
+                cancellationReason: reason
             })
             .where(eq(appointments.id, id))
             .returning();

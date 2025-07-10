@@ -30,7 +30,6 @@ import {
 import { ClinicForm } from './ClinicForm';
 import { useAuth } from '@/lib/contexts/auth-context';
 import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { useDebounce } from 'use-debounce';
 
 interface ClinicsClientProps {
