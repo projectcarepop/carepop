@@ -64,7 +64,7 @@ const ClinicDetails = ({ clinic }: { clinic: ManagementContext['clinic'] }) => {
 export function ClinicManagementClient({ initialContext }: ClinicManagementClientProps) {
   const { session } = useAuth();
   const queryClient = useQueryClient();
-  const { clinic, allServices, allDoctors } = initialContext;
+  const { clinic, allDoctors } = initialContext;
 
   const [assignments, setAssignments] = useState<Assignments>(() => {
     // Transform the initial flat array into the nested map structure
