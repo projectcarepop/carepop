@@ -238,44 +238,47 @@ function FindAClinicClient() {
               {isLoadingClinics ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)
               : clinics.length > 0 ? clinics.map((clinic) => (
                       <Card key={clinic.id} className="cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleListSelect(clinic)}>
-                        <CardHeader className="pb-2 px-4 pt-3">
-                          <CardTitle className="text-base font-semibold leading-tight">{clinic.name}</CardTitle>
+                        <CardHeader className="pb-1 px-4 pt-3">
+                          <CardTitle className="text-base font-semibold leading-tight mb-1">{clinic.name}</CardTitle>
                         </CardHeader>
                                                  <CardContent className="px-4 pb-3 pt-0">
-                           <p className="text-sm text-gray-600 leading-snug">
-                             {(() => {
-                               // Check if clinic has any address property (cast to any to access all possible fields)
-                               const c = clinic as any;
-                               
-                               // Option 1: Use full_address if available (Supabase format)
-                               if (c.full_address) {
-                                 return c.full_address;
-                               }
-                               
-                               // Option 2: Build from individual Supabase fields
-                               if (c.street_address || c.locality || c.region) {
-                                 const parts = [c.street_address, c.locality, c.region].filter(Boolean);
-                                 return parts.length > 0 ? parts.join(', ') : 'Address not available';
-                               }
-                               
-                               // Option 3: Handle address as JSONB object (Drizzle format)
-                               if (c.address && typeof c.address === 'object') {
-                                 const addr = c.address;
-                                 const parts = [addr.street, addr.city || addr.cityMunicipality, addr.province].filter(Boolean);
-                                 return parts.length > 0 ? parts.join(', ') : 'Address not available';
-                               }
-                               
-                               // Option 4: Handle individual address fields (legacy format)
-                               if (c.street || c.cityMunicipality) {
-                                 const cityName = typeof c.cityMunicipality === 'string' 
-                                   ? c.cityMunicipality 
-                                   : c.cityMunicipality?.name;
-                                 return [c.street, cityName].filter(Boolean).join(', ');
-                               }
-                               
-                               return 'Address not available';
-                             })()}
-                           </p>
+                           <div className="flex items-start gap-1">
+                             <MapPin className="h-3 w-3 text-gray-500 mt-0.5 flex-shrink-0" />
+                             <p className="text-sm text-gray-600 leading-tight">
+                               {(() => {
+                                 // Check if clinic has any address property (cast to any to access all possible fields)
+                                 const c = clinic as any;
+                                 
+                                 // Option 1: Use full_address if available (Supabase format)
+                                 if (c.full_address) {
+                                   return c.full_address;
+                                 }
+                                 
+                                 // Option 2: Build from individual Supabase fields
+                                 if (c.street_address || c.locality || c.region) {
+                                   const parts = [c.street_address, c.locality, c.region].filter(Boolean);
+                                   return parts.length > 0 ? parts.join(', ') : 'Address not available';
+                                 }
+                                 
+                                 // Option 3: Handle address as JSONB object (Drizzle format)
+                                 if (c.address && typeof c.address === 'object') {
+                                   const addr = c.address;
+                                   const parts = [addr.street, addr.city || addr.cityMunicipality, addr.province].filter(Boolean);
+                                   return parts.length > 0 ? parts.join(', ') : 'Address not available';
+                                 }
+                                 
+                                 // Option 4: Handle individual address fields (legacy format)
+                                 if (c.street || c.cityMunicipality) {
+                                   const cityName = typeof c.cityMunicipality === 'string' 
+                                     ? c.cityMunicipality 
+                                     : c.cityMunicipality?.name;
+                                   return [c.street, cityName].filter(Boolean).join(', ');
+                                 }
+                                 
+                                 return 'Address not available';
+                               })()}
+                             </p>
+                           </div>
                            {clinic.distance && (
                              <p className="text-xs text-blue-600 font-medium mt-1">
                                {(clinic.distance / 1000).toFixed(2)} km away

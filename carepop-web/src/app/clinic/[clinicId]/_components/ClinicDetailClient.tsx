@@ -1,15 +1,15 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { GoogleMap, useJsApiLoader, MarkerF } from '@react-google-maps/api';
 import { type Clinic } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MapPin, Navigation, Phone, Globe, Clock, Star, Calendar, User, Stethoscope } from 'lucide-react';
+
+import { Input } from '@/components/ui/input';
+import { MapPin, Navigation, Phone, Globe, Calendar, User, Stethoscope, Search } from 'lucide-react';
 
 interface ClinicDetailClientProps {
     clinic: Clinic;
@@ -46,6 +46,7 @@ const ClinicMap = ({ lat, lng, name }: { lat: number; lng: number; name: string 
 
 export default function ClinicDetailClient({ clinic }: ClinicDetailClientProps) {
     const { name, street, cityMunicipality, province, zipCode, phone, website, latitude, longitude, services } = clinic;
+    const [searchTerm, setSearchTerm] = useState('');
 
     // Build full address from individual components
     const addressParts = [street, typeof cityMunicipality === 'string' ? cityMunicipality : cityMunicipality?.name, typeof province === 'string' ? province : province?.name, zipCode].filter(Boolean);
@@ -55,17 +56,27 @@ export default function ClinicDetailClient({ clinic }: ClinicDetailClientProps) 
         ? `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`
         : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ', ' + fullAddress)}`;
 
-    // Sample doctors data (this would come from the API in a real implementation)
+    // Sample doctors data (simplified)
     const sampleDoctors = [
-        { id: '1', fullName: 'Dr. Maria Santos', specialization: 'General Medicine', experience: '8 years', rating: 4.8 },
-        { id: '2', fullName: 'Dr. Juan Dela Cruz', specialization: 'Pediatrics', experience: '12 years', rating: 4.9 },
-        { id: '3', fullName: 'Dr. Anna Reyes', specialization: 'Gynecology', experience: '6 years', rating: 4.7 },
+        { id: '1', fullName: 'Dr. Maria Santos', specialization: 'General Medicine' },
+        { id: '2', fullName: 'Dr. Juan Dela Cruz', specialization: 'Pediatrics' },
+        { id: '3', fullName: 'Dr. Anna Reyes', specialization: 'Gynecology' },
     ];
+
+    // Filter services based on search only
+    const filteredServices = useMemo(() => {
+        if (!services) return [];
+        return services.filter(service => {
+            const matchesSearch = service.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                  (service.description && service.description.toLowerCase().includes(searchTerm.toLowerCase()));
+            return matchesSearch;
+        });
+    }, [services, searchTerm]);
 
     return (
         <div className="container mx-auto max-w-7xl py-8 md:py-12 px-4">
             {/* Header Section */}
-            <header className="mb-8">
+            <header className="mb-4">
                 <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
                     <div className="flex-1">
                         <h1 className="text-4xl font-extrabold tracking-tight lg:text-5xl text-gray-900 mb-4">{name}</h1>
@@ -126,92 +137,88 @@ export default function ClinicDetailClient({ clinic }: ClinicDetailClientProps) 
                 </div>
             </header>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Main Content */}
-                <div className="lg:col-span-2 space-y-8">
-                    {/* Map Section */}
-                    {latitude && longitude && (
-                        <section>
-                            <h2 className="text-2xl font-bold mb-4">Location</h2>
-                            <ClinicMap lat={latitude} lng={longitude} name={name} />
-                        </section>
-                    )}
-                    
-                    {/* Services Section */}
+            {/* Quick Information Section - Moved under header */}
+            <section className="mb-8">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Quick Information</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <h4 className="font-medium text-sm text-gray-700 mb-2">Operating Hours</h4>
+                            <p className="text-sm text-gray-600">Monday - Friday: 8:00 AM - 6:00 PM</p>
+                            <p className="text-sm text-gray-600">Saturday: 8:00 AM - 4:00 PM</p>
+                            <p className="text-sm text-gray-600">Sunday: Closed</p>
+                        </div>
+                        
+                        <div>
+                            <h4 className="font-medium text-sm text-gray-700 mb-2">Services Available</h4>
+                            <p className="text-sm text-gray-600">{services ? services.length : 0} services offered</p>
+                        </div>
+                        
+                        <div>
+                            <h4 className="font-medium text-sm text-gray-700 mb-2">Contact</h4>
+                            {phone && <p className="text-sm text-gray-600">{phone}</p>}
+                            {website && (
+                                <a href={website} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline block">
+                                    Visit Website
+                                </a>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            </section>
+
+            <div className="space-y-8">
+                {/* Map Section */}
+                {latitude && longitude && (
                     <section>
-                        <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                            <Stethoscope className="h-6 w-6" />
-                            Services Available
-                        </h2>
-                        {services && services.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {services.map(service => (
-                                    <Card key={service.id} className="hover:shadow-md transition-shadow">
-                                        <CardHeader className="pb-3">
-                                            <CardTitle className="text-lg">{service.name}</CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            {service.description && (
-                                                <p className="text-sm text-gray-600 mb-3">{service.description}</p>
-                                            )}
-                                            <div className="flex items-center justify-between">
+                        <h2 className="text-2xl font-bold mb-4">Location</h2>
+                        <ClinicMap lat={latitude} lng={longitude} name={name} />
+                    </section>
+                )}
+                
+                {/* Services Section - Single column with filters */}
+                <section>
+                    <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                        <Stethoscope className="h-6 w-6" />
+                        Services Available
+                    </h2>
+                    
+                    {/* Filter Controls */}
+                    <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            <Input
+                                placeholder="Search services..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-10"
+                            />
+                        </div>
+                    </div>
+
+                    {filteredServices && filteredServices.length > 0 ? (
+                        <div className="space-y-4">
+                            {filteredServices.map(service => (
+                                <Card key={service.id} className="hover:shadow-md transition-shadow">
+                                    <CardContent className="p-6">
+                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                            <div className="flex-1">
+                                                <h3 className="text-lg font-semibold mb-2">{service.name}</h3>
+                                                {service.description && (
+                                                    <p className="text-sm text-gray-600 mb-2">{service.description}</p>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-4">
                                                 {service.price && (
                                                     <Badge variant="secondary" className="font-medium">
                                                         ₱{parseFloat(service.price).toLocaleString()}
                                                     </Badge>
                                                 )}
-                                                <Button size="sm" variant="outline" asChild>
+                                                <Button size="sm" asChild>
                                                     <Link href={`/book-appointment?clinicId=${clinic.id}&serviceId=${service.id}`}>
                                                         Book Now
-                                                    </Link>
-                                                </Button>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                ))}
-                            </div>
-                        ) : (
-                            <Card>
-                                <CardContent className="text-center py-8">
-                                    <Stethoscope className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                                    <p className="text-gray-500 text-lg">No specific services are listed for this clinic at the moment.</p>
-                                    <p className="text-gray-400 text-sm mt-2">Please call the clinic directly for information about available services.</p>
-                                </CardContent>
-                            </Card>
-                        )}
-                    </section>
-
-                    {/* Doctors Section */}
-                    <section>
-                        <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                            <User className="h-6 w-6" />
-                            Our Doctors
-                        </h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {sampleDoctors.map(doctor => (
-                                <Card key={doctor.id} className="hover:shadow-md transition-shadow">
-                                    <CardContent className="p-6">
-                                        <div className="flex items-start gap-4">
-                                            <Avatar className="h-16 w-16">
-                                                <AvatarImage src={`https://api.dicebear.com/7.x/personas/svg?seed=${doctor.fullName}`} />
-                                                <AvatarFallback>{doctor.fullName.split(' ').map(n => n[0]).join('').slice(0, 2)}</AvatarFallback>
-                                            </Avatar>
-                                            <div className="flex-1">
-                                                <h3 className="font-semibold text-lg mb-1">{doctor.fullName}</h3>
-                                                <p className="text-blue-600 font-medium mb-2">{doctor.specialization}</p>
-                                                <div className="flex items-center gap-4 text-sm text-gray-600">
-                                                    <div className="flex items-center gap-1">
-                                                        <Clock className="h-4 w-4" />
-                                                        {doctor.experience}
-                                                    </div>
-                                                    <div className="flex items-center gap-1">
-                                                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                                                        {doctor.rating}
-                                                    </div>
-                                                </div>
-                                                <Button size="sm" className="mt-3" asChild>
-                                                    <Link href={`/book-appointment?clinicId=${clinic.id}&doctorId=${doctor.id}`}>
-                                                        Book with Dr. {doctor.fullName.split(' ')[1]}
                                                     </Link>
                                                 </Button>
                                             </div>
@@ -220,57 +227,59 @@ export default function ClinicDetailClient({ clinic }: ClinicDetailClientProps) 
                                 </Card>
                             ))}
                         </div>
-                    </section>
-                </div>
-
-                {/* Sidebar */}
-                <aside className="lg:col-span-1">
-                    <div className="sticky top-24 space-y-6">
-                        {/* Quick Info Card */}
+                    ) : services && services.length > 0 ? (
                         <Card>
-                            <CardHeader>
-                                <CardTitle>Quick Information</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div>
-                                    <h4 className="font-medium text-sm text-gray-700 mb-2">Operating Hours</h4>
-                                    <p className="text-sm text-gray-600">Monday - Friday: 8:00 AM - 6:00 PM</p>
-                                    <p className="text-sm text-gray-600">Saturday: 8:00 AM - 4:00 PM</p>
-                                    <p className="text-sm text-gray-600">Sunday: Closed</p>
-                                </div>
-                                
-                                <Separator />
-                                
-                                <div>
-                                    <h4 className="font-medium text-sm text-gray-700 mb-2">Services Available</h4>
-                                    <p className="text-sm text-gray-600">{services ? services.length : 0} services offered</p>
-                                </div>
-                                
-                                <Separator />
-                                
-                                <div>
-                                    <h4 className="font-medium text-sm text-gray-700 mb-2">Contact</h4>
-                                    {phone && <p className="text-sm text-gray-600">{phone}</p>}
-                                    {website && (
-                                        <a href={website} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline block">
-                                            Visit Website
-                                        </a>
-                                    )}
-                                </div>
+                            <CardContent className="text-center py-8">
+                                <p className="text-gray-500">No services match your search criteria.</p>
                             </CardContent>
                         </Card>
+                    ) : (
+                        <Card>
+                            <CardContent className="text-center py-8">
+                                <Stethoscope className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                                <p className="text-gray-500 text-lg">No specific services are listed for this clinic at the moment.</p>
+                                <p className="text-gray-400 text-sm mt-2">Please call the clinic directly for information about available services.</p>
+                            </CardContent>
+                        </Card>
+                    )}
+                </section>
 
-                        {/* Emergency Notice */}
-                        <Card className="border-red-200 bg-red-50">
-                            <CardContent className="p-4">
-                                <h4 className="font-medium text-red-800 mb-2">Emergency Notice</h4>
-                                <p className="text-sm text-red-700">
-                                    For medical emergencies, please call 911 or go to the nearest emergency room immediately.
-                                </p>
-                            </CardContent>
-                        </Card>
+                {/* Doctors Section - Single column, simplified */}
+                <section>
+                    <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                        <User className="h-6 w-6" />
+                        Our Doctors
+                    </h2>
+                    <div className="space-y-4">
+                        {sampleDoctors.map(doctor => (
+                            <Card key={doctor.id} className="hover:shadow-md transition-shadow">
+                                <CardContent className="p-6">
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                        <div className="flex-1">
+                                            <h3 className="font-semibold text-lg mb-1">{doctor.fullName}</h3>
+                                            <p className="text-blue-600 font-medium">{doctor.specialization}</p>
+                                        </div>
+                                        <Button size="sm" asChild>
+                                            <Link href={`/book-appointment?clinicId=${clinic.id}&doctorId=${doctor.id}`}>
+                                                Book with Dr. {doctor.fullName.split(' ')[1]}
+                                            </Link>
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ))}
                     </div>
-                </aside>
+                </section>
+
+                {/* Emergency Notice */}
+                <Card className="border-red-200 bg-red-50">
+                    <CardContent className="p-4">
+                        <h4 className="font-medium text-red-800 mb-2">Emergency Notice</h4>
+                        <p className="text-sm text-red-700">
+                            For medical emergencies, please call 911 or go to the nearest emergency room immediately.
+                        </p>
+                    </CardContent>
+                </Card>
             </div>
         </div>
     );
