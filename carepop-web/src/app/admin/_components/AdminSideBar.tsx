@@ -11,7 +11,7 @@ import {
   Stethoscope,
   Pill,
   Calendar,
-  Package,
+  //Package,
 } from 'lucide-react';
 
 const sidebarNavItems = [
@@ -57,12 +57,11 @@ const sidebarNavItems = [
     icon: Calendar,
     roles: ['admin'], // Only admins can access booking management
   },
-  {
-    title: 'Inventory',
-    href: '/admin/inventory',
-    icon: Package,
-    roles: ['admin', 'manager'], // Both admins and managers can manage inventory
-  },
+  //{
+  //  title: 'Inventory',
+  //  href: '/admin/inventory',
+  //  icon: Package,
+  //},
 ];
 
 interface AdminSidebarProps {
