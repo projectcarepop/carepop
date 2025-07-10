@@ -2560,11 +2560,18 @@ adminRoutes.get('/users', zValidator('query', adminUsersQuerySchema), async (c) 
         let userProfiles: any[] = [];
         if (userIds.length > 0) {
             try {
+                console.log(`[ADMIN] Fetching profiles for ${userIds.length} users:`, userIds);
                 userProfiles = await db
                     .select()
                     .from(profiles)
                     .where(inArray(profiles.id, userIds))
                     .orderBy(asc(profiles.firstName), asc(profiles.lastName));
+                console.log(`[ADMIN] Found ${userProfiles.length} profiles:`, userProfiles.map(p => ({ 
+                    id: p.id, 
+                    firstName: p.firstName, 
+                    lastName: p.lastName, 
+                    email: p.email 
+                })));
             } catch (dbError) {
                 console.log('Error fetching user profiles:', dbError);
                 // Continue without profile data if database query fails
@@ -2587,7 +2594,7 @@ adminRoutes.get('/users', zValidator('query', adminUsersQuerySchema), async (c) 
                 fullName = `${firstName} ${lastName}`.trim() || null;
             }
 
-            return {
+            const transformedUser = {
                 id: user.id,
                 email: user.email,
                 role: user.app_metadata?.role || profile?.role || 'patient',
@@ -2596,6 +2603,20 @@ adminRoutes.get('/users', zValidator('query', adminUsersQuerySchema), async (c) 
                 lastSignIn: user.last_sign_in_at,
                 emailConfirmed: !!user.email_confirmed_at,
             };
+
+            // Debug log for the first few users
+            if (filteredUsers.indexOf(user) < 3) {
+                console.log(`[ADMIN] User ${user.id} transformed:`, {
+                    email: user.email,
+                    profileFound: !!profile,
+                    profileFirstName: profile?.firstName,
+                    profileLastName: profile?.lastName,
+                    constructedFullName: fullName,
+                    role: transformedUser.role
+                });
+            }
+
+            return transformedUser;
         });
 
         // Apply search filter after transformation (so we can search full names)
