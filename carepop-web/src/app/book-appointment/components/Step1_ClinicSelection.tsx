@@ -12,19 +12,19 @@ import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { useDebounce } from 'use-debounce';
 
-// Helper to format the address
-function formatAddress(address: any): string {
-    if (!address) return 'Address not available';
-    if (typeof address === 'string') return address;
+// Helper to format the address - Updated to match admin clinic address handling
+function formatAddress(clinic: Clinic): string {
+    const { street, cityMunicipality, province, zipCode } = clinic;
     
-    const parts = [
-        address.street,
-        address.city,
-        address.province,
-        address.zip,
-    ].filter(Boolean); // Filter out any null/undefined parts
+    // Handle cityMunicipality and province which might be objects with a 'name' property
+    // depending on the API response. Let's handle both cases.
+    const cityName = typeof cityMunicipality === 'object' ? cityMunicipality?.name : cityMunicipality;
+    const provinceName = typeof province === 'object' ? province?.name : province;
     
-    return parts.join(', ');
+    // Filter out any null/undefined parts and join with commas
+    const parts = [street, cityName, provinceName, zipCode].filter(Boolean);
+    
+    return parts.length > 0 ? parts.join(', ') : 'Address not available';
 }
 
 interface Step1_ClinicSelectionProps {
@@ -103,7 +103,7 @@ export const Step1_ClinicSelection: React.FC<Step1_ClinicSelectionProps> = ({
                         <p className="font-semibold text-base truncate">{clinic.name}</p>
                         <div className="flex items-start gap-2 text-muted-foreground mt-1.5">
                             <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                            <p className="text-xs">{formatAddress(clinic.address)}</p>
+                            <p className="text-xs">{formatAddress(clinic)}</p>
                         </div>
                     </CardContent>
                     </Card>

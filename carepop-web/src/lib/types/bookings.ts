@@ -14,7 +14,16 @@ export type ClinicOverride = {
 export interface Clinic {
   id: string;
   name: string;
-  address: string; // Assuming address is a simple string for now
+  // Fix: Use individual address fields that match the actual data structure
+  street?: string | null;
+  cityMunicipality?: { name: string, code: string } | string | null;
+  province?: { name: string, code: string } | string | null;
+  zipCode?: string | null;
+  latitude?: number;
+  longitude?: number;
+  phone?: string | null;
+  website?: string | null;
+  distance?: number;
   // Add other clinic details as needed
 }
 
