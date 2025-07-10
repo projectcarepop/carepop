@@ -19,6 +19,7 @@ import { serviceAssignmentsColumns } from './service-assignments-columns';
 import { doctorAssignmentsColumns } from './doctor-assignments-columns';
 import { AddServicesModal } from './AddServicesModal';
 import { ManageDoctorAssignmentsModal } from './ManageDoctorAssignmentsModal';
+import { ManageServiceAssignmentsModal } from './ManageServiceAssignmentsModal';
 
 // Updated type to handle both possible backend response formats
 type ManagementContext = {
@@ -56,7 +57,9 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
   // State for modals
   const [isAddServicesModalOpen, setIsAddServicesModalOpen] = useState(false);
   const [isDoctorAssignmentsModalOpen, setIsDoctorAssignmentsModalOpen] = useState(false);
+  const [isServiceAssignmentsModalOpen, setIsServiceAssignmentsModalOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<any>(null);
+  const [selectedDoctor, setSelectedDoctor] = useState<any>(null);
   
   // State for search
   const [servicesSearch, setServicesSearch] = useState('');
@@ -285,15 +288,43 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
     }
   };
 
-  const handleManageServices = () => {
-    // TODO: Implement doctor service management modal
-    toast({ title: 'Info', description: 'Doctor service management coming soon' });
+  const handleManageServices = (doctor: { id: string; fullName: string; specialization?: string; assignedServices?: { id: string; name: string }[] }) => {
+    setSelectedDoctor(doctor);
+    setIsServiceAssignmentsModalOpen(true);
   };
 
-  const handleRemoveDoctor = () => {
-    // TODO: Implement doctor removal
-    toast({ title: 'Info', description: 'Doctor removal coming soon' });
+  const handleRemoveDoctor = (doctor: { id: string; fullName: string; specialization?: string; assignedServices?: { id: string; name: string }[] }) => {
+    if (confirm(`Are you sure you want to remove "${doctor.fullName}" from this clinic?`)) {
+      toast({ title: 'Info', description: 'Doctor removal functionality will be implemented later' });
+    }
   };
+
+  // Mutation for updating service assignments to doctors
+  const updateServiceAssignmentsMutation = useMutation({
+    mutationFn: async ({ doctorId, serviceIds }: { doctorId: string, serviceIds: string[] }) => {
+      // We need to update all assignments for this doctor
+      // Create assignments array for all services this doctor should have
+      const assignments = serviceIds.map(serviceId => ({
+        serviceId,
+        doctorIds: [doctorId] // Only this doctor for each service
+      }));
+      
+      return updateClinicDoctorAssignments({
+        clinicId,
+        assignments,
+        token: session!.access_token
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clinic-management', clinicId] });
+      toast({ title: 'Success', description: 'Service assignments updated successfully' });
+      setIsServiceAssignmentsModalOpen(false);
+      setSelectedDoctor(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
 
   // Column configurations
   const serviceColumns = serviceAssignmentsColumns({
@@ -323,59 +354,6 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
       </div>
 
       <Separator />
-
-      {/* Debug Section - Temporary */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Debug Information</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <h4 className="font-medium">All Services ({initialContext?.allServices?.length || 0}):</h4>
-              <pre className="text-xs bg-gray-50 p-2 rounded max-h-32 overflow-y-auto">
-                {JSON.stringify(initialContext?.allServices, null, 2)}
-              </pre>
-            </div>
-            <div>
-              <h4 className="font-medium">All Doctors ({initialContext?.allDoctors?.length || 0}):</h4>
-              <pre className="text-xs bg-gray-50 p-2 rounded max-h-32 overflow-y-auto">
-                {JSON.stringify(initialContext?.allDoctors, null, 2)}
-              </pre>
-            </div>
-            <div>
-              <h4 className="font-medium">Clinic Services ({initialContext?.clinic?.services?.length || 0}):</h4>
-              <pre className="text-xs bg-gray-50 p-2 rounded max-h-32 overflow-y-auto">
-                {JSON.stringify(initialContext?.clinic?.services, null, 2)}
-              </pre>
-            </div>
-            <div>
-              <h4 className="font-medium">Clinic Doctors ({initialContext?.clinic?.doctors?.length || 0}):</h4>
-              <pre className="text-xs bg-gray-50 p-2 rounded max-h-32 overflow-y-auto">
-                {JSON.stringify(initialContext?.clinic?.doctors, null, 2)}
-              </pre>
-            </div>
-            <div>
-              <h4 className="font-medium">Doctor Clinic Services ({initialContext?.clinic?.doctorClinicServices?.length || 0}):</h4>
-              <pre className="text-xs bg-gray-50 p-2 rounded max-h-32 overflow-y-auto">
-                {JSON.stringify(initialContext?.clinic?.doctorClinicServices, null, 2)}
-              </pre>
-            </div>
-            <div>
-              <h4 className="font-medium">Transformed Services Data ({servicesData.length}):</h4>
-              <pre className="text-xs bg-gray-50 p-2 rounded max-h-32 overflow-y-auto">
-                {JSON.stringify(servicesData, null, 2)}
-              </pre>
-            </div>
-            <div>
-              <h4 className="font-medium">Transformed Doctors Data ({doctorsData.length}):</h4>
-              <pre className="text-xs bg-gray-50 p-2 rounded max-h-32 overflow-y-auto">
-                {JSON.stringify(doctorsData, null, 2)}
-              </pre>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Clinic Details */}
       <Card>
@@ -426,38 +404,7 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
               <div className="flex items-center justify-between">
                 <CardTitle>Clinic Services</CardTitle>
                 <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      console.log('=== TEST DOCTOR ASSIGNMENT BUTTON CLICKED ===');
-                      console.log('initialContext?.allDoctors:', initialContext?.allDoctors);
-                      console.log('servicesData:', servicesData);
-                      console.log('selectedService will be:', servicesData[0]);
-                      if (servicesData.length > 0) {
-                        setSelectedService(servicesData[0]);
-                        setIsDoctorAssignmentsModalOpen(true);
-                      } else {
-                        toast({ title: 'No services found', description: 'Add some services first' });
-                      }
-                    }}
-                  >
-                    Test Doctor Assignment
-                  </Button>
-                  <Button onClick={() => {
-                    console.log('=== ADD SERVICES BUTTON CLICKED ===');
-                    console.log('initialContext?.allServices:', initialContext?.allServices);
-                    console.log('currentServiceIds calculation:', (() => {
-                      const clinicServices = initialContext?.clinic?.services || [];
-                      const assignedServices = initialContext?.assignedServices || [];
-                      
-                      if (clinicServices.length > 0) {
-                        return clinicServices.map(cs => cs?.service?.id).filter(Boolean) as string[];
-                      } else {
-                        return assignedServices.map(s => s?.id).filter(Boolean) as string[];
-                      }
-                    })());
-                    setIsAddServicesModalOpen(true);
-                  }}>
+                  <Button onClick={() => setIsAddServicesModalOpen(true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Services
                   </Button>
@@ -561,6 +508,32 @@ export function ClinicManagementClient({ initialContext, clinicId }: ClinicManag
           doctorIds 
         })}
         isLoading={updateDoctorAssignmentsMutation.isPending}
+      />
+
+      <ManageServiceAssignmentsModal
+        isOpen={isServiceAssignmentsModalOpen}
+        onClose={() => {
+          setIsServiceAssignmentsModalOpen(false);
+          setSelectedDoctor(null);
+        }}
+        doctor={selectedDoctor}
+        availableServices={initialContext?.clinic?.services?.map(cs => cs.service).filter(Boolean) || []}
+        currentAssignments={selectedDoctor ? (() => {
+          const doctorClinicServices = initialContext?.clinic?.doctorClinicServices || [];
+          const doctorServiceAssignments = initialContext?.doctorServiceAssignments || [];
+          
+          const assignments = doctorClinicServices.length > 0 ? doctorClinicServices : doctorServiceAssignments;
+          
+          return assignments
+            .filter(dcs => dcs?.doctorId === selectedDoctor.id)
+            .map(dcs => dcs?.serviceId)
+            .filter(Boolean) as string[];
+        })() : []}
+        onSave={(doctorId: string, serviceIds: string[]) => updateServiceAssignmentsMutation.mutate({ 
+          doctorId, 
+          serviceIds 
+        })}
+        isLoading={updateServiceAssignmentsMutation.isPending}
       />
     </div>
   );
