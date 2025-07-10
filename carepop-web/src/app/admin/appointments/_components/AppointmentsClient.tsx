@@ -51,7 +51,7 @@ export function AppointmentsClient({ initialAppointments }: AppointmentsClientPr
     enabled: !!session,
   });
 
-  const appointments = data?.data || [];
+  const appointments = Array.isArray(data?.data) ? data.data : [];
   const pageCount = data?.pagination?.totalPages ?? 0;
 
   const cancelMutation = useMutation({

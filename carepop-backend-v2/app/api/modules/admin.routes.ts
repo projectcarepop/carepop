@@ -1253,8 +1253,7 @@ adminRoutes.get('/appointments', zValidator('query', getAppointmentsSchema), asy
             ...getTableColumns(appointments),
             clinicName: clinics.name,
             doctorName: doctors.fullName,
-            patientFirstName: profiles.firstName,
-            patientLastName: profiles.lastName,
+            patientName: sql<string>`COALESCE(CONCAT(${profiles.firstName}, ' ', ${profiles.lastName}), 'Unknown Patient')`,
         })
         .from(appointments)
         .leftJoin(clinics, eq(appointments.clinicId, clinics.id))
@@ -1303,8 +1302,7 @@ adminRoutes.get('/appointments/:id', async (c) => {
             ...getTableColumns(appointments),
             clinicName: clinics.name,
             doctorName: doctors.fullName,
-            patientFirstName: profiles.firstName,
-            patientLastName: profiles.lastName,
+            patientName: sql<string>`COALESCE(CONCAT(${profiles.firstName}, ' ', ${profiles.lastName}), 'Unknown Patient')`,
             serviceName: services.name,
             servicePrice: services.price,
         })
