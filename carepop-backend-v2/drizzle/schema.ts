@@ -33,7 +33,7 @@ export const clinics = pgTable("clinics", {
 	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
 	name: text("name").notNull(),
 	street: text("street"),
-	barangayCode: text("baranggay_code"),
+	barangayCode: text("barangay_code"),
 	cityMunicipalityCode: text("city_municipality_code"),
 	provinceCode: text("province_code"),
 	zipCode: text("zip_code"),

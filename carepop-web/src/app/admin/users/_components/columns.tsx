@@ -34,9 +34,53 @@ export const columns = ({ onEditRole }: ColumnActions): ColumnDef<AdminUser>[] =
         </Button>
       );
     },
-    cell: ({ row }) => (
-      <div className="text-left font-medium">{row.original.fullName}</div>
-    ),
+    cell: ({ row }) => {
+      const user = row.original;
+      
+      // Debug: log the first user's structure to see what fields are available
+      if (row.index === 0) {
+        console.log('[FRONTEND COLUMNS] First user data structure:', {
+          fullName: user.fullName,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          email: user.email,
+          role: user.role,
+          allFields: Object.keys(user)
+        });
+      }
+      
+      // Try multiple approaches to get the full name
+      let displayName = user.fullName;
+      
+      if (!displayName) {
+        // Try camelCase fields (Drizzle schema)
+        const firstName1 = user.firstName || '';
+        const lastName1 = user.lastName || '';
+        if (firstName1 || lastName1) {
+          displayName = `${firstName1} ${lastName1}`.trim();
+        }
+      }
+      
+      if (!displayName) {
+        // Try snake_case fields (database/Supabase)
+        const firstName2 = user.first_name || '';
+        const lastName2 = user.last_name || '';
+        if (firstName2 || lastName2) {
+          displayName = `${firstName2} ${lastName2}`.trim();
+        }
+      }
+      
+      // Final fallback
+      if (!displayName) {
+        displayName = user.email || 'N/A';
+      }
+      
+      return (
+        <div className="text-left font-medium">{displayName}</div>
+      );
+    },
   },
   {
     accessorKey: 'email',

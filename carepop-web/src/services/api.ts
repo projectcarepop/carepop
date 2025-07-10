@@ -43,6 +43,17 @@ export type AdminUser = {
   email?: string;
   role: 'admin' | 'patient' | 'manager'; // Added manager
   fullName?: string | null;
+  // Potential fields from Supabase Auth or profiles table
+  first_name?: string | null;
+  last_name?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  createdAt?: string;
+  created_at?: string;
+  lastSignIn?: string;
+  last_sign_in_at?: string;
+  emailConfirmed?: boolean;
+  email_confirmed_at?: string;
   // Add other fields as necessary from your 'get_all_users_with_roles' RPC or profiles table
 };
 
@@ -960,12 +971,22 @@ export async function getAdminUsers(
     if (params.q) url.searchParams.set('q', params.q);
     if (params.role) url.searchParams.set('role', params.role);
     
+    console.log('[FRONTEND] Calling admin users API:', url.toString());
+    
     const response = await fetch(url.toString(), { headers });
     if (!response.ok) {
         const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
         throw new Error(error.message || 'Failed to fetch users.');
     }
-    return response.json();
+    
+    const result = await response.json();
+    console.log('[FRONTEND] Admin users API response:', {
+        dataLength: result.data?.length,
+        sampleUser: result.data?.[0],
+        fullResponse: result
+    });
+    
+    return result;
 }
 
 export async function updateUserRole(
