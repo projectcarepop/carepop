@@ -2226,11 +2226,16 @@ adminRoutes.get('/clinics/:id/management-context', async (c) => {
             with: {
                 services: { with: { service: true } },
                 doctors: { with: { doctor: true } },
+                doctorClinicServices: true, // Fetch the join table records
             }
         });
 
-        const allServicesQuery = db.query.services.findMany();
-        const allDoctorsQuery = db.query.doctors.findMany();
+        const allServicesQuery = db.query.services.findMany({
+            orderBy: [asc(services.name)]
+        });
+        const allDoctorsQuery = db.query.doctors.findMany({
+            orderBy: [asc(doctors.fullName)]
+        });
 
         const [clinic, allServices, allDoctors] = await Promise.all([
             clinicQuery,
@@ -2242,18 +2247,11 @@ adminRoutes.get('/clinics/:id/management-context', async (c) => {
             return c.json({ error: 'Clinic not found' }, 404);
         }
 
-        // We need to shape the data correctly for the frontend.
-        const context = {
-            clinic: {
-                ...clinic,
-                assignedServiceIds: clinic.services.map(cs => cs.service.id),
-                assignedDoctorIds: clinic.doctors.map(cd => cd.doctor.id),
-            },
+        return c.json({
+            clinic,
             allServices,
             allDoctors,
-        };
-        
-        return c.json(context);
+        });
 
     } catch (error: any) {
         console.error(`Failed to get management context for clinic ${id}:`, error);
@@ -2284,41 +2282,6 @@ adminRoutes.get('/doctors', async (c) => {
 
     return c.json({ data: allDoctors });
   });
-
-// START: CLINIC MANAGEMENT CONTEXT ENDPOINT
-adminRoutes.get('/clinics/:id/management-context', async (c) => {
-    const { id } = c.req.param();
-    try {
-        const clinicPromise = db.query.clinics.findFirst({
-            where: eq(clinics.id, id),
-            with: { 
-                services: { with: { service: true } },
-                doctors: { with: { doctor: true } },
-            }
-        });
-        const allServicesPromise = db.query.services.findMany();
-        const allDoctorsPromise = db.query.doctors.findMany();
-
-        const [clinic, allServices, allDoctors] = await Promise.all([
-            clinicPromise,
-            allServicesPromise,
-            allDoctorsPromise,
-        ]);
-
-        if (!clinic) {
-            return c.json({ error: 'Clinic not found' }, 404);
-        }
-
-        return c.json({
-            data: { clinic, allServices, allDoctors }
-        });
-
-    } catch (error: any) {
-        console.error(`Error fetching management context for clinic ${id}:`, error);
-        return c.json({ error: 'Failed to fetch management context', details: error.message }, 500);
-    }
-});
-// END: CLINIC MANAGEMENT CONTEXT ENDPOINT
 
 // START: UPDATE DOCTOR-SERVICE ASSIGNMENTS
 adminRoutes.put('/clinics/:clinicId/doctor-assignments',
