@@ -55,16 +55,25 @@ export default function CategoryClient({ initialCategories }: CategoryClientProp
 
     const { data: categoriesResponse, isLoading: isLoadingCategories } = useQuery({
         queryKey,
-        queryFn: () => getProductCategories(accessToken!, {
-            page: pagination.pageIndex + 1,
-            limit: pagination.pageSize,
-            q: debouncedFilter || undefined,
-        }),
+        queryFn: async () => {
+            try {
+                const response = await getProductCategories(accessToken!, {
+                    page: pagination.pageIndex + 1,
+                    limit: pagination.pageSize,
+                    q: debouncedFilter || undefined,
+                });
+                return response;
+            } catch (error) {
+                console.error('Failed to fetch categories:', error);
+                // Fallback to empty response structure
+                return { data: [], pagination: { totalPages: 0, currentPage: 1, totalCount: 0 } };
+            }
+        },
         enabled: !!accessToken,
         initialData: { data: initialCategories, pagination: { totalPages: 1, currentPage: 1, totalCount: initialCategories.length } },
     });
 
-    const categories = categoriesResponse?.data || [];
+    const categories = Array.isArray(categoriesResponse?.data) ? categoriesResponse.data : [];
     const pageCount = categoriesResponse?.pagination?.totalPages ?? 0;
 
     const handleMutationSuccess = () => {

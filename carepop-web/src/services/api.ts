@@ -545,8 +545,27 @@ export async function getProductCategories(
   if (params?.q) url.searchParams.set('q', params.q);
   
   const response = await fetch(url.toString(), { headers, cache: 'no-store' });
-  if (!response.ok) throw new Error("Failed to fetch product categories.");
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: "Failed to fetch product categories." }));
+    throw new Error(error.message || "Failed to fetch product categories.");
+  }
   const result = await response.json();
+  
+  // Ensure result has the expected structure
+  if (!result || typeof result !== 'object') {
+    return { data: [], pagination: { totalPages: 0, currentPage: 1, totalCount: 0 } };
+  }
+  
+  // If the backend doesn't support pagination yet, wrap the response
+  if (Array.isArray(result)) {
+    return { data: result, pagination: { totalPages: 1, currentPage: 1, totalCount: result.length } };
+  }
+  
+  // Ensure data is an array
+  if (!Array.isArray(result.data)) {
+    return { data: [], pagination: result.pagination || { totalPages: 0, currentPage: 1, totalCount: 0 } };
+  }
+  
   return result;
 }
 export const getAdminProductCategories = getProductCategories; // Alias for compatibility
@@ -608,8 +627,28 @@ export async function getInventoryForClinic(
     const url = `${API_BASE_URL}/api/admin/clinics/${clinicId}/inventory${queryString ? `?${queryString}` : ''}`;
     
     const response = await fetch(url, { headers, cache: 'no-store' });
-    if (!response.ok) throw new Error('Failed to fetch inventory');
-    return response.json();
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Failed to fetch inventory' }));
+        throw new Error(error.message || 'Failed to fetch inventory');
+    }
+    const result = await response.json();
+    
+    // Ensure result has the expected structure
+    if (!result || typeof result !== 'object') {
+        return { data: [], pagination: { totalPages: 0, currentPage: 1, totalCount: 0 } };
+    }
+    
+    // If the backend doesn't support pagination yet, wrap the response
+    if (Array.isArray(result)) {
+        return { data: result, pagination: { totalPages: 1, currentPage: 1, totalCount: result.length } };
+    }
+    
+    // Ensure data is an array
+    if (!Array.isArray(result.data)) {
+        return { data: [], pagination: result.pagination || { totalPages: 0, currentPage: 1, totalCount: 0 } };
+    }
+    
+    return result;
 }
 
 export async function getInventoryStats(clinicId: string, accessToken: string) {

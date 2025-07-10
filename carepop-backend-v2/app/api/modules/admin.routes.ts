@@ -1137,21 +1137,61 @@ adminRoutes.delete('/doctors/:id', zValidator('param', z.object({ id: z.string()
   });
 
 // --- Service Management Endpoints ---
-adminRoutes.get('/services', async (c) => {
+const getServicesSchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(10),
+  q: z.string().optional(),
+});
+
+adminRoutes.get('/services', zValidator('query', getServicesSchema), async (c) => {
   console.log("[GET /services] Handler started.");
   try {
-    const allServices = await db.query.services.findMany({
-      with: {
-        serviceCategory: {
-          columns: {
-            name: true,
-          },
-        },
+    const { page, limit, q } = c.req.valid('query');
+    const offset = (page - 1) * limit;
+
+    const whereClause = q 
+      ? or(
+          ilike(services.name, `%${q}%`),
+          ilike(serviceCategories.name, `%${q}%`)
+        )
+      : undefined;
+
+    const servicesQuery = db.select({
+      ...getTableColumns(services),
+      serviceCategory: {
+        id: serviceCategories.id,
+        name: serviceCategories.name,
       },
-      orderBy: (services, { desc }) => [desc(services.name)],
+    })
+    .from(services)
+    .leftJoin(serviceCategories, eq(services.categoryId, serviceCategories.id))
+    .where(whereClause)
+    .orderBy(desc(services.name))
+    .limit(limit)
+    .offset(offset);
+
+    const totalCountQuery = db.select({ count: count() })
+      .from(services)
+      .leftJoin(serviceCategories, eq(services.categoryId, serviceCategories.id))
+      .where(whereClause);
+
+    const [allServices, totalResult] = await Promise.all([
+      servicesQuery,
+      totalCountQuery
+    ]);
+
+    const totalCount = totalResult[0]?.count ?? 0;
+
+    console.log(`[GET /services] Successfully fetched ${allServices.length} services (page ${page}).`);
+    return c.json({
+      data: allServices,
+      pagination: {
+        page,
+        pageSize: limit,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limit)
+      }
     });
-    console.log(`[GET /services] Successfully fetched ${allServices.length} services.`);
-    return c.json({ data: allServices });
   } catch (error) {
     console.error("[GET /services] CRASH:", error);
     return c.json({ error: 'Internal Server Error' }, 500);

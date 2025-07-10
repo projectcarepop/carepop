@@ -82,27 +82,43 @@ export default function ProductsClient() {
 
   const { data: productsResponse, isLoading: isLoadingProducts } = useQuery({
     queryKey: ['inventory-items', selectedClinicId, pagination, { lowStock: showLowStockOnly, expiringSoon: showExpiringSoon, q: debouncedFilter }],
-    queryFn: () => {
+    queryFn: async () => {
         if (!selectedClinicId || !accessToken) return Promise.resolve({ data: [], pagination: { totalPages: 0, currentPage: 1, totalCount: 0 } });
-        return getInventoryForClinic(selectedClinicId, accessToken, {
-            lowStock: showLowStockOnly,
-            expiringSoon: showExpiringSoon,
-            q: debouncedFilter,
-            page: pagination.pageIndex + 1,
-            limit: pagination.pageSize,
-        });
+        try {
+            const response = await getInventoryForClinic(selectedClinicId, accessToken, {
+                lowStock: showLowStockOnly,
+                expiringSoon: showExpiringSoon,
+                q: debouncedFilter,
+                page: pagination.pageIndex + 1,
+                limit: pagination.pageSize,
+            });
+            return response;
+        } catch (error) {
+            console.error('Failed to fetch inventory:', error);
+            // Fallback to empty response structure
+            return { data: [], pagination: { totalPages: 0, currentPage: 1, totalCount: 0 } };
+        }
     },
     enabled: !!accessToken && !!selectedClinicId,
   });
 
-  const products = productsResponse?.data || [];
+  const products = Array.isArray(productsResponse?.data) ? productsResponse.data : [];
   const pageCount = productsResponse?.pagination?.totalPages ?? 0;
 
   const { data: categories } = useQuery({
     queryKey: ['admin-product-categories'],
-    queryFn: () => getProductCategories(accessToken!),
+    queryFn: async () => {
+      try {
+        const response = await getProductCategories(accessToken!, { limit: 100 });
+        return response;
+      } catch (error) {
+        console.error('Failed to fetch categories:', error);
+        // Fallback to empty response structure
+        return { data: [], pagination: { totalPages: 0, currentPage: 1, totalCount: 0 } };
+      }
+    },
     enabled: !!accessToken,
-    select: (data) => data.data,
+    select: (data) => Array.isArray(data?.data) ? data.data : [],
   });
 
   const { data: itemBatches, isLoading: isLoadingBatches } = useQuery({
