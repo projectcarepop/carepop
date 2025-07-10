@@ -75,7 +75,7 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
   });
 
   const { data: servicesData, isLoading: isLoadingServices } = useQuery({
-    queryKey: ['adminServices'],
+    queryKey: ['adminServicesForClinicForm'],
     queryFn: () => getAdminServices(session!.access_token),
     enabled: !!session,
   });
@@ -167,7 +167,7 @@ export default function ClinicsClient({ initialClinics }: ClinicsClientProps) {
         data={clinics || []}
         pageCount={pageCount}
         pagination={pagination}
-        setPagination={setPagination}
+        setPagination={setPagination as React.Dispatch<React.SetStateAction<any>>}
         globalFilter={globalFilter}
         setGlobalFilter={setGlobalFilter}
         isLoading={isLoading}
