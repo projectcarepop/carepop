@@ -13,10 +13,55 @@ import {
 } from '../components';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Calendar, Clock, MapPin, Stethoscope, Building } from 'lucide-react-native';
-import type { AppointmentsStackParamList } from '../navigation/AppNavigator';
+import type { AppointmentsStackParamList } from '../navigation/AppDrawerNavigator';
 import { getAppointmentById, cancelAppointment } from '../services/api';
 import { format } from 'date-fns';
 import type { DetailedAppointment } from '../lib/types';
+
+// === HELPER FUNCTIONS ===
+const formatClinicAddress = (clinic: any): string => {
+  if (!clinic) return 'Address not available';
+  
+  // Cast to any to access all possible address field variations
+  const c = clinic as any;
+  
+  // Option 1: Use full_address if available (Supabase format)
+  if (c.full_address) {
+    return c.full_address;
+  }
+  
+  // Option 2: Build from individual Supabase fields
+  if (c.street_address || c.locality || c.region) {
+    const parts = [c.street_address, c.locality, c.region].filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : 'Address not available';
+  }
+  
+  // Option 3: Handle address as JSONB object (Drizzle format)
+  if (c.address && typeof c.address === 'object') {
+    const addr = c.address;
+    const parts = [
+      addr.street, 
+      addr.city || addr.cityMunicipality, 
+      addr.province,
+      addr.barangay
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : 'Address not available';
+  }
+  
+  // Option 4: Handle individual address fields (legacy format)
+  if (c.street || c.cityMunicipality) {
+    const cityName = typeof c.cityMunicipality === 'string' 
+      ? c.cityMunicipality 
+      : c.cityMunicipality?.name;
+    const provinceName = typeof c.province === 'string'
+      ? c.province
+      : c.province?.name;
+    const parts = [c.street, cityName, provinceName].filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : 'Address not available';
+  }
+  
+  return 'Address not available';
+};
 
 type AppointmentDetailScreenRouteProp = RouteProp<
   AppointmentsStackParamList,
@@ -108,7 +153,7 @@ export const AppointmentDetailScreen: React.FC = () => {
                   </View>
                    <View style={styles.detailItem}>
                       <MapPin size={20} color={theme.colors.primary} />
-                      <Text style={styles.detailText}>{appointment.clinic.address?.street || 'Address not available'}</Text>
+                      <Text style={styles.detailText}>{formatClinicAddress(appointment.clinic)}</Text>
                   </View>
               </CardContent>
           </Card>

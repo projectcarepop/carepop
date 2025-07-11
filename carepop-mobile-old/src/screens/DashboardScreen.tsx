@@ -34,6 +34,49 @@ import {
   MapPin,
 } from 'lucide-react-native';
 
+// === HELPER FUNCTIONS ===
+const formatClinicAddress = (clinic: Clinic): string => {
+  // Cast to any to access all possible address field variations
+  const c = clinic as any;
+  
+  // Option 1: Use full_address if available (Supabase format)
+  if (c.full_address) {
+    return c.full_address;
+  }
+  
+  // Option 2: Build from individual Supabase fields
+  if (c.street_address || c.locality || c.region) {
+    const parts = [c.street_address, c.locality, c.region].filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : 'Address not available';
+  }
+  
+  // Option 3: Handle address as JSONB object (Drizzle format)
+  if (c.address && typeof c.address === 'object') {
+    const addr = c.address;
+    const parts = [
+      addr.street, 
+      addr.city || addr.cityMunicipality, 
+      addr.province,
+      addr.barangay
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : 'Address not available';
+  }
+  
+  // Option 4: Handle individual address fields (legacy format)
+  if (c.street || c.cityMunicipality) {
+    const cityName = typeof c.cityMunicipality === 'string' 
+      ? c.cityMunicipality 
+      : c.cityMunicipality?.name;
+    const provinceName = typeof c.province === 'string'
+      ? c.province
+      : c.province?.name;
+    const parts = [c.street, cityName, provinceName].filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : 'Address not available';
+  }
+  
+  return 'Address not available';
+};
+
 type DashboardNavigationProp = DrawerNavigationProp<DrawerParamList>;
 
 const ActionCard = ({
@@ -79,7 +122,7 @@ const ClinicCard = ({ clinic, onPress }: { clinic: Clinic, onPress: () => void }
         <Map size={24} color={theme.colors.secondary} />
         <View style={styles.clinicCardTextContainer}>
             <Text style={styles.clinicCardTitle} numberOfLines={1}>{clinic.name}</Text>
-            <Text style={styles.clinicCardAddress} numberOfLines={1}>{clinic.address?.street}, {clinic.address?.city}</Text>
+            <Text style={styles.clinicCardAddress} numberOfLines={2}>{formatClinicAddress(clinic)}</Text>
         </View>
     </TouchableOpacity>
 );
