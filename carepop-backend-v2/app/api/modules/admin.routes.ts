@@ -1462,7 +1462,52 @@ adminRoutes.get('/appointments/:id', async (c) => {
             return c.json({ error: 'Appointment not found' }, 404);
         }
 
-        return c.json({ data: appointmentDetails });
+        // Fetch medical records with their details
+        const recordsList = await db.select({
+            id: medicalRecords.id,
+            appointmentId: medicalRecords.appointmentId,
+            recordType: medicalRecords.recordType,
+            createdAt: medicalRecords.createdAt,
+        })
+        .from(medicalRecords)
+        .where(eq(medicalRecords.appointmentId, id))
+        .orderBy(desc(medicalRecords.createdAt));
+
+        // Fetch details for each medical record
+        const medicalRecordsWithDetails = await Promise.all(
+            recordsList.map(async (record) => {
+                let details = null;
+                
+                switch (record.recordType) {
+                    case 'DOCTOR_NOTE':
+                        const [noteDetails] = await db.select()
+                            .from(recordDoctorNotes)
+                            .where(eq(recordDoctorNotes.recordId, record.id));
+                        details = noteDetails;
+                        break;
+                    case 'PRESCRIPTION':
+                        const [prescriptionDetails] = await db.select()
+                            .from(recordPrescriptions)
+                            .where(eq(recordPrescriptions.recordId, record.id));
+                        details = prescriptionDetails;
+                        break;
+                    case 'CLINICAL_DOCUMENT':
+                    case 'LAB_RESULT':
+                        const [documentDetails] = await db.select()
+                            .from(recordDocuments)
+                            .where(eq(recordDocuments.recordId, record.id));
+                        details = documentDetails;
+                        break;
+                }
+                
+                return {
+                    ...record,
+                    details
+                };
+            })
+        );
+
+        return c.json({ data: { ...appointmentDetails, medicalRecords: medicalRecordsWithDetails } });
     } catch (error: any) {
         console.error("Error fetching appointment details:", error);
         return c.json({ error: 'Failed to fetch appointment details', message: error.message }, 500);
