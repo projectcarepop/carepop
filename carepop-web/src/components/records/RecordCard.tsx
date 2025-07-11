@@ -37,7 +37,31 @@ const RecordDetails = ({ record }: { record: MedicalRecordWithRelations }) => {
             
         case 'CLINICAL_DOCUMENT':
             const docDetails = record.details as any;
-            return <p>Document: {docDetails?.documentName}</p> // In a real app, this would be a download link
+            if (!docDetails) {
+                return <p className="text-sm text-gray-500">Document details not available.</p>;
+            }
+            return (
+                <div className="text-sm space-y-2">
+                    <p><strong className="font-semibold">Document:</strong> {docDetails.documentName}</p>
+                    {docDetails.fileType && <p><strong className="font-semibold">Type:</strong> {docDetails.fileType}</p>}
+                    {docDetails.filePath && (
+                        <div className="mt-2">
+                            <p className="text-xs text-gray-500 mb-1">File uploaded successfully</p>
+                            <button 
+                                onClick={(e) => {
+                                    e.preventDefault(); // Prevent link navigation
+                                    // TODO: Implement download functionality
+                                    alert('Download functionality will be implemented');
+                                }}
+                                className="inline-flex items-center px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                            >
+                                <FileText className="h-3 w-3 mr-1" />
+                                View Document
+                            </button>
+                        </div>
+                    )}
+                </div>
+            );
             
         default:
             return <p className="text-sm text-gray-500">Details for this record type are not available.</p>;

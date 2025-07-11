@@ -314,7 +314,8 @@ meRoutes.get('/records/:recordId', async (c) => {
     try {
         // First, fetch the base record and join with appointments to verify ownership.
         const [baseRecord] = await db.select({
-            recordId: medicalRecords.id,
+            id: medicalRecords.id,
+            appointmentId: medicalRecords.appointmentId,
             recordType: medicalRecords.recordType,
             createdAt: medicalRecords.createdAt,
             appointment: {
@@ -347,21 +348,36 @@ meRoutes.get('/records/:recordId', async (c) => {
             return c.json({ error: 'Record not found or you do not have permission to view it.' }, 404);
         }
 
+        // Restructure to match the list endpoint format
+        const restructuredRecord = {
+            id: baseRecord.id,
+            appointmentId: baseRecord.appointmentId,
+            recordType: baseRecord.recordType,
+            createdAt: baseRecord.createdAt,
+            appointment: {
+                id: baseRecord.appointment.id,
+                appointmentTime: baseRecord.appointment.appointmentTime,
+                doctor: baseRecord.doctor,
+                clinic: baseRecord.clinic,
+                service: baseRecord.service,
+            }
+        };
+
         // Now, fetch the specific details for the found record
         let details = null;
         switch (baseRecord.recordType) {
             case 'DOCTOR_NOTE':
-                details = await db.query.recordDoctorNotes.findFirst({ where: eq(recordDoctorNotes.recordId, baseRecord.recordId) });
+                details = await db.query.recordDoctorNotes.findFirst({ where: eq(recordDoctorNotes.recordId, baseRecord.id) });
                 break;
             case 'PRESCRIPTION':
-                details = await db.query.recordPrescriptions.findFirst({ where: eq(recordPrescriptions.recordId, baseRecord.recordId) });
+                details = await db.query.recordPrescriptions.findFirst({ where: eq(recordPrescriptions.recordId, baseRecord.id) });
                 break;
             case 'CLINICAL_DOCUMENT':
-                details = await db.query.recordDocuments.findFirst({ where: eq(recordDocuments.recordId, baseRecord.recordId) });
+                details = await db.query.recordDocuments.findFirst({ where: eq(recordDocuments.recordId, baseRecord.id) });
                 break;
         }
 
-        const enrichedRecord = { ...baseRecord, details };
+        const enrichedRecord = { ...restructuredRecord, details };
         return c.json(enrichedRecord);
 
     } catch (error) {

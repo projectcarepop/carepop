@@ -125,9 +125,9 @@ export default async function MedicalRecordDetailPage({ params, searchParams }: 
         </CardHeader>
         <CardContent className="p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-base">
-                <div className="flex items-center text-gray-700"><User className="h-5 w-5 mr-3 text-gray-400" /> <strong>Provider:</strong><span className="ml-2">{record.doctor.fullName}</span></div>
-                <div className="flex items-center text-gray-700"><Building className="h-5 w-5 mr-3 text-gray-400" /> <strong>Clinic:</strong><span className="ml-2">{record.clinic.name}</span></div>
-                <div className="flex items-center text-gray-700"><Syringe className="h-5 w-5 mr-3 text-gray-400" /> <strong>Service:</strong><span className="ml-2">{record.service.name}</span></div>
+                <div className="flex items-center text-gray-700"><User className="h-5 w-5 mr-3 text-gray-400" /> <strong>Provider:</strong><span className="ml-2">{record.appointment.doctor?.fullName || 'Unknown Provider'}</span></div>
+                <div className="flex items-center text-gray-700"><Building className="h-5 w-5 mr-3 text-gray-400" /> <strong>Clinic:</strong><span className="ml-2">{record.appointment.clinic?.name || 'Unknown Clinic'}</span></div>
+                <div className="flex items-center text-gray-700"><Syringe className="h-5 w-5 mr-3 text-gray-400" /> <strong>Service:</strong><span className="ml-2">{record.appointment.service?.name || 'Unknown Service'}</span></div>
                 <div className="flex items-center text-gray-700"><Calendar className="h-5 w-5 mr-3 text-gray-400" /> <strong>Time:</strong><span className="ml-2">{format(new Date(record.appointment.appointmentTime), 'p')}</span></div>
             </div>
             <div>

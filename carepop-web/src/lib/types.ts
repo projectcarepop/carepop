@@ -273,7 +273,8 @@ export type MedicalRecordWithDetails = MedicalRecord & {
 }
 
 export type MedicalRecordWithRelations = {
-  recordId: string;
+  id: string;
+  appointmentId: string;
   recordType: 'DOCTOR_NOTE' | 'PRESCRIPTION' | 'CLINICAL_DOCUMENT' | 'LAB_ORDER' | 'LAB_RESULT';
   createdAt: string;
   details: DoctorNote | Prescription | ClinicalDocument | null;

@@ -62,7 +62,7 @@ export default function RecordListClient({ initialRecords }: RecordListClientPro
   return (
     <div className="space-y-6">
       {records.map((record) => (
-        <Link key={record.recordId} href={`/records/${record.recordId}?from=records`} className="block">
+        <Link key={record.id} href={`/records/${record.id}?from=records`} className="block">
           <RecordCard record={record} />
         </Link>
       ))}
