@@ -17,7 +17,7 @@ import { Card, CardHeader, CardContent, CardTitle } from '../components/card.nat
 import { format } from 'date-fns';
 import { Menu, LogOut } from 'lucide-react-native';
 import type { ProfileStackParamList } from '../navigation/ProfileNavigator';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../utils/supabase';
 
 // --- Import Location Data ---
 import provinces from '../data/psgc/provinces.json';

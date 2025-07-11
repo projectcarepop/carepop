@@ -3,8 +3,8 @@
     "name": "CarePop Mobile",
     "slug": "carepop",
     "version": "1.0.0",
-    "entryPoint": "./index.ts",
     "orientation": "portrait",
+    "icon": "./assets/carepop-logo-pink.png",
     "scheme": "carepop",
     "userInterfaceStyle": "light",
     "splash": {
@@ -15,7 +15,23 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.carepop.mobile",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "NSLocationWhenInUseUsageDescription": "We need your location to find nearby clinics and provide you with accurate directions.",
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.92849154218-ihqat9lglvl9c0nsv0qugds2io6rv4c2"
+            ]
+          },
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.92849154218-ihqat9lglvl9c0nsv0qugds2io6rv4c2"
+            ]
+          }
+        ]
+      },
+      "runtimeVersion": {
+        "policy": "appVersion"
       }
     },
     "android": {
@@ -25,7 +41,7 @@
       },
       "package": "com.carepop.mobile",
       "edgeToEdgeEnabled": true,
-      "supabaseUrl": "https://aylfhhekjdyiisqoevcq.supabase.co"
+      "runtimeVersion": "1.0.0"
     },
     "web": {
       "favicon": "./assets/carepop-logo-blue.png"
@@ -37,14 +53,15 @@
     "extra": {
       "eas": {
         "projectId": "42305f69-4bf4-4559-b9d3-500ad85b7a11"
-      },
-      "EXPO_PUBLIC_SUPABASE_URL": "https://aylfhhekjdyiisqoevcq.supabase.co",
-      "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5bGZoaGVramR5aWlzcW9ldmNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2MTA0NTUsImV4cCI6MjA2NjE4NjQ1NX0.80vlX5kU_vEIFm3IpaI7IIMXWsNNZ3bWe8eZ-54a9rY",
-      "EXPO_PUBLIC_BACKEND_API_URL": "https://carepop-backend-api-92849154218.us-central1.run.app"
+      }
     },
     "plugins": [
       "expo-font",
-      "expo-web-browser"
-    ]
+      "expo-web-browser",
+      "expo-router"
+    ],
+    "updates": {
+      "url": "https://u.expo.dev/42305f69-4bf4-4559-b9d3-500ad85b7a11"
+    }
   }
 }

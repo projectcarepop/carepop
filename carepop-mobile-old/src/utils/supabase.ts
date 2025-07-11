@@ -3,13 +3,14 @@ import 'react-native-url-polyfill/auto'; // Required for Supabase JS V2
 import * as SecureStore from 'expo-secure-store';
 import { createClient } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
+import type { Profile } from '../lib/types';
 
-// Ensure your environment variables are configured correctly in app.json -> extra
-const supabaseUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+// Ensure your environment variables are configured correctly in your .env file
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-// Retrieve the backend API URL from app.json extra
-const EXPO_PUBLIC_BACKEND_API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL;
+// Retrieve the backend API URL from your .env file
+const EXPO_PUBLIC_BACKEND_API_URL = process.env.EXPO_PUBLIC_BACKEND_API_URL;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('**************************************************************************');
@@ -48,43 +49,8 @@ export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '', {
   },
 });
 
-// --- Define Profile Type (Matches the extended DB schema) ---
-export interface Profile {
-  user_id: string; // From existing schema
-  username: string | null; // From existing schema, often email or a chosen username
-  
-  // Fields from the initial migration (ensure types match)
-  first_name: string | null; // Was TEXT
-  last_name: string | null;  // Was TEXT
-  date_of_birth: string | null; // Was DATE, Supabase JS client typically handles as string YYYY-MM-DD
-  phone_number: string | null; // Was TEXT UNIQUE (app uses contact_no, consider alignment)
-  address: string | null; // Was TEXT (generic, now using granular fields below)
-  granular_consents: Record<string, any> | null; // Was JSONB, Record<string, any> is a good TS equivalent
-  created_at: string; // Was TIMESTAMPTZ
-  updated_at: string | null; // Was TIMESTAMPTZ
-
-  // Newly added fields from YYYYMMDDHHMMSS_add_detailed_profile_fields.sql
-  middle_initial: string | null;
-  avatar_url: string | null;
-  age: number | null; // Was INT4
-  civil_status: string | null;
-  religion: string | null;
-  occupation: string | null;
-  contact_no: string | null; // App-preferred contact field
-  street: string | null;
-  province: string | null;
-  city: string | null;
-  barangay: string | null;
-  barangay_code: string | null;
-  city_municipality_code: string | null;
-  province_code: string | null;
-  philhealth_no: string | null;
-
-  // SOGIE related fields
-  gender_identity: string | null;
-  pronouns: string | null;
-  assigned_sex_at_birth: string | null;
-}
+// Note: Profile type is now consolidated in src/lib/types.ts
+// This avoids type conflicts and maintains consistency across the app
 
 // --- getUserProfile Function ---
 export const getUserProfile = async (userId: string): Promise<Profile | null> => {

@@ -1,25 +1,26 @@
 {
   "cli": {
-    "version": ">= 16.4.1",
+    "version": ">= 7.8.2",
     "appVersionSource": "remote"
   },
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "channel": "development",
+      "ios": {
+        "simulator": true
+      }
     },
     "preview": {
       "distribution": "internal",
-      "env": {
-        "EXPO_PUBLIC_SUPABASE_URL":"https://aylfhhekjdyiisqoevcq.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5bGZoaGVramR5aWlzcW9ldmNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2MTA0NTUsImV4cCI6MjA2NjE4NjQ1NX0.80vlX5kU_vEIFm3IpaI7IIMXWsNNZ3bWe8eZ-54a9rY",
-        "EXPO_PUBLIC_SUPABASE_SERVICE_ROLE_KEY":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5bGZoaGVramR5aWlzcW9ldmNxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MDYxMDQ1NSwiZXhwIjoyMDY2MTg2NDU1fQ.d8G90DW0-f9Un1VPGVgxEKfmFz7Wr2Zq7Pt7IYxo2zs",
-        "EXPO_PUBLIC_API_URL":"https://carepop-backend-api-92849154218.us-central1.run.app",
-        "EXPO_PUBLIC_BACKEND_URL":"https://carepop-backend-api-92849154218.us-central1.run.app",
-        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY":"AIzaSyAgoc0vXEJDwvkBLDOCUK5ZpgKrZ3yFslg"
+      "channel": "preview",
+      "android": {
+        "buildType": "apk"
       }
     },
     "production": {
+      "channel": "production",
       "autoIncrement": true
     }
   },

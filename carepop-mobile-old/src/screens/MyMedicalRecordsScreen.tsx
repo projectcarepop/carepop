@@ -96,11 +96,11 @@ const MyMedicalRecordsScreen = () => {
     const message = getEmptyStateMessage(filter);
     
     return (
-      <View style={styles.emptyStateContainer}>
-        <FileSearch size={48} color={theme.colors.mutedForeground} />
+    <View style={styles.emptyStateContainer}>
+      <FileSearch size={48} color={theme.colors.mutedForeground} />
         <Text style={styles.emptyStateMessage}>{message}</Text>
-      </View>
-    );
+    </View>
+  );
   }, [filter]);
 
   const ListHeader = useCallback(() => (

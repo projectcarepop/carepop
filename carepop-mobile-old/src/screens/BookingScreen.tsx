@@ -141,7 +141,7 @@ const createMarkedDates = (availableDays: string[] | undefined, selectedDate: st
 
 const BookingScreen = () => {
   const navigation = useNavigation<BookingScreenNavigationProp>();
-  const queryClient = useQueryClient();
+    const queryClient = useQueryClient();
 
   // === CONSOLIDATED STATE MANAGEMENT ===
   const [selections, setSelections] = useState<BookingSelections>({
@@ -283,7 +283,7 @@ const BookingScreen = () => {
           ]
         );
       } else {
-        Alert.alert('Booking Failed', error.message || 'An unexpected error occurred.');
+      Alert.alert('Booking Failed', error.message || 'An unexpected error occurred.');
       }
     },
   });
@@ -442,11 +442,11 @@ const BookingScreen = () => {
     if (isLoadingClinics) {
         return <View style={styles.listContainer}>{ [1,2,3,4].map(i => <SkeletonCard key={i} />) }</View>;
     }
-    return (
-      <FlatList
+                return (
+                                    <FlatList
         data={clinics?.filter(c => c.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()))}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
+                                        keyExtractor={(item) => item.id}
+                                        renderItem={({ item }) => (
           <TouchableOpacity onPress={() => updateSelections({ clinicId: item.id })}>
             <Card style={[styles.selectableCard, selections.clinicId === item.id && styles.selectedCard, { marginHorizontal: theme.spacing.lg }]}>
               <Text style={styles.cardTitle}>{item.name}</Text>
@@ -455,8 +455,8 @@ const BookingScreen = () => {
                 <Text style={styles.cardSubtitle}>{formatAddress(item)}</Text>
               </View>
             </Card>
-          </TouchableOpacity>
-        )}
+                                            </TouchableOpacity>
+                                        )}
         ListHeaderComponent={<TextInput style={[styles.searchInput, {marginHorizontal: theme.spacing.lg}]} placeholder="Search clinics..." onChangeText={(text) => updateUIState({ searchQuery: text })} value={uiState.searchQuery} />}
         ListEmptyComponent={<EmptyState icon={<Building size={48} color={theme.colors.mutedForeground}/>} message="No Clinics Found" description="We couldn't find any clinics. Please check back later." />}
         contentContainerStyle={styles.listContainer}
@@ -473,7 +473,7 @@ const BookingScreen = () => {
         ? 'All Categories'
         : serviceCategories?.find(c=>c.id === uiState.selectedCategoryId)?.name || 'Select a Category';
 
-    return (
+                return (
         <View style={{flex: 1}}>
           {isLoadingCategories ? <ActivityIndicator style={{marginVertical: theme.spacing.lg}} /> : (
               <TouchableOpacity onPress={() => updateUIState({ isCategoryPickerVisible: true })} style={[styles.pickerInput, {marginHorizontal: theme.spacing.lg}]}>
@@ -481,17 +481,17 @@ const BookingScreen = () => {
                   <ChevronsRight color={theme.colors.mutedForeground} />
               </TouchableOpacity>
           )}
-          <FlatList
+                            <FlatList
             data={filteredServices}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
+                                keyExtractor={(item) => item.id}
+                                renderItem={({ item }) => (
               <TouchableOpacity onPress={() => updateSelections({ serviceId: item.id })}>
                 <Card style={[styles.selectableCard, selections.serviceId === item.id && styles.selectedCard, { marginHorizontal: theme.spacing.lg }]}>
                   <Text style={styles.cardTitle}>{item.name}</Text>
                   {item.serviceCategory?.name && (
                       <View style={styles.categoryTag}>
                           <Text style={styles.categoryTagText}>{item.serviceCategory.name}</Text>
-                      </View>
+                                        </View>
                   )}
                   {item.durationMinutes && (
                       <View style={styles.durationContainer}>
@@ -503,14 +503,14 @@ const BookingScreen = () => {
                   )}
                   <Text style={styles.cardSubtitle} numberOfLines={2}>{item.description}</Text>
                 </Card>
-              </TouchableOpacity>
-            )}
+                                    </TouchableOpacity>
+                                )}
             ListHeaderComponent={<TextInput style={[styles.searchInput, {marginHorizontal: theme.spacing.lg}]} placeholder="Search services..." onChangeText={(text) => updateUIState({ searchQuery: text })} value={uiState.searchQuery} />}
             ListEmptyComponent={<EmptyState icon={<Stethoscope size={48} color={theme.colors.mutedForeground}/>} message="No Services Available" description="No services match your search or filter. Please try a different category." />}
             contentContainerStyle={styles.listContainer}
-          />
-        </View>
-    );
+                            />
+                    </View>
+                );
   }
 
   const renderDoctorStep = () => {
@@ -542,77 +542,77 @@ const BookingScreen = () => {
 
   const renderDateTimeStep = () => (
     <View style={{ flex: 1, paddingVertical: theme.spacing.lg, paddingHorizontal: theme.spacing.lg }}>
-      <Calendar
-        onDayPress={(day: DateData) => {
+                                   <Calendar
+            onDayPress={(day: DateData) => {
           updateSelections({ date: day.dateString, time: null });
-        }}
+            }}
         markedDates={markedDates}
-        minDate={new Date().toISOString().split('T')[0]}
+            minDate={new Date().toISOString().split('T')[0]}
         onMonthChange={(month) => updateUIState({ currentMonth: new Date(month.dateString) })}
-        theme={{
-            arrowColor: theme.colors.primary,
-            todayTextColor: theme.colors.foreground,
-            monthTextColor: theme.colors.primary,
-            dayTextColor: theme.colors.foreground,
-            textDayFontFamily: theme.typography.fontFamily,
-            textMonthFontFamily: theme.typography.fontFamilySemiBold,
-            textDayHeaderFontFamily: theme.typography.fontFamilySemiBold,
-        }}
-        style={{
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-            borderRadius: theme.radius.md,
-            marginBottom: theme.spacing.md,
-            marginHorizontal: theme.spacing.md,
-            paddingHorizontal: theme.spacing.lg,
+            theme={{
+                arrowColor: theme.colors.primary,
+                todayTextColor: theme.colors.foreground,
+                monthTextColor: theme.colors.primary,
+                dayTextColor: theme.colors.foreground,
+                textDayFontFamily: theme.typography.fontFamily,
+                textMonthFontFamily: theme.typography.fontFamilySemiBold,
+                textDayHeaderFontFamily: theme.typography.fontFamilySemiBold,
+            }}
+            style={{
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                borderRadius: theme.radius.md,
+                marginBottom: theme.spacing.md,
+                marginHorizontal: theme.spacing.md,
+                paddingHorizontal: theme.spacing.lg,
             height: 300,
-        }}
-      />
+            }}
+        />
 
       {(isLoadingAvailableSlots || isLoadingAvailableDays) && <ActivityIndicator style={{marginTop: theme.spacing.xl}}/>}
 
       {selections.date && (
-        <View style={{ flex: 1 }}>
+            <View style={{ flex: 1 }}>
             {isLoadingAvailableSlots ? <ActivityIndicator style={{marginTop: theme.spacing.xl}}/> : (
-                <>
-                    <View style={styles.timeSlotsHeaderContainer}>
+                    <>
+                        <View style={styles.timeSlotsHeaderContainer}>
                         <View style={{ flex: 1 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <Clock size={18} color={theme.colors.secondary} />
-                                <Text style={styles.timeSlotsHeaderText}>
+                            <Clock size={18} color={theme.colors.secondary} />
+                            <Text style={styles.timeSlotsHeaderText}>
                                     Available Time Slots for {format(new Date(selections.date + 'T00:00:00'), 'MM/dd/yyyy')}
                                 </Text>
                             </View>
                             <Text style={styles.lastUpdateText}>
                                 Updated {format(uiState.lastRefresh, 'h:mm a')}
-                            </Text>
+                                                    </Text>
                         </View>
                         <TouchableOpacity onPress={handleRefreshSlots} style={styles.refreshButton}>
                             <Text style={styles.refreshButtonText}>Refresh</Text>
                         </TouchableOpacity>
-                    </View>
-                    <ScrollView>
-                        <View style={styles.gridContainer}>
+                        </View>
+                        <ScrollView>
+                            <View style={styles.gridContainer}>
                             {!availableSlots || availableSlots.length === 0 ? (
-                                <Text>No time slots available for this date.</Text>
-                            ) : (
+                                    <Text>No time slots available for this date.</Text>
+                                ) : (
                                 availableSlots.map((timeSlot: string) => {
                                     const timeFormatted = format(new Date(timeSlot), 'p');
-                                    return (
+                                        return (
                                         <Button key={timeSlot} variant={selections.time === timeSlot ? 'default' : 'outline'} onPress={() => updateSelections({ time: timeSlot })} style={styles.gridButton}>
-                                            {timeFormatted}
-                                        </Button>
-                                    )
-                                })
-                            )}
-                        </View>
-                    </ScrollView>
-                </>
-            )}
-        </View>
-      )}
-    </View>
-  );
+                                                {timeFormatted}
+                                            </Button>
+                                        )
+                                    })
+                                )}
+                            </View>
+                        </ScrollView>
+                    </>
+                )}
+                            </View>
+                        )}
+                    </View>
+                );
 
   const renderConfirmStep = () => (
       <View style={{padding: theme.spacing.lg}}>
@@ -708,11 +708,11 @@ const BookingScreen = () => {
   }
 
   // === MAIN RENDER ===
-  return (
+    return (
     <SafeAreaView style={styles.container}>
       <WizardHeader />
-      <View style={{flex: 1}}>
-        {renderStepContent()}
+            <View style={{flex: 1}}>
+                    {renderStepContent()}
       </View>
       <View style={styles.footer}>
         {uiState.currentStep !== 'clinic' && <Button variant="outline" onPress={goToPreviousStep} style={styles.footerButton} textStyle={styles.footerBackButtonText}>Back</Button>}
@@ -733,7 +733,7 @@ const BookingScreen = () => {
                 </Button>
             )}
         </View>
-      </View>
+            </View>
 
       {/* Modals */}
       <CustomPickerModal visible={uiState.isCategoryPickerVisible} onClose={() => updateUIState({ isCategoryPickerVisible: false })} title="Select a Category">
@@ -752,8 +752,8 @@ const BookingScreen = () => {
 
       {renderSuccessModal()}
 
-    </SafeAreaView>
-  );
+        </SafeAreaView>
+    );
 };
 
 const styles = StyleSheet.create({

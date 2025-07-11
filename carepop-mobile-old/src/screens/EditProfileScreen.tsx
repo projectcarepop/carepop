@@ -1,17 +1,16 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, SafeAreaView, TouchableOpacity, ScrollView, StyleSheet, Platform, Pressable, DimensionValue, FlatList, TextInput as RNTextInput } from "react-native";
+import { View, Text, SafeAreaView, TouchableOpacity, ScrollView, StyleSheet, Platform, Pressable, DimensionValue, FlatList, TextInput as RNTextInput, KeyboardAvoidingView } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { MotiView, AnimatePresence } from 'moti';
 import { useMutation } from '@tanstack/react-query';
 import { useForm, Controller, FieldValues, UseControllerProps } from 'react-hook-form';
 import Toast from 'react-native-toast-message';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Check, Search } from 'lucide-react-native';
 
 import { useAuth } from '../context/AuthContext';
 import { updateMyProfile } from '../services/api';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../utils/supabase';
 import type { Profile, UpdateProfileApiPayload, UpdateProfilePayload } from '../lib/types';
 import { Button } from '../components/button.native';
 import { Input } from '../components/text-input.native';
@@ -207,7 +206,11 @@ export function EditProfileScreen() {
 
     return (
         <SafeAreaView style={styles.safeArea}>
-            <KeyboardAwareScrollView>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1 }}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+            >
                 <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
                     <Text style={styles.screenTitle}>Edit Profile</Text>
                     <Text style={styles.screenSubTitle}>
@@ -372,7 +375,7 @@ export function EditProfileScreen() {
                         />
                     </View>
                 </ScrollView>
-            </KeyboardAwareScrollView>
+            </KeyboardAvoidingView>
 
              {/* Unified Modal for all pickers */}
             <CustomPickerModal

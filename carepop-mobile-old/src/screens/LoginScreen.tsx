@@ -21,6 +21,7 @@ import * as WebBrowser from 'expo-web-browser';
 
 import { signInWithEmail } from '../services/api';
 import { loginSchema, type LoginFormValues } from '../lib/validation/auth';
+import { handleAuthError, logAuthError } from '../lib/auth-errors';
 import {
   Button,
   Input,
@@ -54,11 +55,9 @@ export const LoginScreen: React.FC = () => {
   const { mutate: handleLogin, isPending: isLoggingIn } = useMutation({
     mutationFn: (data: LoginFormValues) => signInWithEmail(data),
     onError: (error) => {
-      if (error.message.includes('Invalid login credentials')) {
-        setAuthError('Invalid email or password. Please try again.');
-      } else {
-        setAuthError(error.message);
-      }
+      logAuthError(error, 'email_login');
+      const errorInfo = handleAuthError(error);
+      setAuthError(errorInfo.userMessage);
     },
     // onSuccess will be handled by the AuthContext listener
   });
@@ -69,16 +68,33 @@ export const LoginScreen: React.FC = () => {
     setAuthError(null);
     setIsSigningInWithGoogle(true);
     try {
-      await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          clientId: Platform.OS === 'ios'
-            ? process.env.EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID_IOS
-            : process.env.EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID_ANDROID,
+          redirectTo: 'io.supabase.carepop://auth/callback',
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+            client_id: Platform.OS === 'ios' 
+              ? process.env.EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID_IOS
+              : process.env.EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID_ANDROID,
+          },
         },
       });
-    } catch (error) {
-      Alert.alert('Google Sign-In Error', 'An unexpected error occurred. Please try again.');
+
+      if (error) throw error;
+
+      if (data.url) {
+        const result = await WebBrowser.openAuthSessionAsync(data.url, null);
+        if (result.type === 'success') {
+          // The auth listener in AuthContext will handle navigation once the session is established
+        }
+      }
+    } catch (error: any) {
+      logAuthError(error, 'google_oauth_login');
+      const errorInfo = handleAuthError(error);
+      setAuthError(errorInfo.userMessage);
+      Alert.alert('Google Sign-In Error', errorInfo.userMessage);
     } finally {
       setIsSigningInWithGoogle(false);
     }

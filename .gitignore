@@ -26,3 +26,15 @@ final-blueprint/
 # Environment variables
 *.env
 /carepop-backend-v2/.env
+
+# Mac
+.DS_Store
+
+# Expo
+.expo/
+dist/
+eas-build-pre-upload.tar.gz
+
+# Mobile-specific native folders
+/carepop-mobile-old/android
+/carepop-mobile-old/ios

@@ -51,11 +51,13 @@ export const OnboardingScreenThree = () => {
 
         <View style={styles.footer}>
           <Button
-            title="Get Started"
             size="lg"
+            variant="primary"
             onPress={handleGetStarted}
             style={{ flex: 1 }} // Make button take full width of footer
-          />
+          >
+            Get Started
+          </Button>
         </View>
       </View>
     </SafeAreaView>

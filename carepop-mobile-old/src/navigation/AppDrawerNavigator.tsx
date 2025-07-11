@@ -5,7 +5,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { theme } from '../components/theme';
 import { LayoutDashboard, CalendarPlus, Map, FileText, HeartPulse, Info, User, LogOut, UserCircle, CalendarDays } from 'lucide-react-native';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../utils/supabase';
 
 // Screen Imports
 import { DashboardScreen } from '../screens/DashboardScreen';

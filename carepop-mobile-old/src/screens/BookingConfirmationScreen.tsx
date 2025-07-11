@@ -2,11 +2,24 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { theme } from '../components';
 import { useNavigation, useRoute, NavigationProp, RouteProp } from '@react-navigation/native';
-import { BookingStackParamList } from '../navigation/AppNavigator';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '../context/AuthContext';
 import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
+
+// Booking navigation types - this should be properly integrated with main navigation
+type BookingStackParamList = {
+  BookingConfirmation: {
+    clinicId: string;
+    serviceId: string;
+    providerId: string;
+    schedule: {
+      date: string;
+      time: string;
+    };
+  };
+  BookingSuccess: undefined;
+};
 
 type BookingConfirmationRouteProp = RouteProp<BookingStackParamList, 'BookingConfirmation'>;
 type BookingConfirmationNavigationProp = NavigationProp<BookingStackParamList, 'BookingConfirmation'>;
@@ -20,7 +33,7 @@ interface BookingDetails {
 export const BookingConfirmationScreen = () => {
     const navigation = useNavigation<BookingConfirmationNavigationProp>();
     const route = useRoute<BookingConfirmationRouteProp>();
-    const { getToken } = useAuth();
+    const { session } = useAuth();
     const { clinicId, serviceId, providerId, schedule } = route.params;
 
     const [details, setDetails] = useState<BookingDetails | null>(null);
@@ -65,7 +78,7 @@ export const BookingConfirmationScreen = () => {
         }
 
         try {
-            const token = await getToken();
+            const token = session?.access_token;
             if (!token) {
                 Alert.alert('Error', 'You must be logged in to book an appointment.');
                 setIsBooking(false);

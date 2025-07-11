@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import * as Location from 'expo-location';
-import { MapPin, Search, X, RotateCw, Crosshair, ArrowLeft, Navigation, Menu, Filter, Clock, Heart, Zap, Stethoscope, Plus, ZoomIn, ZoomOut, Layers } from 'lucide-react-native';
+import { MapPin, Search, X, RotateCw, Crosshair, ArrowLeft, Navigation, Menu, Filter, Clock, Heart, Zap, Stethoscope, Plus, ZoomIn, ZoomOut, Layers, Maximize } from 'lucide-react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import { GestureHandlerRootView, PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
@@ -57,14 +57,14 @@ const MAP_DELTA = {
 };
 
 const ZOOMED_IN_MAP_DELTA = {
-  latitudeDelta: 0.02,
-  longitudeDelta: 0.02,
+    latitudeDelta: 0.02,
+    longitudeDelta: 0.02,
 };
 
 const DEFAULT_REGION = {
   latitude: 14.5995, // Metro Manila center
-  longitude: 120.9842,
-  ...MAP_DELTA,
+    longitude: 120.9842,
+    ...MAP_DELTA,
 };
 
 // Bottom Sheet Configuration
@@ -75,6 +75,7 @@ const SHEET_HEADER_HEIGHT = 80;
 const SNAP_POINT_FULL = screenHeight - SHEET_MAX_HEIGHT;
 const SNAP_POINT_MID = screenHeight * 0.5;
 const SNAP_POINT_DIRECTIONS = screenHeight - DIRECTIONS_CARD_HEIGHT - SHEET_HEADER_HEIGHT;
+const SNAP_POINT_HIDDEN = screenHeight - SHEET_HEADER_HEIGHT;
 
 // Clustering Configuration
 const CLUSTER_DISTANCE = 0.01; // Degrees (roughly 1km)
@@ -546,14 +547,9 @@ export function ClinicFinderScreen() {
 
   // --- Reanimated and Gesture Handler Setup ---
   const translateY = useSharedValue(SNAP_POINT_MID);
-  const isNavigationActiveSV = useSharedValue(false);
   const isClinicSelectedSV = useSharedValue(false);
 
   type GestureContext = { startY: number };
-
-  useEffect(() => {
-    isNavigationActiveSV.value = isNavigationActive;
-  }, [isNavigationActive]);
 
   useEffect(() => {
     isClinicSelectedSV.value = !!selectedClinic;
@@ -576,7 +572,7 @@ export function ClinicFinderScreen() {
     onEnd: (event) => {
       const snapPoints = isClinicSelectedSV.value
         ? [SNAP_POINT_DIRECTIONS]
-        : [SNAP_POINT_FULL, SNAP_POINT_MID];
+        : [SNAP_POINT_FULL, SNAP_POINT_MID, SNAP_POINT_HIDDEN];
       
       const projectedY = translateY.value + event.velocityY * 0.1;
 
@@ -597,14 +593,15 @@ export function ClinicFinderScreen() {
 
   useEffect(() => {
     if (isNavigationActive) {
-      // Close sheet if open
-      translateY.value = withTiming(screenHeight);
-    } else if (selectedClinic) {
-      translateY.value = withTiming(SNAP_POINT_DIRECTIONS)
+      translateY.value = withTiming(screenHeight, { duration: 250 });
     } else {
-      translateY.value = withTiming(SNAP_POINT_MID);
+      if (selectedClinic) {
+        translateY.value = withTiming(SNAP_POINT_DIRECTIONS, { duration: 250 });
+      } else {
+        translateY.value = withTiming(SNAP_POINT_MID, { duration: 250 });
     }
-  }, [isNavigationActive]);
+    }
+  }, [isNavigationActive, selectedClinic]);
 
   useEffect(() => {
     const startWatching = async () => {
@@ -623,12 +620,6 @@ export function ClinicFinderScreen() {
         },
         (location) => {
           setCurrentUserPosition(location.coords);
-          mapRef.current?.animateCamera({
-            center: location.coords,
-            pitch: 45,
-            heading: location.coords.heading ?? 0,
-            zoom: 18,
-          }, { duration: 500 });
         }
       );
     };
@@ -694,8 +685,8 @@ export function ClinicFinderScreen() {
     // Filter by search text
     if (debouncedSearchText) {
       clinics = clinics.filter(clinic =>
-        clinic.name.toLowerCase().includes(debouncedSearchText.toLowerCase())
-      );
+      clinic.name.toLowerCase().includes(debouncedSearchText.toLowerCase())
+    );
     }
     
     // Filter by "Open Now" if enabled
@@ -793,10 +784,37 @@ export function ClinicFinderScreen() {
   const handleCancelNavigation = () => {
     setIsNavigationActive(false);
     setDirections(null);
+    mapRef.current?.animateCamera({ pitch: 0, heading: 0 }, { duration: 500 });
     if(selectedClinic){
         onMarkerPress(selectedClinic);
+    } else {
+        translateY.value = withTiming(SNAP_POINT_MID);
     }
   }
+
+  const handleRecenter = () => {
+    if (isNavigationActive) {
+      if (currentUserPosition) {
+        mapRef.current?.animateCamera({
+          center: currentUserPosition,
+          pitch: 45,
+          heading: currentUserPosition.heading ?? 0,
+          zoom: 18,
+        }, { duration: 800 });
+      }
+    } else {
+      handleFindNearMe();
+    }
+  };
+
+  const handleShowRouteOverview = () => {
+    if (directions?.coordinates) {
+      mapRef.current?.fitToCoordinates(directions.coordinates, {
+        edgePadding: { top: 150, right: 50, bottom: 100, left: 50 },
+        animated: true,
+      });
+    }
+  };
 
   const handleOpenDrawer = useCallback(() => {
     navigation.openDrawer();
@@ -920,20 +938,20 @@ export function ClinicFinderScreen() {
               <>
                 <Text style={styles.filterSectionTitle}>Search Radius</Text>
                 <View style={styles.radiusGrid}>
-                  {RADIUS_OPTIONS_KM.map(r => (
-                    <TouchableOpacity 
-                      key={r}
+                    {RADIUS_OPTIONS_KM.map(r => (
+                        <TouchableOpacity 
+                            key={r}
                       style={[styles.radiusChip, radius === r && styles.radiusChipSelected]}
-                      onPress={() => {
-                        setRadius(r);
+                            onPress={() => {
+                                setRadius(r);
                         setFilters((prev: Filters) => ({...prev, radius: r * 1000}));
-                      }}
-                    >
+                            }}
+                        >
                       <Text style={[styles.radiusChipText, radius === r && styles.radiusChipTextSelected]}>
                         {r} km
                       </Text>
-                    </TouchableOpacity>
-                  ))}
+                        </TouchableOpacity>
+                    ))}
                 </View>
               </>
             ) : (
@@ -944,7 +962,7 @@ export function ClinicFinderScreen() {
                  </Text>
               </View>
             )}
-          </View>
+            </View>
         )}
 
         {/* Action Buttons */}
@@ -956,17 +974,17 @@ export function ClinicFinderScreen() {
             style={styles.findNearMeButton}
           >
             {isFetchingLocation ? 'Finding...' : 'Find Near Me'}
-          </Button>
-          {isFilterActive && (
+            </Button>
+            {isFilterActive && (
             <Button 
               onPress={clearFilters} 
               variant="secondary" 
               icon={<X size={18} color={theme.colors.destructive} />}
               style={styles.clearButton}
             >
-              Clear
-            </Button>
-          )}
+                    Clear
+                </Button>
+            )}
         </View>
 
         {clinicsQuery.isFetching && (
@@ -1047,7 +1065,7 @@ export function ClinicFinderScreen() {
         onRegionChangeComplete={handleRegionChangeThrottled}
       >
           {mapClusters.map((cluster, index) => (
-            <Marker
+              <Marker
               key={cluster.type === 'single' ? cluster.clinic!.id : `cluster-${index}`}
               coordinate={{ latitude: cluster.latitude, longitude: cluster.longitude }}
               onPress={() => {
@@ -1122,9 +1140,15 @@ export function ClinicFinderScreen() {
           </TouchableOpacity>
       )}
 
-      <TouchableOpacity style={styles.recenterButton} onPress={handleFindNearMe}>
+      <TouchableOpacity style={styles.recenterButton} onPress={handleRecenter}>
         <Crosshair size={24} color={theme.colors.foreground} />
       </TouchableOpacity>
+
+      {isNavigationActive && (
+        <TouchableOpacity style={styles.overviewButton} onPress={handleShowRouteOverview}>
+          <Maximize size={22} color={theme.colors.foreground} />
+        </TouchableOpacity>
+      )}
 
       {!isNavigationActive && (
         <TouchableOpacity style={styles.hamburgerButton} onPress={handleOpenDrawer}>
@@ -1603,16 +1627,29 @@ const styles = StyleSheet.create({
   },
   recenterButton: {
       position: 'absolute',
-      top: 50,
+    top: 50,
       right: 20,
-      backgroundColor: theme.colors.background,
-      padding: theme.spacing.md,
-      borderRadius: theme.radius.full,
-      elevation: 5,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.25,
-      shadowRadius: 3.84,
+    backgroundColor: theme.colors.background,
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.full,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  overviewButton: {
+    position: 'absolute',
+    top: 110,
+    right: 20,
+    backgroundColor: theme.colors.background,
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.full,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   hamburgerButton: {
       position: 'absolute',

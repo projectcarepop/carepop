@@ -314,20 +314,20 @@ export function ClinicDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.toolbar}>
+        <View style={styles.toolbar}>
         <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
-          <ChevronLeft size={24} color={theme.colors.primary} />
-          <Text style={styles.backButtonText}>Back to Finder</Text>
-        </TouchableOpacity>
-      </View>
+                <ChevronLeft size={24} color={theme.colors.primary} />
+                <Text style={styles.backButtonText}>Back to Finder</Text>
+            </TouchableOpacity>
+        </View>
       
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.headerContainer}>
-          <MapPin size={48} color={theme.colors.primary} style={styles.icon} />
-          <Text style={styles.title}>{clinic.name}</Text>
+            <MapPin size={48} color={theme.colors.primary} style={styles.icon} />
+            <Text style={styles.title}>{clinic.name}</Text>
           <Text style={styles.address} numberOfLines={2}>
             {formatClinicAddress(clinic)}
-          </Text>
+            </Text>
         </View>
 
         <View style={styles.content}>
@@ -335,7 +335,7 @@ export function ClinicDetailScreen() {
           <ServicesSection />
           <DoctorsSection />
           <EmergencyNotice />
-        </View>
+                    </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -415,8 +415,8 @@ const styles = StyleSheet.create({
   serviceIcon: {
       marginRight: theme.spacing.lg,
   },
-    serviceInfo: {
-    flex: 1,
+  serviceInfo: {
+      flex: 1,
   },
   serviceHeader: {
     flexDirection: 'row',

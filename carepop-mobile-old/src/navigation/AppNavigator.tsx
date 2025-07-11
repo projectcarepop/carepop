@@ -47,9 +47,9 @@ export type RootStackParamList = {
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 
-// --- Root Navigator with State Machine Logic ---
+// --- Root Navigator with Enhanced State Machine Logic ---
 export function RootAppNavigator() {
-  const { authStatus } = useAuth();
+  const { authStatus, session, profile } = useAuth();
   const [hasOnboarded, setHasOnboarded] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -59,18 +59,30 @@ export function RootAppNavigator() {
         setHasOnboarded(onboarded === 'true');
       } catch (e) {
         console.error("Failed to read onboarding status", e);
+        // Default to false to ensure onboarding is shown if we can't read the status
         setHasOnboarded(false);
       }
     };
     checkOnboarding();
   }, []);
 
+  // Enhanced loading state with safety checks
   if (hasOnboarded === null || authStatus === 'loading') {
     return <SplashScreen />;
-}
+  }
+
+  // Debug logging for development
+  if (__DEV__) {
+    console.log('Navigation Guard State:', {
+      authStatus,
+      hasOnboarded,
+      hasSession: !!session,
+      hasProfile: !!profile,
+    });
+  }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         {authStatus === 'unauthenticated' ? (
           hasOnboarded ? (
@@ -80,11 +92,14 @@ export function RootAppNavigator() {
           )
         ) : authStatus === 'no-profile' ? (
           <RootStack.Screen name="CreateProfile" component={CreateProfileScreen} />
-        ) : (
+        ) : authStatus === 'authenticated' ? (
           <RootStack.Group>
             <RootStack.Screen name="Main" component={AppDrawerNavigator} />
             <RootStack.Screen name="EditProfile" component={EditProfileScreen} />
           </RootStack.Group>
+        ) : (
+          // Fallback for unexpected states
+          <RootStack.Screen name="Auth" component={AuthNavigator} />
         )}
       </RootStack.Navigator>
     </NavigationContainer>

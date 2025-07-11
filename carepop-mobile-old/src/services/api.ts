@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { supabase } from "../lib/supabaseClient"; // FIX 1: Correct the import path
+import { supabase } from "../utils/supabase";
 import type {
   Clinic,
   DetailedAppointment,

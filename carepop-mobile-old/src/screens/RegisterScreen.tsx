@@ -22,6 +22,7 @@ import * as WebBrowser from 'expo-web-browser';
 
 import { signUpWithEmail } from '../services/api';
 import { registerSchema, type RegisterFormValues } from '../lib/validation/auth';
+import { handleAuthError, logAuthError } from '../lib/auth-errors';
 import {
   Button,
   Input,
@@ -100,7 +101,11 @@ export const RegisterScreen: React.FC = () => {
       Alert.alert('Check your email!', 'We sent you a confirmation link to complete your registration.');
       navigation.navigate('Login');
     },
-    onError: (error) => Alert.alert('Registration Error', error.message),
+    onError: (error) => {
+      logAuthError(error, 'email_registration');
+      const errorInfo = handleAuthError(error);
+      Alert.alert('Registration Error', errorInfo.userMessage);
+    },
   });
   
   const [isSigningInWithGoogle, setIsSigningInWithGoogle] = useState(false);
@@ -111,7 +116,14 @@ export const RegisterScreen: React.FC = () => {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: 'exp://192.168.1.10:8081', 
+          redirectTo: 'io.supabase.carepop://auth/callback',
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+            client_id: Platform.OS === 'ios' 
+              ? process.env.EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID_IOS
+              : process.env.EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID_ANDROID,
+          },
         },
       });
 
@@ -120,12 +132,13 @@ export const RegisterScreen: React.FC = () => {
       if (data.url) {
         const result = await WebBrowser.openAuthSessionAsync(data.url, null);
         if (result.type === 'success') {
-          // The auth listener in AuthContext will handle navigation once the session is established.
+          // The auth listener in AuthContext will handle navigation once the session is established
         }
       }
-    } catch (error) {
-      console.error('Google Sign-In Error:', error);
-      Alert.alert('Google Sign-In Error', 'An unexpected error occurred. Please try again.');
+    } catch (error: any) {
+      logAuthError(error, 'google_oauth_registration');
+      const errorInfo = handleAuthError(error);
+      Alert.alert('Google Sign-In Error', errorInfo.userMessage);
     } finally {
       setIsSigningInWithGoogle(false);
     }
