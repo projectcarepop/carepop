@@ -271,6 +271,20 @@ export async function getSingleMedicalRecord(recordId: string, accessToken: stri
     return response.json();
 }
 
+export async function downloadMedicalDocument(recordId: string, accessToken: string) {
+    const headers = await getAuthHeaders(accessToken);
+    const url = `${API_BASE_URL}/api/me/records/${recordId}/download`;
+    const response = await fetch(url, { headers, cache: 'no-store' });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: "Failed to generate download link." }));
+        throw new Error(error.message);
+    }
+    
+    const data = await response.json();
+    return data;
+}
+
 // --- Admin Service (Requires Admin/Manager Role) ---
 // The functions in this section are designed for both client-side and server-side usage.
 // When calling from a server component, pass the access token directly.

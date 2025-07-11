@@ -10,6 +10,7 @@ import { generativeModel } from '../../../src/services/vertex-ai';
 import type { InferInsertModel, InferSelectModel } from 'drizzle-orm';
 import { differenceInHours, isSameDay, eachDayOfInterval, format, startOfDay, endOfDay, addMinutes } from 'date-fns';
 import { zonedTimeToUtc } from 'date-fns-tz';
+import { createClient } from '@supabase/supabase-js';
 
 // Define types from schema for local use
 type Appointment = InferSelectModel<typeof appointments>;
@@ -382,6 +383,73 @@ meRoutes.get('/records/:recordId', async (c) => {
 
     } catch (error) {
         console.error(`Error fetching single medical record ${recordId}:`, error);
+        return c.json({ error: "Internal Server Error" }, 500);
+    }
+});
+
+/**
+ * GET /me/records/:recordId/download
+ * Generates a signed URL for downloading a medical document.
+ */
+meRoutes.get('/records/:recordId/download', async (c) => {
+    const user = c.get('user');
+    const { recordId } = c.req.param();
+
+    try {
+        // First, verify the user owns this record and it's a document
+        const [record] = await db.select({
+            id: medicalRecords.id,
+            recordType: medicalRecords.recordType,
+            appointmentId: medicalRecords.appointmentId,
+        })
+        .from(medicalRecords)
+        .innerJoin(appointments, eq(medicalRecords.appointmentId, appointments.id))
+        .where(
+            and(
+                eq(medicalRecords.id, recordId),
+                eq(appointments.patientId, user.id),
+                eq(medicalRecords.recordType, 'CLINICAL_DOCUMENT')
+            )
+        );
+
+        if (!record) {
+            return c.json({ error: 'Document not found or you do not have permission to access it.' }, 404);
+        }
+
+        // Get the document details
+        const [documentDetails] = await db.select()
+            .from(recordDocuments)
+            .where(eq(recordDocuments.recordId, record.id));
+
+        if (!documentDetails || !documentDetails.filePath) {
+            return c.json({ error: 'Document file not found.' }, 404);
+        }
+
+        // Create Supabase admin client
+        const supabaseAdmin = createClient(
+            process.env.SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
+
+        // Generate signed URL (valid for 1 hour)
+        const { data, error } = await supabaseAdmin.storage
+            .from('medical-documents')
+            .createSignedUrl(documentDetails.filePath, 3600); // 1 hour
+
+        if (error) {
+            console.error('Error generating signed URL:', error);
+            return c.json({ error: 'Failed to generate download link.' }, 500);
+        }
+
+        return c.json({
+            downloadUrl: data.signedUrl,
+            fileName: documentDetails.documentName,
+            fileType: documentDetails.fileType,
+            expiresIn: 3600 // 1 hour in seconds
+        });
+
+    } catch (error) {
+        console.error(`Error generating download URL for record ${recordId}:`, error);
         return c.json({ error: "Internal Server Error" }, 500);
     }
 });

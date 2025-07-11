@@ -2,7 +2,10 @@ import { type MedicalRecordWithRelations } from '@/lib/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { Stethoscope, Pill, FileText, User, Building, Syringe, Calendar } from 'lucide-react';
+import { Stethoscope, Pill, FileText, User, Building, Syringe, Calendar, Download } from 'lucide-react';
+import { downloadMedicalDocument } from '@/services/api';
+import { useAuth } from '@/lib/contexts/auth-context';
+import { useState } from 'react';
 
 interface RecordCardProps {
   record: MedicalRecordWithRelations;
@@ -19,6 +22,38 @@ const formatRecordType = (type: MedicalRecordWithRelations['recordType']) => {
 };
 
 const RecordDetails = ({ record }: { record: MedicalRecordWithRelations }) => {
+    const { session } = useAuth();
+    const [isDownloading, setIsDownloading] = useState(false);
+
+    const handleDownload = async (e: React.MouseEvent) => {
+        e.preventDefault(); // Prevent link navigation
+        
+        if (!session?.access_token) {
+            alert('Please log in to download documents');
+            return;
+        }
+
+        setIsDownloading(true);
+        try {
+            const response = await downloadMedicalDocument(record.id, session.access_token);
+            
+            // Create a temporary link element and trigger download
+            const link = document.createElement('a');
+            link.href = response.downloadUrl;
+            link.download = response.fileName || 'medical-document';
+            link.target = '_blank';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+        } catch (error) {
+            console.error('Download failed:', error);
+            alert('Failed to download document. Please try again.');
+        } finally {
+            setIsDownloading(false);
+        }
+    };
+
     switch (record.recordType) {
         case 'DOCTOR_NOTE':
             const noteDetails = record.details as any; // Cast to access note content
@@ -48,15 +83,21 @@ const RecordDetails = ({ record }: { record: MedicalRecordWithRelations }) => {
                         <div className="mt-2">
                             <p className="text-xs text-gray-500 mb-1">File uploaded successfully</p>
                             <button 
-                                onClick={(e) => {
-                                    e.preventDefault(); // Prevent link navigation
-                                    // TODO: Implement download functionality
-                                    alert('Download functionality will be implemented');
-                                }}
-                                className="inline-flex items-center px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                                onClick={handleDownload}
+                                disabled={isDownloading}
+                                className="inline-flex items-center px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                <FileText className="h-3 w-3 mr-1" />
-                                View Document
+                                {isDownloading ? (
+                                    <>
+                                        <div className="animate-spin h-3 w-3 mr-1 border border-blue-600 border-t-transparent rounded-full"></div>
+                                        Downloading...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Download className="h-3 w-3 mr-1" />
+                                        Download
+                                    </>
+                                )}
                             </button>
                         </div>
                     )}
