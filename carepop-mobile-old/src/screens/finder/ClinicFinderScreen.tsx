@@ -14,10 +14,11 @@ import {
   Linking,
   Alert,
   ListRenderItem,
+  Switch,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import * as Location from 'expo-location';
-import { MapPin, Search, X, RotateCw, Crosshair, ArrowLeft, Navigation } from 'lucide-react-native';
+import { MapPin, Search, X, RotateCw, Crosshair, ArrowLeft, Navigation, Menu, Filter, Clock } from 'lucide-react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import { GestureHandlerRootView, PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
@@ -31,6 +32,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import { type NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { type DrawerNavigationProp } from '@react-navigation/drawer';
 
 import {
   searchClinicsForFinder,
@@ -40,7 +42,7 @@ import { useDebounce } from '../../hooks/useDebounce';
 import { theme } from '../../components/theme';
 import { Clinic } from '../../lib/types';
 import { Button } from '../../components/button.native';
-import { type ClinicFinderStackParamList } from '../../navigation/AppDrawerNavigator';
+import { type ClinicFinderStackParamList, type DrawerParamList } from '../../navigation/AppDrawerNavigator';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -76,6 +78,7 @@ type Filters = {
   lat?: number;
   lon?: number;
   radius?: number; // in meters
+  openNow?: boolean;
 };
 
 const RADIUS_OPTIONS_KM = [5, 10, 25, 50];
@@ -153,7 +156,7 @@ const EmptyState = () => (
 // --- Main Screen ---
 
 export function ClinicFinderScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<ClinicFinderStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<ClinicFinderStackParamList> & DrawerNavigationProp<DrawerParamList>>();
   const [filters, setFilters] = useState<Filters>({});
   const [searchText, setSearchText] = useState('');
   const debouncedSearchText = useDebounce(searchText, 500);
@@ -166,6 +169,8 @@ export function ClinicFinderScreen() {
   const [currentUserPosition, setCurrentUserPosition] = useState<Location.LocationObjectCoords | null>(null);
   const [directionSteps, setDirectionSteps] = useState<any[]>([]);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [openNow, setOpenNow] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   const mapRef = useRef<MapView>(null);
   const flatListRef = useRef<FlatList<Clinic>>(null);
@@ -220,7 +225,7 @@ export function ClinicFinderScreen() {
   }));
   // --- End Reanimated Setup ---
 
-  const isFilterActive = useMemo(() => !!(filters.q || (filters.lat && filters.lon)), [filters]);
+  const isFilterActive = useMemo(() => !!(filters.q || (filters.lat && filters.lon) || openNow), [filters, openNow]);
 
   useEffect(() => {
     if (isNavigationActive) {
@@ -327,14 +332,41 @@ export function ClinicFinderScreen() {
   });
 
   const filteredClinics = useMemo(() => {
-    const clinics = clinicsQuery.data ?? [];
-    if (!debouncedSearchText) {
-      return clinics;
+    let clinics = clinicsQuery.data ?? [];
+    
+    // Filter by search text
+    if (debouncedSearchText) {
+      clinics = clinics.filter(clinic =>
+        clinic.name.toLowerCase().includes(debouncedSearchText.toLowerCase())
+      );
     }
-    return clinics.filter(clinic =>
-      clinic.name.toLowerCase().includes(debouncedSearchText.toLowerCase())
-    );
-  }, [clinicsQuery.data, debouncedSearchText]);
+    
+    // Filter by "Open Now" if enabled
+    if (openNow) {
+      const currentHour = new Date().getHours();
+      // Basic business hours filter (8 AM - 6 PM)
+      // This can be enhanced when actual operating hours data is available
+      const isBusinessHours = currentHour >= 8 && currentHour < 18;
+      if (isBusinessHours) {
+        // For now, show all clinics during business hours
+        // In a real implementation, this would check actual operating hours
+        clinics = clinics.filter(clinic => {
+          // Placeholder logic - can be enhanced with real operating hours data
+          return true; // Assume all clinics are open during business hours
+        });
+      } else {
+        // After hours - filter to 24/7 or emergency clinics
+        // For now, show a subset (this would use real data in production)
+        clinics = clinics.filter(clinic => {
+          // Placeholder: show clinics with "emergency" or "24" in name
+          const name = clinic.name.toLowerCase();
+          return name.includes('emergency') || name.includes('24') || name.includes('urgent');
+        });
+      }
+    }
+    
+    return clinics;
+  }, [clinicsQuery.data, debouncedSearchText, openNow]);
 
   const isLoading = clinicsQuery.isLoading;
 
@@ -366,6 +398,8 @@ export function ClinicFinderScreen() {
       setFilters({});
       setSearchText('');
       setRadius(10);
+      setOpenNow(false);
+      setShowFilters(false);
       setSelectedClinic(null);
       setUserLocation(null);
       setDirections(null);
@@ -402,6 +436,19 @@ export function ClinicFinderScreen() {
     }
   }
 
+  const handleOpenDrawer = useCallback(() => {
+    navigation.openDrawer();
+  }, [navigation]);
+
+  const handleToggleOpenNow = useCallback((value: boolean) => {
+    setOpenNow(value);
+    setFilters(prev => ({ ...prev, openNow: value }));
+  }, []);
+
+  const handleToggleFilters = useCallback(() => {
+    setShowFilters(prev => !prev);
+  }, []);
+
   const instructionText = useMemo(() => {
     if (isLocationSearch) return `Showing clinics near you.`;
     if (debouncedSearchText) return `Showing results for "${debouncedSearchText}".`;
@@ -413,6 +460,8 @@ export function ClinicFinderScreen() {
   const renderSearchHeader = () => (
      <View style={styles.controlsContainer}>
         <Text style={styles.instructionText}>{instructionText}</Text>
+        
+        {/* Search Bar */}
         <View style={styles.searchInputContainer}>
           <Search size={20} color={theme.colors.secondary} style={styles.searchIcon} />
           <TextInput
@@ -429,44 +478,87 @@ export function ClinicFinderScreen() {
           )}
         </View>
 
-        {filters.lat && filters.lon && (
-            <View style={styles.radiusContainer}>
-                <Text style={styles.radiusLabel}>Search within:</Text>
-                <ScrollView 
-                    horizontal 
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.radiusScrollContainer}
-                    style={{ flex: 1 }}
-                >
-                    {RADIUS_OPTIONS_KM.map(r => (
-                        <TouchableOpacity 
-                            key={r}
-                            style={[styles.radiusButton, radius === r && styles.radiusButtonSelected]}
-                            onPress={() => {
-                                setRadius(r);
-                                if (filters.lat && filters.lon) {
-                                    setFilters(prev => ({...prev, radius: r * 1000}));
-                                }
-                            }}
-                        >
-                            <Text style={[styles.radiusButtonText, radius === r && styles.radiusButtonTextSelected]}>{r} km</Text>
-                        </TouchableOpacity>
-                    ))}
-                </ScrollView>
-            </View>
+        {/* Filter Toggle & Quick Filters Row */}
+        <View style={styles.filterRow}>
+          <TouchableOpacity style={styles.filterToggleButton} onPress={handleToggleFilters}>
+            <Filter size={16} color={theme.colors.primary} />
+            <Text style={styles.filterToggleText}>Filters</Text>
+            {isFilterActive && <View style={styles.filterActiveDot} />}
+          </TouchableOpacity>
+
+          {/* Open Now Quick Toggle */}
+          <View style={styles.openNowContainer}>
+            <Clock size={16} color={openNow ? theme.colors.primary : theme.colors.secondary} />
+            <Text style={[styles.openNowLabel, openNow && styles.openNowLabelActive]}>Open Now</Text>
+            <Switch
+              value={openNow}
+              onValueChange={handleToggleOpenNow}
+              trackColor={{ false: theme.colors.muted, true: theme.colors.primary }}
+              thumbColor={theme.colors.background}
+              style={styles.openNowSwitch}
+            />
+          </View>
+        </View>
+
+        {/* Expanded Filters Panel */}
+        {showFilters && (
+          <View style={styles.filtersPanel}>
+            {filters.lat && filters.lon ? (
+              <>
+                <Text style={styles.filterSectionTitle}>Search Radius</Text>
+                <View style={styles.radiusGrid}>
+                  {RADIUS_OPTIONS_KM.map(r => (
+                    <TouchableOpacity 
+                      key={r}
+                      style={[styles.radiusChip, radius === r && styles.radiusChipSelected]}
+                      onPress={() => {
+                        setRadius(r);
+                        setFilters(prev => ({...prev, radius: r * 1000}));
+                      }}
+                    >
+                      <Text style={[styles.radiusChipText, radius === r && styles.radiusChipTextSelected]}>
+                        {r} km
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            ) : (
+              <View style={styles.filterHint}>
+                <MapPin size={20} color={theme.colors.secondary} />
+                                 <Text style={styles.filterHintText}>
+                   Use &quot;Find Near Me&quot; to enable distance filtering
+                 </Text>
+              </View>
+            )}
+          </View>
         )}
 
-        <View style={styles.filterButtons}>
-            <Button onPress={handleFindNearMe} disabled={isFetchingLocation} icon={<MapPin size={16} color={theme.colors.primaryForeground} />}>
-              Find Near Me
+        {/* Action Buttons */}
+        <View style={styles.actionButtons}>
+          <Button 
+            onPress={handleFindNearMe} 
+            disabled={isFetchingLocation} 
+            icon={<MapPin size={16} color={theme.colors.primaryForeground} />}
+            style={styles.findNearMeButton}
+          >
+            {isFetchingLocation ? 'Finding...' : 'Find Near Me'}
+          </Button>
+          {isFilterActive && (
+            <Button 
+              onPress={clearFilters} 
+              variant="secondary" 
+              icon={<X size={16} color={theme.colors.secondary} />}
+              style={styles.clearButton}
+            >
+              Clear
             </Button>
-            {isFilterActive && (
-                 <Button onPress={clearFilters} variant="secondary" icon={<X size={16} color={theme.colors.accentForeground} />}>
-                    Clear
-                </Button>
-            )}
+          )}
         </View>
-         {clinicsQuery.isFetching && <ActivityIndicator style={styles.refetchingIndicator} color={theme.colors.primary} />}
+
+        {clinicsQuery.isFetching && (
+          <ActivityIndicator style={styles.refetchingIndicator} color={theme.colors.primary} />
+        )}
       </View>
   )
   
@@ -602,6 +694,12 @@ export function ClinicFinderScreen() {
         <Crosshair size={24} color={theme.colors.foreground} />
       </TouchableOpacity>
 
+      {!isNavigationActive && (
+        <TouchableOpacity style={styles.hamburgerButton} onPress={handleOpenDrawer}>
+          <Menu size={24} color={theme.colors.foreground} />
+        </TouchableOpacity>
+      )}
+
       <PanGestureHandler onGestureEvent={gestureHandler}>
         <Animated.View style={[styles.sheet, animatedSheetStyle]}>
           <View style={styles.handle} />
@@ -689,6 +787,127 @@ const styles = StyleSheet.create({
     color: theme.colors.primaryForeground,
     fontFamily: theme.typography.fontFamilySemiBold,
   },
+  filterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+  },
+  filterToggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.muted,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.radius.md,
+    position: 'relative',
+  },
+  filterToggleText: {
+    ...theme.typography.body,
+    marginLeft: theme.spacing.xs,
+    color: theme.colors.primary,
+    fontFamily: theme.typography.fontFamilyMedium,
+  },
+  filterActiveDot: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.primary,
+  },
+  openNowContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.muted,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.radius.md,
+  },
+  openNowLabel: {
+    ...theme.typography.body,
+    marginLeft: theme.spacing.xs,
+    marginRight: theme.spacing.sm,
+    color: theme.colors.secondary,
+  },
+  openNowLabelActive: {
+    color: theme.colors.primary,
+    fontFamily: theme.typography.fontFamilyMedium,
+  },
+  openNowSwitch: {
+    transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }],
+  },
+  filtersPanel: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
+    marginTop: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  filterSectionTitle: {
+    ...theme.typography.h4,
+    marginBottom: theme.spacing.md,
+    color: theme.colors.foreground,
+  },
+  radiusGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.xs,
+    justifyContent: 'flex-start',
+  },
+  radiusChip: {
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.full,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
+    minWidth: 50,
+    alignItems: 'center',
+  },
+  radiusChipSelected: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  radiusChipText: {
+    ...theme.typography.small,
+    fontFamily: theme.typography.fontFamilyMedium,
+    color: theme.colors.foreground,
+  },
+  radiusChipTextSelected: {
+    color: theme.colors.primaryForeground,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'stretch',
+    marginTop: theme.spacing.lg,
+    gap: theme.spacing.sm,
+  },
+  findNearMeButton: {
+    flex: 2,
+    minHeight: 44,
+  },
+  clearButton: {
+    flex: 1,
+    minHeight: 44,
+    paddingHorizontal: theme.spacing.md,
+  },
+  filterHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.lg,
+  },
+  filterHintText: {
+    ...theme.typography.body,
+    color: theme.colors.secondary,
+    marginLeft: theme.spacing.sm,
+    textAlign: 'center',
+  },
   filterButtons: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -757,6 +976,19 @@ const styles = StyleSheet.create({
       position: 'absolute',
       top: 60,
       right: 20,
+      backgroundColor: theme.colors.background,
+      padding: theme.spacing.md,
+      borderRadius: theme.radius.full,
+      elevation: 5,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+  },
+  hamburgerButton: {
+      position: 'absolute',
+      top: 60,
+      left: 20,
       backgroundColor: theme.colors.background,
       padding: theme.spacing.md,
       borderRadius: theme.radius.full,
