@@ -20,14 +20,33 @@ export default function Page() {
   const supabase = createClientComponentClient();
 
   const handleGoogleSignIn = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        // This tells Supabase to redirect back to our Next.js app's
-        // auth callback route after the user authenticates with Google.
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+    try {
+      console.log('Initiating Google OAuth with redirect to:', `${window.location.origin}/auth/callback`);
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          // This tells Supabase to redirect back to our Next.js app's
+          // auth callback route after the user authenticates with Google.
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+
+      if (error) {
+        console.error('Error initiating Google OAuth:', error);
+        alert(`Google sign-in failed: ${error.message}`);
+        return;
+      }
+
+      console.log('Google OAuth initiated successfully:', data);
+    } catch (err) {
+      console.error('Unexpected error during Google sign-in:', err);
+      alert('An unexpected error occurred. Please try again.');
+    }
   };
 
   return (

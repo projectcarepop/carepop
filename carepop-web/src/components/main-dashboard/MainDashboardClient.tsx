@@ -130,7 +130,7 @@ export function MainDashboardClient({
             <div className="grid gap-6 sm:grid-cols-2">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Calendar className="h-5 w-5 text-primary"/> Upcoming Appointments</CardTitle>
+                        <CardTitle className="flex items-center gap-2"><Calendar className="h-5 w-5 text-primary"/>Appointments</CardTitle>
                     </CardHeader>
                     <CardContent>
                         {isLoadingAppointments ? (
