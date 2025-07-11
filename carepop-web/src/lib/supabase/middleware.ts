@@ -41,7 +41,7 @@ export async function updateSession(request: NextRequest) {
   // The rest of the logic for redirecting users based on auth state.
   const { data: { user } } = await supabase.auth.getUser()
   const { pathname } = request.nextUrl
-  const publicPaths = ['/', '/about', '/contact', '/clinic-finder', '/download-app', '/sign-in', '/sign-up', '/forgot-password', '/update-password', '/auth/callback', '/auth/confirm', '/auth/debug', '/auth/auth-code-error', '/terms-of-service', '/privacy-policy']
+  const publicPaths = ['/', '/about', '/contact', '/clinic-finder', '/download-app', '/sign-in', '/sign-up', '/forgot-password', '/update-password', '/auth/callback', '/auth/confirm', '/auth/debug', '/auth/email-debug', '/auth/auth-code-error', '/terms-of-service', '/privacy-policy']
   const authPages = ['/sign-in', '/sign-up', '/forgot-password']
 
   if (user) {

@@ -46,10 +46,16 @@ export async function GET(request: Request) {
         return NextResponse.redirect(errorUrl.toString())
       }
       
-      if (data.session) {
-        console.log('Session exchange successful, redirecting to:', next)
-        return NextResponse.redirect(`${origin}${next}`)
-      }
+             if (data.session) {
+         console.log('Session exchange successful, redirecting to:', next)
+         
+         // Special handling for password reset flow
+         if (next === '/update-password') {
+           console.log('Password reset session detected, redirecting to update password')
+         }
+         
+         return NextResponse.redirect(`${origin}${next}`)
+       }
     } catch (err) {
       console.error('Unexpected error during code exchange:', err)
       const errorUrl = new URL('/auth/auth-code-error', origin)
