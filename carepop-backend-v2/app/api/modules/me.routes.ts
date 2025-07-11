@@ -247,7 +247,7 @@ meRoutes.get('/records', async (c) => {
 
     // The frontend expects a flat list of records, not appointments.
     // We will transform the data to match the required `{ records: [...] }` shape.
-    const records = userAppointmentsWithRecords.flatMap(appt => 
+    const allRecords = userAppointmentsWithRecords.flatMap(appt => 
         appt.medicalRecords.map((record: MedicalRecord) => ({
             ...record,
             // Attach the appointment details to each record for context
@@ -261,7 +261,41 @@ meRoutes.get('/records', async (c) => {
         }))
     );
 
-    return c.json({ records });
+    // Fetch details for each medical record
+    const recordsWithDetails = await Promise.all(
+        allRecords.map(async (record) => {
+            let details = null;
+            
+            switch (record.recordType) {
+                case 'DOCTOR_NOTE':
+                    const [noteDetails] = await db.select()
+                        .from(recordDoctorNotes)
+                        .where(eq(recordDoctorNotes.recordId, record.id));
+                    details = noteDetails;
+                    break;
+                case 'PRESCRIPTION':
+                    const [prescriptionDetails] = await db.select()
+                        .from(recordPrescriptions)
+                        .where(eq(recordPrescriptions.recordId, record.id));
+                    details = prescriptionDetails;
+                    break;
+                case 'CLINICAL_DOCUMENT':
+                case 'LAB_RESULT':
+                    const [documentDetails] = await db.select()
+                        .from(recordDocuments)
+                        .where(eq(recordDocuments.recordId, record.id));
+                    details = documentDetails;
+                    break;
+            }
+            
+            return {
+                ...record,
+                details
+            };
+        })
+    );
+
+    return c.json({ records: recordsWithDetails });
 
   } catch (error) {
     console.error(`Error fetching medical records for user ${user.id}:`, error);
