@@ -48,7 +48,26 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
-// --- Custom Bottom Sheet Constants ---
+// === CONSTANTS & CONFIGURATION ===
+
+// Map Configuration
+const MAP_DELTA = {
+  latitudeDelta: 0.1,
+  longitudeDelta: 0.1,
+};
+
+const ZOOMED_IN_MAP_DELTA = {
+  latitudeDelta: 0.02,
+  longitudeDelta: 0.02,
+};
+
+const DEFAULT_REGION = {
+  latitude: 14.5995, // Metro Manila center
+  longitude: 120.9842,
+  ...MAP_DELTA,
+};
+
+// Bottom Sheet Configuration
 const SHEET_MAX_HEIGHT = screenHeight * 0.85;
 const DIRECTIONS_CARD_HEIGHT = 280;
 const SHEET_HEADER_HEIGHT = 80;
@@ -57,21 +76,27 @@ const SNAP_POINT_FULL = screenHeight - SHEET_MAX_HEIGHT;
 const SNAP_POINT_MID = screenHeight * 0.5;
 const SNAP_POINT_DIRECTIONS = screenHeight - DIRECTIONS_CARD_HEIGHT - SHEET_HEADER_HEIGHT;
 
-const MAP_DELTA = {
-  latitudeDelta: 0.1,
-  longitudeDelta: 0.1,
-};
+// Clustering Configuration
+const CLUSTER_DISTANCE = 0.01; // Degrees (roughly 1km)
+const CLUSTER_ZOOM_THRESHOLD = 0.05; // Cluster when zoomed out beyond this
+const MIN_CLUSTER_SIZE = 2; // Minimum clinics to form a cluster
 
-const ZOOMED_IN_MAP_DELTA = {
-    latitudeDelta: 0.02,
-    longitudeDelta: 0.02,
-}
+// Performance Configuration
+const REGION_CHANGE_THROTTLE_MS = 300; // Throttle map region updates
+const LOCATION_UPDATE_INTERVAL_MS = 1000; // GPS update frequency during navigation
+const LOCATION_DISTANCE_THRESHOLD_M = 10; // Minimum distance to trigger location update
+const NAVIGATION_STEP_PROXIMITY_M = 20; // Distance to next step to advance navigation
 
-const DEFAULT_REGION = {
-    latitude: 14.5995, // Metro Manila
-    longitude: 120.9842,
-    ...MAP_DELTA,
-};
+// Search Configuration
+const SEARCH_DEBOUNCE_MS = 500; // Debounce search input
+const DEFAULT_SEARCH_RADIUS_KM = 10; // Default search radius
+const RADIUS_OPTIONS_KM = [5, 10, 25, 50]; // Available radius options
+
+// Business Hours Configuration (placeholder for future enhancement)
+const BUSINESS_HOURS_START = 8; // 8 AM
+const BUSINESS_HOURS_END = 18; // 6 PM
+
+// === TYPE DEFINITIONS ===
 
 type Filters = {
   q?: string;
@@ -81,7 +106,26 @@ type Filters = {
   openNow?: boolean;
 };
 
-const RADIUS_OPTIONS_KM = [5, 10, 25, 50];
+// Utility function for throttling
+const throttle = <T extends (...args: any[]) => any>(func: T, delay: number): T => {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  let lastExecTime = 0;
+  
+  return ((...args: any[]) => {
+    const currentTime = Date.now();
+    
+    if (currentTime - lastExecTime > delay) {
+      func(...args);
+      lastExecTime = currentTime;
+    } else {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        func(...args);
+        lastExecTime = Date.now();
+      }, delay - (currentTime - lastExecTime));
+    }
+  }) as T;
+};
 
 // === HELPER FUNCTIONS ===
 
@@ -192,16 +236,18 @@ const ClinicMarker = React.memo(({ clinic, isSelected }: { clinic: Clinic; isSel
       </View>
     </View>
   );
+}, (prevProps, nextProps) => {
+  // Only re-render if clinic ID or selection state changes
+  return prevProps.clinic.id === nextProps.clinic.id && 
+         prevProps.isSelected === nextProps.isSelected;
 });
 ClinicMarker.displayName = 'ClinicMarker';
 
 // Clustering logic
-const CLUSTER_DISTANCE = 0.01; // Degrees (roughly 1km)
-
 const createClusters = (clinics: Clinic[], region: any) => {
-  const shouldCluster = region.latitudeDelta > 0.05; // Cluster when zoomed out
+  const shouldCluster = region.latitudeDelta > CLUSTER_ZOOM_THRESHOLD; // Cluster when zoomed out
   
-  if (!shouldCluster || clinics.length <= 5) {
+  if (!shouldCluster || clinics.length <= MIN_CLUSTER_SIZE) {
     return clinics.map(clinic => ({ 
       type: 'single' as const, 
       clinic, 
@@ -211,48 +257,82 @@ const createClusters = (clinics: Clinic[], region: any) => {
     }));
   }
 
-  const clusters: Array<{ type: 'cluster' | 'single', clinic?: Clinic, clinics?: Clinic[], count: number, latitude: number, longitude: number }> = [];
+  // Optimized clustering with spatial grid
+  const gridSize = CLUSTER_DISTANCE / 2; // Create a grid for spatial indexing
+  const grid = new Map<string, Clinic[]>();
+  
+  // Group clinics into grid cells for O(n) initial grouping
+  clinics.forEach(clinic => {
+    const gridX = Math.floor(clinic.longitude / gridSize);
+    const gridY = Math.floor(clinic.latitude / gridSize);
+    const cellKey = `${gridX},${gridY}`;
+    
+    if (!grid.has(cellKey)) {
+      grid.set(cellKey, []);
+    }
+    grid.get(cellKey)!.push(clinic);
+  });
+
+  const clusters: Array<{ 
+    type: 'cluster' | 'single', 
+    clinic?: Clinic, 
+    clinics?: Clinic[], 
+    count: number, 
+    latitude: number, 
+    longitude: number 
+  }> = [];
   const processed = new Set<string>();
 
-  clinics.forEach(clinic => {
-    if (processed.has(clinic.id)) return;
+  // Process each grid cell
+  for (const [cellKey, cellClinics] of grid) {
+    if (cellClinics.length === 1) {
+      const clinic = cellClinics[0];
+      if (!processed.has(clinic.id)) {
+        clusters.push({
+          type: 'single',
+          clinic,
+          count: 1,
+          latitude: clinic.latitude,
+          longitude: clinic.longitude,
+        });
+        processed.add(clinic.id);
+      }
+      continue;
+    }
 
-    const nearby = clinics.filter(other => {
-      if (processed.has(other.id) || other.id === clinic.id) return false;
-      const distance = Math.sqrt(
-        Math.pow(clinic.latitude - other.latitude, 2) + 
-        Math.pow(clinic.longitude - other.longitude, 2)
-      );
-      return distance < CLUSTER_DISTANCE;
-    });
-
-    if (nearby.length >= 2) {
-      // Create cluster
-      const allClinics = [clinic, ...nearby];
-      const avgLat = allClinics.reduce((sum, c) => sum + c.latitude, 0) / allClinics.length;
-      const avgLng = allClinics.reduce((sum, c) => sum + c.longitude, 0) / allClinics.length;
+    // For cells with multiple clinics, create clusters
+    const unprocessedInCell = cellClinics.filter(c => !processed.has(c.id));
+    
+    if (unprocessedInCell.length >= MIN_CLUSTER_SIZE) {
+      // Calculate cluster center using centroid
+      const avgLat = unprocessedInCell.reduce((sum, c) => sum + c.latitude, 0) / unprocessedInCell.length;
+      const avgLng = unprocessedInCell.reduce((sum, c) => sum + c.longitude, 0) / unprocessedInCell.length;
       
       clusters.push({
         type: 'cluster',
-        clinics: allClinics,
-        count: allClinics.length,
+        clinics: unprocessedInCell,
+        count: unprocessedInCell.length,
         latitude: avgLat,
         longitude: avgLng,
       });
 
-      allClinics.forEach(c => processed.add(c.id));
+      unprocessedInCell.forEach(c => processed.add(c.id));
     } else {
-      // Single clinic
-      processed.add(clinic.id);
-      clusters.push({
-        type: 'single',
-        clinic,
-        count: 1,
-        latitude: clinic.latitude,
-        longitude: clinic.longitude,
+      // Add remaining clinics as singles
+      unprocessedInCell.forEach(clinic => {
+        if (!processed.has(clinic.id)) {
+          clusters.push({
+            type: 'single',
+            clinic,
+            count: 1,
+            latitude: clinic.latitude,
+            longitude: clinic.longitude,
+          });
+          processed.add(clinic.id);
+        }
       });
     }
-  });
+  }
 
   return clusters;
 };
@@ -273,7 +353,10 @@ const ClusterMarker = React.memo(({ count, onPress }: { count: number; onPress: 
     {/* Cluster Point */}
     <View style={styles.clusterPoint} />
   </View>
-));
+), (prevProps, nextProps) => {
+  // Only re-render if count changes (onPress is assumed to be stable)
+  return prevProps.count === nextProps.count;
+});
 ClusterMarker.displayName = 'ClusterMarker';
 
 // Map legend component
@@ -394,15 +477,47 @@ const ClinicCard = React.memo(function ClinicCard({ item, isSelected }: { item: 
           )}
         </View>
     );
+}, (prevProps, nextProps) => {
+  // Only re-render if clinic ID, selection state, or distance changes
+  return prevProps.item.id === nextProps.item.id && 
+         prevProps.isSelected === nextProps.isSelected &&
+         prevProps.item.distance === nextProps.item.distance;
 });
 
-const EmptyState = () => (
+const EmptyState = React.memo(() => (
   <View style={styles.centered}>
     <Search size={48} color={theme.colors.secondary} style={{ marginBottom: theme.spacing.md }}/>
     <Text style={styles.emptyStateTitle}>No Clinics Found</Text>
     <Text style={styles.emptyStateSubtitle}>Try adjusting your search or find clinics near you.</Text>
   </View>
-);
+));
+EmptyState.displayName = 'EmptyState';
+
+// Loading skeleton component for clinic cards
+const ClinicCardSkeleton = React.memo(() => (
+  <View style={[styles.card, styles.skeletonCard]}>
+    <View style={[styles.skeletonLine, styles.skeletonTitle]} />
+    <View style={[styles.skeletonLine, styles.skeletonAddress]} />
+    <View style={[styles.skeletonLine, styles.skeletonDistance]} />
+  </View>
+));
+ClinicCardSkeleton.displayName = 'ClinicCardSkeleton';
+
+// Loading skeleton for search header
+const SearchHeaderSkeleton = React.memo(() => (
+  <View style={styles.controlsContainer}>
+    <View style={[styles.skeletonLine, styles.skeletonInstruction]} />
+    <View style={[styles.searchInputContainer, styles.skeletonSearchInput]} />
+    <View style={styles.filterRow}>
+      <View style={[styles.skeletonLine, styles.skeletonFilterButton]} />
+      <View style={[styles.skeletonLine, styles.skeletonFilterButton]} />
+    </View>
+    <View style={styles.actionButtons}>
+      <View style={[styles.skeletonLine, styles.skeletonActionButton]} />
+    </View>
+  </View>
+));
+SearchHeaderSkeleton.displayName = 'SearchHeaderSkeleton';
 
 // --- Main Screen ---
 
@@ -410,10 +525,10 @@ export function ClinicFinderScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ClinicFinderStackParamList> & DrawerNavigationProp<DrawerParamList>>();
   const [filters, setFilters] = useState<Filters>({});
   const [searchText, setSearchText] = useState('');
-  const debouncedSearchText = useDebounce(searchText, 500);
+  const debouncedSearchText = useDebounce(searchText, SEARCH_DEBOUNCE_MS);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [selectedClinic, setSelectedClinic] = useState<Clinic | null>(null);
-  const [radius, setRadius] = useState<number>(10); // Default radius in km
+  const [radius, setRadius] = useState<number>(DEFAULT_SEARCH_RADIUS_KM); // Default radius in km
   const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number} | null>(null);
   const [directions, setDirections] = useState<any>(null);
   const [isNavigationActive, setIsNavigationActive] = useState(false);
@@ -503,8 +618,8 @@ export function ClinicFinderScreen() {
       locationSubscription.current = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.BestForNavigation,
-          timeInterval: 1000,
-          distanceInterval: 10,
+          timeInterval: LOCATION_UPDATE_INTERVAL_MS,
+          distanceInterval: LOCATION_DISTANCE_THRESHOLD_M,
         },
         (location) => {
           setCurrentUserPosition(location.coords);
@@ -549,8 +664,8 @@ export function ClinicFinderScreen() {
 
     const distanceToNextStep = getDistance(currentUserPosition, nextStep.start_location);
 
-    if (distanceToNextStep < 20) {
-      setCurrentStepIndex(prev => prev + 1);
+    if (distanceToNextStep < NAVIGATION_STEP_PROXIMITY_M) {
+      setCurrentStepIndex((prev: number) => prev + 1);
     }
 
   }, [currentUserPosition, directionSteps, currentStepIndex, isNavigationActive]);
@@ -567,18 +682,7 @@ export function ClinicFinderScreen() {
     queryKey: ['clinics', { lat: filters.lat, lon: filters.lon, radius: filters.radius }],
     queryFn: () => {
       if (isLocationSearch) {
-        return searchClinicsForFinder(filters).then(clinics => {
-            // This logic is needed here now since we cannot modify api.ts
-            return clinics.map((clinic: any) => {
-                if (clinic.location && typeof clinic.location === 'string') {
-                    const match = clinic.location.match(/POINT\\(([-\\d.]+) ([-\\d.]+)\\)/);
-                    if (match) {
-                        return { ...clinic, longitude: parseFloat(match[1]), latitude: parseFloat(match[2]) };
-                    }
-                }
-                return clinic;
-            });
-        });
+        return searchClinicsForFinder(filters);
       }
       return getPublicClinics();
     },
@@ -599,7 +703,7 @@ export function ClinicFinderScreen() {
       const currentHour = new Date().getHours();
       // Basic business hours filter (8 AM - 6 PM)
       // This can be enhanced when actual operating hours data is available
-      const isBusinessHours = currentHour >= 8 && currentHour < 18;
+      const isBusinessHours = currentHour >= BUSINESS_HOURS_START && currentHour < BUSINESS_HOURS_END;
       if (isBusinessHours) {
         // For now, show all clinics during business hours
         // In a real implementation, this would check actual operating hours
@@ -655,7 +759,7 @@ export function ClinicFinderScreen() {
   const clearFilters = () => {
       setFilters({});
       setSearchText('');
-      setRadius(10);
+      setRadius(DEFAULT_SEARCH_RADIUS_KM);
       setOpenNow(false);
       setShowFilters(false);
       setSelectedClinic(null);
@@ -700,16 +804,24 @@ export function ClinicFinderScreen() {
 
   const handleToggleOpenNow = useCallback((value: boolean) => {
     setOpenNow(value);
-    setFilters(prev => ({ ...prev, openNow: value }));
+    setFilters((prev: Filters) => ({ ...prev, openNow: value }));
   }, []);
 
   const handleToggleFilters = useCallback(() => {
-    setShowFilters(prev => !prev);
+    setShowFilters((prev: boolean) => !prev);
   }, []);
 
   const handleRegionChange = useCallback((region: any) => {
     setMapRegion(region);
   }, []);
+
+  // Throttled version for clustering to improve performance
+  const handleRegionChangeThrottled = useCallback(
+    throttle((region: any) => {
+      setMapRegion(region);
+    }, REGION_CHANGE_THROTTLE_MS), // Only update clustering every 300ms
+    []
+  );
 
   const handleClusterPress = useCallback((clusteredClinics: Clinic[]) => {
     // Zoom to show all clinics in cluster
@@ -814,7 +926,7 @@ export function ClinicFinderScreen() {
                       style={[styles.radiusChip, radius === r && styles.radiusChipSelected]}
                       onPress={() => {
                         setRadius(r);
-                        setFilters(prev => ({...prev, radius: r * 1000}));
+                        setFilters((prev: Filters) => ({...prev, radius: r * 1000}));
                       }}
                     >
                       <Text style={[styles.radiusChipText, radius === r && styles.radiusChipTextSelected]}>
@@ -932,7 +1044,7 @@ export function ClinicFinderScreen() {
         initialRegion={DEFAULT_REGION}
         showsUserLocation
         showsMyLocationButton={false}
-        onRegionChangeComplete={handleRegionChange}
+        onRegionChangeComplete={handleRegionChangeThrottled}
       >
           {mapClusters.map((cluster, index) => (
             <Marker
@@ -1042,9 +1154,22 @@ export function ClinicFinderScreen() {
               data={filteredClinics}
               keyExtractor={(item) => item.id}
               renderItem={renderItem}
-              ListHeaderComponent={renderSearchHeader}
-              ListEmptyComponent={!isLoading ? <EmptyState /> : null}
+              ListHeaderComponent={isLoading ? <SearchHeaderSkeleton /> : renderSearchHeader}
+              ListEmptyComponent={
+                isLoading ? (
+                  <View>
+                    {Array.from({ length: 3 }, (_, index) => (
+                      <ClinicCardSkeleton key={`skeleton-${index}`} />
+                    ))}
+                  </View>
+                ) : (
+                  <EmptyState />
+                )
+              }
               contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+              onRefresh={() => clinicsQuery.refetch()}
+              refreshing={clinicsQuery.isFetching && !isLoading}
             />
           )}
         </Animated.View>
@@ -1637,6 +1762,55 @@ const styles = StyleSheet.create({
   },
   buttonFlex: {
     flex: 1,
+  },
+  skeletonCard: {
+    backgroundColor: theme.colors.muted,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
+    marginHorizontal: theme.spacing.lg,
+    marginVertical: theme.spacing.xs,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  skeletonLine: {
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: theme.colors.border,
+  },
+  skeletonTitle: {
+    width: '80%',
+    marginBottom: theme.spacing.sm,
+  },
+  skeletonAddress: {
+    width: '60%',
+    marginBottom: theme.spacing.sm,
+  },
+  skeletonDistance: {
+    width: '40%',
+  },
+  skeletonInstruction: {
+    width: '70%',
+    marginBottom: theme.spacing.md,
+    alignSelf: 'center',
+  },
+  skeletonSearchInput: {
+    backgroundColor: theme.colors.muted,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.md,
+  },
+  skeletonFilterButton: {
+    width: 100,
+    height: 30,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.muted,
+    marginRight: theme.spacing.sm,
+  },
+  skeletonActionButton: {
+    width: '100%',
+    height: 44,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.muted,
   },
 });
 
