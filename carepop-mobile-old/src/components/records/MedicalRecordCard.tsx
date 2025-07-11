@@ -29,11 +29,11 @@ const MedicalRecordCard: React.FC<MedicalRecordCardProps> = ({ record, onPress }
       <View style={styles.detailsContainer}>
         <View style={styles.detailRow}>
           <Stethoscope size={16} color={theme.colors.secondary} />
-          <Text style={styles.detailText}>{appointment?.doctor?.fullName || 'N/A'}</Text>
+          <Text style={styles.detailText}>{appointment?.doctor?.fullName || 'Provider information not available'}</Text>
         </View>
         <View style={styles.detailRow}>
           <Building size={16} color={theme.colors.secondary} />
-          <Text style={styles.detailText}>{appointment?.clinic?.name || 'N/A'}</Text>
+          <Text style={styles.detailText}>{appointment?.clinic?.name || 'Clinic information not available'}</Text>
         </View>
         <View style={styles.detailRow}>
           <Calendar size={16} color={theme.colors.secondary} />

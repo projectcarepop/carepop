@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import {
   ActivityIndicator,
+  Alert,
+  Linking,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -14,6 +16,7 @@ import {
   ArrowLeft,
   Building,
   Calendar,
+  Download,
   FileText,
   HeartPulse,
   Pill,
@@ -21,53 +24,92 @@ import {
   User,
 } from 'lucide-react-native';
 import { format, isValid, parse } from 'date-fns';
-import React from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 
 import { Button } from '../components/button.native';
 import { theme } from '../components/theme';
-import { DetailedMedicalRecord } from '../lib/types';
-import { getMedicalRecordDetails } from '../services/api';
+import { MedicalRecordWithRelations } from '../lib/types';
+import { getMedicalRecordDetails, downloadMedicalDocument } from '../services/api';
 import { RecordsStackParamList } from '../navigation/AppDrawerNavigator';
 import { Card } from '../components/card.native';
 
 type RecordDetailScreenRouteProp = RouteProp<RecordsStackParamList, 'RecordDetail'>;
 
-const DetailRow = ({ icon: Icon, label, value }: any) => (
+const formatDate = (dateString: string): string => {
+  const date = parse(dateString, "yyyy-MM-dd HH:mm:ss+00", new Date());
+  return isValid(date) ? format(date, 'MMMM dd, yyyy @ p') : 'Invalid Date';
+};
+
+const formatRecordTypeLabel = (type: string): string => {
+  return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+};
+
+// === OPTIMIZED COMPONENTS ===
+const DetailRow = React.memo(({ icon: Icon, label, value }: any) => (
   <View style={styles.detailRow}>
     <Icon size={16} color={theme.colors.secondary} style={styles.icon} />
     <Text style={styles.label}>{label}</Text>
     <Text style={styles.value}>{value}</Text>
   </View>
-);
+));
+DetailRow.displayName = 'DetailRow';
 
-const Section = ({ title, children }: any) => (
+const Section = React.memo(({ title, children }: any) => (
   <Card style={styles.sectionCard}>
     <Text style={styles.sectionTitle}>{title}</Text>
     {children}
   </Card>
-);
+));
+Section.displayName = 'Section';
 
-const renderRecordDetails = (record: DetailedMedicalRecord) => {
+const renderRecordDetails = (record: MedicalRecordWithRelations, onDownload: (record: MedicalRecordWithRelations) => void, downloading: boolean) => {
   const { details, recordType } = record;
   if (!details) return <Text style={styles.value}>No additional details provided.</Text>;
 
   switch (recordType) {
     case 'DOCTOR_NOTE':
       return (
-        <Text style={styles.value}>{details.note || 'No note content available.'}</Text>
+        <Text style={styles.value}>{(details as any)?.note || 'No note content available.'}</Text>
       );
     case 'PRESCRIPTION':
+      const prescriptionDetails = details as any;
       return (
         <>
-          <DetailRow icon={Pill} label="Medication" value={details.medicationName || 'N/A'} />
-          <DetailRow icon={Pill} label="Dosage" value={details.dosage || 'N/A'} />
-          <DetailRow icon={Pill} label="Frequency" value={details.frequency || 'N/A'} />
-          <DetailRow icon={FileText} label="Instructions" value={details.instructions || 'N/A'} />
+          <DetailRow icon={Pill} label="Medication" value={prescriptionDetails?.medicationName || prescriptionDetails?.medication || 'N/A'} />
+          <DetailRow icon={Pill} label="Dosage" value={prescriptionDetails?.dosage || 'N/A'} />
+          <DetailRow icon={Pill} label="Frequency" value={prescriptionDetails?.frequency || 'N/A'} />
+          <DetailRow icon={FileText} label="Instructions" value={prescriptionDetails?.instructions || prescriptionDetails?.notes || 'N/A'} />
         </>
       );
     case 'CLINICAL_DOCUMENT':
+      const documentDetails = details as any;
       return (
-        <DetailRow icon={FileText} label="Document Name" value={details.documentName || 'N/A'} />
+        <View>
+          <DetailRow icon={FileText} label="Document Name" value={documentDetails?.documentName || 'N/A'} />
+          {documentDetails?.documentName && (
+            <View style={styles.downloadContainer}>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onPress={() => onDownload(record)}
+                disabled={downloading}
+                style={[styles.downloadButton, downloading && styles.downloadButtonDisabled]}
+              >
+                {downloading ? (
+                  <>
+                    <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginRight: theme.spacing.xs }} />
+                    <Text style={styles.downloadButtonText}>Downloading...</Text>
+                  </>
+                ) : (
+                  <>
+                    <Download size={16} color={theme.colors.primary} style={{ marginRight: theme.spacing.xs }} />
+                    <Text style={styles.downloadButtonText}>Download</Text>
+                  </>
+                )}
+              </Button>
+            </View>
+          )}
+        </View>
       );
     default:
       return <Text style={styles.value}>This record type has no specific details view.</Text>;
@@ -78,13 +120,66 @@ export const RecordDetailScreen = () => {
   const route = useRoute<RecordDetailScreenRouteProp>();
   const navigation = useNavigation();
   const { recordId } = route.params;
+  const [isDownloading, setIsDownloading] = useState(false);
 
-  const { data, isLoading, isError, error, refetch } = useQuery<DetailedMedicalRecord, Error>({
+  // === DATA FETCHING ===
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['medicalRecordDetails', recordId],
     queryFn: () => getMedicalRecordDetails(recordId),
     enabled: !!recordId,
   });
 
+  // Debug logging
+  useEffect(() => {
+    if (data) {
+      console.log('🔍 [RecordDetailScreen] Received data:', JSON.stringify(data, null, 2));
+      console.log('🔍 [RecordDetailScreen] Doctor:', data.appointment?.doctor);
+      console.log('🔍 [RecordDetailScreen] Clinic:', data.appointment?.clinic);
+      console.log('🔍 [RecordDetailScreen] Service:', data.appointment?.service);
+    }
+  }, [data]);
+
+  // === OPTIMIZED EVENT HANDLERS ===
+  const handleGoBack = useCallback(() => {
+    navigation.goBack();
+  }, [navigation]);
+
+  const handleRetry = useCallback(() => {
+    refetch();
+  }, [refetch]);
+
+  const handleDownload = useCallback(async (record: MedicalRecordWithRelations) => {
+    if (isDownloading) return;
+
+    setIsDownloading(true);
+    try {
+      const response = await downloadMedicalDocument(record.id);
+      
+      // Use Linking to open the download URL
+      const supported = await Linking.canOpenURL(response.downloadUrl);
+      if (supported) {
+        await Linking.openURL(response.downloadUrl);
+      } else {
+        Alert.alert('Error', 'Cannot open download link. Please try again.');
+      }
+    } catch (error) {
+      console.error('Download failed:', error);
+      Alert.alert(
+        'Download Failed', 
+        error instanceof Error ? error.message : 'Failed to download document. Please try again.'
+      );
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [isDownloading]);
+
+  // === OPTIMIZED DERIVED STATE ===
+  const appointmentDate = useMemo(() => {
+    if (!data?.appointment?.appointmentTime) return null;
+    return parse(data.appointment.appointmentTime, "yyyy-MM-dd HH:mm:ss+00", new Date());
+  }, [data?.appointment?.appointmentTime]);
+
+  // === LOADING STATE ===
   if (isLoading) {
     return (
       <View style={[styles.container, styles.centered]}>
@@ -93,13 +188,14 @@ export const RecordDetailScreen = () => {
     );
   }
 
+  // === ERROR STATE ===
   if (isError) {
     return (
       <View style={[styles.container, styles.centered]}>
         <AlertCircle size={48} color={theme.colors.destructive} />
         <Text style={styles.errorText}>Failed to load record details.</Text>
         <Text style={styles.errorSubText}>{error?.message}</Text>
-        <Button onPress={() => refetch()} variant="outline" style={{ marginTop: 20 }}>
+        <Button onPress={handleRetry} variant="outline" style={{ marginTop: 20 }}>
           Try Again
         </Button>
       </View>
@@ -108,12 +204,11 @@ export const RecordDetailScreen = () => {
 
   if (!data) return null;
 
-  const appointmentDate = parse(data.appointment.appointmentTime, "yyyy-MM-dd HH:mm:ss+00", new Date());
-
+  // === MAIN RENDER ===
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
           <ArrowLeft size={24} color={theme.colors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Record Details</Text>
@@ -123,15 +218,15 @@ export const RecordDetailScreen = () => {
           <DetailRow
             icon={Calendar}
             label="Date"
-            value={isValid(appointmentDate) ? format(appointmentDate, 'MMMM dd, yyyy @ p') : 'Invalid Date'}
+            value={appointmentDate && isValid(appointmentDate) ? format(appointmentDate, 'MMMM dd, yyyy @ p') : 'Invalid Date'}
           />
-          <DetailRow icon={Stethoscope} label="Provider" value={data.doctor.fullName} />
-          <DetailRow icon={Building} label="Clinic" value={data.clinic.name} />
-          <DetailRow icon={HeartPulse} label="Service" value={data.service.name} />
+          <DetailRow icon={Stethoscope} label="Provider" value={data.appointment?.doctor?.fullName || 'Provider information not available'} />
+          <DetailRow icon={Building} label="Clinic" value={data.appointment?.clinic?.name || 'Clinic information not available'} />
+          <DetailRow icon={HeartPulse} label="Service" value={data.appointment?.service?.name || 'Service information not available'} />
         </Section>
         
         <Section title="Clinical Notes">
-          {renderRecordDetails(data)}
+          {renderRecordDetails(data, handleDownload, isDownloading)}
         </Section>
       </ScrollView>
     </SafeAreaView>
@@ -211,5 +306,27 @@ const styles = StyleSheet.create({
     color: theme.colors.mutedForeground,
     marginTop: theme.spacing.sm,
     textAlign: 'center',
+  },
+  downloadContainer: {
+    marginTop: theme.spacing.md,
+    alignItems: 'flex-end',
+  },
+  downloadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    borderColor: theme.colors.primary,
+    borderWidth: 1,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+  },
+  downloadButtonDisabled: {
+    opacity: 0.6,
+  },
+  downloadButtonText: {
+    color: theme.colors.primary,
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamilyMedium,
   },
 }); 

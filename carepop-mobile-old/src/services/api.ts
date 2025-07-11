@@ -3,7 +3,9 @@ import { supabase } from "../lib/supabaseClient"; // FIX 1: Correct the import p
 import type {
   Clinic,
   DetailedAppointment,
+  DetailedMedicalRecord,
   MedicalRecord,
+  MedicalRecordWithRelations,
   Profile,
   UpdateProfileApiPayload,
   AvailabilitySlot,
@@ -217,6 +219,24 @@ export async function updateMyProfile(
 export const getMyMedicalRecords = async (): Promise<MedicalRecord[]> => {
   const response = await apiFetch<{ records: MedicalRecord[] }>('/api/me/records');
   return response?.records ?? [];
+};
+
+/**
+ * Retrieves the details of a specific medical record for the currently authenticated user.
+ * @param recordId The ID of the medical record to fetch.
+ * @returns A promise that resolves to the medical record with relations.
+ */
+export const getMedicalRecordDetails = async (recordId: string): Promise<MedicalRecordWithRelations> => {
+  return apiFetch<MedicalRecordWithRelations>(`/api/me/records/${recordId}`);
+};
+
+/**
+ * Generates a download link for a medical document.
+ * @param recordId The ID of the medical record containing the document.
+ * @returns A promise that resolves to download information.
+ */
+export const downloadMedicalDocument = async (recordId: string): Promise<{ downloadUrl: string; fileName: string }> => {
+  return apiFetch<{ downloadUrl: string; fileName: string }>(`/api/me/records/${recordId}/download`);
 };
 
 // ============================================================================

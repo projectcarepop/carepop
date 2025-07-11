@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { FileSearch, ServerCrash } from 'lucide-react-native';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -30,11 +30,28 @@ const FILTER_OPTIONS: { label: string; value: MedicalRecordType | 'all' }[] = [
   { label: 'Lab Results & Documents', value: 'CLINICAL_DOCUMENT' },
 ];
 
+// === HELPER FUNCTIONS ===
+const filterRecordsByType = (records: MedicalRecordWithRelations[] | undefined, filter: MedicalRecordType | 'all'): MedicalRecordWithRelations[] => {
+  if (!records) return [];
+  if (filter === 'all') return records;
+  return records.filter(record => record.recordType === filter);
+};
+
+const formatRecordType = (type: MedicalRecordType): string => {
+  return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+};
+
+const getEmptyStateMessage = (filter: MedicalRecordType | 'all'): string => {
+  if (filter === 'all') return "You have no medical records yet.";
+  return `You have no ${formatRecordType(filter).toLowerCase()} records yet.`;
+};
+
 const MyMedicalRecordsScreen = () => {
   const navigation = useNavigation<NavigationProps>();
   const { authStatus } = useAuth();
   const [filter, setFilter] = useState<MedicalRecordType | 'all'>('all');
 
+  // === DATA FETCHING ===
   const {
     data: records,
     isLoading,
@@ -42,37 +59,51 @@ const MyMedicalRecordsScreen = () => {
     error,
     refetch,
     isRefetching,
-  } = useQuery<MedicalRecordWithRelations[], Error>({
+  } = useQuery({
     queryKey: ['myMedicalRecords'],
     queryFn: getMyMedicalRecords,
     enabled: authStatus === 'authenticated',
+    select: (data: any) => data as MedicalRecordWithRelations[], // Type assertion for API response
   });
 
-  const filteredRecords = useMemo(() => {
-    if (!records) return [];
-    if (filter === 'all') {
-      return records;
-    }
-    return records.filter(record => record.recordType === filter);
-  }, [records, filter]);
-
-  const handleViewDetails = (recordId: string) => {
-    // This assumes that a 'RecordDetail' screen is available in the navigation stack.
-    // If 'Records' is part of another stack (like a RecordsStack), this will work.
-    // If not, the navigator needs to be adjusted.
-    // @ts-ignore - TS doesn't know about RecordDetail in the DrawerParamList, which is correct.
-    // We are relying on a parent navigator to handle this.
-    navigation.navigate('RecordDetail', { recordId });
-  };
-
-  const EmptyState = () => (
-    <View style={styles.emptyStateContainer}>
-      <FileSearch size={48} color={theme.colors.mutedForeground} />
-      <Text style={styles.emptyStateMessage}>You have no medical records yet.</Text>
-    </View>
+  // === OPTIMIZED DERIVED STATE ===
+  const filteredRecords = useMemo(() => 
+    filterRecordsByType(records, filter), 
+    [records, filter]
   );
 
-  const ListHeader = () => (
+  // === OPTIMIZED EVENT HANDLERS ===
+  const handleViewDetails = useCallback((recordId: string) => {
+    // @ts-ignore - TS doesn't know about RecordDetail in the DrawerParamList
+    navigation.navigate('RecordDetail', { recordId });
+  }, [navigation]);
+
+  const handleFilterChange = useCallback((value: MedicalRecordType | 'all') => {
+    setFilter(value);
+  }, []);
+
+  // === OPTIMIZED COMPONENTS ===
+  const renderRecord = useCallback(({ item }: { item: MedicalRecordWithRelations }) => (
+    <View style={{ paddingHorizontal: theme.spacing.lg, marginBottom: theme.spacing.md }}>
+      <MedicalRecordCard 
+        record={item} 
+        onPress={() => handleViewDetails(item.id)} 
+      />
+    </View>
+  ), [handleViewDetails]);
+
+  const EmptyState = useCallback(() => {
+    const message = getEmptyStateMessage(filter);
+    
+    return (
+      <View style={styles.emptyStateContainer}>
+        <FileSearch size={48} color={theme.colors.mutedForeground} />
+        <Text style={styles.emptyStateMessage}>{message}</Text>
+      </View>
+    );
+  }, [filter]);
+
+  const ListHeader = useCallback(() => (
     <View style={styles.headerContainer}>
       <Text style={styles.headerTitle}>My Medical Records</Text>
       <Text style={styles.headerDescription}>
@@ -83,12 +114,13 @@ const MyMedicalRecordsScreen = () => {
           label="Filter by Type"
           options={FILTER_OPTIONS}
           selectedValue={filter}
-          onValueChange={(value) => setFilter(value as MedicalRecordType | 'all')}
+          onValueChange={handleFilterChange}
         />
       </View>
     </View>
-  );
+  ), [filter, handleFilterChange]);
 
+  // === LOADING STATE ===
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -100,6 +132,7 @@ const MyMedicalRecordsScreen = () => {
     );
   }
 
+  // === ERROR STATE ===
   if (isError) {
     return (
       <SafeAreaView style={styles.container}>
@@ -116,20 +149,21 @@ const MyMedicalRecordsScreen = () => {
     );
   }
 
+  // === MAIN RENDER ===
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
         data={filteredRecords}
-        renderItem={({ item }) => (
-          <View style={{ paddingHorizontal: theme.spacing.lg, marginBottom: theme.spacing.md }}>
-            <MedicalRecordCard record={item} onPress={() => handleViewDetails(item.id)} />
-          </View>
-        )}
+        renderItem={renderRecord}
         keyExtractor={item => item.id}
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={EmptyState}
         contentContainerStyle={{ flexGrow: 1, paddingTop: 0 }}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
+        removeClippedSubviews={true}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={10}
       />
     </SafeAreaView>
   );

@@ -128,14 +128,22 @@ export type AppointmentWithRelations = Appointment & {
 // This is the shape returned by the GET /api/me/records endpoint
 export type MedicalRecordWithRelations = {
   id: string;
+  appointmentId: string;
   recordType: MedicalRecordType;
   createdAt: string;
+  details: any; // JSONB details for the record
   appointment: {
     id: string;
     appointmentTime: string;
-    doctor: Pick<Doctor, 'fullName'> | null;
-    clinic: Pick<Clinic, 'name'> | null;
-    service: Pick<Service, 'name'> | null;
+    doctor: {
+      fullName: string | null;
+    } | null;
+    clinic: {
+      name: string | null;
+    } | null;
+    service: {
+      name: string | null;
+    } | null;
   };
 };
 
