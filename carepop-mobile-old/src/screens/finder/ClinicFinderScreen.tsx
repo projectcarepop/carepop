@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import * as Location from 'expo-location';
-import { MapPin, Search, X, RotateCw, Crosshair, ArrowLeft, Navigation, Menu, Filter, Clock } from 'lucide-react-native';
+import { MapPin, Search, X, RotateCw, Crosshair, ArrowLeft, Navigation, Menu, Filter, Clock, Heart, Zap, Stethoscope, Plus, ZoomIn, ZoomOut, Layers } from 'lucide-react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import { GestureHandlerRootView, PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
@@ -84,6 +84,257 @@ type Filters = {
 const RADIUS_OPTIONS_KM = [5, 10, 25, 50];
 
 // === HELPER FUNCTIONS ===
+
+// Determine clinic type based on name and services
+const getClinicType = (clinic: Clinic): 'emergency' | 'dental' | 'specialized' | 'general' => {
+  const name = clinic.name.toLowerCase();
+  const services = (clinic.services || []).map(s => s.name.toLowerCase()).join(' ');
+  
+  // Emergency/Urgent care
+  if (name.includes('emergency') || name.includes('urgent') || name.includes('24') || 
+      services.includes('emergency') || services.includes('urgent')) {
+    return 'emergency';
+  }
+  
+  // Dental
+  if (name.includes('dental') || name.includes('dentist') || 
+      services.includes('dental') || services.includes('tooth') || services.includes('oral')) {
+    return 'dental';
+  }
+  
+  // Specialized (cardiology, dermatology, etc.)
+  if (name.includes('cardio') || name.includes('dermato') || name.includes('neuro') ||
+      name.includes('specialist') || name.includes('specialty') ||
+      services.includes('cardio') || services.includes('dermato') || services.includes('specialist')) {
+    return 'specialized';
+  }
+  
+  return 'general';
+};
+
+// Custom marker component with map pin shape and label
+const ClinicMarker = React.memo(({ clinic, isSelected }: { clinic: Clinic; isSelected: boolean }) => {
+  const clinicType = getClinicType(clinic);
+  
+  const getMarkerConfig = () => {
+    const size = isSelected ? 48 : 40;
+    const iconSize = isSelected ? 24 : 20;
+
+    switch (clinicType) {
+      case 'emergency':
+        return {
+          color: '#ef4444', // Red
+          icon: <Zap size={iconSize} color="white" />,
+          label: clinic.name,
+          size,
+        };
+      case 'dental':
+        return {
+          color: '#06b6d4', // Cyan
+          icon: <Plus size={iconSize} color="white" />,
+          label: clinic.name,
+          size,
+        };
+      case 'specialized':
+        return {
+          color: '#8b5cf6', // Purple
+          icon: <Heart size={iconSize} color="white" />,
+          label: clinic.name,
+          size,
+        };
+      default:
+        return {
+          color: isSelected ? theme.colors.primary : '#10b981', // Green
+          icon: <Stethoscope size={iconSize} color="white" />,
+          label: clinic.name,
+          size,
+        };
+    }
+  };
+
+  const { color, icon, label, size } = getMarkerConfig();
+
+  return (
+    <View style={styles.markerContainer}>
+      {/* Clinic Name Label */}
+      <View style={[styles.markerLabel, isSelected && styles.markerLabelSelected]}>
+        <Text style={[styles.markerLabelText, isSelected && styles.markerLabelTextSelected]}>
+          {label}
+        </Text>
+      </View>
+      
+      {/* Map Pin Shape */}
+      <View style={styles.markerWrapper}>
+        <View style={[
+          styles.markerPin,
+          {
+            width: size,
+            height: size,
+            backgroundColor: color,
+            borderRadius: size / 2,
+          },
+          isSelected && styles.markerPinSelected
+        ]}>
+          {icon}
+        </View>
+        
+        {/* Pointed Bottom */}
+        <View style={[
+          styles.markerPoint,
+          { 
+            borderLeftWidth: size * 0.25,
+            borderRightWidth: size * 0.25,
+            borderTopWidth: size * 0.3,
+            borderTopColor: color,
+          },
+          isSelected && styles.markerPointSelected
+        ]} />
+      </View>
+    </View>
+  );
+});
+ClinicMarker.displayName = 'ClinicMarker';
+
+// Clustering logic
+const CLUSTER_DISTANCE = 0.01; // Degrees (roughly 1km)
+
+const createClusters = (clinics: Clinic[], region: any) => {
+  const shouldCluster = region.latitudeDelta > 0.05; // Cluster when zoomed out
+  
+  if (!shouldCluster || clinics.length <= 5) {
+    return clinics.map(clinic => ({ 
+      type: 'single' as const, 
+      clinic, 
+      count: 1, 
+      latitude: clinic.latitude, 
+      longitude: clinic.longitude 
+    }));
+  }
+
+  const clusters: Array<{ type: 'cluster' | 'single', clinic?: Clinic, clinics?: Clinic[], count: number, latitude: number, longitude: number }> = [];
+  const processed = new Set<string>();
+
+  clinics.forEach(clinic => {
+    if (processed.has(clinic.id)) return;
+
+    const nearby = clinics.filter(other => {
+      if (processed.has(other.id) || other.id === clinic.id) return false;
+      const distance = Math.sqrt(
+        Math.pow(clinic.latitude - other.latitude, 2) + 
+        Math.pow(clinic.longitude - other.longitude, 2)
+      );
+      return distance < CLUSTER_DISTANCE;
+    });
+
+    if (nearby.length >= 2) {
+      // Create cluster
+      const allClinics = [clinic, ...nearby];
+      const avgLat = allClinics.reduce((sum, c) => sum + c.latitude, 0) / allClinics.length;
+      const avgLng = allClinics.reduce((sum, c) => sum + c.longitude, 0) / allClinics.length;
+      
+      clusters.push({
+        type: 'cluster',
+        clinics: allClinics,
+        count: allClinics.length,
+        latitude: avgLat,
+        longitude: avgLng,
+      });
+
+      allClinics.forEach(c => processed.add(c.id));
+    } else {
+      // Single clinic
+      processed.add(clinic.id);
+      clusters.push({
+        type: 'single',
+        clinic,
+        count: 1,
+        latitude: clinic.latitude,
+        longitude: clinic.longitude,
+      });
+    }
+  });
+
+  return clusters;
+};
+
+// Cluster marker component with pin shape
+const ClusterMarker = React.memo(({ count, onPress }: { count: number; onPress: () => void }) => (
+  <View style={styles.clusterContainer}>
+    {/* Cluster Count Label */}
+    <View style={styles.clusterLabel}>
+      <Text style={styles.clusterLabelText}>{count} clinics</Text>
+    </View>
+    
+    {/* Cluster Pin */}
+    <TouchableOpacity onPress={onPress} style={styles.clusterMarker}>
+      <Text style={styles.clusterText}>{count}</Text>
+    </TouchableOpacity>
+    
+    {/* Cluster Point */}
+    <View style={styles.clusterPoint} />
+  </View>
+));
+ClusterMarker.displayName = 'ClusterMarker';
+
+// Map legend component
+const MapLegend = React.memo(() => (
+  <View style={styles.mapLegend}>
+    <Text style={styles.legendTitle}>Clinic Types</Text>
+    <View style={styles.legendItems}>
+      <View style={styles.legendItem}>
+        <View style={[styles.legendIcon, { backgroundColor: '#10b981' }]}>
+          <Stethoscope size={12} color="white" />
+        </View>
+        <Text style={styles.legendText}>General</Text>
+      </View>
+      <View style={styles.legendItem}>
+        <View style={[styles.legendIcon, { backgroundColor: '#ef4444' }]}>
+          <Zap size={12} color="white" />
+        </View>
+        <Text style={styles.legendText}>Emergency</Text>
+      </View>
+      <View style={styles.legendItem}>
+        <View style={[styles.legendIcon, { backgroundColor: '#06b6d4' }]}>
+          <Plus size={12} color="white" />
+        </View>
+        <Text style={styles.legendText}>Dental</Text>
+      </View>
+      <View style={styles.legendItem}>
+        <View style={[styles.legendIcon, { backgroundColor: '#8b5cf6' }]}>
+          <Heart size={12} color="white" />
+        </View>
+        <Text style={styles.legendText}>Specialist</Text>
+      </View>
+    </View>
+  </View>
+));
+MapLegend.displayName = 'MapLegend';
+
+// Enhanced map controls component
+const MapControls = React.memo(({ 
+  onZoomIn, 
+  onZoomOut, 
+  onToggleMapType, 
+  mapType 
+}: { 
+  onZoomIn: () => void; 
+  onZoomOut: () => void; 
+  onToggleMapType: () => void; 
+  mapType: 'standard' | 'satellite';
+}) => (
+  <View style={styles.mapControls}>
+    <TouchableOpacity style={styles.mapControlButton} onPress={onZoomIn}>
+      <ZoomIn size={20} color={theme.colors.foreground} />
+    </TouchableOpacity>
+    <TouchableOpacity style={styles.mapControlButton} onPress={onZoomOut}>
+      <ZoomOut size={20} color={theme.colors.foreground} />
+    </TouchableOpacity>
+    <TouchableOpacity style={styles.mapControlButton} onPress={onToggleMapType}>
+      <Layers size={20} color={mapType === 'satellite' ? theme.colors.primary : theme.colors.foreground} />
+    </TouchableOpacity>
+  </View>
+));
+MapControls.displayName = 'MapControls';
 const formatClinicAddress = (clinic: Clinic): string => {
   // Cast to any to access all possible address field variations
   const c = clinic as any;
@@ -171,6 +422,8 @@ export function ClinicFinderScreen() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [openNow, setOpenNow] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [mapRegion, setMapRegion] = useState(DEFAULT_REGION);
+  const [mapType, setMapType] = useState<'standard' | 'satellite'>('standard');
 
   const mapRef = useRef<MapView>(null);
   const flatListRef = useRef<FlatList<Clinic>>(null);
@@ -368,6 +621,11 @@ export function ClinicFinderScreen() {
     return clinics;
   }, [clinicsQuery.data, debouncedSearchText, openNow]);
 
+  // Create clusters for map display
+  const mapClusters = useMemo(() => {
+    return createClusters(filteredClinics, mapRegion);
+  }, [filteredClinics, mapRegion]);
+
   const isLoading = clinicsQuery.isLoading;
 
   const handleFindNearMe = async () => {
@@ -447,6 +705,49 @@ export function ClinicFinderScreen() {
 
   const handleToggleFilters = useCallback(() => {
     setShowFilters(prev => !prev);
+  }, []);
+
+  const handleRegionChange = useCallback((region: any) => {
+    setMapRegion(region);
+  }, []);
+
+  const handleClusterPress = useCallback((clusteredClinics: Clinic[]) => {
+    // Zoom to show all clinics in cluster
+    const minLat = Math.min(...clusteredClinics.map(c => c.latitude));
+    const maxLat = Math.max(...clusteredClinics.map(c => c.latitude));
+    const minLng = Math.min(...clusteredClinics.map(c => c.longitude));
+    const maxLng = Math.max(...clusteredClinics.map(c => c.longitude));
+    
+    const region = {
+      latitude: (minLat + maxLat) / 2,
+      longitude: (minLng + maxLng) / 2,
+      latitudeDelta: Math.max(maxLat - minLat, 0.02) * 1.2,
+      longitudeDelta: Math.max(maxLng - minLng, 0.02) * 1.2,
+    };
+
+    mapRef.current?.animateToRegion(region, 500);
+  }, []);
+
+  const handleZoomIn = useCallback(() => {
+    const newRegion = {
+      ...mapRegion,
+      latitudeDelta: mapRegion.latitudeDelta * 0.5,
+      longitudeDelta: mapRegion.longitudeDelta * 0.5,
+    };
+    mapRef.current?.animateToRegion(newRegion, 300);
+  }, [mapRegion]);
+
+  const handleZoomOut = useCallback(() => {
+    const newRegion = {
+      ...mapRegion,
+      latitudeDelta: Math.min(mapRegion.latitudeDelta * 2, 5),
+      longitudeDelta: Math.min(mapRegion.longitudeDelta * 2, 5),
+    };
+    mapRef.current?.animateToRegion(newRegion, 300);
+  }, [mapRegion]);
+
+  const handleToggleMapType = useCallback(() => {
+    setMapType(prev => prev === 'standard' ? 'satellite' : 'standard');
   }, []);
 
   const instructionText = useMemo(() => {
@@ -548,7 +849,7 @@ export function ClinicFinderScreen() {
             <Button 
               onPress={clearFilters} 
               variant="secondary" 
-              icon={<X size={16} color={theme.colors.secondary} />}
+              icon={<X size={18} color={theme.colors.destructive} />}
               style={styles.clearButton}
             >
               Clear
@@ -627,18 +928,37 @@ export function ClinicFinderScreen() {
         ref={mapRef}
         style={StyleSheet.absoluteFill}
         provider={PROVIDER_GOOGLE}
+        mapType={mapType}
         initialRegion={DEFAULT_REGION}
         showsUserLocation
         showsMyLocationButton={false}
+        onRegionChangeComplete={handleRegionChange}
       >
-          {filteredClinics.map((clinic) => (
-              <Marker
-                key={clinic.id}
-                coordinate={{ latitude: clinic.latitude, longitude: clinic.longitude }}
-                title={clinic.name}
-                onPress={() => onMarkerPress(clinic)}
-                pinColor={selectedClinic?.id === clinic.id ? theme.colors.primary : theme.colors.accent}
-              />
+          {mapClusters.map((cluster, index) => (
+            <Marker
+              key={cluster.type === 'single' ? cluster.clinic!.id : `cluster-${index}`}
+              coordinate={{ latitude: cluster.latitude, longitude: cluster.longitude }}
+              onPress={() => {
+                if (cluster.type === 'single') {
+                  onMarkerPress(cluster.clinic!);
+                } else {
+                  handleClusterPress(cluster.clinics!);
+                }
+              }}
+              anchor={{ x: 0.5, y: 1 }}
+            >
+              {cluster.type === 'single' ? (
+                <ClinicMarker 
+                  clinic={cluster.clinic!} 
+                  isSelected={selectedClinic?.id === cluster.clinic!.id}
+                />
+              ) : (
+                <ClusterMarker 
+                  count={cluster.count}
+                  onPress={() => handleClusterPress(cluster.clinics!)}
+                />
+              )}
+            </Marker>
           ))}
           {userLocation && (
               <Marker
@@ -698,6 +1018,17 @@ export function ClinicFinderScreen() {
         <TouchableOpacity style={styles.hamburgerButton} onPress={handleOpenDrawer}>
           <Menu size={24} color={theme.colors.foreground} />
         </TouchableOpacity>
+      )}
+
+      {!isNavigationActive && !selectedClinic && <MapLegend />}
+
+      {!isNavigationActive && (
+        <MapControls
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onToggleMapType={handleToggleMapType}
+          mapType={mapType}
+        />
       )}
 
       <PanGestureHandler onGestureEvent={gestureHandler}>
@@ -908,6 +1239,179 @@ const styles = StyleSheet.create({
     marginLeft: theme.spacing.sm,
     textAlign: 'center',
   },
+  clusterContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 150,
+    height: 80,
+  },
+  clusterLabel: {
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.radius.md,
+    marginBottom: theme.spacing.xs,
+  },
+  clusterLabelText: {
+    fontSize: 11,
+    lineHeight: 14,
+    color: 'white',
+    fontFamily: theme.typography.fontFamilyMedium,
+    textAlign: 'center',
+  },
+  clusterMarker: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+  },
+  clusterText: {
+    ...theme.typography.h4,
+    color: 'white',
+    fontFamily: theme.typography.fontFamilyBold,
+  },
+  clusterPoint: {
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 12,
+    borderRightWidth: 12,
+    borderTopWidth: 15,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: theme.colors.primary,
+    marginTop: -2,
+  },
+  mapLegend: {
+    position: 'absolute',
+    bottom: 140,
+    right: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    minWidth: 120,
+  },
+  legendTitle: {
+    ...theme.typography.small,
+    fontFamily: theme.typography.fontFamilyBold,
+    marginBottom: theme.spacing.sm,
+    textAlign: 'center',
+    color: theme.colors.foreground,
+  },
+  legendItems: {
+    gap: theme.spacing.xs,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+  },
+  legendIcon: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  legendText: {
+    ...theme.typography.small,
+    color: theme.colors.foreground,
+    flex: 1,
+  },
+  mapControls: {
+    position: 'absolute',
+    top: 110,
+    right: 20,
+    gap: theme.spacing.xs,
+  },
+  mapControlButton: {
+    backgroundColor: theme.colors.background,
+    padding: theme.spacing.sm,
+    borderRadius: theme.radius.md,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  markerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 200,
+    height: 80,
+  },
+  markerLabel: {
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.radius.md,
+    marginBottom: theme.spacing.xs,
+  },
+  markerLabelSelected: {
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    transform: [{ scale: 1.1 }],
+  },
+  markerLabelText: {
+    fontSize: 11,
+    lineHeight: 14,
+    color: 'white',
+    fontFamily: theme.typography.fontFamilyMedium,
+    textAlign: 'center',
+  },
+  markerLabelTextSelected: {
+    fontFamily: theme.typography.fontFamilyBold,
+  },
+  markerWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markerPin: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 5,
+  },
+  markerPinSelected: {
+    elevation: 12,
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    transform: [{ scale: 1.1 }],
+  },
+  markerPoint: {
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    marginTop: -2,
+  },
+  markerPointSelected: {
+    borderLeftWidth: 14,
+    borderRightWidth: 14,
+    borderTopWidth: 16,
+    marginTop: -3,
+  },
   filterButtons: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -974,7 +1478,7 @@ const styles = StyleSheet.create({
   },
   recenterButton: {
       position: 'absolute',
-      top: 60,
+      top: 50,
       right: 20,
       backgroundColor: theme.colors.background,
       padding: theme.spacing.md,
@@ -987,7 +1491,7 @@ const styles = StyleSheet.create({
   },
   hamburgerButton: {
       position: 'absolute',
-      top: 60,
+      top: 50,
       left: 20,
       backgroundColor: theme.colors.background,
       padding: theme.spacing.md,
@@ -1000,7 +1504,7 @@ const styles = StyleSheet.create({
   },
   cancelNavButton: {
     position: 'absolute',
-    top: 60,
+    top: 50,
     left: 20,
     backgroundColor: theme.colors.background,
     padding: theme.spacing.md,
@@ -1077,7 +1581,7 @@ const styles = StyleSheet.create({
   },
   instructionCard: {
     position: 'absolute',
-    top: 60,
+    top: 110,
     left: '10%',
     right: '10%',
     backgroundColor: 'rgba(0, 0, 0, 0.75)',
