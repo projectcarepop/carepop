@@ -1568,7 +1568,7 @@ adminRoutes.post(
       
       console.log(`[UPLOAD_DOC] Received data: appointmentId=${appointmentId}, documentName='${documentName}', fileName='${file.name}', fileSize=${file.size}`);
       
-      const supabaseAdmin = createClient(c.env.SUPABASE_URL!, c.env.SUPABASE_SERVICE_ROLE_KEY!);
+      const supabaseAdmin = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
       // Step 1: Upload to Supabase Storage
       const storagePath = `${appointmentId}/${Date.now()}-${file.name}`;
