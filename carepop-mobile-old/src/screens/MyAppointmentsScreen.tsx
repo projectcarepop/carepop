@@ -1,6 +1,6 @@
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isFuture, isPast } from 'date-fns';
+import { isFuture, isPast, differenceInHours } from 'date-fns';
 import { CalendarPlus, ServerCrash } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import {
@@ -109,7 +109,7 @@ const MyAppointmentsScreen: React.FC<MyAppointmentsScreenProps> = ({ navigation 
   const handleCancelAppointment = (appointmentId: string) => {
     Alert.alert(
       'Confirm Cancellation',
-      'Are you sure you want to cancel this appointment? This action cannot be undone.',
+      'Are you sure you want to cancel this appointment? This action cannot be undone.\n\nPlease note: Appointments can only be cancelled up to 36 hours in advance.',
       [
         { text: 'Back', style: 'cancel' },
         {

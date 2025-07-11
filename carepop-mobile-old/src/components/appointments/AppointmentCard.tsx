@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { format } from 'date-fns';
+import { format, differenceInHours } from 'date-fns';
 import { Calendar, Clock, Building } from 'lucide-react-native';
 import { theme } from '../theme';
 import { Card } from '../card.native';
@@ -23,6 +23,23 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, appointm
   const formattedDate = format(appointmentDate, 'eeee, MMMM dd');
   const formattedTime = format(appointmentDate, 'h:mm a');
   const statusText = displayStatus.replace(/_/g, ' ').replace('canceled by', 'cancelled by');
+
+  // Determine if appointment can be cancelled following web restrictions
+  const isCancellable = (() => {
+    // Only scheduled appointments can be cancelled
+    if (status !== 'scheduled') return false;
+    
+    // Past appointments cannot be cancelled
+    if (appointmentDate <= new Date()) return false;
+    
+    // Must be at least 36 hours in advance (following web rules)
+    try {
+      const hoursUntilAppointment = differenceInHours(appointmentDate, new Date());
+      return hoursUntilAppointment >= 36;
+    } catch {
+      return false; // If date calculation fails, disable cancellation
+    }
+  })();
 
   return (
     <Card style={styles.card}>
@@ -54,7 +71,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, appointm
           </View>
         </View>
         
-        {status === 'scheduled' && (
+        {isCancellable && (
           <View style={styles.actionsContainer}>
             <Button
               variant="destructive"

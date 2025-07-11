@@ -15,32 +15,27 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import { Calendar, DateData } from 'react-native-calendars';
-import { ChevronsRight, X, Calendar as CalendarIcon, Clock, Building, Stethoscope, MapPin, CheckCircle } from 'lucide-react-native';
+import { ChevronsRight, X, Calendar as CalendarIcon, Clock, Building, Stethoscope, MapPin, CheckCircle, User } from 'lucide-react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import {
-    startOfMonth,
-    endOfMonth,
     format,
-    isSameDay,
-    parseISO,
-    setHours,
-    setMinutes,
-    setSeconds,
-    addMinutes,
-    isBefore,
 } from 'date-fns';
 
 import {
   getPublicClinics,
   getPublicServices,
   getPublicServiceCategories,
-  getClinicBookedAppointments,
+  getProvidersForService,
+  getAvailableSlots,
+  getAvailableDays,
   createAppointment,
+  validateSlotAvailability,
   NewAppointmentPayload,
   ServiceCategory,
 } from '../services/api';
 import type {
   Clinic,
+  Doctor,
   ServiceWithCategory,
 } from '../lib/types';
 import { useDebounce } from '../hooks/useDebounce';
@@ -52,13 +47,14 @@ import { Button } from '../components/button.native';
 
 type BookingScreenNavigationProp = StackNavigationProp<DrawerParamList, 'Booking'>;
 
-type Step = 'clinic' | 'service' | 'datetime' | 'confirm';
+type Step = 'clinic' | 'service' | 'doctor' | 'datetime' | 'confirm';
 
 const STEPS = [
     { key: 'clinic' as Step, number: 1, title: 'Select a Clinic', description: 'Choose your preferred clinic location to begin.' },
     { key: 'service' as Step, number: 2, title: 'Select a Service', description: 'Pick a service available at the selected clinic.' },
-    { key: 'datetime' as Step, number: 3, title: 'Select Date & Time', description: 'Choose a date and time that works for you.' },
-    { key: 'confirm' as Step, number: 4, title: 'Confirm & Book', description: 'Review your selections and confirm your appointment.' },
+    { key: 'doctor' as Step, number: 3, title: 'Select a Doctor', description: 'Choose an available healthcare provider.' },
+    { key: 'datetime' as Step, number: 4, title: 'Select Date & Time', description: 'Choose a date and time that works for you.' },
+    { key: 'confirm' as Step, number: 5, title: 'Confirm & Book', description: 'Review your selections and confirm your appointment.' },
 ];
 
 const BookingScreen = () => {
@@ -69,6 +65,7 @@ const BookingScreen = () => {
   const [currentStep, setCurrentStep] = useState<Step>('clinic');
   const [selectedClinicId, setSelectedClinicId] = useState<string | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
+  const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -76,6 +73,7 @@ const BookingScreen = () => {
   const [isCategoryPickerVisible, setCategoryPickerVisible] = useState(false);
   const [isSuccessModalVisible, setSuccessModalVisible] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [lastRefresh, setLastRefresh] = useState(new Date());
 
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
@@ -98,39 +96,105 @@ const BookingScreen = () => {
     select: (data: any) => data.data || data,
   });
   
-  // --- NEW: Core Data Fetching Logic ---
-  const { data: bookedAppointments, isLoading: isLoadingBookedAppointments } = useQuery({
-    queryKey: ['bookedAppointments', selectedClinicId, format(currentMonth, 'yyyy-MM')],
+  const { data: doctors, isLoading: isLoadingDoctors } = useQuery<Doctor[], Error>({
+    queryKey: ['providersForService', selectedServiceId, selectedClinicId],
+    queryFn: () => getProvidersForService(selectedServiceId!, selectedClinicId!),
+    enabled: !!selectedServiceId && !!selectedClinicId,
+    select: (data: any) => data.data || data,
+  });
+  
+  // --- Proper Backend API Calls for Availability ---
+  const { data: availableDays, isLoading: isLoadingAvailableDays } = useQuery({
+    queryKey: ['availableDays', selectedDoctorId, selectedServiceId, selectedClinicId, format(currentMonth, 'yyyy-MM')],
     queryFn: () => {
-      if (!selectedClinicId) return { data: [] };
-      const startDate = startOfMonth(currentMonth).toISOString();
-      const endDate = endOfMonth(currentMonth).toISOString();
-      return getClinicBookedAppointments({ clinicId: selectedClinicId, startDate, endDate });
+      if (!selectedDoctorId || !selectedServiceId || !selectedClinicId) return [];
+      return getAvailableDays(
+        selectedDoctorId,
+        selectedServiceId,
+        selectedClinicId,
+        currentMonth.getMonth() + 1, // getMonth() is 0-indexed, backend expects 1-indexed
+        currentMonth.getFullYear()
+      );
     },
-    enabled: !!selectedClinicId,
-    select: (res) => (res?.data ?? []).map(appt => ({
-        ...appt,
-        appointmentTime: parseISO(appt.appointmentTime) // Ensure dates are Date objects
-    })),
+    enabled: !!selectedDoctorId && !!selectedServiceId && !!selectedClinicId,
+    refetchInterval: currentStep === 'datetime' ? 60000 : false, // Refresh every minute when on datetime step
+    refetchIntervalInBackground: false,
+  });
+
+  const { data: availableSlots, isLoading: isLoadingAvailableSlots } = useQuery({
+    queryKey: ['availableSlots', selectedDoctorId, selectedServiceId, selectedClinicId, selectedDate],
+    queryFn: () => {
+      if (!selectedDoctorId || !selectedServiceId || !selectedClinicId || !selectedDate) return [];
+      return getAvailableSlots(
+        selectedDoctorId,
+        selectedServiceId,
+        selectedClinicId,
+        selectedDate
+      );
+    },
+    enabled: !!selectedDoctorId && !!selectedServiceId && !!selectedClinicId && !!selectedDate,
+    // Auto-refresh every 30 seconds when on datetime step
+    refetchInterval: currentStep === 'datetime' ? 30000 : false,
+    refetchIntervalInBackground: false,
   });
 
 
   const { mutate: bookAppointment, isPending: isBooking } = useMutation({
-    mutationFn: (appointmentData: NewAppointmentPayload) => createAppointment(appointmentData),
+    mutationFn: async (appointmentData: NewAppointmentPayload) => {
+      // First validate slot availability
+      if (appointmentData.doctorId && appointmentData.serviceId && appointmentData.clinicId) {
+        const validation = await validateSlotAvailability(
+          appointmentData.doctorId,
+          appointmentData.serviceId,
+          appointmentData.clinicId,
+          appointmentData.appointmentTime
+        );
+        
+        if (!validation.available) {
+          const error = new Error(validation.message || 'This time slot is no longer available.');
+          (error as any).code = 'SLOT_UNAVAILABLE';
+          throw error;
+        }
+      }
+      
+      return createAppointment(appointmentData);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['myAppointments'] });
-      queryClient.invalidateQueries({ queryKey: ['bookedAppointments'] }); // NEW
+      queryClient.invalidateQueries({ queryKey: ['bookedAppointments'] });
       setSuccessModalVisible(true);
     },
-    onError: (error: Error) => {
+    onError: (error: any) => {
       console.error('Booking mutation error:', JSON.stringify(error, null, 2));
-      Alert.alert('Booking Failed', error.message || 'An unexpected error occurred.');
+      
+      // Handle slot unavailability specifically
+      if (error.code === 'SLOT_UNAVAILABLE' || error.message.includes('no longer available')) {
+        Alert.alert(
+          'Time Slot Unavailable',
+          'Someone else just booked this time slot. Please select a different time.',
+          [
+                         {
+               text: 'OK',
+               onPress: () => {
+                 // Refresh available slots and clear selected time
+                 queryClient.invalidateQueries({ queryKey: ['availableSlots'] });
+                 queryClient.invalidateQueries({ queryKey: ['availableDays'] });
+                 setSelectedTime(null);
+                 setCurrentStep('datetime');
+               }
+             }
+          ]
+        );
+      } else {
+        Alert.alert('Booking Failed', error.message || 'An unexpected error occurred.');
+      }
     },
   });
 
   // --- Derived State ---
   const selectedClinic = useMemo(() => clinics?.find(c => c.id === selectedClinicId), [clinics, selectedClinicId]);
   const selectedService = useMemo(() => services?.find(s => s.id === selectedServiceId), [services, selectedServiceId]);
+  const selectedDoctor = useMemo(() => doctors?.find(d => d.id === selectedDoctorId), [doctors, selectedDoctorId]);
 
   const filteredServices = useMemo(() => {
     if (!services) return [];
@@ -150,49 +214,74 @@ const BookingScreen = () => {
     return filtered;
   }, [services, selectedCategoryId, debouncedSearchQuery]);
 
-  // --- NEW: Core Availability Calculation ---
-  const availableTimeSlots = useMemo(() => {
-    if (!selectedDate || !selectedService || !bookedAppointments) {
-      return [];
+  // Convert available days to markedDates format for react-native-calendars
+  const markedDates = useMemo(() => {
+    const marked: { [key: string]: any } = {};
+    
+    // Mark the selected date
+    if (selectedDate) {
+      marked[selectedDate] = { selected: true, selectedColor: theme.colors.primary };
     }
     
-    const serviceDuration = selectedService.durationMinutes ?? 30;
-    const dayAsDateObj = parseISO(selectedDate);
-    const workDayStart = setHours(setMinutes(setSeconds(dayAsDateObj, 0), 0), 9); // 9:00 AM
-    const workDayEnd = setHours(setMinutes(setSeconds(dayAsDateObj, 0), 0), 17); // 5:00 PM (17:00)
-
-    const potentialSlots: Date[] = [];
-    let currentSlot = workDayStart;
-    while (isBefore(currentSlot, workDayEnd)) {
-        potentialSlots.push(currentSlot);
-        currentSlot = addMinutes(currentSlot, serviceDuration);
+    // Mark available days
+    if (availableDays) {
+      availableDays.forEach((dateStr: string) => {
+        if (dateStr !== selectedDate) {
+          marked[dateStr] = { 
+            ...marked[dateStr],
+            dotColor: theme.colors.primary,
+            marked: true
+          };
+        } else {
+          // If this is the selected date, keep selection and add dot
+          marked[dateStr] = { 
+            ...marked[dateStr],
+            dotColor: theme.colors.primary,
+            marked: true
+          };
+        }
+      });
     }
+    
+    return marked;
+  }, [availableDays, selectedDate, theme.colors.primary]);
 
-    const bookedSlotsSet = new Set(
-        bookedAppointments
-            .filter(appt => isSameDay(appt.appointmentTime, dayAsDateObj))
-            .map(appt => appt.appointmentTime.toISOString())
-    );
-
-    const availableSlots = potentialSlots.filter(
-        slot => !bookedSlotsSet.has(slot.toISOString())
-    );
-
-    return availableSlots;
-  }, [selectedDate, selectedService, bookedAppointments]);
-
-  const formatAddress = (address: any): string => {
-    if (!address) {
+  const formatAddress = (clinic: any): string => {
+    if (!clinic) {
       return 'Address not available';
     }
-    if (typeof address === 'string') {
-      return address;
+    
+    // Debug: Log clinic structure to understand the data format (remove in production)
+    // console.log('Clinic data structure:', JSON.stringify(clinic, null, 2));
+    
+    // Handle both old nested address format and new individual fields format
+    let street, city, province, zip;
+    
+    if (clinic.address && typeof clinic.address === 'object') {
+      // Old format: nested address object
+      street = clinic.address.street;
+      city = clinic.address.city;
+      province = clinic.address.province;
+      zip = clinic.address.zip;
+    } else {
+      // New format: individual fields on clinic object
+      street = clinic.street;
+      
+      // Handle cityMunicipality - could be string or object with name property
+      const cityMunicipality = clinic.cityMunicipality || clinic.cityMunicipalityCode;
+      city = typeof cityMunicipality === 'object' ? cityMunicipality?.name : cityMunicipality;
+      
+      // Handle province - could be string or object with name property  
+      const provinceData = clinic.province || clinic.provinceCode;
+      province = typeof provinceData === 'object' ? provinceData?.name : provinceData;
+      
+      zip = clinic.zipCode || clinic.zip;
     }
-    if (typeof address === 'object') {
-      const { street, city, zip } = address;
-      return [street, city, zip].filter(Boolean).join(', ');
-    }
-    return 'Address not available';
+    
+    // Filter out any null/undefined parts and join with commas
+    const parts = [street, city, province, zip].filter(Boolean);
+    
+    return parts.length > 0 ? parts.join(', ') : 'Address not available';
   };
 
   const formatTo12Hour = (time24: string | null): string => {
@@ -221,8 +310,14 @@ const BookingScreen = () => {
     }
   };
 
+  const handleRefreshSlots = () => {
+    queryClient.invalidateQueries({ queryKey: ['availableSlots'] });
+    queryClient.invalidateQueries({ queryKey: ['availableDays'] });
+    setLastRefresh(new Date());
+  };
+
     const handleConfirmBooking = () => {
-    if (!selectedClinicId || !selectedServiceId || !selectedTime) {
+    if (!selectedClinicId || !selectedServiceId || !selectedDoctorId || !selectedTime) {
       Alert.alert("Error", "Missing information. Please complete all steps.");
       return;
     }
@@ -231,7 +326,7 @@ const BookingScreen = () => {
       clinicId: selectedClinicId,
       serviceId: selectedServiceId,
       appointmentTime: selectedTime,
-      doctorId: '02ab0a6b-b366-4c10-9b75-623a5be46f1d',
+      doctorId: selectedDoctorId,
     };
     
     bookAppointment(payload);
@@ -241,6 +336,7 @@ const BookingScreen = () => {
     setCurrentStep('clinic');
     setSelectedClinicId(null);
     setSelectedServiceId(null);
+    setSelectedDoctorId(null);
     setSelectedDate(null);
     setSelectedTime(null);
     setSearchQuery('');
@@ -313,7 +409,7 @@ const BookingScreen = () => {
               <Text style={styles.cardTitle}>{item.name}</Text>
               <View style={styles.addressContainer}>
                 <MapPin size={14} color={theme.colors.mutedForeground} />
-                <Text style={styles.cardSubtitle}>{formatAddress(item.address)}</Text>
+                <Text style={styles.cardSubtitle}>{formatAddress(item)}</Text>
               </View>
             </Card>
                                             </TouchableOpacity>
@@ -352,7 +448,15 @@ const BookingScreen = () => {
                   {item.serviceCategory?.name && (
                       <View style={styles.categoryTag}>
                           <Text style={styles.categoryTagText}>{item.serviceCategory.name}</Text>
-                                        </View>
+                      </View>
+                  )}
+                  {item.durationMinutes && (
+                      <View style={styles.durationContainer}>
+                          <Clock size={12} color={theme.colors.mutedForeground} />
+                          <Text style={styles.durationText}>
+                              {item.durationMinutes >= 60 ? `${Math.floor(item.durationMinutes / 60)} hr${item.durationMinutes % 60 > 0 ? ` ${item.durationMinutes % 60} min` : ''}` : `${item.durationMinutes} min`}
+                          </Text>
+                      </View>
                   )}
                   <Text style={styles.cardSubtitle} numberOfLines={2}>{item.description}</Text>
                 </Card>
@@ -366,6 +470,33 @@ const BookingScreen = () => {
                 );
   }
 
+  const renderDoctorStep = () => {
+    if (isLoadingDoctors) {
+        return <View style={styles.listContainer}>{ [1,2,3].map(i => <SkeletonCard key={i} />) }</View>;
+    }
+
+    return (
+        <FlatList
+            data={doctors}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+                <TouchableOpacity onPress={() => setSelectedDoctorId(item.id)}>
+                    <Card style={[styles.selectableCard, selectedDoctorId === item.id && styles.selectedCard, { marginHorizontal: theme.spacing.lg }]}>
+                        <Text style={styles.cardTitle}>{item.fullName}</Text>
+                        {item.specialtyText && (
+                            <View style={styles.categoryTag}>
+                                <Text style={styles.categoryTagText}>{item.specialtyText}</Text>
+                            </View>
+                        )}
+                    </Card>
+                </TouchableOpacity>
+            )}
+            ListEmptyComponent={<EmptyState icon={<User size={48} color={theme.colors.mutedForeground}/>} message="No Doctors Available" description="No healthcare providers are available for this service at the selected clinic." />}
+            contentContainerStyle={styles.listContainer}
+        />
+    );
+  }
+
   const renderDateTimeStep = () => (
     <View style={{ flex: 1, paddingVertical: theme.spacing.lg, paddingHorizontal: theme.spacing.lg }}>
                                    <Calendar
@@ -373,7 +504,7 @@ const BookingScreen = () => {
               setSelectedDate(day.dateString);
               setSelectedTime(null);
             }}
-            markedDates={{ [selectedDate || '']: { selected: true, selectedColor: theme.colors.primary } }}
+            markedDates={markedDates}
             minDate={new Date().toISOString().split('T')[0]}
             onMonthChange={(month) => setCurrentMonth(new Date(month.dateString))}
             theme={{
@@ -392,31 +523,41 @@ const BookingScreen = () => {
                 marginBottom: theme.spacing.md,
                 marginHorizontal: theme.spacing.md,
                 paddingHorizontal: theme.spacing.lg,
+                height: 300,
             }}
         />
 
-        {(isLoadingBookedAppointments) && <ActivityIndicator style={{marginTop: theme.spacing.xl}}/>}
+        {(isLoadingAvailableSlots || isLoadingAvailableDays) && <ActivityIndicator style={{marginTop: theme.spacing.xl}}/>}
 
                             {selectedDate && (
             <View style={{ flex: 1 }}>
-                {isLoadingBookedAppointments ? <ActivityIndicator style={{marginTop: theme.spacing.xl}}/> : (
+                {isLoadingAvailableSlots ? <ActivityIndicator style={{marginTop: theme.spacing.xl}}/> : (
                     <>
                         <View style={styles.timeSlotsHeaderContainer}>
-                            <Clock size={18} color={theme.colors.secondary} />
-                            <Text style={styles.timeSlotsHeaderText}>
-                                Available Time Slots for {new Date(selectedDate + 'T00:00:00').toDateString()}
-                                                    </Text>
+                            <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Clock size={18} color={theme.colors.secondary} />
+                                    <Text style={styles.timeSlotsHeaderText}>
+                                        Available Time Slots for {format(new Date(selectedDate + 'T00:00:00'), 'MM/dd/yyyy')}
+                                    </Text>
+                                </View>
+                                <Text style={styles.lastUpdateText}>
+                                    Updated {format(lastRefresh, 'h:mm a')}
+                                </Text>
+                            </View>
+                            <TouchableOpacity onPress={handleRefreshSlots} style={styles.refreshButton}>
+                                <Text style={styles.refreshButtonText}>Refresh</Text>
+                            </TouchableOpacity>
                         </View>
                         <ScrollView>
                             <View style={styles.gridContainer}>
-                                {availableTimeSlots.length === 0 ? (
+                                {!availableSlots || availableSlots.length === 0 ? (
                                     <Text>No time slots available for this date.</Text>
                                 ) : (
-                                    availableTimeSlots.map(time => {
-                                        const timeAsString = time.toISOString();
-                                        const timeFormatted = format(time, 'p');
+                                    availableSlots.map((timeSlot: string) => {
+                                        const timeFormatted = format(new Date(timeSlot), 'p');
                                         return (
-                                            <Button key={timeAsString} variant={selectedTime === timeAsString ? 'default' : 'outline'} onPress={() => setSelectedTime(timeAsString)} style={styles.gridButton}>
+                                            <Button key={timeSlot} variant={selectedTime === timeSlot ? 'default' : 'outline'} onPress={() => setSelectedTime(timeSlot)} style={styles.gridButton}>
                                                 {timeFormatted}
                                             </Button>
                                         )
@@ -445,12 +586,26 @@ const BookingScreen = () => {
                       <Text style={styles.summaryValue}>{selectedService?.name}</Text>
                   </View>
                   <View style={styles.summaryRow}>
+                      <Text style={styles.summaryLabel}>Duration</Text>
+                      <Text style={styles.summaryValue}>
+                          {selectedService?.durationMinutes 
+                              ? selectedService.durationMinutes >= 60 
+                                  ? `${Math.floor(selectedService.durationMinutes / 60)} hr${selectedService.durationMinutes % 60 > 0 ? ` ${selectedService.durationMinutes % 60} min` : ''}`
+                                  : `${selectedService.durationMinutes} min`
+                              : 'N/A'}
+                      </Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                      <Text style={styles.summaryLabel}>Doctor</Text>
+                      <Text style={styles.summaryValue}>{selectedDoctor?.fullName}</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
                       <Text style={styles.summaryLabel}>Date</Text>
                       <Text style={styles.summaryValue}>{selectedDate ? new Date(selectedDate + 'T00:00:00').toDateString() : ''}</Text>
                   </View>
                   <View style={styles.summaryRow}>
                       <Text style={styles.summaryLabel}>Time</Text>
-                      <Text style={styles.summaryValue}>{selectedTime ? format(parseISO(selectedTime), 'p') : ''}</Text>
+                      <Text style={styles.summaryValue}>{selectedTime ? format(new Date(selectedTime), 'p') : ''}</Text>
                   </View>
               </View>
           </Card>
@@ -467,7 +622,7 @@ const BookingScreen = () => {
       <View style={styles.modalBackdropConfirmation}>
         <View style={styles.modalContentConfirmation}>
           <View style={{alignItems: 'center', paddingTop: theme.spacing.lg}}>
-            <CheckCircle size={64} color={theme.colors.success} strokeWidth={1.5}/>
+            <CheckCircle size={48} color={theme.colors.success} strokeWidth={1.5}/>
             <Text style={styles.successModalTitle}>Booking Confirmed!</Text>
             <Text style={styles.successModalSubtitle}>Your appointment is scheduled. A confirmation has been sent to your email.</Text>
           </View>
@@ -503,6 +658,7 @@ const BookingScreen = () => {
     switch(currentStep) {
       case 'clinic': return renderClinicStep();
       case 'service': return renderServiceStep();
+      case 'doctor': return renderDoctorStep();
       case 'datetime': return renderDateTimeStep();
       case 'confirm': return renderConfirmStep();
       default: return null;
@@ -525,7 +681,7 @@ const BookingScreen = () => {
                     <Text style={styles.footerButtonText}>{isBooking ? 'Booking...' : 'Confirm & Book'}</Text>
                 </Button>
             ) : (
-                <Button onPress={goToNextStep} disabled={ (currentStep === 'clinic' && !selectedClinicId) || (currentStep === 'service' && !selectedServiceId) || (currentStep === 'datetime' && !selectedTime) } style={styles.footerButton} textStyle={styles.footerButtonText}>
+                <Button onPress={goToNextStep} disabled={ (currentStep === 'clinic' && !selectedClinicId) || (currentStep === 'service' && !selectedServiceId) || (currentStep === 'doctor' && !selectedDoctorId) || (currentStep === 'datetime' && !selectedTime) } style={styles.footerButton} textStyle={styles.footerButtonText}>
                     Continue
                 </Button>
             )}
@@ -594,6 +750,16 @@ const styles = StyleSheet.create({
     ...theme.typography.xsmall,
     color: theme.colors.mutedForeground,
     fontWeight: '500',
+  },
+  durationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: theme.spacing.xs,
+  },
+  durationText: {
+    ...theme.typography.small,
+    color: theme.colors.mutedForeground,
+    marginLeft: theme.spacing.xs,
   },
 
   searchInput: { ...theme.typography.body, backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md, padding: theme.spacing.md, marginBottom: theme.spacing.lg },
@@ -669,14 +835,32 @@ const styles = StyleSheet.create({
   timeSlotsHeaderContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     marginTop: theme.spacing.xl,
     marginBottom: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
   },
   timeSlotsHeaderText: {
     ...theme.typography.h4,
     color: theme.colors.secondary,
     marginLeft: theme.spacing.sm,
+  },
+  lastUpdateText: {
+    ...theme.typography.small,
+    color: theme.colors.mutedForeground,
+    marginLeft: theme.spacing.lg + theme.spacing.sm,
+    marginTop: theme.spacing.xs,
+  },
+  refreshButton: {
+    backgroundColor: theme.colors.muted,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.radius.sm,
+  },
+  refreshButtonText: {
+    ...theme.typography.small,
+    color: theme.colors.primary,
+    fontFamily: theme.typography.fontFamilySemiBold,
   },
 
   // Success Modal Styles
@@ -707,6 +891,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: theme.spacing.lg,
   },
+
   successModalButtonContainer: {
     flexDirection: 'row',
     justifyContent: 'center',

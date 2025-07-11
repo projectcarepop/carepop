@@ -294,27 +294,35 @@ export const getAiInsight = async (): Promise<AIInsight> => {
 };
 
 /**
- * This payload is used for creating a new appointment via the mobile app,
- * reflecting the new backend logic where a doctor is not selected upfront.
+ * This payload is used for creating a new appointment via the mobile app.
+ * Updated to include doctor selection like the web implementation.
  */
 export type NewAppointmentPayload = {
   clinicId: string;
   serviceId: string;
+  doctorId: string;
   appointmentTime: string; // ISO String for the selected slot
 };
 
 /**
  * Creates a new appointment for the currently authenticated user.
- * This is updated to use the simplified payload.
  * @param appointmentData The data for the new appointment.
  * @returns A promise that resolves to the newly created detailed appointment.
  */
 export const createAppointment = async (
   appointmentData: NewAppointmentPayload,
 ): Promise<DetailedAppointment> => {
+  // Convert frontend payload to backend format
+  const backendPayload = {
+    clinic_id: appointmentData.clinicId,
+    service_id: appointmentData.serviceId,
+    doctor_id: appointmentData.doctorId,
+    appointment_time: appointmentData.appointmentTime,
+  };
+  
   return apiFetch<DetailedAppointment>("/api/me/appointments", {
     method: "POST",
-    body: JSON.stringify(appointmentData),
+    body: JSON.stringify(backendPayload),
   });
 };
 
@@ -453,6 +461,110 @@ export const getClinicBookedAppointments = async ({
  */
 export const getPublicServiceCategories = async (): Promise<ServiceCategory[]> => {
   return apiFetch<ServiceCategory[]>("/api/public/service-categories");
+};
+
+/**
+ * Fetches providers/doctors available for a specific service.
+ * @param serviceId The ID of the service.
+ * @param clinicId Optional clinic ID to filter providers.
+ * @returns A promise that resolves to providers for the service.
+ */
+export const getProvidersForService = async (serviceId: string, clinicId?: string) => {
+  const url = new URL(`${API_URL}/api/public/services/${serviceId}/providers`);
+  if (clinicId) {
+    url.searchParams.set('clinicId', clinicId);
+  }
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to fetch providers for service: ${response.status} - ${errorText}`);
+  }
+  return response.json();
+};
+
+/**
+ * Gets available time slots for a specific doctor on a specific date.
+ * This uses the sophisticated backend calculation that considers doctor schedules,
+ * doctor overrides, clinic holidays, and existing appointments.
+ * @param doctorId The UUID of the doctor.
+ * @param serviceId The UUID of the service.
+ * @param clinicId The UUID of the clinic.
+ * @param date The date in YYYY-MM-DD format.
+ * @returns A promise that resolves to an array of available time slots (ISO strings).
+ */
+export const getAvailableSlots = async (
+  doctorId: string,
+  serviceId: string,
+  clinicId: string,
+  date: string
+) => {
+  const response = await fetch(`${API_URL}/api/public/doctors/${doctorId}/available-slots?serviceId=${serviceId}&clinicId=${clinicId}&date=${date}`);
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to fetch available slots: ${response.status} - ${errorText}`);
+  }
+  const data = await response.json();
+  return data.data; // The backend wraps the array in a 'data' property
+};
+
+/**
+ * Gets all days with available slots for a given doctor/service in a specific month.
+ * @param doctorId The UUID of the doctor.
+ * @param serviceId The UUID of the service.
+ * @param clinicId The UUID of the clinic.
+ * @param month The month to check (1-12).
+ * @param year The year to check.
+ * @returns A promise that resolves to a list of dates (YYYY-MM-DD) that have availability.
+ */
+export const getAvailableDays = async (
+  doctorId: string,
+  serviceId: string,
+  clinicId: string,
+  month: number,
+  year: number
+) => {
+  const response = await fetch(`${API_URL}/api/public/doctors/${doctorId}/available-days?serviceId=${serviceId}&clinicId=${clinicId}&month=${month}&year=${year}`);
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to fetch available days: ${response.status} - ${errorText}`);
+  }
+  const data = await response.json();
+  return data.data;
+};
+
+/**
+ * Validates if a specific slot is still available before booking.
+ * @param doctorId The ID of the doctor.
+ * @param serviceId The ID of the service.
+ * @param clinicId The ID of the clinic.
+ * @param appointmentTime The appointment time in ISO string format.
+ * @returns A promise that resolves to availability status.
+ */
+export const validateSlotAvailability = async (
+  doctorId: string,
+  serviceId: string,
+  clinicId: string,
+  appointmentTime: string
+): Promise<{ available: boolean; message?: string }> => {
+  try {
+    const response = await apiFetch<{ available: boolean; message?: string }>("/api/me/appointments/validate-slot", {
+      method: "POST",
+      body: JSON.stringify({
+        doctor_id: doctorId,
+        service_id: serviceId,
+        clinic_id: clinicId,
+        appointment_time: appointmentTime,
+      }),
+    });
+    return response;
+  } catch (error) {
+    // Fallback: If validation endpoint doesn't exist, assume available but warn
+    console.warn("Slot validation endpoint not available, proceeding with booking attempt");
+    return { 
+      available: true, 
+      message: "Unable to verify slot availability. Booking will be attempted." 
+    };
+  }
 };
 
 export const forgotPassword = async (email: string): Promise<void> => {
