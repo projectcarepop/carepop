@@ -280,15 +280,15 @@ export type MedicalRecordWithRelations = {
   appointment: {
     id: string;
     appointmentTime: string;
-  };
-  doctor: {
-    fullName: string | null;
-  };
-  clinic: {
-    name: string | null;
-  };
-  service: {
-    name: string | null;
+    doctor: {
+      fullName: string | null;
+    } | null;
+    clinic: {
+      name: string | null;
+    } | null;
+    service: {
+      name: string | null;
+    } | null;
   };
 };
 

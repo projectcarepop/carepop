@@ -60,11 +60,11 @@ export default function RecordCard({ record }: RecordCardProps) {
       </CardHeader>
       <CardContent className="p-4 grid md:grid-cols-2 gap-4 text-sm">
         <div className="space-y-3">
-            <div className="flex items-center text-gray-600"><User className="h-4 w-4 mr-2 text-gray-400" /> <strong>Provider:</strong><span className="ml-2">{record.doctor.fullName}</span></div>
-            <div className="flex items-center text-gray-600"><Building className="h-4 w-4 mr-2 text-gray-400" /> <strong>Clinic:</strong><span className="ml-2">{record.clinic.name}</span></div>
+            <div className="flex items-center text-gray-600"><User className="h-4 w-4 mr-2 text-gray-400" /> <strong>Provider:</strong><span className="ml-2">{record.appointment.doctor?.fullName || 'Unknown Provider'}</span></div>
+            <div className="flex items-center text-gray-600"><Building className="h-4 w-4 mr-2 text-gray-400" /> <strong>Clinic:</strong><span className="ml-2">{record.appointment.clinic?.name || 'Unknown Clinic'}</span></div>
         </div>
         <div className="space-y-3">
-            <div className="flex items-center text-gray-600"><Syringe className="h-4 w-4 mr-2 text-gray-400" /> <strong>Service:</strong><span className="ml-2">{record.service.name}</span></div>
+            <div className="flex items-center text-gray-600"><Syringe className="h-4 w-4 mr-2 text-gray-400" /> <strong>Service:</strong><span className="ml-2">{record.appointment.service?.name || 'Unknown Service'}</span></div>
             <div className="flex items-center text-gray-600"><Calendar className="h-4 w-4 mr-2 text-gray-400" /> <strong>Time:</strong><span className="ml-2">{format(new Date(record.appointment.appointmentTime), 'p')}</span></div>
         </div>
       </CardContent>
