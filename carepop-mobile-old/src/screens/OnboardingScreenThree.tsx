@@ -1,32 +1,24 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, SafeAreaView } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Button } from '../../src/components/button.native';
 import { theme } from '../../src/components/theme';
-import { AuthStackParamList } from '../../src/navigation/AuthNavigator';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation/AppNavigator';
 
-type OnboardingNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type OnboardingScreenThreeProps = {
+  onComplete: () => void;
+};
 
-// This screen will likely be part of a larger stack that, upon completion,
-// navigates the user to the main app (e.g., Auth or Dashboard).
-// The onComplete prop is a good pattern for this.
-export const OnboardingScreenThree = () => {
-  const navigation = useNavigation<OnboardingNavigationProp>();
-
+export const OnboardingScreenThree = ({
+  onComplete,
+}: OnboardingScreenThreeProps) => {
   const handleGetStarted = async () => {
     try {
       await AsyncStorage.setItem('hasOnboarded', 'true');
-      // The RootAppNavigator will automatically handle the switch to the Auth stack
-      // when the `hasOnboarded` state changes. We can just navigate to the Auth
-      // entry point as a fallback or to trigger the re-render.
-      navigation.replace('Auth');
+      onComplete();
     } catch (e) {
       console.error('Failed to save onboarding status', e);
       // Even if it fails, we should still try to navigate.
-      navigation.replace('Auth');
+      onComplete();
     }
   };
 
@@ -51,13 +43,12 @@ export const OnboardingScreenThree = () => {
 
         <View style={styles.footer}>
           <Button
+            title="Get Started"
             size="lg"
-            variant="primary"
+            variant="default"
             onPress={handleGetStarted}
             style={{ flex: 1 }} // Make button take full width of footer
-          >
-            Get Started
-          </Button>
+          />
         </View>
       </View>
     </SafeAreaView>

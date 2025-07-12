@@ -66,6 +66,10 @@ export function RootAppNavigator() {
     checkOnboarding();
   }, []);
 
+  const handleOnboardingComplete = () => {
+    setHasOnboarded(true);
+  };
+
   // Enhanced loading state with safety checks
   if (hasOnboarded === null || authStatus === 'loading') {
     return <SplashScreen />;
@@ -88,10 +92,19 @@ export function RootAppNavigator() {
           hasOnboarded ? (
             <RootStack.Screen name="Auth" component={AuthNavigator} />
           ) : (
-            <RootStack.Screen name="Onboarding" component={OnboardingNavigator} />
+            <RootStack.Screen name="Onboarding">
+              {() => (
+                <OnboardingNavigator
+                  onOnboardingComplete={handleOnboardingComplete}
+                />
+              )}
+            </RootStack.Screen>
           )
         ) : authStatus === 'no-profile' ? (
-          <RootStack.Screen name="CreateProfile" component={CreateProfileScreen} />
+          <RootStack.Screen
+            name="CreateProfile"
+            component={CreateProfileScreen}
+          />
         ) : authStatus === 'authenticated' ? (
           <RootStack.Group>
             <RootStack.Screen name="Main" component={AppDrawerNavigator} />

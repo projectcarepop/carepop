@@ -19,8 +19,9 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import * as Location from 'expo-location';
 import { MapPin, Search, X, RotateCw, Crosshair, ArrowLeft, Navigation, Menu, Filter, Clock, Heart, Zap, Stethoscope, Plus, ZoomIn, ZoomOut, Layers, Maximize } from 'lucide-react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import MapViewDirections from 'react-native-maps-directions';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+// import MapViewDirections from 'react-native-maps-directions';
+import { decode } from '@googlemaps/polyline-codec';
 import { GestureHandlerRootView, PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
@@ -540,6 +541,11 @@ export function ClinicFinderScreen() {
   const [showFilters, setShowFilters] = useState(false);
   const [mapRegion, setMapRegion] = useState(DEFAULT_REGION);
   const [mapType, setMapType] = useState<'standard' | 'satellite'>('standard');
+  const [isSheetMaximized, setIsSheetMaximized] = useState(false);
+  const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number } | null>(null);
+  const [routeCoordinates, setRouteCoordinates] = useState<Array<{ latitude: number; longitude: number }>>([]);
+  
+  const debouncedFilters = useDebounce(filters, SEARCH_DEBOUNCE_MS);
 
   const mapRef = useRef<MapView>(null);
   const flatListRef = useRef<FlatList<Clinic>>(null);
@@ -772,14 +778,52 @@ export function ClinicFinderScreen() {
     translateY.value = withTiming(SNAP_POINT_DIRECTIONS);
   }, []);
   
-  const handleGetDirections = () => {
-    if (!userLocation || !selectedClinic) {
-      Alert.alert("Location Needed", "Please use the 'Find Near Me' button first to set your location.");
-      return;
+  const handleGetDirections = async () => {
+    if (!userLocation || !selectedClinic) return;
+
+    try {
+      const origin = `${userLocation.latitude},${userLocation.longitude}`;
+      const destination = `${selectedClinic.latitude},${selectedClinic.longitude}`;
+      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&key=${GOOGLE_MAPS_API_KEY}`;
+      
+      const response = await fetch(url);
+      const json = await response.json();
+
+      if (json.routes.length > 0) {
+        const route = json.routes[0];
+        const points = route.overview_polyline.points;
+        const decodedCoords = decode(points).map(point => ({
+          latitude: point[0],
+          longitude: point[1],
+        }));
+        setRouteCoordinates(decodedCoords);
+
+        if (route.legs.length > 0) {
+          const leg = route.legs[0];
+          setRouteInfo({
+            distance: leg.distance.value / 1000, // convert meters to km
+            duration: leg.duration.value / 60,   // convert seconds to minutes
+          });
+        }
+        
+        setIsNavigationActive(true);
+        // panToHidden(); // This function is not defined in the original file
+
+        // Fit map to coordinates
+        setTimeout(() => { // Timeout to allow sheet to animate
+          mapRef.current?.fitToCoordinates(decodedCoords, {
+            edgePadding: { top: 150, right: 50, bottom: 350, left: 50 },
+          });
+        }, 300);
+
+      } else {
+        Alert.alert("No Route Found", "Could not find a route to the selected clinic.");
+      }
+    } catch (error) {
+      console.error("Error fetching directions:", error);
+      Alert.alert("Directions Error", "Failed to get directions. Please check your connection and try again.");
     }
-    setDirections(null); 
-    setIsNavigationActive(true);
-  }
+  };
 
   const handleCancelNavigation = () => {
     setIsNavigationActive(false);
@@ -1056,7 +1100,7 @@ export function ClinicFinderScreen() {
     <View style={styles.container}>
       <MapView
         ref={mapRef}
-        style={StyleSheet.absoluteFill}
+        style={{ flex: 1 }}
         provider={PROVIDER_GOOGLE}
         mapType={mapType}
         initialRegion={DEFAULT_REGION}
@@ -1110,27 +1154,22 @@ export function ClinicFinderScreen() {
                 </View>
               </Marker>
           )}
-          {isNavigationActive && userLocation && selectedClinic && GOOGLE_MAPS_API_KEY && (
-              <MapViewDirections 
-                origin={userLocation}
-                destination={{latitude: selectedClinic.latitude, longitude: selectedClinic.longitude}}
-                apikey={GOOGLE_MAPS_API_KEY}
-                strokeWidth={5}
+          {isNavigationActive && routeCoordinates.length > 0 && (
+              <Polyline
+                coordinates={routeCoordinates}
                 strokeColor={theme.colors.primary}
-                onReady={result => {
-                    setDirections(result);
-                    if (result.legs[0]?.steps) {
-                      setDirectionSteps(result.legs[0].steps);
-                      setCurrentStepIndex(0);
-                    }
-                    mapRef.current?.fitToCoordinates(result.coordinates, {
-                        edgePadding: { top: 150, right: 50, bottom: 100, left: 50 },
-                        animated: true,
-                    });
-                }}
+                strokeWidth={5}
               />
-          )}
+            )}
       </MapView>
+
+      {/* DEBUG VIEW START */}
+      {/* <View style={styles.debugContainer}>
+        <Text style={styles.debugText}>
+          API Key Loaded: {GOOGLE_MAPS_API_KEY ? 'Yes' : 'No'}
+        </Text>
+      </View> */}
+      {/* DEBUG VIEW END */}
 
       <DirectionInstructionCard />
 
@@ -1848,6 +1887,19 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.muted,
+  },
+  debugContainer: {
+    position: 'absolute',
+    top: 150,
+    left: 10,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    padding: 8,
+    borderRadius: 5,
+  },
+  debugText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });
 

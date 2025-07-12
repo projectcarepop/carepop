@@ -3,6 +3,7 @@
     "name": "CarePop Mobile",
     "slug": "carepop",
     "version": "1.0.0",
+    "owner": "projectcarepop",
     "orientation": "portrait",
     "icon": "./assets/carepop-logo-pink.png",
     "scheme": "carepop",
@@ -12,17 +13,15 @@
       "backgroundColor": "#FFFFFF"
     },
     "ios": {
+      "config": {
+        "googleMapsApiKey": "AIzaSyCWpKBn_um2wbO35jXyuyrzoPQAsqESeYo"
+      },
       "supportsTablet": true,
       "bundleIdentifier": "com.carepop.mobile",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "We need your location to find nearby clinics and provide you with accurate directions.",
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleURLTypes": [
-          {
-            "CFBundleURLSchemes": [
-              "com.googleusercontent.apps.92849154218-ihqat9lglvl9c0nsv0qugds2io6rv4c2"
-            ]
-          },
           {
             "CFBundleURLSchemes": [
               "com.googleusercontent.apps.92849154218-ihqat9lglvl9c0nsv0qugds2io6rv4c2"
@@ -41,7 +40,12 @@
       },
       "package": "com.carepop.mobile",
       "edgeToEdgeEnabled": true,
-      "runtimeVersion": "1.0.0"
+      "runtimeVersion": "1.0.0",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCWpKBn_um2wbO35jXyuyrzoPQAsqESeYo"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/carepop-logo-blue.png"
@@ -50,18 +54,10 @@
       "assets/*",
       "src/data/psgc/*"
     ],
-    "extra": {
-      "eas": {
-        "projectId": "42305f69-4bf4-4559-b9d3-500ad85b7a11"
-      }
-    },
     "plugins": [
       "expo-font",
       "expo-web-browser",
       "expo-router"
-    ],
-    "updates": {
-      "url": "https://u.expo.dev/42305f69-4bf4-4559-b9d3-500ad85b7a11"
-    }
+    ]
   }
 }

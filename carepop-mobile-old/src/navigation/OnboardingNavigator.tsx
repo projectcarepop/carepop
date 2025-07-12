@@ -16,12 +16,26 @@ export type OnboardingStackParamList = {
 
 const OnboardingStack = createNativeStackNavigator<OnboardingStackParamList>();
 
-export function OnboardingNavigator() {
+type OnboardingNavigatorProps = {
+  onOnboardingComplete: () => void;
+};
+
+export function OnboardingNavigator({
+  onOnboardingComplete,
+}: OnboardingNavigatorProps) {
   return (
     <OnboardingStack.Navigator screenOptions={{ headerShown: false }}>
-      <OnboardingStack.Screen name="OnboardingOne" component={OnboardingScreenOne} />
-      <OnboardingStack.Screen name="OnboardingTwo" component={OnboardingScreenTwo} />
-      <OnboardingStack.Screen name="OnboardingThree" component={OnboardingScreenThree} />
+      <OnboardingStack.Screen
+        name="OnboardingOne"
+        component={OnboardingScreenOne}
+      />
+      <OnboardingStack.Screen
+        name="OnboardingTwo"
+        component={OnboardingScreenTwo}
+      />
+      <OnboardingStack.Screen name="OnboardingThree">
+        {() => <OnboardingScreenThree onComplete={onOnboardingComplete} />}
+      </OnboardingStack.Screen>
     </OnboardingStack.Navigator>
   );
 } 
