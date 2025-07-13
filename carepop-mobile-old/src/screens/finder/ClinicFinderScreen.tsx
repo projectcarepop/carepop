@@ -19,8 +19,6 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import * as Location from 'expo-location';
 import { MapPin, Search, X, RotateCw, Crosshair, ArrowLeft, Navigation, Menu, Filter, Clock, Heart, Zap, Stethoscope, Plus, ZoomIn, ZoomOut, Layers, Maximize } from 'lucide-react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
-import MapViewDirections from 'react-native-maps-directions';
 import { GestureHandlerRootView, PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
@@ -33,20 +31,23 @@ import Animated, {
 import { useNavigation } from '@react-navigation/native';
 import { type NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { type DrawerNavigationProp } from '@react-navigation/drawer';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {
   searchClinicsForFinder,
   getPublicClinics,
+  getMapboxRoute,
 } from '../../services/api';
 import { useDebounce } from '../../hooks/useDebounce';
 import { theme } from '../../components/theme';
 import { Clinic } from '../../lib/types';
 import { Button } from '../../components/button.native';
 import { type ClinicFinderStackParamList, type DrawerParamList } from '../../navigation/AppDrawerNavigator';
+import MapboxGL from '@rnmapbox/maps';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
-const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+MapboxGL.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_API_KEY || '');
 
 // === CONSTANTS & CONFIGURATION ===
 
@@ -76,11 +77,6 @@ const SNAP_POINT_FULL = screenHeight - SHEET_MAX_HEIGHT;
 const SNAP_POINT_MID = screenHeight * 0.5;
 const SNAP_POINT_DIRECTIONS = screenHeight - DIRECTIONS_CARD_HEIGHT - SHEET_HEADER_HEIGHT;
 const SNAP_POINT_HIDDEN = screenHeight - SHEET_HEADER_HEIGHT;
-
-// Clustering Configuration
-const CLUSTER_DISTANCE = 0.01; // Degrees (roughly 1km)
-const CLUSTER_ZOOM_THRESHOLD = 0.05; // Cluster when zoomed out beyond this
-const MIN_CLUSTER_SIZE = 2; // Minimum clinics to form a cluster
 
 // Performance Configuration
 const REGION_CHANGE_THROTTLE_MS = 300; // Throttle map region updates
@@ -244,121 +240,9 @@ const ClinicMarker = React.memo(({ clinic, isSelected }: { clinic: Clinic; isSel
 });
 ClinicMarker.displayName = 'ClinicMarker';
 
-// Clustering logic
-const createClusters = (clinics: Clinic[], region: any) => {
-  const shouldCluster = region.latitudeDelta > CLUSTER_ZOOM_THRESHOLD; // Cluster when zoomed out
-  
-  if (!shouldCluster || clinics.length <= MIN_CLUSTER_SIZE) {
-    return clinics.map(clinic => ({ 
-      type: 'single' as const, 
-      clinic, 
-      count: 1, 
-      latitude: clinic.latitude, 
-      longitude: clinic.longitude 
-    }));
-  }
+// Clustering logic - REMOVED, will be handled natively by Mapbox
 
-  // Optimized clustering with spatial grid
-  const gridSize = CLUSTER_DISTANCE / 2; // Create a grid for spatial indexing
-  const grid = new Map<string, Clinic[]>();
-  
-  // Group clinics into grid cells for O(n) initial grouping
-  clinics.forEach(clinic => {
-    const gridX = Math.floor(clinic.longitude / gridSize);
-    const gridY = Math.floor(clinic.latitude / gridSize);
-    const cellKey = `${gridX},${gridY}`;
-    
-    if (!grid.has(cellKey)) {
-      grid.set(cellKey, []);
-    }
-    grid.get(cellKey)!.push(clinic);
-  });
-
-  const clusters: Array<{ 
-    type: 'cluster' | 'single', 
-    clinic?: Clinic, 
-    clinics?: Clinic[], 
-    count: number, 
-    latitude: number, 
-    longitude: number 
-  }> = [];
-  const processed = new Set<string>();
-
-  // Process each grid cell
-  for (const [cellKey, cellClinics] of grid) {
-    if (cellClinics.length === 1) {
-      const clinic = cellClinics[0];
-      if (!processed.has(clinic.id)) {
-        clusters.push({
-          type: 'single',
-          clinic,
-          count: 1,
-          latitude: clinic.latitude,
-          longitude: clinic.longitude,
-        });
-        processed.add(clinic.id);
-      }
-      continue;
-    }
-
-    // For cells with multiple clinics, create clusters
-    const unprocessedInCell = cellClinics.filter(c => !processed.has(c.id));
-    
-    if (unprocessedInCell.length >= MIN_CLUSTER_SIZE) {
-      // Calculate cluster center using centroid
-      const avgLat = unprocessedInCell.reduce((sum, c) => sum + c.latitude, 0) / unprocessedInCell.length;
-      const avgLng = unprocessedInCell.reduce((sum, c) => sum + c.longitude, 0) / unprocessedInCell.length;
-      
-      clusters.push({
-        type: 'cluster',
-        clinics: unprocessedInCell,
-        count: unprocessedInCell.length,
-        latitude: avgLat,
-        longitude: avgLng,
-      });
-
-      unprocessedInCell.forEach(c => processed.add(c.id));
-    } else {
-      // Add remaining clinics as singles
-      unprocessedInCell.forEach(clinic => {
-        if (!processed.has(clinic.id)) {
-          clusters.push({
-            type: 'single',
-            clinic,
-            count: 1,
-            latitude: clinic.latitude,
-            longitude: clinic.longitude,
-          });
-          processed.add(clinic.id);
-        }
-      });
-    }
-  }
-
-  return clusters;
-};
-
-// Cluster marker component with pin shape
-const ClusterMarker = React.memo(({ count, onPress }: { count: number; onPress: () => void }) => (
-  <View style={styles.clusterContainer}>
-    {/* Cluster Count Label */}
-    <View style={styles.clusterLabel}>
-      <Text style={styles.clusterLabelText}>{count} clinics</Text>
-    </View>
-    
-    {/* Cluster Pin */}
-    <TouchableOpacity onPress={onPress} style={styles.clusterMarker}>
-      <Text style={styles.clusterText}>{count}</Text>
-    </TouchableOpacity>
-    
-    {/* Cluster Point */}
-    <View style={styles.clusterPoint} />
-  </View>
-), (prevProps, nextProps) => {
-  // Only re-render if count changes (onPress is assumed to be stable)
-  return prevProps.count === nextProps.count;
-});
-ClusterMarker.displayName = 'ClusterMarker';
+// Cluster marker component - REMOVED, will be handled natively by Mapbox
 
 // Map legend component
 const MapLegend = React.memo(() => (
@@ -540,13 +424,34 @@ export function ClinicFinderScreen() {
   const [mapRegion, setMapRegion] = useState(DEFAULT_REGION);
   const [mapType, setMapType] = useState<'standard' | 'satellite'>('standard');
   const [isSheetMaximized, setIsSheetMaximized] = useState(false);
-  const [directionsResult, setDirectionsResult] = useState<any>(null);
+  const [directionsResult, setDirectionsResult] = useState<{ duration: number, distance: number } | null>(null);
+  const [routeGeoJSON, setRouteGeoJSON] = useState<GeoJSON.Geometry | null>(null);
   
   const debouncedFilters = useDebounce(filters, SEARCH_DEBOUNCE_MS);
 
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<MapboxGL.MapView>(null);
+  const cameraRef = useRef<MapboxGL.Camera>(null);
   const flatListRef = useRef<FlatList<Clinic>>(null);
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
+
+  useEffect(() => {
+    const checkFirstVisit = async () => {
+      try {
+        const hasVisited = await AsyncStorage.getItem('@hasVisitedClinicFinder');
+        if (hasVisited === null) {
+          // It's the first visit, automatically find nearby clinics
+          handleFindNearMe();
+          // Mark as visited so this doesn't run again
+          await AsyncStorage.setItem('@hasVisitedClinicFinder', 'true');
+        }
+      } catch (error) {
+        console.error('AsyncStorage error in ClinicFinderScreen:', error);
+      }
+    };
+
+    checkFirstVisit();
+  }, []); // The empty dependency array ensures this runs only once on mount.
+
 
   // --- Reanimated and Gesture Handler Setup ---
   const translateY = useSharedValue(SNAP_POINT_MID);
@@ -656,7 +561,10 @@ export function ClinicFinderScreen() {
     const nextStep = directionSteps[currentStepIndex + 1];
     if (!nextStep) return;
 
-    const distanceToNextStep = getDistance(currentUserPosition, nextStep.start_location);
+    const distanceToNextStep = getDistance(currentUserPosition, {
+        latitude: nextStep.maneuver.location[1],
+        longitude: nextStep.maneuver.location[0]
+    });
 
     if (distanceToNextStep < NAVIGATION_STEP_PROXIMITY_M) {
       setCurrentStepIndex((prev: number) => prev + 1);
@@ -719,12 +627,23 @@ export function ClinicFinderScreen() {
     return clinics;
   }, [clinicsQuery.data, debouncedSearchText, openNow]);
 
-  // Create clusters for map display
-  const mapClusters = useMemo(() => {
-    return createClusters(filteredClinics, mapRegion);
-  }, [filteredClinics, mapRegion]);
-
   const isLoading = clinicsQuery.isLoading;
+
+  const onMarkerPress = useCallback((clinic: Clinic) => {
+    setSelectedClinic(clinic);
+    
+    // Reset navigation state only if it's currently active
+    if (isNavigationActive) {
+      setIsNavigationActive(false);
+      setDirectionsResult(null);
+      setDirectionSteps([]);
+      setCurrentStepIndex(0);
+      setRouteGeoJSON(null);
+    }
+    
+    cameraRef.current?.flyTo([clinic.longitude, clinic.latitude], 500);
+    translateY.value = withTiming(SNAP_POINT_DIRECTIONS);
+  }, [isNavigationActive]);
 
   const handleFindNearMe = async () => {
     setIsFetchingLocation(true);
@@ -739,7 +658,7 @@ export function ClinicFinderScreen() {
       let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       const coords = { latitude: location.coords.latitude, longitude: location.coords.longitude };
       setUserLocation(coords);
-      mapRef.current?.animateToRegion({ ...coords, ...ZOOMED_IN_MAP_DELTA }, 1000);
+      cameraRef.current?.flyTo([coords.longitude, coords.latitude], 1000);
       setSearchText('');
       setFilters({ lat: coords.latitude, lon: coords.longitude, radius: radius * 1000 });
     } catch (e) {
@@ -762,47 +681,44 @@ export function ClinicFinderScreen() {
       setDirectionSteps([]);
       setCurrentStepIndex(0);
       setIsNavigationActive(false);
-      mapRef.current?.animateToRegion(DEFAULT_REGION, 1000);
+      setRouteGeoJSON(null);
+      cameraRef.current?.flyTo([DEFAULT_REGION.longitude, DEFAULT_REGION.latitude], 1000);
+      cameraRef.current?.zoomTo(10, 1000);
       translateY.value = withTiming(SNAP_POINT_MID);
   }
   
-  const onMarkerPress = useCallback((clinic: Clinic) => {
-    setSelectedClinic(clinic);
-    
-    // Reset navigation state only if it's currently active
-    if (isNavigationActive) {
-      setIsNavigationActive(false);
-      setDirectionsResult(null);
-      setDirectionSteps([]);
-      setCurrentStepIndex(0);
-    }
-    
-    mapRef.current?.animateToRegion({
-      latitude: clinic.latitude,
-      longitude: clinic.longitude,
-      ...ZOOMED_IN_MAP_DELTA,
-    }, 500);
-    translateY.value = withTiming(SNAP_POINT_DIRECTIONS);
-  }, [isNavigationActive]);
-  
   const handleGetDirections = async () => {
     if (!userLocation || !selectedClinic) return;
-    // This function now simply triggers the MapViewDirections component to render.
-    // The actual fetching is handled by the component itself.
-    setIsNavigationActive(true);
 
-    // Fit map to coordinates after a short delay to allow the route to be calculated
-    setTimeout(() => {
-        mapRef.current?.fitToCoordinates(
-            [
-                { latitude: userLocation.latitude, longitude: userLocation.longitude },
-                { latitude: selectedClinic.latitude, longitude: selectedClinic.longitude }
-            ], {
-                edgePadding: { top: 150, right: 50, bottom: 350, left: 50 },
-                animated: true
-            }
+    try {
+      const routeData = await getMapboxRoute(userLocation, {
+        latitude: selectedClinic.latitude,
+        longitude: selectedClinic.longitude,
+      });
+
+      if (routeData && routeData.geometry) {
+        setRouteGeoJSON(routeData.geometry);
+        setDirectionSteps(routeData.legs?.[0]?.steps || []);
+        setDirectionsResult({
+          distance: routeData.distance / 1000, // meters to km
+          duration: routeData.duration / 60,   // seconds to minutes
+        });
+        //setIsNavigationActive(true); // Defer starting navigation until user action
+
+        const northEast = [Math.max(userLocation.longitude, selectedClinic.longitude), Math.max(userLocation.latitude, selectedClinic.latitude)];
+        const southWest = [Math.min(userLocation.longitude, selectedClinic.longitude), Math.min(userLocation.latitude, selectedClinic.latitude)];
+
+        cameraRef.current?.fitBounds(
+            northEast,
+            southWest,
+            [150, 50, 350, 50], // padding: top, right, bottom, left
+            500 // animation duration
         );
-    }, 300);
+      }
+    } catch (error) {
+      Alert.alert("Routing Error", "Could not calculate the route. The service may be unavailable.");
+      console.error('Mapbox Directions Error:', error);
+    }
   };
 
   const handleCancelNavigation = () => {
@@ -810,7 +726,7 @@ export function ClinicFinderScreen() {
     setDirectionsResult(null);
     setDirectionSteps([]);
     setCurrentStepIndex(0);
-    mapRef.current?.animateCamera({ pitch: 0, heading: 0 }, { duration: 500 });
+    setRouteGeoJSON(null);
     if(selectedClinic){
         onMarkerPress(selectedClinic);
     } else {
@@ -821,12 +737,13 @@ export function ClinicFinderScreen() {
   const handleRecenter = () => {
     if (isNavigationActive) {
       if (currentUserPosition) {
-        mapRef.current?.animateCamera({
-          center: currentUserPosition,
-          pitch: 45,
-          heading: currentUserPosition.heading ?? 0,
-          zoom: 18,
-        }, { duration: 800 });
+        cameraRef.current?.setCamera({
+            centerCoordinate: [currentUserPosition.longitude, currentUserPosition.latitude],
+            pitch: 45,
+            heading: currentUserPosition.heading ?? 0,
+            zoomLevel: 18,
+            animationDuration: 800
+        });
       }
     } else {
       handleFindNearMe();
@@ -834,11 +751,16 @@ export function ClinicFinderScreen() {
   };
 
   const handleShowRouteOverview = () => {
-    if (directionsResult?.coordinates) {
-      mapRef.current?.fitToCoordinates(directionsResult.coordinates, {
-        edgePadding: { top: 150, right: 50, bottom: 100, left: 50 },
-        animated: true,
-      });
+    if (userLocation && selectedClinic) {
+        const northEast = [Math.max(userLocation.longitude, selectedClinic.longitude), Math.max(userLocation.latitude, selectedClinic.latitude)];
+        const southWest = [Math.min(userLocation.longitude, selectedClinic.longitude), Math.min(userLocation.latitude, selectedClinic.latitude)];
+
+        cameraRef.current?.fitBounds(
+            northEast,
+            southWest,
+            [150, 50, 100, 50], // padding: top, right, bottom, left
+            500 // animation duration
+        );
     }
   };
 
@@ -862,45 +784,24 @@ export function ClinicFinderScreen() {
   // Throttled version for clustering to improve performance
   const handleRegionChangeThrottled = useCallback(
     throttle((region: any) => {
-      setMapRegion(region);
-    }, REGION_CHANGE_THROTTLE_MS), // Only update clustering every 300ms
+      // setMapRegion(region); // TODO: Re-evaluate if needed for Mapbox
+    }, REGION_CHANGE_THROTTLE_MS),
     []
   );
 
-  const handleClusterPress = useCallback((clusteredClinics: Clinic[]) => {
-    // Zoom to show all clinics in cluster
-    const minLat = Math.min(...clusteredClinics.map(c => c.latitude));
-    const maxLat = Math.max(...clusteredClinics.map(c => c.latitude));
-    const minLng = Math.min(...clusteredClinics.map(c => c.longitude));
-    const maxLng = Math.max(...clusteredClinics.map(c => c.longitude));
-    
-    const region = {
-      latitude: (minLat + maxLat) / 2,
-      longitude: (minLng + maxLng) / 2,
-      latitudeDelta: Math.max(maxLat - minLat, 0.02) * 1.2,
-      longitudeDelta: Math.max(maxLng - minLng, 0.02) * 1.2,
-    };
-
-    mapRef.current?.animateToRegion(region, 500);
+  const handleZoomIn = useCallback(async () => {
+    const currentZoom = await mapRef.current?.getZoom();
+    if (typeof currentZoom === 'number') {
+      cameraRef.current?.zoomTo(currentZoom + 1, 300);
+    }
   }, []);
 
-  const handleZoomIn = useCallback(() => {
-    const newRegion = {
-      ...mapRegion,
-      latitudeDelta: mapRegion.latitudeDelta * 0.5,
-      longitudeDelta: mapRegion.longitudeDelta * 0.5,
-    };
-    mapRef.current?.animateToRegion(newRegion, 300);
-  }, [mapRegion]);
-
-  const handleZoomOut = useCallback(() => {
-    const newRegion = {
-      ...mapRegion,
-      latitudeDelta: Math.min(mapRegion.latitudeDelta * 2, 5),
-      longitudeDelta: Math.min(mapRegion.longitudeDelta * 2, 5),
-    };
-    mapRef.current?.animateToRegion(newRegion, 300);
-  }, [mapRegion]);
+  const handleZoomOut = useCallback(async () => {
+    const currentZoom = await mapRef.current?.getZoom();
+    if (typeof currentZoom === 'number') {
+      cameraRef.current?.zoomTo(currentZoom - 1, 300);
+    }
+  }, []);
 
   const handleToggleMapType = useCallback(() => {
     setMapType(prev => prev === 'standard' ? 'satellite' : 'standard');
@@ -960,35 +861,38 @@ export function ClinicFinderScreen() {
         {/* Expanded Filters Panel */}
         {showFilters && (
           <View style={styles.filtersPanel}>
-            {filters.lat && filters.lon ? (
-              <>
-                <Text style={styles.filterSectionTitle}>Search Radius</Text>
-                <View style={styles.radiusGrid}>
-                    {RADIUS_OPTIONS_KM.map(r => (
-                        <TouchableOpacity 
-                            key={r}
-                      style={[styles.radiusChip, radius === r && styles.radiusChipSelected]}
-                            onPress={() => {
-                                setRadius(r);
-                        setFilters((prev: Filters) => ({...prev, radius: r * 1000}));
-                            }}
-                        >
-                      <Text style={[styles.radiusChipText, radius === r && styles.radiusChipTextSelected]}>
+            <Text style={styles.filterSectionTitle}>Search Radius</Text>
+            <View style={styles.radiusGrid}>
+                {RADIUS_OPTIONS_KM.map(r => (
+                    <TouchableOpacity
+                        key={r}
+                        style={[
+                            styles.radiusChip,
+                            radius === r && styles.radiusChipSelected,
+                            !isLocationSearch && styles.radiusChipDisabled,
+                        ]}
+                        disabled={!isLocationSearch}
+                        onPress={() => {
+                            setRadius(r);
+                            setFilters((prev: Filters) => ({...prev, radius: r * 1000}));
+                        }}
+                    >
+                    <Text style={[
+                        styles.radiusChipText,
+                        radius === r && styles.radiusChipTextSelected,
+                        !isLocationSearch && styles.radiusChipTextDisabled,
+                    ]}>
                         {r} km
-                      </Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-              </>
-            ) : (
-              <View style={styles.filterHint}>
-                <MapPin size={20} color={theme.colors.secondary} />
-                                 <Text style={styles.filterHintText}>
-                   Use &quot;Find Near Me&quot; to enable distance filtering
-                 </Text>
-              </View>
-            )}
+                    </Text>
+                    </TouchableOpacity>
+                ))}
             </View>
+            {!isLocationSearch && (
+                 <Text style={styles.filterHintText}>
+                   Use &quot;Find Near Me&quot; to enable distance filtering.
+                 </Text>
+            )}
+          </View>
         )}
 
         {/* Action Buttons */}
@@ -1026,8 +930,10 @@ export function ClinicFinderScreen() {
 
     const step = directionSteps[currentStepIndex];
     if (!step) return null; // Added safety check
-    const instruction = step.html_instructions.replace(/<[^>]*>/g, '');
-    const distance = step.distance.text;
+    const instruction = step.maneuver.instruction;
+    const distance = step.distance > 1000 
+        ? `${(step.distance / 1000).toFixed(1)} km`
+        : `${Math.round(step.distance)} m`;
 
     return (
         <View style={styles.instructionCard}>
@@ -1059,8 +965,16 @@ export function ClinicFinderScreen() {
       </View>
 
       <View style={styles.buttonRow}>
-        <Button onPress={handleGetDirections} style={styles.buttonFlex} disabled={isNavigationActive}>
-          {isNavigationActive ? 'Route Active' : 'Get Directions'}
+        <Button
+          onPress={routeGeoJSON ? () => setIsNavigationActive(true) : handleGetDirections}
+          style={styles.buttonFlex}
+          disabled={isNavigationActive}
+          icon={!routeGeoJSON ? <Navigation size={16} color="white" /> : (isNavigationActive ? undefined : <Navigation size={16} color="white" />)}
+        >
+          {routeGeoJSON
+            ? (isNavigationActive ? 'Navigating...' : 'Start Navigation')
+            : 'Get Directions'
+          }
         </Button>
         <Button 
           variant="secondary" 
@@ -1086,88 +1000,52 @@ export function ClinicFinderScreen() {
   return (
     <GestureHandlerRootView style={{flex: 1}}>
     <View style={styles.container}>
-      <MapView
+      <MapboxGL.MapView
         ref={mapRef}
         style={{ flex: 1 }}
-        provider={PROVIDER_GOOGLE}
-        mapType={mapType}
-        initialRegion={DEFAULT_REGION}
-        showsUserLocation
-        showsMyLocationButton={false}
-        onRegionChangeComplete={handleRegionChangeThrottled}
+        styleURL={mapType === 'standard' ? MapboxGL.StyleURL.Street : MapboxGL.StyleURL.Satellite}
+        // onRegionDidChange={handleRegionChangeThrottled}
       >
-          {mapClusters.map((cluster, index) => (
-              <Marker
-              key={cluster.type === 'single' ? cluster.clinic!.id : `cluster-${index}`}
-              coordinate={{ latitude: cluster.latitude, longitude: cluster.longitude }}
-              onPress={() => {
-                if (cluster.type === 'single') {
-                  onMarkerPress(cluster.clinic!);
-                } else {
-                  handleClusterPress(cluster.clinics!);
-                }
-              }}
-              anchor={{ x: 0.5, y: 1 }}
+        <MapboxGL.Camera 
+            ref={cameraRef}
+            defaultSettings={{
+                centerCoordinate: [DEFAULT_REGION.longitude, DEFAULT_REGION.latitude],
+                zoomLevel: 10,
+            }}
+            followUserLocation={isNavigationActive}
+            followZoomLevel={16}
+            followPitch={45}
+        />
+        <MapboxGL.UserLocation 
+            visible={true}
+            showsUserHeadingIndicator={true}
+        />
+
+          {filteredClinics.map(clinic => (
+            <MapboxGL.MarkerView
+              key={clinic.id}
+              id={clinic.id}
+              coordinate={[clinic.longitude, clinic.latitude]}
             >
-              {cluster.type === 'single' ? (
-                <ClinicMarker 
-                  clinic={cluster.clinic!} 
-                  isSelected={selectedClinic?.id === cluster.clinic!.id}
-                />
-              ) : (
-                <ClusterMarker 
-                  count={cluster.count}
-                  onPress={() => handleClusterPress(cluster.clinics!)}
-                />
-              )}
-            </Marker>
+              <TouchableOpacity onPress={() => onMarkerPress(clinic)}>
+                  <ClinicMarker clinic={clinic} isSelected={selectedClinic?.id === clinic.id} />
+              </TouchableOpacity>
+            </MapboxGL.MarkerView>
           ))}
-          {userLocation && (
-              <Marker
-                  coordinate={userLocation}
-                  title="Your Location"
-              >
-                  <View style={styles.userLocationMarker}>
-                      <View style={styles.userLocationMarkerCore} />
-                  </View>
-              </Marker>
+
+          {routeGeoJSON && (
+            <MapboxGL.ShapeSource id="routeSource" shape={routeGeoJSON}>
+              <MapboxGL.LineLayer
+                id="routeLine"
+                style={{
+                  lineColor: theme.colors.primary,
+                  lineWidth: 5,
+                  lineOpacity: 0.85,
+                }}
+              />
+            </MapboxGL.ShapeSource>
           )}
-          {currentUserPosition && (
-              <Marker
-                  anchor={{ x: 0.5, y: 0.5 }}
-                  coordinate={currentUserPosition}
-              >
-                <View style={[styles.navigationArrow]}>
-                    <Navigation size={18} color="white" style={{ transform: [{ rotate: '-45deg' }]}} />
-                </View>
-              </Marker>
-          )}
-          {isNavigationActive && userLocation && selectedClinic && (
-             <MapViewDirections
-                origin={userLocation}
-                destination={{
-                    latitude: selectedClinic.latitude,
-                    longitude: selectedClinic.longitude,
-                }}
-                apikey={GOOGLE_MAPS_API_KEY!}
-                strokeWidth={5}
-                strokeColor={theme.colors.primary}
-                onReady={(result) => {
-                  setDirectionsResult(result);
-                  setDirectionSteps(result.legs?.[0]?.steps || []);
-                  setCurrentStepIndex(0);
-                  mapRef.current?.fitToCoordinates(result.coordinates, {
-                    edgePadding: { top: 150, right: 50, bottom: 350, left: 50 },
-                  });
-                }}
-                onError={(errorMessage) => {
-                    console.error('MapViewDirections Error: ', errorMessage);
-                    Alert.alert("Routing Error", "Could not calculate the route. The service may be unavailable.");
-                    setIsNavigationActive(false);
-                }}
-             />
-            )}
-      </MapView>
+      </MapboxGL.MapView>
 
       <DirectionInstructionCard />
 
@@ -1180,6 +1058,12 @@ export function ClinicFinderScreen() {
       <TouchableOpacity style={styles.recenterButton} onPress={handleRecenter}>
         <Crosshair size={24} color={theme.colors.foreground} />
       </TouchableOpacity>
+      
+      {isFilterActive && (
+        <TouchableOpacity style={styles.resetButton} onPress={clearFilters}>
+            <RotateCw size={22} color={theme.colors.foreground} />
+        </TouchableOpacity>
+      )}
 
       {isNavigationActive && (
         <TouchableOpacity style={styles.overviewButton} onPress={handleShowRouteOverview}>
@@ -1385,6 +1269,10 @@ const styles = StyleSheet.create({
     minWidth: 50,
     alignItems: 'center',
   },
+  radiusChipDisabled: {
+    backgroundColor: theme.colors.muted,
+    borderColor: theme.colors.border,
+  },
   radiusChipSelected: {
     backgroundColor: theme.colors.primary,
     borderColor: theme.colors.primary,
@@ -1393,6 +1281,9 @@ const styles = StyleSheet.create({
     ...theme.typography.small,
     fontFamily: theme.typography.fontFamilyMedium,
     color: theme.colors.foreground,
+  },
+  radiusChipTextDisabled: {
+    color: theme.colors.secondary,
   },
   radiusChipTextSelected: {
     color: theme.colors.primaryForeground,
@@ -1420,7 +1311,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.lg,
   },
   filterHintText: {
-    ...theme.typography.body,
+    ...theme.typography.small,
     color: theme.colors.secondary,
     marginLeft: theme.spacing.sm,
     textAlign: 'center',
@@ -1675,6 +1566,23 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
   },
+  resetButton: {
+    position: 'absolute',
+    top: 170, 
+    right: 20,
+    backgroundColor: theme.colors.background,
+    padding: theme.spacing.sm,
+    borderRadius: theme.radius.md,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   overviewButton: {
     position: 'absolute',
     top: 110,
@@ -1900,6 +1808,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+
 
 function getDistance(
   coord1: { latitude: number; longitude: number },

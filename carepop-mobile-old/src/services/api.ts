@@ -371,6 +371,37 @@ export const getPublicClinics = async (): Promise<Clinic[]> => {
   }
 };
 
+const MAPBOX_API_KEY = process.env.EXPO_PUBLIC_MAPBOX_API_KEY;
+
+export const getMapboxRoute = async (
+  origin: { latitude: number; longitude: number },
+  destination: { latitude: number; longitude: number }
+) => {
+  if (!MAPBOX_API_KEY) {
+    throw new Error('Mapbox API key is not configured.');
+  }
+
+  const coordinates = `${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}`;
+  const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordinates}?geometries=geojson&steps=true&overview=full&access_token=${MAPBOX_API_KEY}`;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Mapbox Directions API Error:', errorData);
+      throw new Error(errorData.message || 'Failed to fetch directions from Mapbox.');
+    }
+    const data = await response.json();
+    if (data.routes && data.routes.length > 0) {
+      return data.routes[0]; // Return the first route object
+    }
+    throw new Error('No routes found.');
+  } catch (error) {
+    console.error('Error fetching Mapbox route:', error);
+    throw error;
+  }
+};
+
 /**
  * Fetches the details for a single public clinic by its ID.
  * @param clinicId The ID of the clinic to fetch.

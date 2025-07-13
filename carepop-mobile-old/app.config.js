@@ -1,5 +1,8 @@
 // app.config.js
 
+// Generate a unique build number based on the current timestamp.
+const buildNumber = String(Math.floor(Date.now() / 1000));
+
 export default {
   "expo": {
     "name": "CarePop Mobile",
@@ -20,6 +23,7 @@ export default {
       },
       "supportsTablet": true,
       "bundleIdentifier": "com.carepop.mobile",
+      "buildNumber": buildNumber,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "We need your location to find nearby clinics and provide you with accurate directions.",
         "ITSAppUsesNonExemptEncryption": false,
@@ -59,7 +63,13 @@ export default {
     "plugins": [
       "expo-font",
       "expo-web-browser",
-      "expo-router"
+      "expo-router",
+      [
+        "@rnmapbox/maps",
+        {
+          "RNMapboxMapsDownloadToken": process.env.EXPO_SECRET_MAPBOX_API_KEY,
+        }
+      ]
     ],
     "extra": {
       "router": {},

@@ -1,32 +1,27 @@
 {
   "cli": {
-    "version": ">= 16.4.1",
-   "appVersionSource": "remote"
+    "version": ">= 16.4.1"
   },
   "build": {
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "channel": "development",
-      "ios": {
-        "simulator": true
+      "env": {
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}",
+        "EXPO_PUBLIC_MAPBOX_API_KEY": "${EXPO_PUBLIC_MAPBOX_API_KEY}"
       }
     },
     "preview": {
       "distribution": "internal",
-      "channel": "preview",
-      "android": {
-        "buildType": "apk"
-      },
       "env": {
-        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}"
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}",
+        "EXPO_PUBLIC_MAPBOX_API_KEY": "${EXPO_PUBLIC_MAPBOX_API_KEY}"
       }
     },
     "production": {
-      "channel": "production",
-      "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}"
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}",
+        "EXPO_PUBLIC_MAPBOX_API_KEY": "${EXPO_PUBLIC_MAPBOX_API_KEY}"
       }
     }
   },
