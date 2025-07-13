@@ -1,4 +1,6 @@
-{
+// app.config.js
+
+export default {
   "expo": {
     "name": "CarePop Mobile",
     "slug": "carepop",
@@ -14,7 +16,7 @@
     },
     "ios": {
       "config": {
-        "googleMapsApiKey": "AIzaSyCWpKBn_um2wbO35jXyuyrzoPQAsqESeYo"
+      "googleMapsApiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
       },
       "supportsTablet": true,
       "bundleIdentifier": "com.carepop.mobile",
@@ -43,7 +45,7 @@
       "runtimeVersion": "1.0.0",
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyCWpKBn_um2wbO35jXyuyrzoPQAsqESeYo"
+          "apiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
         }
       }
     },
@@ -58,6 +60,12 @@
       "expo-font",
       "expo-web-browser",
       "expo-router"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "38106ce3-1f9c-482e-8102-3f0db6130196"
+      }
+    }
   }
-}
+};

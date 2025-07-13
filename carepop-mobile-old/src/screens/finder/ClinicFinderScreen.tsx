@@ -20,8 +20,7 @@ import { useQuery } from '@tanstack/react-query';
 import * as Location from 'expo-location';
 import { MapPin, Search, X, RotateCw, Crosshair, ArrowLeft, Navigation, Menu, Filter, Clock, Heart, Zap, Stethoscope, Plus, ZoomIn, ZoomOut, Layers, Maximize } from 'lucide-react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
-// import MapViewDirections from 'react-native-maps-directions';
-import { decode } from '@googlemaps/polyline-codec';
+import MapViewDirections from 'react-native-maps-directions';
 import { GestureHandlerRootView, PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
@@ -532,7 +531,6 @@ export function ClinicFinderScreen() {
   const [selectedClinic, setSelectedClinic] = useState<Clinic | null>(null);
   const [radius, setRadius] = useState<number>(DEFAULT_SEARCH_RADIUS_KM); // Default radius in km
   const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number} | null>(null);
-  const [directions, setDirections] = useState<any>(null);
   const [isNavigationActive, setIsNavigationActive] = useState(false);
   const [currentUserPosition, setCurrentUserPosition] = useState<Location.LocationObjectCoords | null>(null);
   const [directionSteps, setDirectionSteps] = useState<any[]>([]);
@@ -542,8 +540,7 @@ export function ClinicFinderScreen() {
   const [mapRegion, setMapRegion] = useState(DEFAULT_REGION);
   const [mapType, setMapType] = useState<'standard' | 'satellite'>('standard');
   const [isSheetMaximized, setIsSheetMaximized] = useState(false);
-  const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number } | null>(null);
-  const [routeCoordinates, setRouteCoordinates] = useState<Array<{ latitude: number; longitude: number }>>([]);
+  const [directionsResult, setDirectionsResult] = useState<any>(null);
   
   const debouncedFilters = useDebounce(filters, SEARCH_DEBOUNCE_MS);
 
@@ -761,7 +758,9 @@ export function ClinicFinderScreen() {
       setShowFilters(false);
       setSelectedClinic(null);
       setUserLocation(null);
-      setDirections(null);
+      setDirectionsResult(null);
+      setDirectionSteps([]);
+      setCurrentStepIndex(0);
       setIsNavigationActive(false);
       mapRef.current?.animateToRegion(DEFAULT_REGION, 1000);
       translateY.value = withTiming(SNAP_POINT_MID);
@@ -769,72 +768,55 @@ export function ClinicFinderScreen() {
   
   const onMarkerPress = useCallback((clinic: Clinic) => {
     setSelectedClinic(clinic);
-    setDirections(null); 
+    
+    // Reset navigation state only if it's currently active
+    if (isNavigationActive) {
+      setIsNavigationActive(false);
+      setDirectionsResult(null);
+      setDirectionSteps([]);
+      setCurrentStepIndex(0);
+    }
+    
     mapRef.current?.animateToRegion({
       latitude: clinic.latitude,
       longitude: clinic.longitude,
       ...ZOOMED_IN_MAP_DELTA,
     }, 500);
     translateY.value = withTiming(SNAP_POINT_DIRECTIONS);
-  }, []);
+  }, [isNavigationActive]);
   
   const handleGetDirections = async () => {
     if (!userLocation || !selectedClinic) return;
+    // This function now simply triggers the MapViewDirections component to render.
+    // The actual fetching is handled by the component itself.
+    setIsNavigationActive(true);
 
-    try {
-      const origin = `${userLocation.latitude},${userLocation.longitude}`;
-      const destination = `${selectedClinic.latitude},${selectedClinic.longitude}`;
-      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&key=${GOOGLE_MAPS_API_KEY}`;
-      
-      const response = await fetch(url);
-      const json = await response.json();
-
-      if (json.routes.length > 0) {
-        const route = json.routes[0];
-        const points = route.overview_polyline.points;
-        const decodedCoords = decode(points).map(point => ({
-          latitude: point[0],
-          longitude: point[1],
-        }));
-        setRouteCoordinates(decodedCoords);
-
-        if (route.legs.length > 0) {
-          const leg = route.legs[0];
-          setRouteInfo({
-            distance: leg.distance.value / 1000, // convert meters to km
-            duration: leg.duration.value / 60,   // convert seconds to minutes
-          });
-        }
-        
-        setIsNavigationActive(true);
-        // panToHidden(); // This function is not defined in the original file
-
-        // Fit map to coordinates
-        setTimeout(() => { // Timeout to allow sheet to animate
-          mapRef.current?.fitToCoordinates(decodedCoords, {
-            edgePadding: { top: 150, right: 50, bottom: 350, left: 50 },
-          });
-        }, 300);
-
-      } else {
-        Alert.alert("No Route Found", "Could not find a route to the selected clinic.");
-      }
-    } catch (error) {
-      console.error("Error fetching directions:", error);
-      Alert.alert("Directions Error", "Failed to get directions. Please check your connection and try again.");
-    }
+    // Fit map to coordinates after a short delay to allow the route to be calculated
+    setTimeout(() => {
+        mapRef.current?.fitToCoordinates(
+            [
+                { latitude: userLocation.latitude, longitude: userLocation.longitude },
+                { latitude: selectedClinic.latitude, longitude: selectedClinic.longitude }
+            ], {
+                edgePadding: { top: 150, right: 50, bottom: 350, left: 50 },
+                animated: true
+            }
+        );
+    }, 300);
   };
 
   const handleCancelNavigation = () => {
     setIsNavigationActive(false);
-    setDirections(null);
+    setDirectionsResult(null);
+    setDirectionSteps([]);
+    setCurrentStepIndex(0);
     mapRef.current?.animateCamera({ pitch: 0, heading: 0 }, { duration: 500 });
     if(selectedClinic){
         onMarkerPress(selectedClinic);
     } else {
         translateY.value = withTiming(SNAP_POINT_MID);
     }
-  }
+  };
 
   const handleRecenter = () => {
     if (isNavigationActive) {
@@ -852,8 +834,8 @@ export function ClinicFinderScreen() {
   };
 
   const handleShowRouteOverview = () => {
-    if (directions?.coordinates) {
-      mapRef.current?.fitToCoordinates(directions.coordinates, {
+    if (directionsResult?.coordinates) {
+      mapRef.current?.fitToCoordinates(directionsResult.coordinates, {
         edgePadding: { top: 150, right: 50, bottom: 100, left: 50 },
         animated: true,
       });
@@ -1043,6 +1025,7 @@ export function ClinicFinderScreen() {
     }
 
     const step = directionSteps[currentStepIndex];
+    if (!step) return null; // Added safety check
     const instruction = step.html_instructions.replace(/<[^>]*>/g, '');
     const distance = step.distance.text;
 
@@ -1055,38 +1038,43 @@ export function ClinicFinderScreen() {
   }
 
   const renderDirectionsCard = () => (
-      <View style={styles.directionsContainer}>
-          <View style={styles.directionsHeader}>
-              <TouchableOpacity onPress={() => { setSelectedClinic(null); setDirections(null); }} style={styles.backButton}>
-                  <ArrowLeft size={24} color={theme.colors.primary} />
-              </TouchableOpacity>
-              <Text style={styles.directionsTitle} numberOfLines={1}>{selectedClinic?.name}</Text>
+    <View style={styles.directionsContainer}>
+      {/* Top content is now wrapped in a single View to keep it compact */}
+      <View>
+        <View style={styles.directionsHeader}>
+          <TouchableOpacity onPress={() => { setSelectedClinic(null); setDirectionsResult(null); }} style={styles.backButton}>
+            <ArrowLeft size={24} color={theme.colors.primary} />
+          </TouchableOpacity>
+          <Text style={styles.directionsTitle} numberOfLines={1}>{selectedClinic?.name}</Text>
+        </View>
+        <Text style={styles.directionsAddress} numberOfLines={2}>{selectedClinic ? formatClinicAddress(selectedClinic) : 'Address not available'}</Text>
+        
+        {directionsResult && (
+          <View style={styles.directionsInfo}>
+            <Text style={styles.directionsInfoText}>{`${Math.round(directionsResult.duration)} min`}</Text>
+            <Text style={styles.directionsInfoSeparator}>•</Text>
+            <Text style={styles.directionsInfoText}>{`${directionsResult.distance.toFixed(1)} km`}</Text>
           </View>
-          <Text style={styles.directionsAddress} numberOfLines={2}>{selectedClinic ? formatClinicAddress(selectedClinic) : 'Address not available'}</Text>
-          
-          {directions && (
-              <View style={styles.directionsInfo}>
-                  <Text style={styles.directionsInfoText}>{directions.duration.text}</Text>
-                  <Text style={styles.directionsInfoSeparator}>•</Text>
-                  <Text style={styles.directionsInfoText}>{directions.distance.text}</Text>
-              </View>
-          )}
-
-          <View style={styles.buttonRow}>
-            <Button onPress={handleGetDirections} style={styles.buttonFlex}>Get Directions</Button>
-            <Button 
-                variant="secondary" 
-                style={styles.buttonFlex}
-                onPress={() => {
-                    if (selectedClinic) {
-                        navigation.navigate('ClinicDetail', { clinicId: selectedClinic.id });
-                    }
-                }}
-            >
-                View Details
-            </Button>
-          </View>
+        )}
       </View>
+
+      <View style={styles.buttonRow}>
+        <Button onPress={handleGetDirections} style={styles.buttonFlex} disabled={isNavigationActive}>
+          {isNavigationActive ? 'Route Active' : 'Get Directions'}
+        </Button>
+        <Button 
+          variant="secondary" 
+          style={styles.buttonFlex}
+          onPress={() => {
+            if (selectedClinic) {
+              navigation.navigate('ClinicDetail', { clinicId: selectedClinic.id });
+            }
+          }}
+        >
+          View Details
+        </Button>
+      </View>
+    </View>
   );
 
   const renderItem: ListRenderItem<Clinic> = ({ item }) => (
@@ -1154,22 +1142,32 @@ export function ClinicFinderScreen() {
                 </View>
               </Marker>
           )}
-          {isNavigationActive && routeCoordinates.length > 0 && (
-              <Polyline
-                coordinates={routeCoordinates}
-                strokeColor={theme.colors.primary}
+          {isNavigationActive && userLocation && selectedClinic && (
+             <MapViewDirections
+                origin={userLocation}
+                destination={{
+                    latitude: selectedClinic.latitude,
+                    longitude: selectedClinic.longitude,
+                }}
+                apikey={GOOGLE_MAPS_API_KEY!}
                 strokeWidth={5}
-              />
+                strokeColor={theme.colors.primary}
+                onReady={(result) => {
+                  setDirectionsResult(result);
+                  setDirectionSteps(result.legs?.[0]?.steps || []);
+                  setCurrentStepIndex(0);
+                  mapRef.current?.fitToCoordinates(result.coordinates, {
+                    edgePadding: { top: 150, right: 50, bottom: 350, left: 50 },
+                  });
+                }}
+                onError={(errorMessage) => {
+                    console.error('MapViewDirections Error: ', errorMessage);
+                    Alert.alert("Routing Error", "Could not calculate the route. The service may be unavailable.");
+                    setIsNavigationActive(false);
+                }}
+             />
             )}
       </MapView>
-
-      {/* DEBUG VIEW START */}
-      {/* <View style={styles.debugContainer}>
-        <Text style={styles.debugText}>
-          API Key Loaded: {GOOGLE_MAPS_API_KEY ? 'Yes' : 'No'}
-        </Text>
-      </View> */}
-      {/* DEBUG VIEW END */}
 
       <DirectionInstructionCard />
 
@@ -1744,18 +1742,19 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   directionsContainer: {
-    padding: theme.spacing.lg,
     backgroundColor: theme.colors.background,
-    flex: 1,
+    height: DIRECTIONS_CARD_HEIGHT,
+    padding: theme.spacing.lg,
   },
   directionsHeader: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: theme.spacing.md,
+      marginBottom: 0
   },
   backButton: {
       padding: theme.spacing.sm,
       marginRight: theme.spacing.md,
+      marginLeft: -theme.spacing.sm, // Align better with edge
   },
   directionsTitle: {
       ...theme.typography.h3,
@@ -1764,7 +1763,7 @@ const styles = StyleSheet.create({
   directionsAddress: {
       ...theme.typography.body,
       color: theme.colors.secondary,
-      marginBottom: theme.spacing.lg,
+      marginBottom: theme.spacing.xs,
       marginLeft: 52, // Align with title
   },
   directionsInfo: {
@@ -1833,8 +1832,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
-    paddingBottom: theme.spacing.lg,
+    marginTop: theme.spacing.lg,
   },
   buttonFlex: {
     flex: 1,

@@ -173,10 +173,6 @@ export function ClinicDetailScreen() {
           </View>
         )}
       </View>
-      <TouchableOpacity style={styles.directionsButton} onPress={handleGetDirections}>
-        <Navigation size={16} color={theme.colors.primaryForeground} />
-        <Text style={styles.directionsButtonText}>Get Directions</Text>
-      </TouchableOpacity>
     </View>
   ));
   QuickInfoSection.displayName = 'QuickInfoSection';
