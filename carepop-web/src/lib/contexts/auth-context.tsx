@@ -45,15 +45,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     getInitialSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
-      // Handle immediate state updates for better UX
-      if (event === 'SIGNED_OUT') {
-        setSession(null);
-        setUser(null);
-      } else {
-        setSession(newSession);
-        setUser(newSession?.user ?? null);
-      }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+      setUser(newSession?.user ?? null);
     });
 
     return () => {

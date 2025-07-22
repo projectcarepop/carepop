@@ -39,40 +39,25 @@ export async function updateSession(request: NextRequest) {
   );
 
   // The rest of the logic for redirecting users based on auth state.
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
   const { pathname } = request.nextUrl
   const publicPaths = ['/', '/about', '/contact', '/clinic-finder', '/download-app', '/sign-in', '/sign-up', '/forgot-password', '/update-password', '/auth/callback', '/auth/confirm', '/auth/debug', '/auth/email-debug', '/auth/auth-code-error', '/terms-of-service', '/privacy-policy']
   const authPages = ['/sign-in', '/sign-up', '/forgot-password']
 
-  // If there's an auth error, treat as unauthenticated
-  if (userError) {
-    console.log('Auth error in middleware:', userError.message);
-  }
-
-  if (user && !userError) {
-    const { data: profile, error: profileError } = await supabase.from('profiles').select('id').eq('id', user.id).single()
-    
-    // If profile query fails, treat as unauthenticated to prevent redirect loops
-    if (profileError) {
-      console.log('Profile query error in middleware:', profileError.message);
-      const isPublic = publicPaths.some(path => pathname.startsWith(path)) || pathname === '/'
-      if (!isPublic) {
-        return NextResponse.redirect(new URL('/sign-in', request.url))
+  if (user) {
+    const { data: profile } = await supabase.from('profiles').select('id').eq('id', user.id).single()
+    const hasProfile = !!profile
+    if (hasProfile) {
+      if (authPages.includes(pathname)) {
+        return NextResponse.redirect(new URL('/main-dashboard', request.url))
+      }
+      if (pathname === '/create-profile' && request.nextUrl.searchParams.get('mode') !== 'edit') {
+        return NextResponse.redirect(new URL('/main-dashboard', request.url))
       }
     } else {
-      const hasProfile = !!profile
-      if (hasProfile) {
-        if (authPages.includes(pathname)) {
-          return NextResponse.redirect(new URL('/main-dashboard', request.url))
-        }
-        if (pathname === '/create-profile' && request.nextUrl.searchParams.get('mode') !== 'edit') {
-          return NextResponse.redirect(new URL('/main-dashboard', request.url))
-        }
-      } else {
-        const allowedPaths = ['/create-profile', ...publicPaths];
-        if (!allowedPaths.includes(pathname)) {
-          return NextResponse.redirect(new URL('/create-profile', request.url))
-        }
+      const allowedPaths = ['/create-profile', ...publicPaths];
+      if (!allowedPaths.includes(pathname)) {
+        return NextResponse.redirect(new URL('/create-profile', request.url))
       }
     }
   } else {

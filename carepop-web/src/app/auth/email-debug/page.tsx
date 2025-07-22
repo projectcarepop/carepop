@@ -119,6 +119,8 @@ export default function EmailDebugPage() {
     }
   };
 
+
+
   return (
     <div className="container mx-auto p-8 max-w-4xl">
       <div className="space-y-6">
@@ -168,23 +170,23 @@ export default function EmailDebugPage() {
                 onChange={(e) => setTestEmail(e.target.value)}
                 className="flex-1"
               />
-              <Button 
-                onClick={handleTestSignUp}
-                disabled={isTestingSend}
-              >
-                {isTestingSend ? 'Testing...' : 'Test Sign-Up'}
-              </Button>
-              <Button 
-                variant="outline"
-                onClick={handleResendConfirmation}
-                disabled={isTestingResend}
-              >
-                {isTestingResend ? 'Resending...' : 'Resend'}
-              </Button>
+                             <Button 
+                 onClick={handleTestSignUp}
+                 disabled={isTestingSend}
+               >
+                 {isTestingSend ? 'Testing...' : 'Test Sign-Up'}
+               </Button>
+               <Button 
+                 variant="outline"
+                 onClick={handleResendConfirmation}
+                 disabled={isTestingResend}
+               >
+                 {isTestingResend ? 'Resending...' : 'Resend'}
+               </Button>
             </div>
-            <p className="text-sm text-muted-foreground">
-              This will attempt to create an account with a temporary password and send a confirmation email.
-            </p>
+                         <p className="text-sm text-muted-foreground">
+               This will attempt to create an account with a temporary password and send a confirmation email.
+             </p>
           </CardContent>
         </Card>
 
@@ -213,26 +215,26 @@ export default function EmailDebugPage() {
                 <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
                   <span className="text-blue-600 text-sm font-medium">1</span>
                 </div>
-                <div>
-                  <h4 className="font-medium">Check Supabase Email Settings</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Go to Supabase Dashboard → Authentication → Settings → Email Templates.
-                    Ensure &quot;Enable email confirmations&quot; is turned ON.
-                  </p>
-                </div>
+                                 <div>
+                   <h4 className="font-medium">Check Supabase Email Settings <Badge variant="destructive" className="ml-2">CRITICAL</Badge></h4>
+                   <p className="text-sm text-muted-foreground">
+                     Go to Supabase Dashboard → Authentication → Settings → Email Templates.
+                     Ensure &quot;Enable email confirmations&quot; is turned ON. <strong>Error 500 usually means this is disabled.</strong>
+                   </p>
+                 </div>
               </div>
 
               <div className="flex items-start gap-3">
                 <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
                   <span className="text-blue-600 text-sm font-medium">2</span>
                 </div>
-                <div>
-                  <h4 className="font-medium">Configure SMTP (Recommended)</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Go to Supabase Dashboard → Project Settings → Auth → SMTP Settings.
-                    Configure your own SMTP provider (Gmail, SendGrid, etc.) for reliable email delivery.
-                  </p>
-                </div>
+                                 <div>
+                   <h4 className="font-medium">Configure SMTP <Badge variant="outline" className="ml-2">HIGHLY RECOMMENDED</Badge></h4>
+                   <p className="text-sm text-muted-foreground">
+                     Go to Supabase Dashboard → Project Settings → Auth → SMTP Settings.
+                     Configure your own SMTP provider (Gmail, SendGrid, etc.) for reliable email delivery. Default Supabase emails often fail.
+                   </p>
+                 </div>
               </div>
 
               <div className="flex items-start gap-3">
