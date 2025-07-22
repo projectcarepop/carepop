@@ -24,7 +24,13 @@ export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
   //    These variables must be set in your Vercel environment for the backend service.
   const supabase = createClient(
     process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
   );
 
   // 2. Get the token from the Authorization header.
