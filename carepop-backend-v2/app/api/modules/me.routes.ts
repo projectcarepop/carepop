@@ -391,7 +391,8 @@ meRoutes.get('/records/:recordId', async (c) => {
 
 /**
  * GET /me/records/:recordId/download
- * Generates a signed URL for downloading a medical document.
+ * Generates a signed URL for downloading medical documents.
+ * Supports both CLINICAL_DOCUMENT and PRESCRIPTION types.
  * Enhanced with comprehensive audit logging.
  */
 meRoutes.get('/records/:recordId/download', async (c) => {
@@ -401,7 +402,7 @@ meRoutes.get('/records/:recordId/download', async (c) => {
     try {
         console.log(`[USER_DOWNLOAD] User ${user.id} (${user.email}) requesting download for record ${recordId}`);
         
-        // First, verify the user owns this record and it's a document
+        // First, verify the user owns this record and it supports downloads
         const [record] = await db.select({
             id: medicalRecords.id,
             recordType: medicalRecords.recordType,
@@ -414,7 +415,10 @@ meRoutes.get('/records/:recordId/download', async (c) => {
             and(
                 eq(medicalRecords.id, recordId),
                 eq(appointments.patientId, user.id),
-                eq(medicalRecords.recordType, 'CLINICAL_DOCUMENT')
+                or(
+                    eq(medicalRecords.recordType, 'CLINICAL_DOCUMENT'),
+                    eq(medicalRecords.recordType, 'PRESCRIPTION')
+                )
             )
         );
 
@@ -426,18 +430,57 @@ meRoutes.get('/records/:recordId/download', async (c) => {
         // Log successful record access
         console.log(`[USER_DOWNLOAD] User ${user.id} accessing record ${recordId} (type: ${record.recordType}, appointment: ${record.appointmentId})`);        
 
-        // Get the document details
-        const [documentDetails] = await db.select()
-            .from(recordDocuments)
-            .where(eq(recordDocuments.recordId, record.id));
+        // Get file details based on record type
+        let documentDetails: any = null;
+        let filePath: string | null = null;
+        let fileName: string | null = null;
+        let fileType: string | null = null;
 
-        if (!documentDetails || !documentDetails.filePath) {
-            console.warn(`[USER_DOWNLOAD] Document file not found for record ${recordId}`);
+        switch (record.recordType) {
+            case 'CLINICAL_DOCUMENT':
+                const [docDetails] = await db.select()
+                    .from(recordDocuments)
+                    .where(eq(recordDocuments.recordId, record.id));
+                
+                if (!docDetails || !docDetails.filePath) {
+                    console.warn(`[USER_DOWNLOAD] No file found for CLINICAL_DOCUMENT record ${recordId}`);
+                    return c.json({ error: 'Document file not found.' }, 404);
+                }
+                
+                documentDetails = docDetails;
+                filePath = docDetails.filePath;
+                fileName = docDetails.documentName;
+                fileType = docDetails.fileType;
+                break;
+
+            case 'PRESCRIPTION':
+                const [prescDetails] = await db.select()
+                    .from(recordPrescriptions)
+                    .where(eq(recordPrescriptions.recordId, record.id));
+                
+                if (!prescDetails || !prescDetails.filePath) {
+                    console.warn(`[USER_DOWNLOAD] No file found for PRESCRIPTION record ${recordId}`);
+                    return c.json({ error: 'Prescription document not found.' }, 404);
+                }
+                
+                documentDetails = prescDetails;
+                filePath = prescDetails.filePath;
+                fileName = prescDetails.documentName || `Prescription-${record.id}`;
+                fileType = prescDetails.fileType;
+                break;
+
+            default:
+                console.warn(`[USER_DOWNLOAD] Unsupported record type: ${record.recordType}`);
+                return c.json({ error: `Downloads not supported for record type: ${record.recordType}` }, 400);
+        }
+
+        if (!filePath) {
+            console.warn(`[USER_DOWNLOAD] No file path found for record ${recordId}`);
             return c.json({ error: 'Document file not found.' }, 404);
         }
 
         // Log file details for audit
-        console.log(`[USER_DOWNLOAD] File details: name='${documentDetails.documentName}', path='${documentDetails.filePath}', type='${documentDetails.fileType}'`);
+        console.log(`[USER_DOWNLOAD] File details: name='${fileName}', path='${filePath}', type='${fileType}'`);
 
         // Create Supabase admin client
         const supabaseAdmin = createClient(
@@ -448,7 +491,7 @@ meRoutes.get('/records/:recordId/download', async (c) => {
         // Generate signed URL (valid for 1 hour)
         const { data, error } = await supabaseAdmin.storage
             .from('medical-documents')
-            .createSignedUrl(documentDetails.filePath, 3600); // 1 hour
+            .createSignedUrl(filePath, 3600); // 1 hour
 
         if (error) {
             console.error(`[USER_DOWNLOAD] Supabase error generating signed URL for record ${recordId}:`, error);
@@ -456,21 +499,26 @@ meRoutes.get('/records/:recordId/download', async (c) => {
         }
 
         // Log successful download generation
-        console.log(`[USER_DOWNLOAD] SUCCESS - User ${user.id} generated download for record ${recordId} (${documentDetails.documentName})`);
+        console.log(`[USER_DOWNLOAD] SUCCESS - User ${user.id} generated download for record ${recordId} (${fileName})`);
         
-        // TODO: Add to audit log table when implemented
-        // await db.insert(auditLog).values({
-        //     userId: user.id,
-        //     action: 'DOWNLOAD_MEDICAL_RECORD',
-        //     resourceId: recordId,
-        //     resourceType: 'medical_record',
-        //     metadata: { recordType: record.recordType, fileName: documentDetails.documentName, fileType: documentDetails.fileType }
-        // });
+        // Log to audit trail for compliance
+        const { logUserDownload, getClientIP, getUserAgent } = await import('../lib/audit-logger');
+        await logUserDownload({
+            userId: user.id,
+            userEmail: user.email || 'unknown@user.com',
+            recordId: recordId,
+            recordType: record.recordType,
+            fileName: fileName || 'unknown',
+            fileType: fileType || undefined,
+            ipAddress: getClientIP(c.req.raw),
+            userAgent: getUserAgent(c.req.raw),
+        });
 
         return c.json({
             downloadUrl: data.signedUrl,
-            fileName: documentDetails.documentName,
-            fileType: documentDetails.fileType,
+            fileName: fileName || 'medical-document',
+            fileType: fileType || 'application/octet-stream',
+            recordType: record.recordType,
             expiresIn: 3600, // 1 hour in seconds
             metadata: {
                 recordId: record.id,
