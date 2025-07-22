@@ -797,39 +797,4 @@ meRoutes.patch('/appointments/:id/cancel', async (c) => {
     }
 });
 
-// --- NEW ENDPOINT FOR MOBILE DOCUMENT DOWNLOADS ---
-const signedUrlSchema = z.object({
-    filePath: z.string().min(1, 'filePath is required.'),
-});
-
-meRoutes.post('/documents/signed-url', zValidator('json', signedUrlSchema), async (c) => {
-    const user = c.get('user');
-    const { filePath } = c.req.valid('json');
-
-    // Basic security check: ensure the path belongs to the user.
-    // This is a simplified check; a more robust one would query the DB
-    // to ensure the user has access to the appointment linked to this document.
-    if (!filePath.startsWith(user.id)) {
-       // A bit of a guess, but appointmentId is often the start of the path.
-       // A proper implementation would query the DB.
-    }
-
-    try {
-        const supabaseAdmin = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-        const { data, error } = await supabaseAdmin.storage
-            .from('medical-documents')
-            .createSignedUrl(filePath, 60); // 60-second expiry
-
-        if (error) {
-            throw new Error(error.message);
-        }
-
-        return c.json({ signedUrl: data.signedUrl });
-
-    } catch (error: any) {
-        return c.json({ message: "Failed to create signed URL", error: error.message }, 500);
-    }
-});
-
-
 export default meRoutes;
