@@ -31,7 +31,8 @@ const InfoRow = ({ label, value }: { label: string, value: string | null | undef
     return <p><strong className="font-semibold text-gray-600">{label}:</strong> {value}</p>;
 };
 
-const PrescriptionDetails = ({ details, onDownload }: { details: any; onDownload: (filePath: string) => void; }) => {
+const PrescriptionDetails = ({ details, onDownload }: { details: any; onDownload: (filePath: string | null | undefined) => void; }) => {
+    const hasFile = details?.filePath && typeof details.filePath === 'string';
     return (
         <div className="text-sm space-y-2 text-gray-800">
             <InfoRow label="Medication" value={details.medication} />
@@ -39,7 +40,7 @@ const PrescriptionDetails = ({ details, onDownload }: { details: any; onDownload
             <InfoRow label="Frequency" value={details.frequency} />
             {details.notes && <InfoRow label="Notes" value={details.notes} />}
             
-            {details.filePath && (
+            {hasFile && (
                 <div className="flex items-center justify-between rounded-lg border p-4 mt-4">
                     <div className="flex items-center gap-3">
                         <FileText className="h-6 w-6 text-green-600" />
@@ -61,7 +62,15 @@ const RecordDetailsContent = ({ record }: { record: MedicalRecordWithRelations }
     const { toast } = useToast();
     const [isDownloading, setIsDownloading] = useState(false);
 
-    const handleDownload = async (filePath: string) => {
+    const handleDownload = async (filePath: string | null | undefined) => {
+        if (!filePath) {
+            toast({
+                title: "Download Not Available",
+                description: "There is no file associated with this record.",
+            });
+            return;
+        }
+
         setIsDownloading(true);
         try {
             const result = await downloadDocument(filePath);
@@ -91,6 +100,9 @@ const RecordDetailsContent = ({ record }: { record: MedicalRecordWithRelations }
         case 'CLINICAL_DOCUMENT':
             const docDetails = record.details as any;
             if (!docDetails) return <p>No document details available.</p>;
+            
+            const hasFile = docDetails.filePath && typeof docDetails.filePath === 'string';
+
             return (
                 <div className="flex items-center justify-between rounded-lg border p-4">
                     <div className="flex items-center gap-3">
@@ -100,7 +112,7 @@ const RecordDetailsContent = ({ record }: { record: MedicalRecordWithRelations }
                             {docDetails.fileType && <span className="text-sm text-gray-500">{docDetails.fileType}</span>}
                         </div>
                     </div>
-                    <Button onClick={() => handleDownload(docDetails.filePath)} disabled={isDownloading} className="min-w-[120px]">
+                    <Button onClick={() => handleDownload(docDetails.filePath)} disabled={isDownloading || !hasFile} className="min-w-[120px]">
                         {isDownloading ? 'Downloading...' : 'Download'}
                     </Button>
                 </div>
@@ -151,4 +163,4 @@ export default function RecordDetailClient({ record, backHref, backText }: Recor
       </Card>
     </div>
   );
-} 
+}
