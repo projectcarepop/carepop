@@ -17,7 +17,7 @@ import GetStartedBtn from './GetStartedBtn';
 import MobileNav from './MobileNav';
 
 export default function Header() {
-  const { user } = useAuth();
+  const { user, isLoading, isInitialized } = useAuth();
   const pathname = usePathname();
   const isAdminPage = pathname.startsWith('/admin');
 
@@ -70,7 +70,13 @@ export default function Header() {
 
         {/* Action Buttons */}
         <div className="hidden md:flex items-center space-x-4">
-          {!user ? (
+          {!isInitialized || isLoading ? (
+            // Show loading skeleton during auth initialization
+            <div className="flex items-center space-x-4">
+              <div className="h-9 w-32 bg-gray-200 rounded-full animate-pulse" />
+              <div className="h-9 w-24 bg-gray-200 rounded-full animate-pulse" />
+            </div>
+          ) : !user ? (
             <>
               <Button variant="outline" asChild className="text-secondary rounded-full hover:text-primary hover:border-primary hover:bg-background px-4 py-2 text-sm font-medium focus:outline-none">
                 <Link href="/download-app">Download our App</Link>
@@ -98,7 +104,7 @@ export default function Header() {
 
         {/* Mobile Menu Button - Hide on admin pages */}
         {!isAdminPage && (
-          <MobileNav user={user} />
+          <MobileNav user={isInitialized && !isLoading ? user : null} />
         )}
       </nav>
     </header>

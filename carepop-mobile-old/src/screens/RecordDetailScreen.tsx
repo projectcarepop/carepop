@@ -32,7 +32,6 @@ import { MedicalRecordWithRelations } from '../lib/types';
 import { getMedicalRecordDetails, downloadMedicalDocument } from '../services/api';
 import { RecordsStackParamList } from '../navigation/AppDrawerNavigator';
 import { Card } from '../components/card.native';
-import { downloadDocument } from '../services/actions';
 
 type RecordDetailScreenRouteProp = RouteProp<RecordsStackParamList, 'RecordDetail'>;
 
@@ -63,7 +62,7 @@ const Section = React.memo(({ title, children }: any) => (
 ));
 Section.displayName = 'Section';
 
-const PrescriptionDetails = ({ details }: { details: any }) => {
+const PrescriptionDetails = ({ details, recordId }: { details: any; recordId: string }) => {
     const [isDownloading, setIsDownloading] = useState(false);
 
     const handleDownload = async () => {
@@ -73,13 +72,18 @@ const PrescriptionDetails = ({ details }: { details: any }) => {
         }
         setIsDownloading(true);
         try {
-            const result = await downloadDocument(details.filePath);
-            if (result.error || !result.downloadUrl) {
-                throw new Error(result.error || 'Could not get download URL.');
+            const response = await downloadMedicalDocument(recordId);
+            
+            // Use Linking to open the download URL
+            const supported = await Linking.canOpenURL(response.downloadUrl);
+            if (supported) {
+                await Linking.openURL(response.downloadUrl);
+            } else {
+                Alert.alert('Error', 'Cannot open download link. Please try again.');
             }
-            await Linking.openURL(result.downloadUrl);
         } catch (error: any) {
-            Alert.alert("Download Failed", error.message);
+            console.error('Prescription download failed:', error);
+            Alert.alert("Download Failed", error.message || 'Failed to download document. Please try again.');
         } finally {
             setIsDownloading(false);
         }
@@ -120,7 +124,7 @@ const renderRecordDetails = (record: MedicalRecordWithRelations, onDownload: (re
         <Text style={styles.value}>{(details as any)?.note || 'No note content available.'}</Text>
       );
     case 'PRESCRIPTION':
-      return <PrescriptionDetails details={details} />;
+      return <PrescriptionDetails details={details} recordId={record.id} />;
     case 'CLINICAL_DOCUMENT':
       const documentDetails = details as any;
       return (

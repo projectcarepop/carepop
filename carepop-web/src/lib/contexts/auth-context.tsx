@@ -11,6 +11,7 @@ type AuthContextType = {
   user: User | null;
   isInitialized: boolean;
   isLoading: boolean;
+  signOut: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -44,9 +45,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     getInitialSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-      setUser(newSession?.user ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
+      // Handle immediate state updates for better UX
+      if (event === 'SIGNED_OUT') {
+        setSession(null);
+        setUser(null);
+      } else {
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
+      }
     });
 
     return () => {
@@ -54,13 +61,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [supabase]);
 
+  // Client-side signOut function for immediate state updates
+  const signOut = async () => {
+    try {
+      // Immediately clear local state for responsive UI
+      setSession(null);
+      setUser(null);
+      
+      // Then perform the actual signout
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Client signout error:', error);
+        // Don't re-set the user state on error - let the auth state change handle it
+      }
+    } catch (error) {
+      console.error('Signout failed:', error);
+    }
+  };
+
   // useMemo to prevent unnecessary re-renders
   const value = useMemo(() => ({
     supabase,
     session,
     user,
     isInitialized,
-    isLoading
+    isLoading,
+    signOut
   }), [supabase, session, user, isInitialized, isLoading]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

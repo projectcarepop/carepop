@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { format } from 'date-fns';
-import { FileText, Stethoscope, Building, Calendar } from 'lucide-react-native';
+import { FileText, Stethoscope, Building, Calendar, Paperclip } from 'lucide-react-native';
 import { theme } from '../theme';
 import { Card } from '../card.native';
 import type { MedicalRecordWithRelations } from '../../lib/types';
@@ -17,8 +17,49 @@ const formatRecordType = (type: string) => {
   return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 };
 
+// Helper to check if record has attached files
+const hasAttachedFile = (record: MedicalRecordWithRelations): boolean => {
+  const details = record.details as any;
+  if (!details) return false;
+
+  switch (record.recordType) {
+    case 'PRESCRIPTION':
+      return !!(details.filePath && typeof details.filePath === 'string');
+    case 'CLINICAL_DOCUMENT':
+      return !!(details.filePath && typeof details.filePath === 'string');
+    default:
+      return false;
+  }
+};
+
+// Helper to get file attachment info
+const getFileAttachmentInfo = (record: MedicalRecordWithRelations) => {
+  const details = record.details as any;
+  if (!details || !hasAttachedFile(record)) return null;
+
+  switch (record.recordType) {
+    case 'PRESCRIPTION':
+      return {
+        fileName: details.documentName || 'Prescription Document',
+        color: '#059669', // green-600
+        backgroundColor: '#D1FAE5', // green-100
+        borderColor: '#A7F3D0', // green-200
+      };
+    case 'CLINICAL_DOCUMENT':
+      return {
+        fileName: details.documentName || 'Clinical Document',
+        color: '#2563EB', // blue-600
+        backgroundColor: '#DBEAFE', // blue-100
+        borderColor: '#BFDBFE', // blue-200
+      };
+    default:
+      return null;
+  }
+};
+
 const MedicalRecordCard: React.FC<MedicalRecordCardProps> = ({ record, onPress }) => {
   const { recordType, createdAt, appointment } = record;
+  const fileInfo = getFileAttachmentInfo(record);
 
   return (
     <Card style={styles.card}>
@@ -42,6 +83,23 @@ const MedicalRecordCard: React.FC<MedicalRecordCardProps> = ({ record, onPress }
           </Text>
         </View>
       </View>
+      
+      {/* File Attachment Indicator */}
+      {fileInfo && (
+        <View style={[styles.attachmentContainer, { 
+          backgroundColor: fileInfo.backgroundColor, 
+          borderColor: fileInfo.borderColor 
+        }]}>
+          <Paperclip size={14} color={fileInfo.color} />
+          <Text style={[styles.attachmentText, { color: fileInfo.color }]}>
+            📎 Document Attached
+          </Text>
+          <Text style={[styles.attachmentFileName, { color: fileInfo.color }]}>
+            ({fileInfo.fileName})
+          </Text>
+        </View>
+      )}
+      
       <View style={styles.footer}>
         <Button variant="outline" size="sm" onPress={onPress}>
           View Details
@@ -80,6 +138,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: theme.typography.fontFamilyMedium,
     color: theme.colors.secondary,
+  },
+  attachmentContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: theme.spacing.md,
+    padding: theme.spacing.sm,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    flexWrap: 'wrap',
+  },
+  attachmentText: {
+    marginLeft: theme.spacing.xs,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamilySemiBold,
+  },
+  attachmentFileName: {
+    marginLeft: theme.spacing.xs,
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily,
+    opacity: 0.8,
   },
   footer: {
     marginTop: theme.spacing.lg,

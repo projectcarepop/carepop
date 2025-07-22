@@ -17,11 +17,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import Link from "next/link"
-import { signOutUser } from "@/app/auth/actions"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useRouter } from "next/navigation"
+import { useState } from "react"
 
 export function UserNav() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, signOut } = useAuth();
+  const router = useRouter();
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   if (isLoading) {
     return <Skeleton className="h-10 w-10 rounded-full" />;
@@ -29,6 +32,20 @@ export function UserNav() {
 
   const getInitials = (email: string | undefined) => {
     return email ? email.slice(0, 2).toUpperCase() : 'U'
+  }
+
+  const handleSignOut = async () => {
+    if (isSigningOut) return;
+    
+    setIsSigningOut(true);
+    try {
+      await signOut();
+      router.push('/sign-in');
+    } catch (error) {
+      console.error('Error during sign out:', error);
+    } finally {
+      setIsSigningOut(false);
+    }
   }
 
   return (
@@ -66,13 +83,15 @@ export function UserNav() {
           </Link>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <form action={signOutUser} className="w-full">
-          <DropdownMenuItem asChild>
-            <button type="submit" className="w-full flex items-center cursor-pointer">
-              Log out
-            </button>
-          </DropdownMenuItem>
-        </form>
+        <DropdownMenuItem asChild>
+          <button 
+            onClick={handleSignOut} 
+            disabled={isSigningOut}
+            className="w-full flex items-center cursor-pointer disabled:opacity-50"
+          >
+            {isSigningOut ? 'Signing out...' : 'Log out'}
+          </button>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )
