@@ -1156,30 +1156,37 @@ export async function addMedicalRecord(appointmentId: string, payload: MedicalRe
   return result.data;
 }
 
-export async function uploadDocument(appointmentId: string, documentName: string, file: File, token: string) {
-  const formData = new FormData();
-  formData.append('documentName', documentName);
-  formData.append('document', file);
+// A new function specifically for uploading documents with multipart/form-data
+export const uploadDocument = async (
+    appointmentId: string, 
+    documentName: string, 
+    file: File, 
+    token: string,
+    prescriptionRecordId?: string
+) => {
+    const formData = new FormData();
+    formData.append('documentName', documentName);
+    formData.append('document', file);
+    if (prescriptionRecordId) {
+        formData.append('prescriptionRecordId', prescriptionRecordId);
+    }
 
-  const headers = {
-    'Authorization': `Bearer ${token}`,
-  };
+    const response = await fetch(`${API_BASE_URL}/api/admin/appointments/${appointmentId}/documents`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            // 'Content-Type': 'multipart/form-data' is set automatically by the browser with FormData
+        },
+        body: formData,
+    });
 
-  const url = `${API_BASE_URL}/api/admin/appointments/${appointmentId}/documents`;
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to upload document.');
+    }
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Failed to upload document.' }));
-    throw new Error(error.message);
-  }
-
-  return response.json();
-}
+    return response.json();
+};
 
 export async function getAdminClinicServices(clinicId: string, accessToken: string) {
     const headers = {

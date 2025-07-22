@@ -25,6 +25,7 @@ import {
     doctorClinicServices
 } from '../../../drizzle/schema';
 import { eq, sql, count, asc, and, gte, lt, getTableColumns, desc, inArray, SQL, sum, isNotNull, or, ilike } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { authMiddleware, adminOrManagerMiddleware, AuthEnv } from '../middleware/auth';
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
@@ -307,6 +308,7 @@ const newMedicalRecordSchema = z.discriminatedUnion("recordType", [
 const uploadDocumentSchema = z.object({
   documentName: z.string().min(1, { message: 'Document name is required.' }),
   document: z.instanceof(File, { message: 'A file is required.' }),
+  prescriptionRecordId: z.string().uuid({ message: "Invalid prescription record ID." }).optional(),
 });
 
 // --- Clinic Management Endpoints ---
@@ -1486,10 +1488,24 @@ adminRoutes.get('/appointments/:id', async (c) => {
                         details = noteDetails;
                         break;
                     case 'PRESCRIPTION':
-                        const [prescriptionDetails] = await db.select()
+                        // --- CORRECTED LOGIC ---
+                        const linkedMedicalRecord = alias(medicalRecords, "linkedMedicalRecord");
+                        const linkedDocument = alias(recordDocuments, "linkedDocument");
+
+                        const [prescriptionDetails] = await db
+                            .select({
+                                // Select all columns from the prescriptions table
+                                ...getTableColumns(recordPrescriptions),
+                                // Manually select and alias the linked document's details
+                                linkedDocumentName: linkedDocument.documentName,
+                                linkedDocumentFilePath: linkedDocument.filePath,
+                            })
                             .from(recordPrescriptions)
+                            .leftJoin(linkedMedicalRecord, eq(recordPrescriptions.linkedDocumentId, linkedMedicalRecord.id))
+                            .leftJoin(linkedDocument, eq(linkedMedicalRecord.id, linkedDocument.recordId))
                             .where(eq(recordPrescriptions.recordId, record.id));
                         details = prescriptionDetails;
+                        // --- END CORRECTED LOGIC ---
                         break;
                     case 'CLINICAL_DOCUMENT':
                     case 'LAB_RESULT':
@@ -1564,9 +1580,9 @@ adminRoutes.post(
     console.log("[UPLOAD_DOC] Endpoint hit.");
     try {
       const { id: appointmentId } = c.req.param();
-      const { documentName, document: file } = c.req.valid('form');
+      const { documentName, document: file, prescriptionRecordId } = c.req.valid('form');
       
-      console.log(`[UPLOAD_DOC] Received data: appointmentId=${appointmentId}, documentName='${documentName}', fileName='${file.name}', fileSize=${file.size}`);
+      console.log(`[UPLOAD_DOC] Received data: appointmentId=${appointmentId}, documentName='${documentName}', fileName='${file.name}', fileSize=${file.size}, prescriptionRecordId=${prescriptionRecordId}`);
       
       const supabaseAdmin = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
@@ -1607,6 +1623,18 @@ adminRoutes.post(
             fileType: file.type,
           })
           .returning();
+        
+        // --- NEW LOGIC ---
+        // If a prescriptionRecordId is provided, link this document to it.
+        if (prescriptionRecordId) {
+            console.log(`[UPLOAD_DOC] Linking document to prescription record: ${prescriptionRecordId}`);
+            await tx
+              .update(recordPrescriptions)
+              .set({ linkedDocumentId: newMedicalRecord.id }) // Link to the master medical_records entry for the document
+              .where(eq(recordPrescriptions.id, prescriptionRecordId));
+            console.log(`[UPLOAD_DOC] Link successful.`);
+        }
+        // --- END NEW LOGIC ---
         
         console.log("[UPLOAD_DOC] Created record_documents entry. Transaction complete.");
         return { ...newMedicalRecord, details: newDocumentRecord };

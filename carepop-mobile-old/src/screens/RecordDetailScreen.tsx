@@ -32,6 +32,7 @@ import { MedicalRecordWithRelations } from '../lib/types';
 import { getMedicalRecordDetails, downloadMedicalDocument } from '../services/api';
 import { RecordsStackParamList } from '../navigation/AppDrawerNavigator';
 import { Card } from '../components/card.native';
+import { downloadDocument } from '../services/actions';
 
 type RecordDetailScreenRouteProp = RouteProp<RecordsStackParamList, 'RecordDetail'>;
 
@@ -62,6 +63,53 @@ const Section = React.memo(({ title, children }: any) => (
 ));
 Section.displayName = 'Section';
 
+const PrescriptionDetails = ({ details }: { details: any }) => {
+    const [isDownloading, setIsDownloading] = useState(false);
+
+    const handleDownload = async () => {
+        if (!details.linkedDocumentFilePath) {
+            Alert.alert("No Document", "There is no document linked to this prescription.");
+            return;
+        }
+        setIsDownloading(true);
+        try {
+            const result = await downloadDocument(details.linkedDocumentFilePath);
+            if (result.error || !result.downloadUrl) {
+                throw new Error(result.error || 'Could not get download URL.');
+            }
+            await Linking.openURL(result.downloadUrl);
+        } catch (error: any) {
+            Alert.alert("Download Failed", error.message);
+        } finally {
+            setIsDownloading(false);
+        }
+    };
+
+    return (
+        <View>
+            <DetailRow icon={Pill} label="Medication" value={details.medicationName || details.medication || 'N/A'} />
+            <DetailRow icon={Pill} label="Dosage" value={details.dosage || 'N/A'} />
+            <DetailRow icon={Pill} label="Frequency" value={details.frequency || 'N/A'} />
+            <DetailRow icon={FileText} label="Instructions" value={details.instructions || details.notes || 'N/A'} />
+
+            {details.linkedDocumentFilePath && (
+                <View style={styles.documentContainer}>
+                    <Download size={20} color={theme.colors.primary} />
+                    <Text style={styles.documentName}>{details.documentName || 'Linked Document'}</Text>
+                    <TouchableOpacity onPress={handleDownload} disabled={isDownloading} style={styles.downloadButton}>
+                        {isDownloading ? (
+                            <ActivityIndicator color="#fff" />
+                        ) : (
+                            <Download size={16} color="#fff" />
+                        )}
+                    </TouchableOpacity>
+                </View>
+            )}
+        </View>
+    );
+};
+
+
 const renderRecordDetails = (record: MedicalRecordWithRelations, onDownload: (record: MedicalRecordWithRelations) => void, downloading: boolean) => {
   const { details, recordType } = record;
   if (!details) return <Text style={styles.value}>No additional details provided.</Text>;
@@ -72,15 +120,7 @@ const renderRecordDetails = (record: MedicalRecordWithRelations, onDownload: (re
         <Text style={styles.value}>{(details as any)?.note || 'No note content available.'}</Text>
       );
     case 'PRESCRIPTION':
-      const prescriptionDetails = details as any;
-      return (
-        <>
-          <DetailRow icon={Pill} label="Medication" value={prescriptionDetails?.medicationName || prescriptionDetails?.medication || 'N/A'} />
-          <DetailRow icon={Pill} label="Dosage" value={prescriptionDetails?.dosage || 'N/A'} />
-          <DetailRow icon={Pill} label="Frequency" value={prescriptionDetails?.frequency || 'N/A'} />
-          <DetailRow icon={FileText} label="Instructions" value={prescriptionDetails?.instructions || prescriptionDetails?.notes || 'N/A'} />
-        </>
-      );
+      return <PrescriptionDetails details={details} />;
     case 'CLINICAL_DOCUMENT':
       const documentDetails = details as any;
       return (
@@ -328,5 +368,19 @@ const styles = StyleSheet.create({
     color: theme.colors.primary,
     fontSize: 14,
     fontFamily: theme.typography.fontFamilyMedium,
+  },
+  documentContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.muted,
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    marginTop: theme.spacing.lg,
+  },
+  documentName: {
+    ...theme.typography.body,
+    fontFamily: theme.typography.fontFamilySemiBold,
+    flex: 1,
+    marginLeft: theme.spacing.md,
   },
 }); 

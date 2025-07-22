@@ -35,6 +35,9 @@ const prescriptionFormSchema = z.object({
     startDate: z.string().optional(),
     endDate: z.string().optional(),
     notes: z.string().optional(),
+    // Add the linked document fields which will be populated by the API
+    linkedDocumentName: z.string().optional().nullable(),
+    linkedDocumentFilePath: z.string().optional().nullable(),
 });
 type PrescriptionFormData = z.infer<typeof prescriptionFormSchema>;
 
@@ -57,16 +60,57 @@ const FREQUENCY_OPTIONS = [
 
 // --- SPECIALIZED CARD COMPONENTS ---
 const NoteCard = ({ details }: { details: DoctorNote }) => ( <p className="text-sm text-gray-700 whitespace-pre-wrap">{details.note}</p> );
-const PrescriptionCard = ({ details }: { details: Prescription }) => (
-    <div className="text-sm grid grid-cols-2 gap-x-4 gap-y-2">
-        <p><strong>Medication:</strong></p><p>{details.medication}</p>
-        {details.dosage && <><p><strong>Dosage:</strong></p><p>{details.dosage}</p></>}
-        {details.frequency && <><p><strong>Frequency:</strong></p><p>{details.frequency}</p></>}
-        {details.startDate && <><p><strong>Start Date:</strong></p><p>{new Date(details.startDate).toLocaleDateString()}</p></>}
-        {details.endDate && <><p><strong>End Date:</strong></p><p>{new Date(details.endDate).toLocaleDateString()}</p></>}
-        {details.notes && <><p><strong>Notes:</strong></p><p className="col-span-2">{details.notes}</p></>}
-    </div>
-);
+
+const PrescriptionCard = ({ details, onLinkDocument }: { details: Prescription, onLinkDocument: (prescriptionRecordId: string) => void }) => {
+    const { supabase } = useAuth();
+    const handleDownload = async (filePath: string) => {
+        if (!supabase) return;
+        const { data, error } = await supabase.storage.from('medical-documents').createSignedUrl(filePath, 60);
+        if (error || !data?.signedUrl) {
+            console.error("Error creating signed URL for prescription document:", error);
+            alert('Could not get download link.');
+            return;
+        }
+        window.open(data.signedUrl, '_blank');
+    };
+
+    return (
+        <div className="text-sm">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                <p><strong>Medication:</strong></p><p>{details.medication}</p>
+                {details.dosage && <><p><strong>Dosage:</strong></p><p>{details.dosage}</p></>}
+                {details.frequency && <><p><strong>Frequency:</strong></p><p>{details.frequency}</p></>}
+                {details.startDate && <><p><strong>Start Date:</strong></p><p>{new Date(details.startDate).toLocaleDateString()}</p></>}
+                {details.endDate && <><p><strong>End Date:</strong></p><p>{new Date(details.endDate).toLocaleDateString()}</p></>}
+                {details.notes && <><p><strong>Notes:</strong></p><p className="col-span-2">{details.notes}</p></>}
+            </div>
+            {/* --- NEW LOGIC for linked document --- */}
+            <div className="mt-4 pt-3 border-t">
+                {(details as any).linkedDocumentFilePath ? (
+                    <div className="flex items-center justify-between p-2 bg-slate-50 rounded-md">
+                        <div className="flex items-center gap-3">
+                            <FileText className="h-5 w-5 text-slate-600"/>
+                            <div>
+                                <span className="text-sm font-medium">{(details as any).linkedDocumentName || 'View Linked Document'}</span>
+                                <p className="text-xs text-slate-500">Linked Document</p>
+                            </div>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => handleDownload((details as any).linkedDocumentFilePath)}>
+                            <Download className="h-4 w-4 mr-2" />Download
+                        </Button>
+                    </div>
+                ) : (
+                    <Button variant="secondary" size="sm" onClick={() => onLinkDocument(details.id)}>
+                        <UploadCloud className="h-4 w-4 mr-2" />
+                        Upload & Link Document
+                    </Button>
+                )}
+            </div>
+            {/* --- END NEW LOGIC --- */}
+        </div>
+    );
+};
+
 const DocumentCard = ({ details }: { details: ClinicalDocument }) => {
     const { supabase } = useAuth();
     const handleDownload = async () => {
@@ -94,7 +138,7 @@ const DocumentCard = ({ details }: { details: ClinicalDocument }) => {
 };
 
 // --- DISPATCHER CARD COMPONENT ---
-const MedicalRecordCard = ({ record }: { record: MedicalRecordWithDetails }) => {
+const MedicalRecordCard = ({ record, onLinkDocument }: { record: MedicalRecordWithDetails, onLinkDocument: (prescriptionRecordId: string) => void }) => {
     const recordDate = new Date(record.createdAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
     const getRecordIcon = () => {
         switch(record.recordType) {
@@ -108,7 +152,7 @@ const MedicalRecordCard = ({ record }: { record: MedicalRecordWithDetails }) => 
         if (!record.details) return <p className="text-sm text-red-500 italic">Error: Record details are missing.</p>;
         switch(record.recordType) {
             case 'DOCTOR_NOTE': return <NoteCard details={record.details as DoctorNote}/>;
-            case 'PRESCRIPTION': return <PrescriptionCard details={record.details as Prescription}/>;
+            case 'PRESCRIPTION': return <PrescriptionCard details={record.details as Prescription} onLinkDocument={onLinkDocument} />;
             case 'CLINICAL_DOCUMENT': case 'LAB_RESULT': return <DocumentCard details={record.details as ClinicalDocument}/>;
             default: return <p className="text-sm italic">Unknown record type.</p>;
         }
@@ -134,6 +178,7 @@ export function MedicalRecordList({ initialRecords, appointmentId }: MedicalReco
     const queryClient = useQueryClient();
     const [dialogOpen, setDialogOpen] = React.useState< 'note' | 'prescription' | 'document' | null>(null);
     const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
+    const [activePrescriptionId, setActivePrescriptionId] = React.useState<string | null>(null);
 
     const noteForm = useForm<NoteFormData>({ resolver: zodResolver(noteFormSchema), defaultValues: { note: '' }});
     const prescriptionForm = useForm<PrescriptionFormData>({ resolver: zodResolver(prescriptionFormSchema), defaultValues: { medication: '', dosage: '', frequency: '', startDate: '', endDate: '', notes: '' }});
@@ -167,28 +212,17 @@ export function MedicalRecordList({ initialRecords, appointmentId }: MedicalReco
     });
 
     const { mutate: uploadDocMutate, isPending: isUploadingDoc } = useMutation({
-        mutationFn: (data: DocumentUploadPayload) => api.uploadDocument(appointmentId, data.documentName, data.file, session!.access_token),
-        onSuccess: (newlyCreatedRecord) => {
-            // Optimistically update the UI without a full refetch
-            queryClient.setQueryData(
-                ['appointmentDetails', appointmentId, 'records'],
-                (oldRecords: MedicalRecordWithDetails[] | undefined) => {
-                    // The API returns the full record object inside a 'data' property
-                    const newRecord = newlyCreatedRecord.data;
-                    if (oldRecords) {
-                        return [...oldRecords, newRecord];
-                    }
-                    return [newRecord];
-                }
-            );
-            
-            // Still invalidate in the background to ensure data consistency with the server
+        mutationFn: (data: DocumentUploadPayload & { prescriptionRecordId?: string }) => 
+            api.uploadDocument(appointmentId, data.documentName, data.file, session!.access_token, data.prescriptionRecordId),
+        onSuccess: () => {
+            // Because we are now linking, a full refetch is safer to ensure all data is consistent.
             queryClient.invalidateQueries({ queryKey: ['appointmentDetails', appointmentId] });
 
             // Reset form and close dialog
             documentForm.reset(); 
             setSelectedFile(null);
             setDialogOpen(null);
+            setActivePrescriptionId(null);
         },
         onError: onMutationError,
     });
@@ -197,7 +231,12 @@ export function MedicalRecordList({ initialRecords, appointmentId }: MedicalReco
     const handlePrescriptionSubmit = (data: PrescriptionFormData) => addPrescriptionMutate(data);
     const handleDocumentSubmit = (data: DocumentFormData) => {
         if (!selectedFile) { alert("Please select a file to upload."); return; }
-        uploadDocMutate({ ...data, file: selectedFile });
+        uploadDocMutate({ ...data, file: selectedFile, prescriptionRecordId: activePrescriptionId || undefined });
+    };
+
+    const handleOpenLinkDialog = (prescriptionRecordId: string) => {
+        setActivePrescriptionId(prescriptionRecordId);
+        setDialogOpen('document');
     };
     
     return (
@@ -269,7 +308,7 @@ export function MedicalRecordList({ initialRecords, appointmentId }: MedicalReco
             </div>
             <div className="space-y-4">
                 {isLoadingRecords ? <p>Loading records...</p> : records && records.length > 0 ? (
-                    records.map((record: MedicalRecordWithDetails) => <MedicalRecordCard key={record.id} record={record} />)
+                    records.map((record: MedicalRecordWithDetails) => <MedicalRecordCard key={record.id} record={record} onLinkDocument={handleOpenLinkDialog} />)
                 ) : (
                     <div className="text-center py-10 border-2 border-dashed rounded-lg">
                         <p className="text-gray-500">No medical records found.</p>

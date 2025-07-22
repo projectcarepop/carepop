@@ -193,6 +193,7 @@ export const recordPrescriptions = pgTable("record_prescriptions", {
     startDate: date("start_date"),
     endDate: date("end_date"),
     notes: text("notes"),
+    linkedDocumentId: uuid("linked_document_id").references(() => medicalRecords.id, { onDelete: 'set null' }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 });
 

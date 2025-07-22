@@ -6,10 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import { Stethoscope, Pill, FileText, User, Building, Syringe, Calendar, Download, ArrowLeft } from 'lucide-react';
+import { Stethoscope, Pill, FileText, User, Building, Syringe, Calendar, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { downloadMedicalDocument } from '@/services/api';
-import { useAuth } from '@/lib/contexts/auth-context';
+import { downloadDocument } from '@/app/records/actions';
+import { useToast } from '@/hooks/use-toast';
 
 interface RecordDetailClientProps {
   record: MedicalRecordWithRelations;
@@ -26,32 +26,55 @@ const formatRecordType = (type: MedicalRecordWithRelations['recordType']) => {
   }
 };
 
+const InfoRow = ({ label, value }: { label: string, value: string | null | undefined }) => {
+    if (!value) return null;
+    return <p><strong className="font-semibold text-gray-600">{label}:</strong> {value}</p>;
+};
+
+const PrescriptionDetails = ({ details, onDownload }: { details: any; onDownload: (filePath: string) => void; }) => {
+    return (
+        <div className="text-sm space-y-2 text-gray-800">
+            <InfoRow label="Medication" value={details.medication} />
+            <InfoRow label="Dosage" value={details.dosage} />
+            <InfoRow label="Frequency" value={details.frequency} />
+            {details.notes && <InfoRow label="Notes" value={details.notes} />}
+            
+            {details.linkedDocumentFilePath && (
+                <div className="flex items-center justify-between rounded-lg border p-4 mt-4">
+                    <div className="flex items-center gap-3">
+                        <FileText className="h-6 w-6 text-green-600" />
+                        <div>
+                            <span className="font-medium block">{details.linkedDocumentName || 'Linked Document'}</span>
+                            <span className="text-sm text-gray-500">Scanned Prescription File</span>
+                        </div>
+                    </div>
+                    <Button onClick={() => onDownload(details.linkedDocumentFilePath)} className="min-w-[120px]">
+                        Download
+                    </Button>
+                </div>
+            )}
+        </div>
+    );
+};
+
 const RecordDetailsContent = ({ record }: { record: MedicalRecordWithRelations }) => {
-    const { session } = useAuth();
+    const { toast } = useToast();
     const [isDownloading, setIsDownloading] = useState(false);
 
-    const handleDownload = async () => {
-        if (!session?.access_token) {
-            alert('Please log in to download documents');
-            return;
-        }
-
+    const handleDownload = async (filePath: string) => {
         setIsDownloading(true);
         try {
-            const response = await downloadMedicalDocument(record.id, session.access_token);
+            const result = await downloadDocument(filePath);
+            if (result.error) throw new Error(result.error);
             
-            // Create a temporary link element and trigger download
             const link = document.createElement('a');
-            link.href = response.downloadUrl;
-            link.download = response.fileName || 'medical-document';
-            link.target = '_blank';
+            link.href = result.downloadUrl!;
+            link.download = result.fileName || 'document';
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            
-        } catch (error) {
-            console.error('Download failed:', error);
-            alert('Failed to download document. Please try again.');
+        } catch (error: any) {
+            toast({ title: "Download Failed", description: error.message, variant: "destructive" });
         } finally {
             setIsDownloading(false);
         }
@@ -63,16 +86,7 @@ const RecordDetailsContent = ({ record }: { record: MedicalRecordWithRelations }
             return <p className="text-gray-700 whitespace-pre-wrap">{noteDetails?.note || 'No note content available.'}</p>;
         
         case 'PRESCRIPTION':
-            const presDetails = record.details as any;
-            if (!presDetails) return <p>No prescription details available.</p>;
-            return (
-                <div className="text-sm space-y-2 text-gray-800">
-                    <p><strong className="font-semibold text-gray-600">Medication:</strong> {presDetails.medication}</p>
-                    <p><strong className="font-semibold text-gray-600">Dosage:</strong> {presDetails.dosage}</p>
-                    <p><strong className="font-semibold text-gray-600">Frequency:</strong> {presDetails.frequency}</p>
-                    {presDetails.notes && <p><strong className="font-semibold text-gray-600">Notes:</strong> {presDetails.notes}</p>}
-                </div>
-            );
+            return <PrescriptionDetails details={record.details} onDownload={handleDownload} />;
             
         case 'CLINICAL_DOCUMENT':
             const docDetails = record.details as any;
@@ -86,22 +100,8 @@ const RecordDetailsContent = ({ record }: { record: MedicalRecordWithRelations }
                             {docDetails.fileType && <span className="text-sm text-gray-500">{docDetails.fileType}</span>}
                         </div>
                     </div>
-                    <Button 
-                        onClick={handleDownload}
-                        disabled={isDownloading}
-                        className="min-w-[120px]"
-                    >
-                        {isDownloading ? (
-                            <>
-                                <div className="animate-spin h-4 w-4 mr-2 border border-white border-t-transparent rounded-full"></div>
-                                Downloading...
-                            </>
-                        ) : (
-                            <>
-                                <Download className="mr-2 h-4 w-4" />
-                                Download
-                            </>
-                        )}
+                    <Button onClick={() => handleDownload(docDetails.filePath)} disabled={isDownloading} className="min-w-[120px]">
+                        {isDownloading ? 'Downloading...' : 'Download'}
                     </Button>
                 </div>
             );

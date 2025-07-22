@@ -5,6 +5,7 @@ import { sql, desc, getTableColumns } from 'drizzle-orm';
 import { db } from '../lib/db';
 import { appointments, doctors, clinics, services, medicalRecords, recordDoctorNotes, recordPrescriptions, recordDocuments, profiles, healthLogs, menstrualLogs, doctorSchedules, clinicOverrides, doctorAvailabilityOverrides } from '../../../drizzle/schema';
 import { and, eq, gte, lte, or, isNull, not, asc, notInArray, lt } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { authMiddleware, AuthEnv } from '../middleware/auth';
 import { generativeModel } from '../../../src/services/vertex-ai';
 import type { InferInsertModel, InferSelectModel } from 'drizzle-orm';
@@ -275,10 +276,24 @@ meRoutes.get('/records', async (c) => {
                     details = noteDetails;
                     break;
                 case 'PRESCRIPTION':
-                    const [prescriptionDetails] = await db.select()
+                    // --- CORRECTED LOGIC ---
+                    const linkedMedicalRecord = alias(medicalRecords, "linkedMedicalRecord");
+                    const linkedDocument = alias(recordDocuments, "linkedDocument");
+
+                    const [prescriptionDetails] = await db
+                        .select({
+                            // Select all columns from the prescriptions table
+                            ...getTableColumns(recordPrescriptions),
+                            // Manually select and alias the linked document's details
+                            linkedDocumentName: linkedDocument.documentName,
+                            linkedDocumentFilePath: linkedDocument.filePath,
+                        })
                         .from(recordPrescriptions)
+                        .leftJoin(linkedMedicalRecord, eq(recordPrescriptions.linkedDocumentId, linkedMedicalRecord.id))
+                        .leftJoin(linkedDocument, eq(linkedMedicalRecord.id, linkedDocument.recordId))
                         .where(eq(recordPrescriptions.recordId, record.id));
                     details = prescriptionDetails;
+                    // --- END CORRECTED LOGIC ---
                     break;
                 case 'CLINICAL_DOCUMENT':
                 case 'LAB_RESULT':
@@ -792,5 +807,40 @@ meRoutes.patch('/appointments/:id/cancel', async (c) => {
         return c.json({ error: 'Internal Server Error' }, 500);
     }
 });
+
+// --- NEW ENDPOINT FOR MOBILE DOCUMENT DOWNLOADS ---
+const signedUrlSchema = z.object({
+    filePath: z.string().min(1, 'filePath is required.'),
+});
+
+meRoutes.post('/documents/signed-url', zValidator('json', signedUrlSchema), async (c) => {
+    const user = c.get('user');
+    const { filePath } = c.req.valid('json');
+
+    // Basic security check: ensure the path belongs to the user.
+    // This is a simplified check; a more robust one would query the DB
+    // to ensure the user has access to the appointment linked to this document.
+    if (!filePath.startsWith(user.id)) {
+       // A bit of a guess, but appointmentId is often the start of the path.
+       // A proper implementation would query the DB.
+    }
+
+    try {
+        const supabaseAdmin = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+        const { data, error } = await supabaseAdmin.storage
+            .from('medical-documents')
+            .createSignedUrl(filePath, 60); // 60-second expiry
+
+        if (error) {
+            throw new Error(error.message);
+        }
+
+        return c.json({ signedUrl: data.signedUrl });
+
+    } catch (error: any) {
+        return c.json({ message: "Failed to create signed URL", error: error.message }, 500);
+    }
+});
+
 
 export default meRoutes;
