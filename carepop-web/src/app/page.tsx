@@ -68,7 +68,7 @@ export default function Home() {
                 </p>
               </div>
               <div className="flex flex-col gap-3 min-[400px]:flex-row">
-                <Link href="/clinic-finder" passHref>
+                <Link href="/find-a-clinic" passHref>
                   <Button size="lg">
                     Find a Clinic
                   </Button>
