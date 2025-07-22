@@ -1626,7 +1626,7 @@ adminRoutes.post(
         
         documentInfo = {
             documentName: document.name,
-            filePath: uploadData.path,
+            filePath: storagePath,
             fileType: document.type,
         };
       }
