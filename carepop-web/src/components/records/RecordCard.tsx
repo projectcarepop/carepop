@@ -2,10 +2,7 @@ import { type MedicalRecordWithRelations } from '@/lib/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { Stethoscope, Pill, FileText, User, Building, Syringe, Calendar, Download } from 'lucide-react';
-import { downloadMedicalDocument } from '@/services/api';
-import { useAuth } from '@/lib/contexts/auth-context';
-import { useState } from 'react';
+import { Stethoscope, Pill, FileText, User, Building, Syringe, Calendar } from 'lucide-react';
 
 interface RecordCardProps {
   record: MedicalRecordWithRelations;
@@ -22,37 +19,6 @@ const formatRecordType = (type: MedicalRecordWithRelations['recordType']) => {
 };
 
 const RecordDetails = ({ record }: { record: MedicalRecordWithRelations }) => {
-    const { session } = useAuth();
-    const [isDownloading, setIsDownloading] = useState(false);
-
-    const handleDownload = async (e: React.MouseEvent) => {
-        e.preventDefault(); // Prevent link navigation
-        
-        if (!session?.access_token) {
-            alert('Please log in to download documents');
-            return;
-        }
-
-        setIsDownloading(true);
-        try {
-            const response = await downloadMedicalDocument(record.id, session.access_token);
-            
-            // Create a temporary link element and trigger download
-            const link = document.createElement('a');
-            link.href = response.downloadUrl;
-            link.download = response.fileName || 'medical-document';
-            link.target = '_blank';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            
-        } catch (error) {
-            console.error('Download failed:', error);
-            alert('Failed to download document. Please try again.');
-        } finally {
-            setIsDownloading(false);
-        }
-    };
 
     switch (record.recordType) {
         case 'DOCTOR_NOTE':
@@ -61,12 +27,20 @@ const RecordDetails = ({ record }: { record: MedicalRecordWithRelations }) => {
         
         case 'PRESCRIPTION':
             const presDetails = record.details as any; // Cast to access prescription fields
+            const hasAttachedFile = presDetails?.filePath && typeof presDetails.filePath === 'string';
             return (
                 <div className="text-sm space-y-2">
                     <p><strong className="font-semibold">Medication:</strong> {presDetails?.medication}</p>
                     <p><strong className="font-semibold">Dosage:</strong> {presDetails?.dosage}</p>
                     <p><strong className="font-semibold">Frequency:</strong> {presDetails?.frequency}</p>
                     {presDetails?.notes && <p><strong className="font-semibold">Notes:</strong> {presDetails.notes}</p>}
+                    {hasAttachedFile && (
+                        <div className="flex items-center gap-2 mt-3 p-2 bg-green-50 border border-green-200 rounded-md">
+                            <FileText className="h-4 w-4 text-green-600" />
+                            <span className="text-green-700 font-medium text-xs">📎 Document Attached</span>
+                            <span className="text-green-600 text-xs">({presDetails.documentName || 'Prescription Document'})</span>
+                        </div>
+                    )}
                 </div>
             );
             
@@ -75,30 +49,16 @@ const RecordDetails = ({ record }: { record: MedicalRecordWithRelations }) => {
             if (!docDetails) {
                 return <p className="text-sm text-gray-500">Document details not available.</p>;
             }
+            const hasDocumentFile = docDetails.filePath && typeof docDetails.filePath === 'string';
             return (
                 <div className="text-sm space-y-2">
                     <p><strong className="font-semibold">Document:</strong> {docDetails.documentName}</p>
                     {docDetails.fileType && <p><strong className="font-semibold">Type:</strong> {docDetails.fileType}</p>}
-                    {docDetails.filePath && (
-                        <div className="mt-2">
-                            <p className="text-xs text-gray-500 mb-1">File uploaded successfully</p>
-                            <button 
-                                onClick={handleDownload}
-                                disabled={isDownloading}
-                                className="inline-flex items-center px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {isDownloading ? (
-                                    <>
-                                        <div className="animate-spin h-3 w-3 mr-1 border border-blue-600 border-t-transparent rounded-full"></div>
-                                        Downloading...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Download className="h-3 w-3 mr-1" />
-                                        Download
-                                    </>
-                                )}
-                            </button>
+                    {hasDocumentFile && (
+                        <div className="flex items-center gap-2 mt-3 p-2 bg-blue-50 border border-blue-200 rounded-md">
+                            <FileText className="h-4 w-4 text-blue-600" />
+                            <span className="text-blue-700 font-medium text-xs">📎 Document Available</span>
+                            <span className="text-blue-600 text-xs">Click to view details and download</span>
                         </div>
                     )}
                 </div>
