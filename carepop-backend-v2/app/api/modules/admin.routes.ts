@@ -1487,6 +1487,7 @@ adminRoutes.get('/appointments/:id', async (c) => {
                         details = noteDetails;
                         break;
                     case 'PRESCRIPTION':
+                        // This is the corrected query that matches the new schema.
                         const [prescriptionDetails] = await db.select()
                             .from(recordPrescriptions)
                             .where(eq(recordPrescriptions.recordId, record.id));

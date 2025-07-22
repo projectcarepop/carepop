@@ -276,24 +276,10 @@ meRoutes.get('/records', async (c) => {
                     details = noteDetails;
                     break;
                 case 'PRESCRIPTION':
-                    // --- CORRECTED LOGIC ---
-                    const linkedMedicalRecord = alias(medicalRecords, "linkedMedicalRecord");
-                    const linkedDocument = alias(recordDocuments, "linkedDocument");
-
-                    const [prescriptionDetails] = await db
-                        .select({
-                            // Select all columns from the prescriptions table
-                            ...getTableColumns(recordPrescriptions),
-                            // Manually select and alias the linked document's details
-                            linkedDocumentName: linkedDocument.documentName,
-                            linkedDocumentFilePath: linkedDocument.filePath,
-                        })
+                    const [prescriptionDetails] = await db.select()
                         .from(recordPrescriptions)
-                        .leftJoin(linkedMedicalRecord, eq(recordPrescriptions.linkedDocumentId, linkedMedicalRecord.id))
-                        .leftJoin(linkedDocument, eq(linkedMedicalRecord.id, linkedDocument.recordId))
                         .where(eq(recordPrescriptions.recordId, record.id));
                     details = prescriptionDetails;
-                    // --- END CORRECTED LOGIC ---
                     break;
                 case 'CLINICAL_DOCUMENT':
                 case 'LAB_RESULT':
@@ -386,7 +372,10 @@ meRoutes.get('/records/:recordId', async (c) => {
                 details = await db.query.recordDoctorNotes.findFirst({ where: eq(recordDoctorNotes.recordId, baseRecord.id) });
                 break;
             case 'PRESCRIPTION':
-                details = await db.query.recordPrescriptions.findFirst({ where: eq(recordPrescriptions.recordId, baseRecord.id) });
+                const [prescriptionDetails] = await db.select()
+                    .from(recordPrescriptions)
+                    .where(eq(recordPrescriptions.recordId, baseRecord.id));
+                details = prescriptionDetails;
                 break;
             case 'CLINICAL_DOCUMENT':
                 details = await db.query.recordDocuments.findFirst({ where: eq(recordDocuments.recordId, baseRecord.id) });
