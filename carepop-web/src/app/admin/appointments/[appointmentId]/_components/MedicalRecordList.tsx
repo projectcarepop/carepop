@@ -61,17 +61,34 @@ const FREQUENCY_OPTIONS = [
 // --- SPECIALIZED CARD COMPONENTS ---
 const NoteCard = ({ details }: { details: DoctorNote }) => ( <p className="text-sm text-gray-700 whitespace-pre-wrap">{details.note}</p> );
 
-const PrescriptionCard = ({ details }: { details: Prescription }) => {
-    const { supabase } = useAuth();
-    const handleDownload = async (filePath: string) => {
-        if (!supabase) return;
-        const { data, error } = await supabase.storage.from('medical-documents').createSignedUrl(filePath, 60);
-        if (error || !data?.signedUrl) {
-            console.error("Error creating signed URL for prescription document:", error);
-            alert('Could not get download link.');
+const PrescriptionCard = ({ details, recordId }: { details: Prescription; recordId: string }) => {
+    const { session } = useAuth();
+    const [isDownloading, setIsDownloading] = React.useState(false);
+    
+    const handleDownload = async () => {
+        if (!session?.access_token) {
+            alert('Authentication required to download documents.');
             return;
         }
-        window.open(data.signedUrl, '_blank');
+        
+        const { downloadWithRetry, getErrorMessage } = await import('@/lib/utils/download-helpers');
+        
+        downloadWithRetry({
+            recordId,
+            accessToken: session.access_token,
+            isAdmin: true,
+            maxRetries: 2,
+            onStart: () => setIsDownloading(true),
+            onSuccess: (fileName) => {
+                console.log(`Successfully downloaded: ${fileName}`);
+                // Could add a success toast here if needed
+            },
+            onError: (error) => {
+                const { title, description, action } = getErrorMessage(error);
+                alert(`${title}\n\n${description}\n\n${action || ''}`);
+            },
+            onFinally: () => setIsDownloading(false)
+        });
     };
 
     return (
@@ -95,8 +112,17 @@ const PrescriptionCard = ({ details }: { details: Prescription }) => {
                                 <p className="text-xs text-slate-500">{(details as any).fileType}</p>
                             </div>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => handleDownload((details as any).filePath)}>
-                            <Download className="h-4 w-4 mr-2" />Download
+                        <Button variant="outline" size="sm" onClick={handleDownload} disabled={isDownloading}>
+                            {isDownloading ? (
+                                <>
+                                    <div className="animate-spin h-4 w-4 mr-2 border-2 border-slate-600 border-t-transparent rounded-full"></div>
+                                    Downloading...
+                                </>
+                            ) : (
+                                <>
+                                    <Download className="h-4 w-4 mr-2" />Download
+                                </>
+                            )}
                         </Button>
                     </div>
                 </div>
@@ -105,18 +131,35 @@ const PrescriptionCard = ({ details }: { details: Prescription }) => {
     );
 };
 
-const DocumentCard = ({ details }: { details: ClinicalDocument }) => {
-    const { supabase } = useAuth();
+const DocumentCard = ({ details, recordId }: { details: ClinicalDocument; recordId: string }) => {
+    const { session } = useAuth();
+    const [isDownloading, setIsDownloading] = React.useState(false);
+    
     const handleDownload = async () => {
-        if (!supabase) return;
-        const { data, error } = await supabase.storage.from('medical-documents').createSignedUrl(details.filePath, 60);
-        if (error || !data?.signedUrl) {
-            console.error("Error creating signed URL:", error);
-            alert('Could not get download link.');
+        if (!session?.access_token) {
+            alert('Authentication required to download documents.');
             return;
         }
-        window.open(data.signedUrl, '_blank');
+        
+        const { downloadWithRetry, getErrorMessage } = await import('@/lib/utils/download-helpers');
+        
+        downloadWithRetry({
+            recordId,
+            accessToken: session.access_token,
+            isAdmin: true,
+            maxRetries: 2,
+            onStart: () => setIsDownloading(true),
+            onSuccess: (fileName) => {
+                console.log(`Successfully downloaded: ${fileName}`);
+            },
+            onError: (error) => {
+                const { title, description, action } = getErrorMessage(error);
+                alert(`${title}\n\n${description}\n\n${action || ''}`);
+            },
+            onFinally: () => setIsDownloading(false)
+        });
     };
+    
     return (
         <div className="flex items-center justify-between p-3 bg-slate-100 rounded-md">
             <div className="flex items-center gap-3">
@@ -126,7 +169,18 @@ const DocumentCard = ({ details }: { details: ClinicalDocument }) => {
                     {details.fileType && <p className="text-xs text-slate-500">{details.fileType}</p>}
                 </div>
             </div>
-            <Button variant="outline" size="sm" onClick={handleDownload}><Download className="h-4 w-4 mr-2" />Download</Button>
+            <Button variant="outline" size="sm" onClick={handleDownload} disabled={isDownloading}>
+                {isDownloading ? (
+                    <>
+                        <div className="animate-spin h-4 w-4 mr-2 border-2 border-slate-600 border-t-transparent rounded-full"></div>
+                        Downloading...
+                    </>
+                ) : (
+                    <>
+                        <Download className="h-4 w-4 mr-2" />Download
+                    </>
+                )}
+            </Button>
         </div>
     );
 };
@@ -146,8 +200,8 @@ const MedicalRecordCard = ({ record }: { record: MedicalRecordWithDetails }) => 
         if (!record.details) return <p className="text-sm text-red-500 italic">Error: Record details are missing.</p>;
         switch(record.recordType) {
             case 'DOCTOR_NOTE': return <NoteCard details={record.details as DoctorNote}/>;
-            case 'PRESCRIPTION': return <PrescriptionCard details={record.details as Prescription}/>;
-            case 'CLINICAL_DOCUMENT': case 'LAB_RESULT': return <DocumentCard details={record.details as ClinicalDocument}/>;
+            case 'PRESCRIPTION': return <PrescriptionCard details={record.details as Prescription} recordId={record.id}/>;
+            case 'CLINICAL_DOCUMENT': case 'LAB_RESULT': return <DocumentCard details={record.details as ClinicalDocument} recordId={record.id}/>;
             default: return <p className="text-sm italic">Unknown record type.</p>;
         }
     };

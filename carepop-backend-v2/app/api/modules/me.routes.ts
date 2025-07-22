@@ -372,12 +372,10 @@ meRoutes.get('/records/:recordId', async (c) => {
                 details = await db.query.recordDoctorNotes.findFirst({ where: eq(recordDoctorNotes.recordId, baseRecord.id) });
                 break;
             case 'PRESCRIPTION':
-                const [prescriptionDetails] = await db.select()
-                    .from(recordPrescriptions)
-                    .where(eq(recordPrescriptions.recordId, baseRecord.id));
-                details = prescriptionDetails;
+                details = await db.query.recordPrescriptions.findFirst({ where: eq(recordPrescriptions.recordId, baseRecord.id) });
                 break;
             case 'CLINICAL_DOCUMENT':
+            case 'LAB_RESULT':
                 details = await db.query.recordDocuments.findFirst({ where: eq(recordDocuments.recordId, baseRecord.id) });
                 break;
         }
@@ -394,17 +392,21 @@ meRoutes.get('/records/:recordId', async (c) => {
 /**
  * GET /me/records/:recordId/download
  * Generates a signed URL for downloading a medical document.
+ * Enhanced with comprehensive audit logging.
  */
 meRoutes.get('/records/:recordId/download', async (c) => {
     const user = c.get('user');
     const { recordId } = c.req.param();
 
     try {
+        console.log(`[USER_DOWNLOAD] User ${user.id} (${user.email}) requesting download for record ${recordId}`);
+        
         // First, verify the user owns this record and it's a document
         const [record] = await db.select({
             id: medicalRecords.id,
             recordType: medicalRecords.recordType,
             appointmentId: medicalRecords.appointmentId,
+            createdAt: medicalRecords.createdAt,
         })
         .from(medicalRecords)
         .innerJoin(appointments, eq(medicalRecords.appointmentId, appointments.id))
@@ -417,8 +419,12 @@ meRoutes.get('/records/:recordId/download', async (c) => {
         );
 
         if (!record) {
+            console.warn(`[USER_DOWNLOAD] Record ${recordId} not found or access denied for user ${user.id}`);
             return c.json({ error: 'Document not found or you do not have permission to access it.' }, 404);
         }
+
+        // Log successful record access
+        console.log(`[USER_DOWNLOAD] User ${user.id} accessing record ${recordId} (type: ${record.recordType}, appointment: ${record.appointmentId})`);        
 
         // Get the document details
         const [documentDetails] = await db.select()
@@ -426,8 +432,12 @@ meRoutes.get('/records/:recordId/download', async (c) => {
             .where(eq(recordDocuments.recordId, record.id));
 
         if (!documentDetails || !documentDetails.filePath) {
+            console.warn(`[USER_DOWNLOAD] Document file not found for record ${recordId}`);
             return c.json({ error: 'Document file not found.' }, 404);
         }
+
+        // Log file details for audit
+        console.log(`[USER_DOWNLOAD] File details: name='${documentDetails.documentName}', path='${documentDetails.filePath}', type='${documentDetails.fileType}'`);
 
         // Create Supabase admin client
         const supabaseAdmin = createClient(
@@ -441,19 +451,36 @@ meRoutes.get('/records/:recordId/download', async (c) => {
             .createSignedUrl(documentDetails.filePath, 3600); // 1 hour
 
         if (error) {
-            console.error('Error generating signed URL:', error);
+            console.error(`[USER_DOWNLOAD] Supabase error generating signed URL for record ${recordId}:`, error);
             return c.json({ error: 'Failed to generate download link.' }, 500);
         }
+
+        // Log successful download generation
+        console.log(`[USER_DOWNLOAD] SUCCESS - User ${user.id} generated download for record ${recordId} (${documentDetails.documentName})`);
+        
+        // TODO: Add to audit log table when implemented
+        // await db.insert(auditLog).values({
+        //     userId: user.id,
+        //     action: 'DOWNLOAD_MEDICAL_RECORD',
+        //     resourceId: recordId,
+        //     resourceType: 'medical_record',
+        //     metadata: { recordType: record.recordType, fileName: documentDetails.documentName, fileType: documentDetails.fileType }
+        // });
 
         return c.json({
             downloadUrl: data.signedUrl,
             fileName: documentDetails.documentName,
             fileType: documentDetails.fileType,
-            expiresIn: 3600 // 1 hour in seconds
+            expiresIn: 3600, // 1 hour in seconds
+            metadata: {
+                recordId: record.id,
+                appointmentId: record.appointmentId,
+                downloadedAt: new Date().toISOString()
+            }
         });
 
     } catch (error) {
-        console.error(`Error generating download URL for record ${recordId}:`, error);
+        console.error(`[USER_DOWNLOAD] CRITICAL ERROR for record ${recordId} by user ${user.id}:`, error);
         return c.json({ error: "Internal Server Error" }, 500);
     }
 });

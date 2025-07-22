@@ -208,6 +208,24 @@ export const recordDocuments = pgTable("record_documents", {
     uploadedAt: timestamp("uploaded_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 });
 
+// Audit trail table for compliance and security monitoring
+export const auditLogs = pgTable("audit_logs", {
+    id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
+    timestamp: timestamp("timestamp", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    userId: uuid("user_id").notNull(),
+    userEmail: text("user_email").notNull(),
+    userRole: text("user_role").notNull(),
+    action: text("action").notNull(),
+    resourceType: text("resource_type").notNull(),
+    resourceId: uuid("resource_id").notNull(),
+    patientId: uuid("patient_id"), // For admin actions on patient data
+    outcome: text("outcome").notNull(), // 'SUCCESS', 'FAILED', 'ERROR'
+    metadata: jsonb("metadata"), // Flexible additional data
+    ipAddress: text("ip_address"), // Support IPv6
+    userAgent: text("user_agent"),
+    sessionId: uuid("session_id"),
+});
+
 export const reviews = pgTable("reviews", {
 	id: uuid('id').default(sql`uuid_generate_v4()`).primaryKey().notNull(),
 	appointmentId: uuid("appointment_id").notNull().unique().references(() => appointments.id, { onDelete: 'cascade' }),

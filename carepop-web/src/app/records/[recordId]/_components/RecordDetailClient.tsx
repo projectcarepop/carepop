@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { Stethoscope, Pill, FileText, User, Building, Syringe, Calendar, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { downloadDocument } from '@/app/records/actions';
+import { useAuth } from '@/lib/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 
 interface RecordDetailClientProps {
@@ -31,7 +31,7 @@ const InfoRow = ({ label, value }: { label: string, value: string | null | undef
     return <p><strong className="font-semibold text-gray-600">{label}:</strong> {value}</p>;
 };
 
-const PrescriptionDetails = ({ details, onDownload }: { details: any; onDownload: (filePath: string | null | undefined) => void; }) => {
+const PrescriptionDetails = ({ details, onDownload }: { details: any; onDownload: () => void; }) => {
     const hasFile = details?.filePath && typeof details.filePath === 'string';
     return (
         <div className="text-sm space-y-2 text-gray-800">
@@ -49,7 +49,7 @@ const PrescriptionDetails = ({ details, onDownload }: { details: any; onDownload
                             <span className="text-sm text-gray-500">{details.fileType || 'Scanned File'}</span>
                         </div>
                     </div>
-                    <Button onClick={() => onDownload(details.filePath)} className="min-w-[120px]">
+                    <Button onClick={onDownload} className="min-w-[120px]">
                         Download
                     </Button>
                 </div>
@@ -60,33 +60,43 @@ const PrescriptionDetails = ({ details, onDownload }: { details: any; onDownload
 
 const RecordDetailsContent = ({ record }: { record: MedicalRecordWithRelations }) => {
     const { toast } = useToast();
+    const { session } = useAuth();
     const [isDownloading, setIsDownloading] = useState(false);
 
-    const handleDownload = async (filePath: string | null | undefined) => {
-        if (!filePath) {
+    const handleDownload = async () => {
+        if (!session?.access_token) {
             toast({
-                title: "Download Not Available",
-                description: "There is no file associated with this record.",
+                title: "Authentication Required",
+                description: "Please log in to download documents.",
+                variant: "destructive"
             });
             return;
         }
 
-        setIsDownloading(true);
-        try {
-            const result = await downloadDocument(filePath);
-            if (result.error) throw new Error(result.error);
-            
-            const link = document.createElement('a');
-            link.href = result.downloadUrl!;
-            link.download = result.fileName || 'document';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        } catch (error: any) {
-            toast({ title: "Download Failed", description: error.message, variant: "destructive" });
-        } finally {
-            setIsDownloading(false);
-        }
+        const { downloadWithRetry, getErrorMessage } = await import('@/lib/utils/download-helpers');
+        
+        downloadWithRetry({
+            recordId: record.id,
+            accessToken: session.access_token,
+            isAdmin: false,
+            maxRetries: 2,
+            onStart: () => setIsDownloading(true),
+            onSuccess: (fileName) => {
+                toast({
+                    title: "Download Successful",
+                    description: `Successfully downloaded: ${fileName}`,
+                });
+            },
+            onError: (error) => {
+                const { title, description, action } = getErrorMessage(error);
+                toast({ 
+                    title, 
+                    description: `${description}${action ? ` ${action}` : ''}`, 
+                    variant: "destructive" 
+                });
+            },
+            onFinally: () => setIsDownloading(false)
+        });
     };
 
     switch (record.recordType) {
@@ -112,7 +122,7 @@ const RecordDetailsContent = ({ record }: { record: MedicalRecordWithRelations }
                             {docDetails.fileType && <span className="text-sm text-gray-500">{docDetails.fileType}</span>}
                         </div>
                     </div>
-                    <Button onClick={() => handleDownload(docDetails.filePath)} disabled={isDownloading || !hasFile} className="min-w-[120px]">
+                    <Button onClick={handleDownload} disabled={isDownloading || !hasFile} className="min-w-[120px]">
                         {isDownloading ? 'Downloading...' : 'Download'}
                     </Button>
                 </div>

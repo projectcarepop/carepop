@@ -272,17 +272,57 @@ export async function getSingleMedicalRecord(recordId: string, accessToken: stri
 }
 
 export async function downloadMedicalDocument(recordId: string, accessToken: string) {
+    // Log download attempt for monitoring
+    console.log(`[CLIENT_DOWNLOAD] User initiating download for record ${recordId}`);
+    
     const headers = await getAuthHeaders(accessToken);
     const url = `${API_BASE_URL}/api/me/records/${recordId}/download`;
-    const response = await fetch(url, { headers, cache: 'no-store' });
-
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: "Failed to generate download link." }));
-        throw new Error(error.message);
-    }
     
-    const data = await response.json();
-    return data;
+    try {
+        const response = await fetch(url, { headers, cache: 'no-store' });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ message: "Failed to generate download link." }));
+            console.warn(`[CLIENT_DOWNLOAD] Download failed for record ${recordId}: ${error.message}`);
+            throw new Error(error.message);
+        }
+        
+        const data = await response.json();
+        console.log(`[CLIENT_DOWNLOAD] Successfully generated download link for record ${recordId} (file: ${data.fileName})`);
+        return data;
+    } catch (error) {
+        console.error(`[CLIENT_DOWNLOAD] Network error for record ${recordId}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Admin function to download medical documents with comprehensive logging
+ * Supports both CLINICAL_DOCUMENT and PRESCRIPTION types
+ */
+export async function downloadMedicalDocumentAdmin(recordId: string, accessToken: string) {
+    // Log admin download attempt for audit trail
+    console.log(`[CLIENT_ADMIN_DOWNLOAD] Admin initiating download for record ${recordId}`);
+    
+    const headers = await getAuthHeaders(accessToken);
+    const url = `${API_BASE_URL}/api/admin/records/${recordId}/download`;
+    
+    try {
+        const response = await fetch(url, { headers, cache: 'no-store' });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ message: "Failed to generate admin download link." }));
+            console.warn(`[CLIENT_ADMIN_DOWNLOAD] Admin download failed for record ${recordId}: ${error.message}`);
+            throw new Error(error.message);
+        }
+        
+        const data = await response.json();
+        console.log(`[CLIENT_ADMIN_DOWNLOAD] Admin successfully generated download link for record ${recordId} (file: ${data.fileName}, patient: ${data.metadata.patientId})`);
+        return data;
+    } catch (error) {
+        console.error(`[CLIENT_ADMIN_DOWNLOAD] Network error for admin download record ${recordId}:`, error);
+        throw error;
+    }
 }
 
 // --- Admin Service (Requires Admin/Manager Role) ---

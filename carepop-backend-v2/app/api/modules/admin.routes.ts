@@ -303,10 +303,96 @@ const newMedicalRecordSchema = z.discriminatedUnion("recordType", [
     noteSchema,
 ]);
 
-// Zod schema for multipart/form-data
+// =================================================================
+// ENHANCED FILE VALIDATION SCHEMAS
+// =================================================================
+
+// Allowed file types for medical documents
+const ALLOWED_FILE_TYPES = [
+    'application/pdf',
+    'image/jpeg',
+    'image/jpg', 
+    'image/png',
+    'image/webp',
+    'image/tiff',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+] as const;
+
+// Maximum file size (10MB)
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
+
+// File validation function
+const validateFile = (file: File) => {
+    // Check file size
+    if (file.size > MAX_FILE_SIZE) {
+        throw new Error(`File size must be less than ${MAX_FILE_SIZE / 1024 / 1024}MB. Current size: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+    }
+    
+    // Check file type
+    if (!ALLOWED_FILE_TYPES.includes(file.type as any)) {
+        throw new Error(`File type '${file.type}' is not allowed. Allowed types: ${ALLOWED_FILE_TYPES.join(', ')}`);
+    }
+    
+    // Check file name for security (prevent path traversal)
+    if (file.name.includes('..') || file.name.includes('/') || file.name.includes('\\')) {
+        throw new Error('Invalid file name. File name cannot contain path separators or relative paths.');
+    }
+    
+    // Check for empty file
+    if (file.size === 0) {
+        throw new Error('File cannot be empty.');
+    }
+    
+    // Check file extension matches MIME type (basic check)
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    const mimeTypeExtensions: Record<string, string[]> = {
+        'application/pdf': ['pdf'],
+        'image/jpeg': ['jpg', 'jpeg'],
+        'image/png': ['png'],
+        'image/webp': ['webp'],
+        'image/tiff': ['tiff', 'tif'],
+        'application/msword': ['doc'],
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['docx']
+    };
+    
+    const expectedExtensions = mimeTypeExtensions[file.type];
+    if (expectedExtensions && fileExtension && !expectedExtensions.includes(fileExtension)) {
+        throw new Error(`File extension '${fileExtension}' does not match file type '${file.type}'`);
+    }
+    
+    return true;
+};
+
+// Enhanced document name validation
+const validateDocumentName = (name: string) => {
+    // Check length
+    if (name.length > 255) {
+        throw new Error('Document name must be less than 255 characters.');
+    }
+    
+    // Check for invalid characters
+    if (/[<>:"/\\|?*]/.test(name)) {
+        throw new Error('Document name contains invalid characters.');
+    }
+    
+    // Check for reserved names (Windows)
+    const reservedNames = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'];
+    if (reservedNames.includes(name.toUpperCase())) {
+        throw new Error('Document name uses a reserved system name.');
+    }
+    
+    return true;
+};
+
+// Enhanced Zod schema for multipart/form-data with comprehensive validation
 const uploadDocumentSchema = z.object({
-  documentName: z.string().min(1, { message: 'Document name is required.' }),
-  document: z.instanceof(File, { message: 'A file is required.' }),
+  documentName: z.string()
+    .min(1, { message: 'Document name is required.' })
+    .max(255, { message: 'Document name must be less than 255 characters.' })
+    .refine(validateDocumentName, { message: 'Invalid document name.' }),
+  document: z.instanceof(File, { message: 'A file is required.' })
+    .refine(validateFile, { message: 'Invalid file.' }),
   prescriptionRecordId: z.string().uuid({ message: "Invalid prescription record ID." }).optional(),
 });
 
@@ -1533,12 +1619,26 @@ adminRoutes.post(
   '/appointments/:id/documents',
   zValidator('form', uploadDocumentSchema), // Use 'form' for multipart/form-data
   async (c) => {
+    const adminUser = c.get('user');
     console.log("[UPLOAD_DOC] Endpoint hit.");
+    
     try {
       const { id: appointmentId } = c.req.param();
       const { documentName, document: file } = c.req.valid('form');
       
-      console.log(`[UPLOAD_DOC] Received data: appointmentId=${appointmentId}, documentName='${documentName}', fileName='${file.name}', fileSize=${file.size}`);
+      // Enhanced security logging
+      console.log(`[UPLOAD_DOC] Admin ${adminUser.id} (${adminUser.email}) uploading document`);
+      console.log(`[UPLOAD_DOC] Details: appointmentId=${appointmentId}, documentName='${documentName}', fileName='${file.name}', fileSize=${file.size}, fileType='${file.type}'`);
+      
+      // Additional file security checks
+      if (file.name.length > 255) {
+        throw new Error('File name too long');
+      }
+      
+      // Log potential security concerns
+      if (file.name.includes('..') || file.name.includes('script')) {
+        console.warn(`[UPLOAD_DOC] SECURITY WARNING: Suspicious file name detected: ${file.name} by admin ${adminUser.id}`);
+      }
       
       const supabaseAdmin = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
@@ -1593,28 +1693,53 @@ adminRoutes.post(
   }
 );
 
-// --- NEW DEDICATED PRESCRIPTION ENDPOINT ---
+// --- ENHANCED PRESCRIPTION ENDPOINT SCHEMA ---
 const createPrescriptionSchema = z.object({
-    medication: z.string().min(1, "Medication is required."),
-    dosage: z.string().optional(),
-    frequency: z.string().optional(),
+    medication: z.string()
+        .min(1, "Medication is required.")
+        .max(255, "Medication name must be less than 255 characters."),
+    dosage: z.string()
+        .max(100, "Dosage must be less than 100 characters.")
+        .optional(),
+    frequency: z.string()
+        .max(100, "Frequency must be less than 100 characters.")
+        .optional(),
     startDate: z.string().optional().nullable(),
     endDate: z.string().optional().nullable(),
-    notes: z.string().optional(),
-    document: z.instanceof(File, { message: 'A file is required.' }).optional(),
+    notes: z.string()
+        .max(1000, "Notes must be less than 1000 characters.")
+        .optional(),
+    document: z.instanceof(File, { message: 'Invalid file provided.' })
+        .refine((file) => {
+            if (!file || file.size === 0) return true; // Optional file
+            return validateFile(file);
+        }, { message: 'Invalid prescription document.' })
+        .optional(),
 });
 
 adminRoutes.post(
   '/appointments/:id/prescriptions',
   zValidator('form', createPrescriptionSchema),
   async (c) => {
+    const adminUser = c.get('user');
     const { id: appointmentId } = c.req.param();
     const { document, ...prescriptionData } = c.req.valid('form');
 
     try {
+      // Enhanced security logging
+      console.log(`[UPLOAD_PRESCRIPTION] Admin ${adminUser.id} (${adminUser.email}) creating prescription for appointment ${appointmentId}`);
+      console.log(`[UPLOAD_PRESCRIPTION] Medication: ${prescriptionData.medication}, HasDocument: ${!!document}`);
+      
       let documentInfo: { documentName: string; filePath: string; fileType: string; } | null = null;
 
       if (document && document.size > 0) {
+        // Additional security logging for file uploads
+        console.log(`[UPLOAD_PRESCRIPTION] File details: name='${document.name}', size=${document.size}, type='${document.type}'`);
+        
+        // Security warning for suspicious files
+        if (document.name.includes('..') || document.name.includes('script')) {
+          console.warn(`[UPLOAD_PRESCRIPTION] SECURITY WARNING: Suspicious file name detected: ${document.name} by admin ${adminUser.id}`);
+        }
         const supabaseAdmin = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
         const storagePath = `${appointmentId}/${Date.now()}-${document.name}`;
         
@@ -2645,6 +2770,150 @@ adminRoutes.get('/users', zValidator('query', adminUsersQuerySchema), async (c) 
     } catch (error: any) {
         console.error('[ADMIN USERS] CRITICAL ERROR:', error);
         return c.json({ error: 'Internal Server Error', message: error.message }, 500);
+    }
+});
+
+// =================================================================
+// SECURE ADMIN DOWNLOAD ENDPOINT
+// =================================================================
+
+/**
+ * GET /admin/records/:recordId/download
+ * Generates a signed URL for admins to download medical documents.
+ * Supports both CLINICAL_DOCUMENT and PRESCRIPTION types.
+ * Includes comprehensive logging and security checks.
+ */
+adminRoutes.get('/records/:recordId/download', 
+    zValidator('param', z.object({ recordId: z.string().uuid() })),
+    async (c) => {
+    const adminUser = c.get('user');
+    const { recordId } = c.req.valid('param');
+
+    try {
+        console.log(`[ADMIN_DOWNLOAD] Admin ${adminUser.id} (${adminUser.email}) requesting download for record ${recordId}`);
+
+        // Step 1: Verify the record exists and get its details
+        const [record] = await db.select({
+            id: medicalRecords.id,
+            recordType: medicalRecords.recordType,
+            appointmentId: medicalRecords.appointmentId,
+            createdAt: medicalRecords.createdAt,
+        })
+        .from(medicalRecords)
+        .where(eq(medicalRecords.id, recordId));
+
+        if (!record) {
+            console.warn(`[ADMIN_DOWNLOAD] Record ${recordId} not found`);
+            return c.json({ error: 'Medical record not found.' }, 404);
+        }
+
+        // Step 2: Get patient info for audit logging
+        const [appointmentInfo] = await db.select({
+            patientId: appointments.patientId,
+            clinicId: appointments.clinicId,
+        })
+        .from(appointments)
+        .where(eq(appointments.id, record.appointmentId));
+
+        if (!appointmentInfo) {
+            console.error(`[ADMIN_DOWNLOAD] Appointment ${record.appointmentId} not found for record ${recordId}`);
+            return c.json({ error: 'Associated appointment not found.' }, 404);
+        }
+
+        // Step 3: Get file details based on record type
+        let documentDetails: any = null;
+        let filePath: string | null = null;
+        let fileName: string | null = null;
+        let fileType: string | null = null;
+
+        switch (record.recordType) {
+            case 'CLINICAL_DOCUMENT':
+                const [docDetails] = await db.select()
+                    .from(recordDocuments)
+                    .where(eq(recordDocuments.recordId, record.id));
+                
+                if (!docDetails || !docDetails.filePath) {
+                    console.warn(`[ADMIN_DOWNLOAD] No file found for CLINICAL_DOCUMENT record ${recordId}`);
+                    return c.json({ error: 'Document file not found.' }, 404);
+                }
+                
+                documentDetails = docDetails;
+                filePath = docDetails.filePath;
+                fileName = docDetails.documentName;
+                fileType = docDetails.fileType;
+                break;
+
+            case 'PRESCRIPTION':
+                const [prescDetails] = await db.select()
+                    .from(recordPrescriptions)
+                    .where(eq(recordPrescriptions.recordId, record.id));
+                
+                if (!prescDetails || !prescDetails.filePath) {
+                    console.warn(`[ADMIN_DOWNLOAD] No file found for PRESCRIPTION record ${recordId}`);
+                    return c.json({ error: 'Prescription document not found.' }, 404);
+                }
+                
+                documentDetails = prescDetails;
+                filePath = prescDetails.filePath;
+                fileName = prescDetails.documentName || `Prescription-${record.id}`;
+                fileType = prescDetails.fileType;
+                break;
+
+            default:
+                console.warn(`[ADMIN_DOWNLOAD] Unsupported record type: ${record.recordType}`);
+                return c.json({ error: `Downloads not supported for record type: ${record.recordType}` }, 400);
+        }
+
+        // Step 4: Generate signed URL using Supabase Admin client
+        const supabaseAdmin = createClient(
+            process.env.SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
+
+        const { data, error } = await supabaseAdmin.storage
+            .from('medical-documents')
+            .createSignedUrl(filePath!, 3600); // 1 hour expiry
+
+        if (error) {
+            console.error(`[ADMIN_DOWNLOAD] Supabase error generating signed URL:`, error);
+            return c.json({ error: 'Failed to generate download link.' }, 500);
+        }
+
+        // Step 5: Log the download attempt for audit trail
+        console.log(`[ADMIN_DOWNLOAD] SUCCESS - Admin ${adminUser.id} downloading record ${recordId} (patient: ${appointmentInfo.patientId}, type: ${record.recordType})`);
+        
+        // Log to audit trail for compliance
+        const { logAdminDownload, getClientIP, getUserAgent } = await import('../lib/audit-logger');
+        await logAdminDownload({
+            adminUserId: adminUser.id,
+            adminEmail: adminUser.email || 'unknown@admin.com',
+            recordId: recordId,
+            patientId: appointmentInfo.patientId,
+            recordType: record.recordType,
+            fileName: fileName || 'unknown',
+            fileType: fileType || undefined,
+            ipAddress: getClientIP(c.req.raw),
+            userAgent: getUserAgent(c.req.raw),
+        });
+
+        return c.json({
+            downloadUrl: data.signedUrl,
+            fileName: fileName || 'medical-document',
+            fileType: fileType || 'application/octet-stream',
+            recordType: record.recordType,
+            expiresIn: 3600, // 1 hour in seconds
+            metadata: {
+                recordId: record.id,
+                appointmentId: record.appointmentId,
+                patientId: appointmentInfo.patientId,
+                downloadedBy: adminUser.id,
+                downloadedAt: new Date().toISOString()
+            }
+        });
+
+    } catch (error) {
+        console.error(`[ADMIN_DOWNLOAD] CRITICAL ERROR for record ${recordId}:`, error);
+        return c.json({ error: "Internal Server Error" }, 500);
     }
 });
 
