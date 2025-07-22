@@ -62,8 +62,15 @@ export function AppointmentDetailsClient({ appointmentId }: AppointmentDetailsCl
     }, []);
 
     const { data: response, isLoading, error } = useQuery({
-        queryKey: ['appointment-details', appointmentId],
-        queryFn: () => getAppointmentDetails(appointmentId, session?.access_token || ''),
+        queryKey: ['appointment-details', appointmentId, session?.access_token],
+        queryFn: () => {
+            if (!session?.access_token) {
+                // Return a promise that never resolves or throw an error
+                // to prevent the query from running without a token.
+                return Promise.reject(new Error("No access token available."));
+            }
+            return getAppointmentDetails(appointmentId, session.access_token);
+        },
         enabled: !!session?.access_token,
         refetchOnWindowFocus: false,
     });
