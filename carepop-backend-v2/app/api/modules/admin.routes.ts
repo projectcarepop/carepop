@@ -1575,7 +1575,7 @@ adminRoutes.post(
           .values({
             recordId: newMedicalRecord.id,
             documentName: documentName,
-            filePath: uploadData.path, // Using filePath to match schema
+            filePath: storagePath, // Using filePath to match schema
             fileType: file.type,
           })
           .returning();
