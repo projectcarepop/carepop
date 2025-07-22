@@ -297,11 +297,10 @@ const prescriptionSchema = z.object({
     }),
 });
 
-// A new union schema for validation. We will only handle notes and prescriptions here.
-// Document uploads will have their own route.
+// A new union schema for validation. We will now only handle notes here.
+// Prescriptions will have their own route to handle file uploads.
 const newMedicalRecordSchema = z.discriminatedUnion("recordType", [
     noteSchema,
-    prescriptionSchema,
 ]);
 
 // Zod schema for multipart/form-data
@@ -1488,24 +1487,10 @@ adminRoutes.get('/appointments/:id', async (c) => {
                         details = noteDetails;
                         break;
                     case 'PRESCRIPTION':
-                        // --- CORRECTED LOGIC ---
-                        const linkedMedicalRecord = alias(medicalRecords, "linkedMedicalRecord");
-                        const linkedDocument = alias(recordDocuments, "linkedDocument");
-
-                        const [prescriptionDetails] = await db
-                            .select({
-                                // Select all columns from the prescriptions table
-                                ...getTableColumns(recordPrescriptions),
-                                // Manually select and alias the linked document's details
-                                linkedDocumentName: linkedDocument.documentName,
-                                linkedDocumentFilePath: linkedDocument.filePath,
-                            })
+                        const [prescriptionDetails] = await db.select()
                             .from(recordPrescriptions)
-                            .leftJoin(linkedMedicalRecord, eq(recordPrescriptions.linkedDocumentId, linkedMedicalRecord.id))
-                            .leftJoin(linkedDocument, eq(linkedMedicalRecord.id, linkedDocument.recordId))
                             .where(eq(recordPrescriptions.recordId, record.id));
                         details = prescriptionDetails;
-                        // --- END CORRECTED LOGIC ---
                         break;
                     case 'CLINICAL_DOCUMENT':
                     case 'LAB_RESULT':
@@ -1548,17 +1533,6 @@ adminRoutes.post('/appointments/:id/records', zValidator('json', newMedicalRecor
                     [details] = await tx.insert(recordDoctorNotes).values({
                         recordId: record.id,
                         note: payload.details.note,
-                    }).returning();
-                    break;
-                case 'PRESCRIPTION':
-                    [details] = await tx.insert(recordPrescriptions).values({
-                        recordId: record.id,
-                        medication: payload.details.medication,
-                        dosage: payload.details.dosage,
-                        frequency: payload.details.frequency,
-                        startDate: payload.details.startDate,
-                        endDate: payload.details.endDate,
-                        notes: payload.details.notes,
                     }).returning();
                     break;
             }
@@ -1645,6 +1619,79 @@ adminRoutes.post(
     } catch (error: any) {
       console.error("[UPLOAD_DOC] CRASH:", error);
       return c.json({ error: 'Internal Server Error', message: error.message }, 500);
+    }
+  }
+);
+
+// --- NEW DEDICATED PRESCRIPTION ENDPOINT ---
+const createPrescriptionSchema = z.object({
+    medication: z.string().min(1, "Medication is required."),
+    dosage: z.string().optional(),
+    frequency: z.string().optional(),
+    startDate: z.string().optional().nullable(),
+    endDate: z.string().optional().nullable(),
+    notes: z.string().optional(),
+    document: z.instanceof(File, { message: 'A file is required.' }).optional(),
+});
+
+adminRoutes.post(
+  '/appointments/:id/prescriptions',
+  zValidator('form', createPrescriptionSchema),
+  async (c) => {
+    const { id: appointmentId } = c.req.param();
+    const { document, ...prescriptionData } = c.req.valid('form');
+
+    try {
+      let documentInfo: { documentName: string; filePath: string; fileType: string; } | null = null;
+
+      // Step 1: Upload document to Supabase Storage if it exists
+      if (document && document.size > 0) {
+        const supabaseAdmin = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+        const storagePath = `${appointmentId}/${Date.now()}-${document.name}`;
+        
+        const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+          .from('medical-documents')
+          .upload(storagePath, document);
+
+        if (uploadError) throw new Error(`Storage Error: ${uploadError.message}`);
+        
+        documentInfo = {
+            documentName: document.name,
+            filePath: uploadData.path,
+            fileType: document.type,
+        };
+      }
+
+      // Step 2: Save records to the database in a transaction
+      const newRecordWithDetails = await db.transaction(async (tx) => {
+        const [record] = await tx.insert(medicalRecords).values({
+          appointmentId: appointmentId,
+          recordType: 'PRESCRIPTION',
+        }).returning();
+
+        const [details] = await tx.insert(recordPrescriptions).values({
+          recordId: record.id,
+          medication: prescriptionData.medication,
+          dosage: prescriptionData.dosage,
+          frequency: prescriptionData.frequency,
+          startDate: prescriptionData.startDate || null,
+          endDate: prescriptionData.endDate || null,
+          notes: prescriptionData.notes,
+          ...(documentInfo && { 
+              documentName: documentInfo.documentName,
+              filePath: documentInfo.filePath,
+              fileType: documentInfo.fileType,
+          })
+        }).returning();
+
+        return { ...record, details };
+      });
+
+      return c.json({ data: newRecordWithDetails }, 201);
+
+    } catch (error: any) {
+      console.error(`Failed to create prescription for appointment ${appointmentId}:`, error);
+      return c.json({ error: 'Failed to create prescription', message: error.message }, 500);
     }
   }
 );

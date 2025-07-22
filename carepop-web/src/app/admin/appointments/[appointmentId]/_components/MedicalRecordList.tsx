@@ -61,7 +61,7 @@ const FREQUENCY_OPTIONS = [
 // --- SPECIALIZED CARD COMPONENTS ---
 const NoteCard = ({ details }: { details: DoctorNote }) => ( <p className="text-sm text-gray-700 whitespace-pre-wrap">{details.note}</p> );
 
-const PrescriptionCard = ({ details, onLinkDocument }: { details: Prescription, onLinkDocument: (prescriptionRecordId: string) => void }) => {
+const PrescriptionCard = ({ details }: { details: Prescription }) => {
     const { supabase } = useAuth();
     const handleDownload = async (filePath: string) => {
         if (!supabase) return;
@@ -84,29 +84,23 @@ const PrescriptionCard = ({ details, onLinkDocument }: { details: Prescription, 
                 {details.endDate && <><p><strong>End Date:</strong></p><p>{new Date(details.endDate).toLocaleDateString()}</p></>}
                 {details.notes && <><p><strong>Notes:</strong></p><p className="col-span-2">{details.notes}</p></>}
             </div>
-            {/* --- NEW LOGIC for linked document --- */}
-            <div className="mt-4 pt-3 border-t">
-                {(details as any).linkedDocumentFilePath ? (
+            {/* Display attached document if it exists */}
+            {(details as any).filePath && (
+                <div className="mt-4 pt-3 border-t">
                     <div className="flex items-center justify-between p-2 bg-slate-50 rounded-md">
                         <div className="flex items-center gap-3">
                             <FileText className="h-5 w-5 text-slate-600"/>
                             <div>
-                                <span className="text-sm font-medium">{(details as any).linkedDocumentName || 'View Linked Document'}</span>
-                                <p className="text-xs text-slate-500">Linked Document</p>
+                                <span className="text-sm font-medium">{(details as any).documentName || 'View Attached Document'}</span>
+                                <p className="text-xs text-slate-500">{(details as any).fileType}</p>
                             </div>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => handleDownload((details as any).linkedDocumentFilePath)}>
+                        <Button variant="outline" size="sm" onClick={() => handleDownload((details as any).filePath)}>
                             <Download className="h-4 w-4 mr-2" />Download
                         </Button>
                     </div>
-                ) : (
-                    <Button variant="secondary" size="sm" onClick={() => onLinkDocument(details.id)}>
-                        <UploadCloud className="h-4 w-4 mr-2" />
-                        Upload & Link Document
-                    </Button>
-                )}
-            </div>
-            {/* --- END NEW LOGIC --- */}
+                </div>
+            )}
         </div>
     );
 };
@@ -138,7 +132,7 @@ const DocumentCard = ({ details }: { details: ClinicalDocument }) => {
 };
 
 // --- DISPATCHER CARD COMPONENT ---
-const MedicalRecordCard = ({ record, onLinkDocument }: { record: MedicalRecordWithDetails, onLinkDocument: (prescriptionRecordId: string) => void }) => {
+const MedicalRecordCard = ({ record }: { record: MedicalRecordWithDetails }) => {
     const recordDate = new Date(record.createdAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
     const getRecordIcon = () => {
         switch(record.recordType) {
@@ -152,7 +146,7 @@ const MedicalRecordCard = ({ record, onLinkDocument }: { record: MedicalRecordWi
         if (!record.details) return <p className="text-sm text-red-500 italic">Error: Record details are missing.</p>;
         switch(record.recordType) {
             case 'DOCTOR_NOTE': return <NoteCard details={record.details as DoctorNote}/>;
-            case 'PRESCRIPTION': return <PrescriptionCard details={record.details as Prescription} onLinkDocument={onLinkDocument} />;
+            case 'PRESCRIPTION': return <PrescriptionCard details={record.details as Prescription}/>;
             case 'CLINICAL_DOCUMENT': case 'LAB_RESULT': return <DocumentCard details={record.details as ClinicalDocument}/>;
             default: return <p className="text-sm italic">Unknown record type.</p>;
         }
@@ -178,7 +172,6 @@ export function MedicalRecordList({ initialRecords, appointmentId }: MedicalReco
     const queryClient = useQueryClient();
     const [dialogOpen, setDialogOpen] = React.useState< 'note' | 'prescription' | 'document' | null>(null);
     const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-    const [activePrescriptionId, setActivePrescriptionId] = React.useState<string | null>(null);
 
     const noteForm = useForm<NoteFormData>({ resolver: zodResolver(noteFormSchema), defaultValues: { note: '' }});
     const prescriptionForm = useForm<PrescriptionFormData>({ resolver: zodResolver(prescriptionFormSchema), defaultValues: { medication: '', dosage: '', frequency: '', startDate: '', endDate: '', notes: '' }});
@@ -206,14 +199,14 @@ export function MedicalRecordList({ initialRecords, appointmentId }: MedicalReco
     });
     
     const { mutate: addPrescriptionMutate, isPending: isAddingPrescription } = useMutation({
-        mutationFn: (data: PrescriptionFormData) => api.addMedicalRecord(appointmentId, { recordType: 'PRESCRIPTION', details: data }, session!.access_token),
-        onSuccess: () => { onMutationSuccess(); prescriptionForm.reset(); },
+        mutationFn: (data: FormData) => api.addPrescription(appointmentId, data, session!.access_token),
+        onSuccess: () => { onMutationSuccess(); prescriptionForm.reset(); setSelectedFile(null); },
         onError: onMutationError,
     });
 
     const { mutate: uploadDocMutate, isPending: isUploadingDoc } = useMutation({
-        mutationFn: (data: DocumentUploadPayload & { prescriptionRecordId?: string }) => 
-            api.uploadDocument(appointmentId, data.documentName, data.file, session!.access_token, data.prescriptionRecordId),
+        mutationFn: (data: DocumentUploadPayload) => 
+            api.uploadDocument(appointmentId, data.documentName, data.file, session!.access_token),
         onSuccess: () => {
             // Because we are now linking, a full refetch is safer to ensure all data is consistent.
             queryClient.invalidateQueries({ queryKey: ['appointmentDetails', appointmentId] });
@@ -222,21 +215,31 @@ export function MedicalRecordList({ initialRecords, appointmentId }: MedicalReco
             documentForm.reset(); 
             setSelectedFile(null);
             setDialogOpen(null);
-            setActivePrescriptionId(null);
         },
         onError: onMutationError,
     });
     
     const handleNoteSubmit = (data: NoteFormData) => addNoteMutate(data);
-    const handlePrescriptionSubmit = (data: PrescriptionFormData) => addPrescriptionMutate(data);
+    const handlePrescriptionSubmit = (data: PrescriptionFormData) => {
+        const formData = new FormData();
+
+        // Append all text fields to FormData
+        Object.entries(data).forEach(([key, value]) => {
+            if (value) {
+                formData.append(key, value as string);
+            }
+        });
+
+        // Append the file if it exists
+        if (selectedFile) {
+            formData.append('document', selectedFile);
+        }
+
+        addPrescriptionMutate(formData);
+    };
     const handleDocumentSubmit = (data: DocumentFormData) => {
         if (!selectedFile) { alert("Please select a file to upload."); return; }
-        uploadDocMutate({ ...data, file: selectedFile, prescriptionRecordId: activePrescriptionId || undefined });
-    };
-
-    const handleOpenLinkDialog = (prescriptionRecordId: string) => {
-        setActivePrescriptionId(prescriptionRecordId);
-        setDialogOpen('document');
+        uploadDocMutate({ ...data, file: selectedFile });
     };
     
     return (
@@ -288,6 +291,15 @@ export function MedicalRecordList({ initialRecords, appointmentId }: MedicalReco
                                     <FormField control={prescriptionForm.control} name="endDate" render={({ field }) => (<FormItem><FormLabel>End Date</FormLabel><FormControl><Input {...field} type="date" /></FormControl><FormMessage /></FormItem>)}/>
                                 </div>
                                 <FormField control={prescriptionForm.control} name="notes" render={({ field }) => (<FormItem><FormLabel>Additional Notes</FormLabel><FormControl><Textarea {...field} placeholder="Any special instructions..." rows={3} /></FormControl><FormMessage /></FormItem>)}/>
+                                
+                                <FormItem>
+                                    <FormLabel>Attach Document (Optional)</FormLabel>
+                                    <FormControl>
+                                        <Input type="file" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}/>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+
                                 <DialogFooter><Button type="submit" disabled={isAddingPrescription}>{isAddingPrescription ? 'Saving...' : 'Save Prescription'}</Button></DialogFooter>
                             </form></Form>
                         </DialogContent>
@@ -308,7 +320,7 @@ export function MedicalRecordList({ initialRecords, appointmentId }: MedicalReco
             </div>
             <div className="space-y-4">
                 {isLoadingRecords ? <p>Loading records...</p> : records && records.length > 0 ? (
-                    records.map((record: MedicalRecordWithDetails) => <MedicalRecordCard key={record.id} record={record} onLinkDocument={handleOpenLinkDialog} />)
+                    records.map((record: MedicalRecordWithDetails) => <MedicalRecordCard key={record.id} record={record} />)
                 ) : (
                     <div className="text-center py-10 border-2 border-dashed rounded-lg">
                         <p className="text-gray-500">No medical records found.</p>

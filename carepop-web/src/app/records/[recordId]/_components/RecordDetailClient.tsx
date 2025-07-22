@@ -39,16 +39,16 @@ const PrescriptionDetails = ({ details, onDownload }: { details: any; onDownload
             <InfoRow label="Frequency" value={details.frequency} />
             {details.notes && <InfoRow label="Notes" value={details.notes} />}
             
-            {details.linkedDocumentFilePath && (
+            {details.filePath && (
                 <div className="flex items-center justify-between rounded-lg border p-4 mt-4">
                     <div className="flex items-center gap-3">
                         <FileText className="h-6 w-6 text-green-600" />
                         <div>
-                            <span className="font-medium block">{details.linkedDocumentName || 'Linked Document'}</span>
-                            <span className="text-sm text-gray-500">Scanned Prescription File</span>
+                            <span className="font-medium block">{details.documentName || 'Attached Document'}</span>
+                            <span className="text-sm text-gray-500">{details.fileType || 'Scanned File'}</span>
                         </div>
                     </div>
-                    <Button onClick={() => onDownload(details.linkedDocumentFilePath)} className="min-w-[120px]">
+                    <Button onClick={() => onDownload(details.filePath)} className="min-w-[120px]">
                         Download
                     </Button>
                 </div>

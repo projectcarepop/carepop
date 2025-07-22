@@ -67,13 +67,13 @@ const PrescriptionDetails = ({ details }: { details: any }) => {
     const [isDownloading, setIsDownloading] = useState(false);
 
     const handleDownload = async () => {
-        if (!details.linkedDocumentFilePath) {
-            Alert.alert("No Document", "There is no document linked to this prescription.");
+        if (!details.filePath) {
+            Alert.alert("No Document", "There is no document attached to this prescription.");
             return;
         }
         setIsDownloading(true);
         try {
-            const result = await downloadDocument(details.linkedDocumentFilePath);
+            const result = await downloadDocument(details.filePath);
             if (result.error || !result.downloadUrl) {
                 throw new Error(result.error || 'Could not get download URL.');
             }
@@ -92,10 +92,10 @@ const PrescriptionDetails = ({ details }: { details: any }) => {
             <DetailRow icon={Pill} label="Frequency" value={details.frequency || 'N/A'} />
             <DetailRow icon={FileText} label="Instructions" value={details.instructions || details.notes || 'N/A'} />
 
-            {details.linkedDocumentFilePath && (
+            {details.filePath && (
                 <View style={styles.documentContainer}>
                     <Download size={20} color={theme.colors.primary} />
-                    <Text style={styles.documentName}>{details.documentName || 'Linked Document'}</Text>
+                    <Text style={styles.documentName}>{details.documentName || 'Attached Document'}</Text>
                     <TouchableOpacity onPress={handleDownload} disabled={isDownloading} style={styles.downloadButton}>
                         {isDownloading ? (
                             <ActivityIndicator color="#fff" />

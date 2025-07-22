@@ -1156,6 +1156,22 @@ export async function addMedicalRecord(appointmentId: string, payload: MedicalRe
   return result.data;
 }
 
+export const addPrescription = async (appointmentId: string, formData: FormData, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/admin/appointments/${appointmentId}/prescriptions`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to add prescription.');
+    }
+    return response.json();
+};
+
+
 // A new function specifically for uploading documents with multipart/form-data
 export const uploadDocument = async (
     appointmentId: string, 
