@@ -103,9 +103,17 @@ export default function SignUpPage() {
             <p className="text-muted-foreground">
               We&apos;ve sent a confirmation link to your email address. Please check your inbox and click the link to complete the sign-up process.
             </p>
-            <Button asChild>
-                <Link href="/sign-in">Back to Sign In</Link>
-            </Button>
+            <div className="space-y-3">
+              <Button asChild className="w-full">
+                  <Link href="/sign-in">Back to Sign In</Link>
+              </Button>
+              <p className="text-sm text-muted-foreground">
+                Not receiving emails? 
+                <Link href="/auth/email-debug" className="text-primary hover:underline ml-1">
+                  Check troubleshooting guide
+                </Link>
+              </p>
+            </div>
         </div>
       </div>
     )

@@ -1,142 +1,302 @@
-'use client';
+"use client";
 
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useState } from 'react';
+import { useAuth } from '@/lib/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { AlertCircle, Mail } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 export default function EmailDebugPage() {
-  const [email, setEmail] = useState('');
+  const { supabase } = useAuth();
+  const [testEmail, setTestEmail] = useState('');
+  const [isTestingSend, setIsTestingSend] = useState(false);
+  const [isTestingResend, setIsTestingResend] = useState(false);
   const [debugInfo, setDebugInfo] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const supabase = createClientComponentClient();
+  const { toast } = useToast();
 
-  const testEmailConfiguration = async () => {
-    if (!email) {
-      alert('Please enter an email address');
+  // Environment variables check
+  const envVars = {
+    'NEXT_PUBLIC_SUPABASE_URL': process.env.NEXT_PUBLIC_SUPABASE_URL ? '✓ Set' : '✗ Missing',
+    'NEXT_PUBLIC_SUPABASE_ANON_KEY': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? '✓ Set' : '✗ Missing',
+  };
+
+  const handleTestSignUp = async () => {
+    if (!testEmail) {
+      toast({
+        variant: 'destructive',
+        title: 'Email required',
+        description: 'Please enter an email address to test',
+      });
       return;
     }
 
-    setIsLoading(true);
+    setIsTestingSend(true);
     try {
-      console.log('Testing email configuration for:', email);
-      
-      const siteUrl = window.location.origin;
-      
-      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${siteUrl}/auth/callback?next=/update-password`,
+      const { data, error } = await supabase.auth.signUp({
+        email: testEmail,
+        password: 'TempPassword123!',
+        options: {
+          emailRedirectTo: `${location.origin}/auth/callback?next=/auth/email-verified`,
+        },
       });
 
-      const result = {
-        email,
-        siteUrl,
-        redirectTo: `${siteUrl}/auth/callback?next=/update-password`,
-        timestamp: new Date().toISOString(),
-        success: !error,
-        error: error?.message,
-        data,
-      };
-
-      setDebugInfo(result);
-      
-      if (error) {
-        console.error('Email test failed:', error);
-      } else {
-        console.log('Email test successful:', data);
-      }
-    } catch (err) {
-      console.error('Unexpected error during email test:', err);
       setDebugInfo({
-        email,
         timestamp: new Date().toISOString(),
-        success: false,
-        error: 'Unexpected error occurred',
-        details: err,
+        email: testEmail,
+        data,
+        error,
+        redirectUrl: `${location.origin}/auth/callback?next=/auth/email-verified`,
+        origin: location.origin,
+      });
+
+      if (error) {
+        toast({
+          variant: 'destructive',
+          title: 'Sign-up failed',
+          description: error.message,
+        });
+      } else {
+        toast({
+          title: 'Test sign-up initiated',
+          description: 'Check the debug info below and your email inbox',
+        });
+      }
+    } catch (err: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Unexpected error',
+        description: err.message || 'An unexpected error occurred',
       });
     } finally {
-      setIsLoading(false);
+      setIsTestingSend(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    if (!testEmail) {
+      toast({
+        variant: 'destructive',
+        title: 'Email required',
+        description: 'Please enter an email address',
+      });
+      return;
+    }
+
+    setIsTestingResend(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: testEmail,
+        options: {
+          emailRedirectTo: `${location.origin}/auth/callback?next=/auth/email-verified`,
+        },
+      });
+
+      if (error) {
+        toast({
+          variant: 'destructive',
+          title: 'Resend failed',
+          description: error.message,
+        });
+      } else {
+        toast({
+          title: 'Confirmation email resent',
+          description: 'Check your email inbox',
+        });
+      }
+    } catch (err: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Unexpected error',
+        description: err.message || 'An unexpected error occurred',
+      });
+    } finally {
+      setIsTestingResend(false);
     }
   };
 
   return (
-    <div className="container mx-auto max-w-4xl py-10">
+    <div className="container mx-auto p-8 max-w-4xl">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Email Configuration Debug</h1>
-          <p className="text-gray-600 mt-2">This page helps diagnose password reset email issues.</p>
+        <div className="text-center">
+          <h1 className="text-3xl font-bold">Email Confirmation Debug</h1>
+          <p className="text-muted-foreground mt-2">
+            Debug tool to identify email confirmation issues
+          </p>
         </div>
 
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium" htmlFor="test-email">Test Email Address</label>
-            <Input
-              id="test-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter email to test"
-              className="mt-1"
-            />
-          </div>
-          
-          <Button 
-            onClick={testEmailConfiguration} 
-            disabled={isLoading || !email}
-            className="min-w-[150px]"
-          >
-            {isLoading ? 'Testing...' : 'Test Password Reset Email'}
-          </Button>
-        </div>
-
-        {debugInfo && (
-          <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-            <h2 className="text-xl font-semibold mb-4">Email Test Results</h2>
-            <div className={`p-4 border rounded mb-4 ${debugInfo.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-              <p className={`font-semibold ${debugInfo.success ? 'text-green-800' : 'text-red-800'}`}>
-                {debugInfo.success ? '✅ Email sent successfully' : '❌ Email failed to send'}
-              </p>
-              {!debugInfo.success && debugInfo.error && (
-                <p className="text-red-700 mt-2">Error: {debugInfo.error}</p>
-              )}
+        {/* Environment Variables Check */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5" />
+              Environment Variables
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {Object.entries(envVars).map(([key, status]) => (
+                <div key={key} className="flex justify-between items-center">
+                  <code className="text-sm bg-gray-100 px-2 py-1 rounded">{key}</code>
+                  <Badge variant={status.includes('✓') ? 'default' : 'destructive'}>
+                    {status}
+                  </Badge>
+                </div>
+              ))}
             </div>
-            
-            <pre className="bg-white p-4 border rounded text-sm overflow-auto">
-              {JSON.stringify(debugInfo, null, 2)}
-            </pre>
-          </div>
+          </CardContent>
+        </Card>
+
+        {/* Test Email Sending */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Test Email Sending
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                type="email"
+                placeholder="Enter test email address"
+                value={testEmail}
+                onChange={(e) => setTestEmail(e.target.value)}
+                className="flex-1"
+              />
+              <Button 
+                onClick={handleTestSignUp}
+                disabled={isTestingSend}
+              >
+                {isTestingSend ? 'Testing...' : 'Test Sign-Up'}
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={handleResendConfirmation}
+                disabled={isTestingResend}
+              >
+                {isTestingResend ? 'Resending...' : 'Resend'}
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              This will attempt to create an account with a temporary password and send a confirmation email.
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Debug Information */}
+        {debugInfo && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Debug Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <pre className="bg-gray-100 p-4 rounded text-sm overflow-auto">
+                {JSON.stringify(debugInfo, null, 2)}
+              </pre>
+            </CardContent>
+          </Card>
         )}
 
-        <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <h3 className="font-semibold text-blue-900">Email Configuration Checklist:</h3>
-          <ul className="mt-2 space-y-1 text-blue-800 text-sm">
-            <li>✓ Supabase Email Settings configured</li>
-            <li>✓ Email templates set up in Supabase</li>
-            <li>✓ SMTP settings configured (if using custom email)</li>
-            <li>✓ Site URL properly configured in Supabase</li>
-            <li>✓ Redirect URLs authorized in Supabase</li>
-          </ul>
-        </div>
+        {/* Troubleshooting Guide */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Troubleshooting Guide</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-blue-600 text-sm font-medium">1</span>
+                </div>
+                <div>
+                  <h4 className="font-medium">Check Supabase Email Settings</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Go to Supabase Dashboard → Authentication → Settings → Email Templates.
+                    Ensure &quot;Enable email confirmations&quot; is turned ON.
+                  </p>
+                </div>
+              </div>
 
-        <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <h3 className="font-semibold text-yellow-900">Common Email Issues:</h3>
-          <ul className="mt-2 space-y-1 text-yellow-800 text-sm">
-            <li>• Site URL not configured in Supabase project settings</li>
-            <li>• Email rate limiting (too many requests)</li>
-            <li>• Email provider blocking Supabase emails</li>
-            <li>• Invalid redirect URL configuration</li>
-            <li>• Email templates not properly set up</li>
-            <li>• SMTP authentication issues (if using custom SMTP)</li>
-          </ul>
-        </div>
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-blue-600 text-sm font-medium">2</span>
+                </div>
+                <div>
+                  <h4 className="font-medium">Configure SMTP (Recommended)</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Go to Supabase Dashboard → Project Settings → Auth → SMTP Settings.
+                    Configure your own SMTP provider (Gmail, SendGrid, etc.) for reliable email delivery.
+                  </p>
+                </div>
+              </div>
 
-        <div className="mt-6 p-4 bg-gray-100 border border-gray-300 rounded-lg">
-          <h3 className="font-semibold text-gray-900">Environment Variables:</h3>
-          <ul className="mt-2 space-y-1 text-gray-700 text-sm">
-            <li>NEXT_PUBLIC_SUPABASE_URL: {process.env.NEXT_PUBLIC_SUPABASE_URL ? '✅ Set' : '❌ Not set'}</li>
-            <li>NEXT_PUBLIC_SUPABASE_ANON_KEY: {process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? '✅ Set' : '❌ Not set'}</li>
-            <li>NEXT_PUBLIC_SITE_URL: {process.env.NEXT_PUBLIC_SITE_URL ? '✅ Set' : '⚠️ Not set (using dynamic URL)'}</li>
-          </ul>
-        </div>
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-blue-600 text-sm font-medium">3</span>
+                </div>
+                <div>
+                  <h4 className="font-medium">Check Site URL</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Go to Supabase Dashboard → Authentication → URL Configuration.
+                    Ensure your Site URL matches your domain (e.g., https://carepop.online).
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-blue-600 text-sm font-medium">4</span>
+                </div>
+                <div>
+                  <h4 className="font-medium">Check Email Filters</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Check spam/junk folders. Add noreply@mail.supabase.co to your safe senders list.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-blue-600 text-sm font-medium">5</span>
+                </div>
+                <div>
+                  <h4 className="font-medium">Rate Limits</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Supabase has email rate limits. Wait a few minutes between attempts if testing multiple times.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Quick Actions */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Button asChild variant="outline" className="w-full">
+              <a 
+                href="https://app.supabase.com" 
+                target="_blank" 
+                rel="noopener noreferrer"
+              >
+                Open Supabase Dashboard
+              </a>
+            </Button>
+            <Button asChild variant="outline" className="w-full">
+              <Link href="/sign-up">
+                Back to Sign Up
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
