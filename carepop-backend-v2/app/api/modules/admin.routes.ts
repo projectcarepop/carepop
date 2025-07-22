@@ -1523,7 +1523,7 @@ adminRoutes.post('/appointments/:id/records', zValidator('json', newMedicalRecor
 
         return c.json({ data: newRecordWithDetails }, 201);
 
-    } catch (error: any).ts
+    } catch (error: any) {
         console.error(`Failed to create medical record for appointment ${appointmentId}:`, error);
         return c.json({ error: 'Failed to create medical record', message: error.message }, 500);
     }
