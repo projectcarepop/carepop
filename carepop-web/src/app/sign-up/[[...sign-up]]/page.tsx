@@ -46,11 +46,13 @@ export default function SignUpPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true)
     try {
+      // Use environment variable for production reliability, fallback to location.origin
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || location.origin;
       const { error } = await supabase.auth.signUp({
         email: values.email,
         password: values.password,
         options: {
-          emailRedirectTo: `${location.origin}/auth/callback?next=/auth/email-verified`,
+          emailRedirectTo: `${siteUrl}/auth/callback?next=/auth/email-verified`,
         },
       })
 
@@ -77,10 +79,12 @@ export default function SignUpPage() {
   async function handleOAuthSignUp(provider: 'google') {
     setIsSubmitting(true);
     try {
+      // Use environment variable for production reliability, fallback to location.origin
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || location.origin;
       await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${location.origin}/auth/callback`,
+          redirectTo: `${siteUrl}/auth/callback`,
         },
       });
     } catch (error: any) {

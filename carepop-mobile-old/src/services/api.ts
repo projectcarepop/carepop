@@ -673,6 +673,9 @@ export const signUpWithEmail = async (payload: RegisterFormValues) => {
   const { data, error } = await supabase.auth.signUp({
     email: payload.email,
     password: payload.password,
+    options: {
+      emailRedirectTo: 'io.supabase.carepop://auth/callback',
+    },
   });
 
   if (error) {
