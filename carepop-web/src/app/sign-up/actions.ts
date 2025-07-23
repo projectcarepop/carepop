@@ -33,13 +33,21 @@ export async function signUpWithEmail(formData: FormData) {
       },
     })
 
+    console.log('Signup response:', { data, error })
+
     if (error) {
       console.error('Signup error:', error)
       return redirect(`/sign-up?message=${encodeURIComponent(error.message)}`)
     }
 
-    console.log('Signup initiated successfully:', data)
-    return redirect('/sign-up?success=true')
+    // Even if there's no error, check if user was created or if email needs confirmation
+    if (data.user) {
+      console.log('Signup initiated successfully for user:', data.user.id)
+      return redirect('/sign-up?success=true')
+    } else {
+      console.log('Signup response received but no user object')
+      return redirect('/sign-up?success=true') // Still consider it success if no error
+    }
     
   } catch (err) {
     console.error('Unexpected error during signup:', err)
