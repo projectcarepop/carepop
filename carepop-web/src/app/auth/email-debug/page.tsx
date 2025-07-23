@@ -36,13 +36,11 @@ export default function EmailDebugPage() {
 
     setIsTestingSend(true);
     try {
-      // Use environment variable for production reliability, fallback to location.origin
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || location.origin;
       const { data, error } = await supabase.auth.signUp({
         email: testEmail,
         password: 'TempPassword123!',
         options: {
-          emailRedirectTo: `${siteUrl}/auth/callback?next=/auth/email-verified`,
+          emailRedirectTo: `${location.origin}/auth/callback?next=/auth/email-verified`,
         },
       });
 
@@ -51,10 +49,8 @@ export default function EmailDebugPage() {
         email: testEmail,
         data,
         error,
-        redirectUrl: `${siteUrl}/auth/callback?next=/auth/email-verified`,
+        redirectUrl: `${location.origin}/auth/callback?next=/auth/email-verified`,
         origin: location.origin,
-        siteUrl: siteUrl,
-        usingEnvVar: !!process.env.NEXT_PUBLIC_SITE_URL,
       });
 
       if (error) {

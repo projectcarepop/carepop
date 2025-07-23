@@ -3,88 +3,32 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/contexts/auth-context'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import * as z from 'zod'
+import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Icons } from '@/components/icons'
 import { GoogleIcon } from '@/components/icons/GoogleIcon'
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form'
 import { useToast } from '@/hooks/use-toast'
 import { MailCheck } from 'lucide-react'
-
-const formSchema = z.object({
-  email: z.string().email({ message: 'Please enter a valid email address.' }),
-  password: z
-    .string()
-    .min(8, { message: 'Password must be at least 8 characters long.' }),
-})
+import { signUpWithEmail } from '../actions'
 
 export default function SignUpPage() {
   const { supabase } = useAuth();
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isSuccess, setIsSuccess] = useState(false)
+  const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false)
   const { toast } = useToast()
   
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-    },
-  })
-
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsSubmitting(true)
-    try {
-      // Use environment variable for production reliability, fallback to location.origin
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || location.origin;
-      const { error } = await supabase.auth.signUp({
-        email: values.email,
-        password: values.password,
-        options: {
-          emailRedirectTo: `${siteUrl}/auth/callback?next=/auth/email-verified`,
-        },
-      })
-
-      if (error) {
-        toast({
-          variant: 'destructive',
-          title: 'Uh oh! Something went wrong.',
-          description: error.message,
-        })
-      } else {
-        setIsSuccess(true);
-      }
-    } catch {
-      toast({
-        variant: 'destructive',
-        title: 'Uh oh! Something went wrong.',
-        description: 'An unexpected error occurred. Please try again.',
-      })
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
+  // Check for success or error messages from server action
+  const message = searchParams.get('message');
+  const success = searchParams.get('success');
+  const isSuccess = success === 'true';
 
   async function handleOAuthSignUp(provider: 'google') {
-    setIsSubmitting(true);
     try {
-      // Use environment variable for production reliability, fallback to location.origin
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || location.origin;
       await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${siteUrl}/auth/callback`,
+          redirectTo: `${location.origin}/auth/callback`,
         },
       });
     } catch (error: any) {
@@ -93,7 +37,6 @@ export default function SignUpPage() {
         title: 'Uh oh! Something went wrong.',
         description: error.message,
       });
-      setIsSubmitting(false);
     }
   }
 
@@ -134,67 +77,50 @@ export default function SignUpPage() {
             Welcome! Please fill in the details to get started.
           </p>
         </div>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email address</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Enter your email address"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+        {/* Email/Password Form using Server Action */}
+        <form action={signUpWithEmail} className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium" htmlFor="email">Email address</label>
+            <Input 
+              id="email" 
+              name="email" 
+              type="email" 
+              placeholder="Enter your email address" 
+              required 
             />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Password</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Input
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Enter your password"
-                        {...field}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 flex items-center pr-3"
-                        aria-label={showPassword ? "Hide password" : "Show password"}
-                      >
-                        {showPassword ? (
-                          <Icons.eyeOff className="h-5 w-5 text-gray-400" />
-                        ) : (
-                          <Icons.eye className="h-5 w-5 text-gray-400" />
-                        )}
-                      </button>
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-                  Creating account...
-                </>
-              ) : (
-                'Create account'
-              )}
-            </Button>
-          </form>
-        </Form>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium" htmlFor="password">Password</label>
+            <div className="relative">
+              <Input
+                id="password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter your password"
+                required
+                minLength={8}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 flex items-center pr-3"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? (
+                  <Icons.eyeOff className="h-5 w-5 text-gray-400" />
+                ) : (
+                  <Icons.eye className="h-5 w-5 text-gray-400" />
+                )}
+              </button>
+            </div>
+          </div>
+          {message && (
+            <p className="text-sm font-medium text-destructive">{message}</p>
+          )}
+          <Button type="submit" className="w-full">
+            Create account
+          </Button>
+        </form>
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
             <span className="w-full border-t" />
@@ -206,7 +132,7 @@ export default function SignUpPage() {
           </div>
         </div>
         <div className="grid grid-cols-1 gap-4">
-            <Button variant="outline" type="button" onClick={() => handleOAuthSignUp('google')} disabled={isSubmitting}>
+            <Button variant="outline" type="button" onClick={() => handleOAuthSignUp('google')}>
                 <GoogleIcon className="mr-2 h-4 w-4" /> Google
             </Button>
         </div>
